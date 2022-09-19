@@ -1,0 +1,32 @@
+commit 8c7ee9083d0d719d0a77ab20d9cc2ae84eeea7f3
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Mon May 9 12:56:21 2022 +0200
+
+    post_per_transfer: remove the updated file name
+    
+    When --remove-on-error is used with --no-clobber, it might have an
+    updated file name to remove.
+    
+    Bug: https://curl.se/docs/CVE-2022-27778.html
+    
+    CVE-2022-27778
+    
+    Reported-by: Harry Sintonen
+    
+    Closes #8824
+
+diff --git a/src/tool_operate.c b/src/tool_operate.c
+index cb587e0a6..daaf0bcd4 100644
+--- a/src/tool_operate.c
++++ b/src/tool_operate.c
+@@ -596,8 +596,8 @@ static CURLcode post_per_transfer(struct GlobalConfig *global,
+         fprintf(global->errors, "curl: (%d) Failed writing body\n", result);
+     }
+     if(result && config->rm_partial) {
+-      notef(global, "Removing output file: %s", per->outfile);
+-      unlink(per->outfile);
++      notef(global, "Removing output file: %s\n", outs->filename);
++      unlink(outs->filename);
+     }
+   }
+ 

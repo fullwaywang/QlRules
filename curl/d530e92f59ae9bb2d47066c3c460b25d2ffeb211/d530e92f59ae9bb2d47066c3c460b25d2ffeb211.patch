@@ -1,0 +1,23 @@
+commit d530e92f59ae9bb2d47066c3c460b25d2ffeb211
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Sun Oct 28 01:33:23 2018 +0200
+
+    voutf: fix bad arethmetic when outputting warnings to stderr
+    
+    CVE-2018-16842
+    Reported-by: Brian Carpenter
+    Bug: https://curl.haxx.se/docs/CVE-2018-16842.html
+
+diff --git a/src/tool_msgs.c b/src/tool_msgs.c
+index 832ed8147..f5e1df25f 100644
+--- a/src/tool_msgs.c
++++ b/src/tool_msgs.c
+@@ -67,7 +67,7 @@ static void voutf(struct GlobalConfig *config,
+         (void)fwrite(ptr, cut + 1, 1, config->errors);
+         fputs("\n", config->errors);
+         ptr += cut + 1; /* skip the space too */
+-        len -= cut;
++        len -= cut + 1;
+       }
+       else {
+         fputs(ptr, config->errors);

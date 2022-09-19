@@ -1,0 +1,29 @@
+commit c394a488942387246653833359a5c94b5832674e
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Fri Oct 2 12:35:19 2015 +0100
+
+    Add PSS parameter check.
+    
+    Avoid seg fault by checking mgf1 parameter is not NULL. This can be
+    triggered during certificate verification so could be a DoS attack
+    against a client or a server enabling client authentication.
+    
+    Thanks to Loïc Jonas Etienne (Qnective AG) for discovering this bug.
+    
+    CVE-2015-3194
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+
+diff --git a/crypto/rsa/rsa_ameth.c b/crypto/rsa/rsa_ameth.c
+index ca3922e6c2..4e0621827c 100644
+--- a/crypto/rsa/rsa_ameth.c
++++ b/crypto/rsa/rsa_ameth.c
+@@ -268,7 +268,7 @@ static X509_ALGOR *rsa_mgf1_decode(X509_ALGOR *alg)
+ {
+     const unsigned char *p;
+     int plen;
+-    if (alg == NULL)
++    if (alg == NULL || alg->parameter == NULL)
+         return NULL;
+     if (OBJ_obj2nid(alg->algorithm) != NID_mgf1)
+         return NULL;

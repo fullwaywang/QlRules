@@ -1,0 +1,32 @@
+commit ba1dbd78e5f1ed67c1b8d37ac89d90e5e330b628
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Wed Jun 13 12:24:40 2018 +0200
+
+    smtp: use the upload buffer size for scratch buffer malloc
+    
+    ... not the read buffer size, as that can be set smaller and thus cause
+    a buffer overflow! CVE-2018-0500
+    
+    Reported-by: Peter Wu
+    Bug: https://curl.haxx.se/docs/adv_2018-70a2.html
+
+diff --git a/lib/smtp.c b/lib/smtp.c
+index e6872badb..ecf10a41a 100644
+--- a/lib/smtp.c
++++ b/lib/smtp.c
+@@ -1563,13 +1563,14 @@ CURLcode Curl_smtp_escape_eob(struct connectdata *conn, const ssize_t nread)
+   if(!scratch || data->set.crlf) {
+     oldscratch = scratch;
+ 
+-    scratch = newscratch = malloc(2 * data->set.buffer_size);
++    scratch = newscratch = malloc(2 * UPLOAD_BUFSIZE);
+     if(!newscratch) {
+       failf(data, "Failed to alloc scratch buffer!");
+ 
+       return CURLE_OUT_OF_MEMORY;
+     }
+   }
++  DEBUGASSERT(UPLOAD_BUFSIZE >= nread);
+ 
+   /* Have we already sent part of the EOB? */
+   eob_sent = smtp->eob;

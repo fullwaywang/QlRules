@@ -1,0 +1,60 @@
+commit f5da52e308a6aeea6d5f3df98c4da295d7e9cc27
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Fri Apr 15 02:37:09 2016 +0100
+
+    Fix ASN1_INTEGER handling.
+    
+    Only treat an ASN1_ANY type as an integer if it has the V_ASN1_INTEGER
+    tag: V_ASN1_NEG_INTEGER is an internal only value which is never used
+    for on the wire encoding.
+    
+    Thanks to David Benjamin <davidben@google.com> for reporting this bug.
+    
+    This was found using libFuzzer.
+    
+    RT#4364 (part)CVE-2016-2108.
+    
+    Reviewed-by: Emilia Käsper <emilia@openssl.org>
+
+diff --git a/crypto/asn1/a_type.c b/crypto/asn1/a_type.c
+index af795306b5..bb166e8568 100644
+--- a/crypto/asn1/a_type.c
++++ b/crypto/asn1/a_type.c
+@@ -126,9 +126,7 @@ int ASN1_TYPE_cmp(const ASN1_TYPE *a, const ASN1_TYPE *b)
+         result = 0;             /* They do not have content. */
+         break;
+     case V_ASN1_INTEGER:
+-    case V_ASN1_NEG_INTEGER:
+     case V_ASN1_ENUMERATED:
+-    case V_ASN1_NEG_ENUMERATED:
+     case V_ASN1_BIT_STRING:
+     case V_ASN1_OCTET_STRING:
+     case V_ASN1_SEQUENCE:
+diff --git a/crypto/asn1/tasn_dec.c b/crypto/asn1/tasn_dec.c
+index 9256049d15..2a13388bfa 100644
+--- a/crypto/asn1/tasn_dec.c
++++ b/crypto/asn1/tasn_dec.c
+@@ -903,9 +903,7 @@ int asn1_ex_c2i(ASN1_VALUE **pval, const unsigned char *cont, int len,
+         break;
+ 
+     case V_ASN1_INTEGER:
+-    case V_ASN1_NEG_INTEGER:
+     case V_ASN1_ENUMERATED:
+-    case V_ASN1_NEG_ENUMERATED:
+         tint = (ASN1_INTEGER **)pval;
+         if (!c2i_ASN1_INTEGER(tint, &cont, len))
+             goto err;
+diff --git a/crypto/asn1/tasn_enc.c b/crypto/asn1/tasn_enc.c
+index f04a6892a8..f7f83e56a9 100644
+--- a/crypto/asn1/tasn_enc.c
++++ b/crypto/asn1/tasn_enc.c
+@@ -611,9 +611,7 @@ int asn1_ex_i2c(ASN1_VALUE **pval, unsigned char *cout, int *putype,
+         break;
+ 
+     case V_ASN1_INTEGER:
+-    case V_ASN1_NEG_INTEGER:
+     case V_ASN1_ENUMERATED:
+-    case V_ASN1_NEG_ENUMERATED:
+         /*
+          * These are all have the same content format as ASN1_INTEGER
+          */

@@ -1,0 +1,25 @@
+commit 43157490a5054bd24256fe12876931e8abc9df49
+Author: z2_ on hackerone <>
+Date:   Tue Aug 24 09:50:33 2021 +0200
+
+    mqtt: clear the leftovers pointer when sending succeeds
+    
+    CVE-2021-22945
+    
+    Bug: https://curl.se/docs/CVE-2021-22945.html
+
+diff --git a/lib/mqtt.c b/lib/mqtt.c
+index f077e6c3d..fcd40b41e 100644
+--- a/lib/mqtt.c
++++ b/lib/mqtt.c
+@@ -128,6 +128,10 @@ static CURLcode mqtt_send(struct Curl_easy *data,
+     mq->sendleftovers = sendleftovers;
+     mq->nsend = nsend;
+   }
++  else {
++    mq->sendleftovers = NULL;
++    mq->nsend = 0;
++  }
+   return result;
+ }
+ 

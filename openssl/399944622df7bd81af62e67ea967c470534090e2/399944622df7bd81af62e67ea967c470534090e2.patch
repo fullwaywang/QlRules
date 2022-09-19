@@ -1,0 +1,44 @@
+commit 399944622df7bd81af62e67ea967c470534090e2
+Author: Cesar Pereida <cesar.pereida@aalto.fi>
+Date:   Mon May 23 12:45:25 2016 +0300
+
+    Fix DSA, preserve BN_FLG_CONSTTIME
+    
+    Operations in the DSA signing algorithm should run in constant time in
+    order to avoid side channel attacks. A flaw in the OpenSSL DSA
+    implementation means that a non-constant time codepath is followed for
+    certain operations. This has been demonstrated through a cache-timing
+    attack to be sufficient for an attacker to recover the private DSA key.
+    
+    CVE-2016-2178
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+    Reviewed-by: Matt Caswell <matt@openssl.org>
+
+diff --git a/crypto/dsa/dsa_ossl.c b/crypto/dsa/dsa_ossl.c
+index ce1da1cd6f..beb62b2ff0 100644
+--- a/crypto/dsa/dsa_ossl.c
++++ b/crypto/dsa/dsa_ossl.c
+@@ -204,10 +204,6 @@ static int dsa_sign_setup(DSA *dsa, BN_CTX *ctx_in,
+             goto err;
+     } while (BN_is_zero(k));
+ 
+-    if ((dsa->flags & DSA_FLAG_NO_EXP_CONSTTIME) == 0) {
+-        BN_set_flags(k, BN_FLG_CONSTTIME);
+-    }
+-
+     if (dsa->flags & DSA_FLAG_CACHE_MONT_P) {
+         if (!BN_MONT_CTX_set_locked(&dsa->method_mont_p,
+                                     dsa->lock, dsa->p, ctx))
+@@ -238,6 +234,11 @@ static int dsa_sign_setup(DSA *dsa, BN_CTX *ctx_in,
+     } else {
+         K = k;
+     }
++
++    if ((dsa->flags & DSA_FLAG_NO_EXP_CONSTTIME) == 0) {
++        BN_set_flags(K, BN_FLG_CONSTTIME);
++    }
++
+     DSA_BN_MOD_EXP(goto err, dsa, r, dsa->g, K, dsa->p, ctx,
+                    dsa->method_mont_p);
+     if (!BN_mod(r, r, dsa->q, ctx))

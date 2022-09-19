@@ -1,0 +1,45 @@
+commit e1b568dd2462f7cacf98f3d117936c34e2849a6b
+Author: Matt Caswell <matt@openssl.org>
+Date:   Thu Feb 26 11:56:00 2015 +0000
+
+    Prevent handshake with unseeded PRNG
+    
+    Fix security issue where under certain conditions a client can complete a
+    handshake with an unseeded PRNG. The conditions are:
+    - Client is on a platform where the PRNG has not been seeded, and the
+    user has not seeded manually
+    - A protocol specific client method version has been used (i.e. not
+    SSL_client_methodv23)
+    - A ciphersuite is used that does not require additional random data
+    from the PRNG beyond the initial ClientHello client random
+    (e.g. PSK-RC4-SHA)
+    
+    If the handshake succeeds then the client random that has been used will
+    have been generated from a PRNG with insufficient entropy and therefore
+    the output may be predictable.
+    
+    For example using the following command with an unseeded openssl will
+    succeed on an unpatched platform:
+    
+    openssl s_client -psk 1a2b3c4d -tls1_2 -cipher PSK-RC4-SHA
+    
+    CVE-2015-0285
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+
+diff --git a/ssl/s3_clnt.c b/ssl/s3_clnt.c
+index 1e437b2e1e..750217fff6 100644
+--- a/ssl/s3_clnt.c
++++ b/ssl/s3_clnt.c
+@@ -719,8 +719,9 @@ int ssl3_client_hello(SSL *s)
+         } else
+             i = 1;
+ 
+-        if (i)
+-            ssl_fill_hello_random(s, 0, p, sizeof(s->s3->client_random));
++        if (i && ssl_fill_hello_random(s, 0, p,
++                                       sizeof(s->s3->client_random)) <= 0)
++            goto err;
+ 
+         /* Do the message type and length last */
+         d = p = ssl_handshake_start(s);

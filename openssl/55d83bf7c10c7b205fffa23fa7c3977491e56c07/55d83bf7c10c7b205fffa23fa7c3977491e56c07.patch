@@ -1,0 +1,25 @@
+commit 55d83bf7c10c7b205fffa23fa7c3977491e56c07
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Fri Aug 19 23:28:29 2016 +0100
+
+    Avoid overflow in MDC2_Update()
+    
+    Thanks to Shi Lei for reporting this issue.
+    
+    CVE-2016-6303
+    
+    Reviewed-by: Matt Caswell <matt@openssl.org>
+
+diff --git a/crypto/mdc2/mdc2dgst.c b/crypto/mdc2/mdc2dgst.c
+index 6397a47e92..37d99f48a5 100644
+--- a/crypto/mdc2/mdc2dgst.c
++++ b/crypto/mdc2/mdc2dgst.c
+@@ -42,7 +42,7 @@ int MDC2_Update(MDC2_CTX *c, const unsigned char *in, size_t len)
+ 
+     i = c->num;
+     if (i != 0) {
+-        if (i + len < MDC2_BLOCK) {
++        if (len < MDC2_BLOCK - i) {
+             /* partial block */
+             memcpy(&(c->data[i]), in, len);
+             c->num += (int)len;

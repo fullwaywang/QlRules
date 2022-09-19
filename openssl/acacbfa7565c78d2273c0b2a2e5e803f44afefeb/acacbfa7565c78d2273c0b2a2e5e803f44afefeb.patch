@@ -1,0 +1,57 @@
+commit acacbfa7565c78d2273c0b2a2e5e803f44afefeb
+Author: Matt Caswell <matt@openssl.org>
+Date:   Fri Sep 23 16:58:11 2016 +0100
+
+    Fix Use After Free for large message sizes
+    
+    The buffer to receive messages is initialised to 16k. If a message is
+    received that is larger than that then the buffer is "realloc'd". This can
+    cause the location of the underlying buffer to change. Anything that is
+    referring to the old location will be referring to free'd data. In the
+    recent commit c1ef7c97 (master) and 4b390b6c (1.1.0) the point in the code
+    where the message buffer is grown was changed. However s->init_msg was not
+    updated to point at the new location.
+    
+    CVE-2016-6309
+    
+    Reviewed-by: Emilia Käsper <emilia@openssl.org>
+    (cherry picked from commit 0d698f6696e114a6e47f8b75ff88ec81f9e30175)
+
+diff --git a/ssl/statem/statem.c b/ssl/statem/statem.c
+index 5faf6aece7..caaf0687b5 100644
+--- a/ssl/statem/statem.c
++++ b/ssl/statem/statem.c
+@@ -445,6 +445,21 @@ static void init_read_state_machine(SSL *s)
+     st->read_state = READ_STATE_HEADER;
+ }
+ 
++static int grow_init_buf(SSL *s, size_t size) {
++
++    size_t msg_offset = (char *)s->init_msg - s->init_buf->data;
++
++    if (!BUF_MEM_grow_clean(s->init_buf, (int)size))
++        return 0;
++
++    if (size < msg_offset)
++        return 0;
++
++    s->init_msg = s->init_buf->data + msg_offset;
++
++    return 1;
++}
++
+ /*
+  * This function implements the sub-state machine when the message flow is in
+  * MSG_FLOW_READING. The valid sub-states and transitions are:
+@@ -545,9 +560,8 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
+             /* dtls_get_message already did this */
+             if (!SSL_IS_DTLS(s)
+                     && s->s3->tmp.message_size > 0
+-                    && !BUF_MEM_grow_clean(s->init_buf,
+-                                           (int)s->s3->tmp.message_size
+-                                           + SSL3_HM_HEADER_LENGTH)) {
++                    && !grow_init_buf(s, s->s3->tmp.message_size
++                                         + SSL3_HM_HEADER_LENGTH)) {
+                 ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_INTERNAL_ERROR);
+                 SSLerr(SSL_F_READ_STATE_MACHINE, ERR_R_BUF_LIB);
+                 return SUB_STATE_ERROR;

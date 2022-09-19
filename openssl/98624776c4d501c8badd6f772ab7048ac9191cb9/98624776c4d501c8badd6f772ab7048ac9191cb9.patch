@@ -1,0 +1,48 @@
+commit 98624776c4d501c8badd6f772ab7048ac9191cb9
+Author: Matt Caswell <matt@openssl.org>
+Date:   Wed Aug 18 17:58:23 2021 +0100
+
+    Fix append_ia5 function to not assume NUL terminated strings
+    
+    ASN.1 strings may not be NUL terminated. Don't assume they are.
+    
+    CVE-2021-3712
+    
+    Reviewed-by: Viktor Dukhovni <viktor@openssl.org>
+    Reviewed-by: Paul Dale <pauli@openssl.org>
+    Reviewed-by: David Benjamin <davidben@google.com>
+
+diff --git a/crypto/x509/v3_utl.c b/crypto/x509/v3_utl.c
+index 4fd1f2cd60..5c63d2d9d8 100644
+--- a/crypto/x509/v3_utl.c
++++ b/crypto/x509/v3_utl.c
+@@ -529,17 +529,25 @@ static int append_ia5(STACK_OF(OPENSSL_STRING) **sk,
+     /* First some sanity checks */
+     if (email->type != V_ASN1_IA5STRING)
+         return 1;
+-    if (!email->data || !email->length)
++    if (email->data == NULL || email->length == 0)
++        return 1;
++    if (memchr(email->data, 0, email->length) != NULL)
+         return 1;
+     if (*sk == NULL)
+         *sk = sk_OPENSSL_STRING_new(sk_strcmp);
+     if (*sk == NULL)
+         return 0;
++
++    emtmp = OPENSSL_strndup((char *)email->data, email->length);
++    if (emtmp == NULL)
++        return 0;
++
+     /* Don't add duplicates */
+-    if (sk_OPENSSL_STRING_find(*sk, (char *)email->data) != -1)
++    if (sk_OPENSSL_STRING_find(*sk, emtmp) != -1) {
++        OPENSSL_free(emtmp);
+         return 1;
+-    emtmp = OPENSSL_strdup((char *)email->data);
+-    if (emtmp == NULL || !sk_OPENSSL_STRING_push(*sk, emtmp)) {
++    }
++    if (!sk_OPENSSL_STRING_push(*sk, emtmp)) {
+         OPENSSL_free(emtmp); /* free on push failure */
+         X509_email_free(*sk);
+         *sk = NULL;

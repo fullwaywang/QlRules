@@ -1,0 +1,29 @@
+commit faf6b755629627f19feafa75b32e81cd7738f12d
+Author: Maxim Levitsky <mlevitsk@redhat.com>
+Date:   Tue Sep 14 18:48:16 2021 +0300
+
+    KVM: x86: nSVM: don't copy virt_ext from vmcb12
+    
+    These field correspond to features that we don't expose yet to L2
+    
+    While currently there are no CVE worthy features in this field,
+    if AMD adds more features to this field, that could allow guest
+    escapes similar to CVE-2021-3653 and CVE-2021-3656.
+    
+    Signed-off-by: Maxim Levitsky <mlevitsk@redhat.com>
+    Message-Id: <20210914154825.104886-6-mlevitsk@redhat.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/svm/nested.c b/arch/x86/kvm/svm/nested.c
+index b41a21cac544..510b833cbd39 100644
+--- a/arch/x86/kvm/svm/nested.c
++++ b/arch/x86/kvm/svm/nested.c
+@@ -545,7 +545,6 @@ static void nested_vmcb02_prepare_control(struct vcpu_svm *svm)
+ 		(svm->nested.ctl.int_ctl & int_ctl_vmcb12_bits) |
+ 		(svm->vmcb01.ptr->control.int_ctl & int_ctl_vmcb01_bits);
+ 
+-	svm->vmcb->control.virt_ext            = svm->nested.ctl.virt_ext;
+ 	svm->vmcb->control.int_vector          = svm->nested.ctl.int_vector;
+ 	svm->vmcb->control.int_state           = svm->nested.ctl.int_state;
+ 	svm->vmcb->control.event_inj           = svm->nested.ctl.event_inj;

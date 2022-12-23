@@ -1,0 +1,34 @@
+commit 20c40794eb85ea29852d7bc37c55713802a543d6
+Author: Dmitry Baryshkov <dmitry.baryshkov@linaro.org>
+Date:   Fri Feb 12 22:26:58 2021 +0300
+
+    misc: fastrpc: restrict user apps from sending kernel RPC messages
+    
+    Verify that user applications are not using the kernel RPC message
+    handle to restrict them from directly attaching to guest OS on the
+    remote subsystem. This is a port of CVE-2019-2308 fix.
+    
+    Fixes: c68cfb718c8f ("misc: fastrpc: Add support for context Invoke method")
+    Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+    Cc: Jonathan Marek <jonathan@marek.ca>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Dmitry Baryshkov <dmitry.baryshkov@linaro.org>
+    Link: https://lore.kernel.org/r/20210212192658.3476137-1-dmitry.baryshkov@linaro.org
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/misc/fastrpc.c b/drivers/misc/fastrpc.c
+index f12e909034ac..beda610e6b30 100644
+--- a/drivers/misc/fastrpc.c
++++ b/drivers/misc/fastrpc.c
+@@ -950,6 +950,11 @@ static int fastrpc_internal_invoke(struct fastrpc_user *fl,  u32 kernel,
+ 	if (!fl->cctx->rpdev)
+ 		return -EPIPE;
+ 
++	if (handle == FASTRPC_INIT_HANDLE && !kernel) {
++		dev_warn_ratelimited(fl->sctx->dev, "user app trying to send a kernel RPC message (%d)\n",  handle);
++		return -EPERM;
++	}
++
+ 	ctx = fastrpc_context_alloc(fl, kernel, sc, args);
+ 	if (IS_ERR(ctx))
+ 		return PTR_ERR(ctx);

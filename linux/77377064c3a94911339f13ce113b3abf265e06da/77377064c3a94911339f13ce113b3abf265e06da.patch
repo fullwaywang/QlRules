@@ -1,0 +1,62 @@
+commit 77377064c3a94911339f13ce113b3abf265e06da
+Author: Vitaly Kuznetsov <vkuznets@redhat.com>
+Date:   Sat Oct 24 04:13:24 2020 -0400
+
+    KVM: ioapic: break infinite recursion on lazy EOI
+    
+    During shutdown the IOAPIC trigger mode is reset to edge triggered
+    while the vfio-pci INTx is still registered with a resampler.
+    This allows us to get into an infinite loop:
+    
+    ioapic_set_irq
+      -> ioapic_lazy_update_eoi
+      -> kvm_ioapic_update_eoi_one
+      -> kvm_notify_acked_irq
+      -> kvm_notify_acked_gsi
+      -> (via irq_acked fn ptr) irqfd_resampler_ack
+      -> kvm_set_irq
+      -> (via set fn ptr) kvm_set_ioapic_irq
+      -> kvm_ioapic_set_irq
+      -> ioapic_set_irq
+    
+    Commit 8be8f932e3db ("kvm: ioapic: Restrict lazy EOI update to
+    edge-triggered interrupts", 2020-05-04) acknowledges that this recursion
+    loop exists and tries to avoid it at the call to ioapic_lazy_update_eoi,
+    but at this point the scenario is already set, we have an edge interrupt
+    with resampler on the same gsi.
+    
+    Fortunately, the only user of irq ack notifiers (in addition to resamplefd)
+    is i8254 timer interrupt reinjection.  These are edge-triggered, so in
+    principle they would need the call to kvm_ioapic_update_eoi_one from
+    ioapic_lazy_update_eoi, but they already disable AVIC(*), so they don't
+    need the lazy EOI behavior.  Therefore, remove the call to
+    kvm_ioapic_update_eoi_one from ioapic_lazy_update_eoi.
+    
+    This fixes CVE-2020-27152.  Note that this issue cannot happen with
+    SR-IOV assigned devices because virtual functions do not have INTx,
+    only MSI.
+    
+    Fixes: f458d039db7e ("kvm: ioapic: Lazy update IOAPIC EOI")
+    Suggested-by: Paolo Bonzini <pbonzini@redhat.com>
+    Tested-by: Alex Williamson <alex.williamson@redhat.com>
+    Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/ioapic.c b/arch/x86/kvm/ioapic.c
+index d057376bd3d3..698969e18fe3 100644
+--- a/arch/x86/kvm/ioapic.c
++++ b/arch/x86/kvm/ioapic.c
+@@ -197,12 +197,9 @@ static void ioapic_lazy_update_eoi(struct kvm_ioapic *ioapic, int irq)
+ 
+ 		/*
+ 		 * If no longer has pending EOI in LAPICs, update
+-		 * EOI for this vetor.
++		 * EOI for this vector.
+ 		 */
+ 		rtc_irq_eoi(ioapic, vcpu, entry->fields.vector);
+-		kvm_ioapic_update_eoi_one(vcpu, ioapic,
+-					  entry->fields.trig_mode,
+-					  irq);
+ 		break;
+ 	}
+ }

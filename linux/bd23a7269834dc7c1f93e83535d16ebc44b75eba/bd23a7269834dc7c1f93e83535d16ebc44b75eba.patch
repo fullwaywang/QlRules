@@ -1,0 +1,42 @@
+commit bd23a7269834dc7c1f93e83535d16ebc44b75eba
+Author: Wenwen Wang <wang6495@umn.edu>
+Date:   Tue May 8 08:50:28 2018 -0500
+
+    virt: vbox: Only copy_from_user the request-header once
+    
+    In vbg_misc_device_ioctl(), the header of the ioctl argument is copied from
+    the userspace pointer 'arg' and saved to the kernel object 'hdr'. Then the
+    'version', 'size_in', and 'size_out' fields of 'hdr' are verified.
+    
+    Before this commit, after the checks a buffer for the entire request would
+    be allocated and then all data including the verified header would be
+    copied from the userspace 'arg' pointer again.
+    
+    Given that the 'arg' pointer resides in userspace, a malicious userspace
+    process can race to change the data pointed to by 'arg' between the two
+    copies. By doing so, the user can bypass the verifications on the ioctl
+    argument.
+    
+    This commit fixes this by using the already checked copy of the header
+    to fill the header part of the allocated buffer and only copying the
+    remainder of the data from userspace.
+    
+    Signed-off-by: Wenwen Wang <wang6495@umn.edu>
+    Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/virt/vboxguest/vboxguest_linux.c b/drivers/virt/vboxguest/vboxguest_linux.c
+index 398d22693234..6e2a9619192d 100644
+--- a/drivers/virt/vboxguest/vboxguest_linux.c
++++ b/drivers/virt/vboxguest/vboxguest_linux.c
+@@ -121,7 +121,9 @@ static long vbg_misc_device_ioctl(struct file *filp, unsigned int req,
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+-	if (copy_from_user(buf, (void *)arg, hdr.size_in)) {
++	*((struct vbg_ioctl_hdr *)buf) = hdr;
++	if (copy_from_user(buf + sizeof(hdr), (void *)arg + sizeof(hdr),
++			   hdr.size_in - sizeof(hdr))) {
+ 		ret = -EFAULT;
+ 		goto out;
+ 	}

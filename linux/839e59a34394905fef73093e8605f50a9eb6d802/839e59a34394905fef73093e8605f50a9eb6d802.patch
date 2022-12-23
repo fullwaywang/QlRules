@@ -1,0 +1,110 @@
+commit 839e59a34394905fef73093e8605f50a9eb6d802
+Author: Patrik Jakobsson <patrik.r.jakobsson@gmail.com>
+Date:   Wed Oct 27 16:27:30 2021 +0200
+
+    drm/amdgpu: Fix even more out of bound writes from debugfs
+    
+    CVE-2021-42327 was fixed by:
+    
+    commit f23750b5b3d98653b31d4469592935ef6364ad67
+    Author: Thelford Williams <tdwilliamsiv@gmail.com>
+    Date:   Wed Oct 13 16:04:13 2021 -0400
+    
+        drm/amdgpu: fix out of bounds write
+    
+    but amdgpu_dm_debugfs.c contains more of the same issue so fix the
+    remaining ones.
+    
+    v2:
+            * Add missing fix in dp_max_bpc_write (Harry Wentland)
+    
+    Fixes: 918698d5c2b5 ("drm/amd/display: Return the number of bytes parsed than allocated")
+    Signed-off-by: Patrik Jakobsson <pjakobsson@suse.de>
+    Reviewed-by: Harry Wentland <harry.wentland@amd.com>
+    Signed-off-by: Alex Deucher <alexander.deucher@amd.com>
+
+diff --git a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
+index 1a68a674913c..3655663e079b 100644
+--- a/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
++++ b/drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm_debugfs.c
+@@ -491,7 +491,7 @@ static ssize_t dp_phy_settings_write(struct file *f, const char __user *buf,
+ 	if (!wr_buf)
+ 		return -ENOSPC;
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					   (long *)param, buf,
+ 					   max_param_num,
+ 					   &param_nums)) {
+@@ -643,7 +643,7 @@ static ssize_t dp_phy_test_pattern_debugfs_write(struct file *f, const char __us
+ 	if (!wr_buf)
+ 		return -ENOSPC;
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					   (long *)param, buf,
+ 					   max_param_num,
+ 					   &param_nums)) {
+@@ -918,7 +918,7 @@ static ssize_t dp_dsc_passthrough_set(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					   &param, buf,
+ 					   max_param_num,
+ 					   &param_nums)) {
+@@ -1215,7 +1215,7 @@ static ssize_t trigger_hotplug(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 						(long *)param, buf,
+ 						max_param_num,
+ 						&param_nums)) {
+@@ -1400,7 +1400,7 @@ static ssize_t dp_dsc_clock_en_write(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					    (long *)param, buf,
+ 					    max_param_num,
+ 					    &param_nums)) {
+@@ -1585,7 +1585,7 @@ static ssize_t dp_dsc_slice_width_write(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					    (long *)param, buf,
+ 					    max_param_num,
+ 					    &param_nums)) {
+@@ -1770,7 +1770,7 @@ static ssize_t dp_dsc_slice_height_write(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					    (long *)param, buf,
+ 					    max_param_num,
+ 					    &param_nums)) {
+@@ -1948,7 +1948,7 @@ static ssize_t dp_dsc_bits_per_pixel_write(struct file *f, const char __user *bu
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					    (long *)param, buf,
+ 					    max_param_num,
+ 					    &param_nums)) {
+@@ -2386,7 +2386,7 @@ static ssize_t dp_max_bpc_write(struct file *f, const char __user *buf,
+ 		return -ENOSPC;
+ 	}
+ 
+-	if (parse_write_buffer_into_params(wr_buf, size,
++	if (parse_write_buffer_into_params(wr_buf, wr_buf_size,
+ 					   (long *)param, buf,
+ 					   max_param_num,
+ 					   &param_nums)) {

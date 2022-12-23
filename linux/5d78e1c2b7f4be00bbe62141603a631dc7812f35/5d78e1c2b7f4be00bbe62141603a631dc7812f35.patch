@@ -1,0 +1,42 @@
+commit 5d78e1c2b7f4be00bbe62141603a631dc7812f35
+Author: Hillf Danton <hdanton@sina.com>
+Date:   Tue Jul 30 17:24:36 2019 +0800
+
+    ALSA: usb-audio: Fix gpf in snd_usb_pipe_sanity_check
+    
+    syzbot found the following crash on:
+    
+      general protection fault: 0000 [#1] SMP KASAN
+      RIP: 0010:snd_usb_pipe_sanity_check+0x80/0x130 sound/usb/helper.c:75
+      Call Trace:
+        snd_usb_motu_microbookii_communicate.constprop.0+0xa0/0x2fb  sound/usb/quirks.c:1007
+        snd_usb_motu_microbookii_boot_quirk sound/usb/quirks.c:1051 [inline]
+        snd_usb_apply_boot_quirk.cold+0x163/0x370 sound/usb/quirks.c:1280
+        usb_audio_probe+0x2ec/0x2010 sound/usb/card.c:576
+        usb_probe_interface+0x305/0x7a0 drivers/usb/core/driver.c:361
+        really_probe+0x281/0x650 drivers/base/dd.c:548
+        ....
+    
+    It was introduced in commit 801ebf1043ae for checking pipe and endpoint
+    types. It is fixed by adding a check of the ep pointer in question.
+    
+    BugLink: https://syzkaller.appspot.com/bug?extid=d59c4387bfb6eced94e2
+    Reported-by: syzbot <syzbot+d59c4387bfb6eced94e2@syzkaller.appspotmail.com>
+    Fixes: 801ebf1043ae ("ALSA: usb-audio: Sanity checks for each pipe and EP types")
+    Cc: Andrey Konovalov <andreyknvl@google.com>
+    Signed-off-by: Hillf Danton <hdanton@sina.com>
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+
+diff --git a/sound/usb/helper.c b/sound/usb/helper.c
+index 71d5f540334a..4c12cc5b53fd 100644
+--- a/sound/usb/helper.c
++++ b/sound/usb/helper.c
+@@ -72,7 +72,7 @@ int snd_usb_pipe_sanity_check(struct usb_device *dev, unsigned int pipe)
+ 	struct usb_host_endpoint *ep;
+ 
+ 	ep = usb_pipe_endpoint(dev, pipe);
+-	if (usb_pipetype(pipe) != pipetypes[usb_endpoint_type(&ep->desc)])
++	if (!ep || usb_pipetype(pipe) != pipetypes[usb_endpoint_type(&ep->desc)])
+ 		return -EINVAL;
+ 	return 0;
+ }

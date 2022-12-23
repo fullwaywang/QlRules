@@ -1,0 +1,24 @@
+commit ce1fad2740c648a4340f6f6c391a8a83769d2e8c
+Merge: 1099f8604411 911b79cde95c
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Tue Oct 20 16:09:36 2015 +0900
+
+    Merge branch 'keys-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
+    
+    Pull key handling fixes from David Howells:
+     "Here are two patches, the first of which at least should go upstream
+      immediately:
+    
+      (1) Prevent a user-triggerable crash in the keyrings destructor when a
+          negatively instantiated keyring is garbage collected.  I have also
+          seen this triggered for user type keys.
+    
+      (2) Prevent the user from using requesting that a keyring be created
+          and instantiated through an upcall.  Doing so is probably safe
+          since the keyring type ignores the arguments to its instantiation
+          function - but we probably shouldn't let keyrings be created in
+          this manner"
+    
+    * 'keys-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs:
+      KEYS: Don't permit request_key() to construct a new keyring
+      KEYS: Fix crash when attempt to garbage collect an uninstantiated keyring

@@ -1,0 +1,46 @@
+commit 46f8a29272e51b6df7393d58fc5cb8967397ef2b
+Author: Maxime Coquelin <maxime.coquelin@redhat.com>
+Date:   Wed Aug 31 17:49:23 2022 +0200
+
+    vduse: prevent uninitialized memory accesses
+    
+    If the VDUSE application provides a smaller config space
+    than the driver expects, the driver may use uninitialized
+    memory from the stack.
+    
+    This patch prevents it by initializing the buffer passed by
+    the driver to store the config value.
+    
+    This fix addresses CVE-2022-2308.
+    
+    Cc: stable@vger.kernel.org # v5.15+
+    Fixes: c8a6153b6c59 ("vduse: Introduce VDUSE - vDPA Device in Userspace")
+    Reviewed-by: Xie Yongji <xieyongji@bytedance.com>
+    Acked-by: Jason Wang <jasowang@redhat.com>
+    Signed-off-by: Maxime Coquelin <maxime.coquelin@redhat.com>
+    Message-Id: <20220831154923.97809-1-maxime.coquelin@redhat.com>
+    Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+    Reviewed-by: Chaitanya Kulkarni <kch@nvidia.com>
+
+diff --git a/drivers/vdpa/vdpa_user/vduse_dev.c b/drivers/vdpa/vdpa_user/vduse_dev.c
+index 41c0b29739f1..35dceee3ed56 100644
+--- a/drivers/vdpa/vdpa_user/vduse_dev.c
++++ b/drivers/vdpa/vdpa_user/vduse_dev.c
+@@ -673,10 +673,15 @@ static void vduse_vdpa_get_config(struct vdpa_device *vdpa, unsigned int offset,
+ {
+ 	struct vduse_dev *dev = vdpa_to_vduse(vdpa);
+ 
+-	if (offset > dev->config_size ||
+-	    len > dev->config_size - offset)
++	/* Initialize the buffer in case of partial copy. */
++	memset(buf, 0, len);
++
++	if (offset > dev->config_size)
+ 		return;
+ 
++	if (len > dev->config_size - offset)
++		len = dev->config_size - offset;
++
+ 	memcpy(buf, dev->config + offset, len);
+ }
+ 

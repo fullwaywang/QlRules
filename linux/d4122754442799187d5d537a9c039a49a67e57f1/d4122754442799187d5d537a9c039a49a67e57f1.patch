@@ -1,0 +1,68 @@
+commit d4122754442799187d5d537a9c039a49a67e57f1
+Author: Samuel Thibault <samuel.thibault@ens-lyon.org>
+Date:   Tue Nov 10 19:35:41 2020 +0100
+
+    speakup: Do not let the line discipline be used several times
+    
+    Speakup has only one speakup_tty variable to store the tty it is managing. This
+    makes sense since its codebase currently assumes that there is only one user who
+    controls the screen reading.
+    
+    That however means that we have to forbid using the line discipline several
+    times, otherwise the second closure would try to free a NULL ldisc_data, leading to
+    
+    general protection fault: 0000 [#1] SMP KASAN PTI
+    RIP: 0010:spk_ttyio_ldisc_close+0x2c/0x60
+    Call Trace:
+     tty_ldisc_release+0xa2/0x340
+     tty_release_struct+0x17/0xd0
+     tty_release+0x9d9/0xcc0
+     __fput+0x231/0x740
+     task_work_run+0x12c/0x1a0
+     do_exit+0x9b5/0x2230
+     ? release_task+0x1240/0x1240
+     ? __do_page_fault+0x562/0xa30
+     do_group_exit+0xd5/0x2a0
+     __x64_sys_exit_group+0x35/0x40
+     do_syscall_64+0x89/0x2b0
+     ? page_fault+0x8/0x30
+     entry_SYSCALL_64_after_hwframe+0x44/0xa9
+    
+    Cc: stable@vger.kernel.org
+    Reported-by: 秦世松 <qinshisong1205@gmail.com>
+    Signed-off-by: Samuel Thibault <samuel.thibault@ens-lyon.org>
+    Tested-by: Shisong Qin <qinshisong1205@gmail.com>
+    Link: https://lore.kernel.org/r/20201110183541.fzgnlwhjpgqzjeth@function
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/accessibility/speakup/spk_ttyio.c b/drivers/accessibility/speakup/spk_ttyio.c
+index a831ff64f8ba..e69ea0c7aa20 100644
+--- a/drivers/accessibility/speakup/spk_ttyio.c
++++ b/drivers/accessibility/speakup/spk_ttyio.c
+@@ -49,15 +49,25 @@ static int spk_ttyio_ldisc_open(struct tty_struct *tty)
+ 
+ 	if (!tty->ops->write)
+ 		return -EOPNOTSUPP;
++
++	mutex_lock(&speakup_tty_mutex);
++	if (speakup_tty) {
++		mutex_unlock(&speakup_tty_mutex);
++		return -EBUSY;
++	}
+ 	speakup_tty = tty;
+ 
+ 	ldisc_data = kmalloc(sizeof(*ldisc_data), GFP_KERNEL);
+-	if (!ldisc_data)
++	if (!ldisc_data) {
++		speakup_tty = NULL;
++		mutex_unlock(&speakup_tty_mutex);
+ 		return -ENOMEM;
++	}
+ 
+ 	init_completion(&ldisc_data->completion);
+ 	ldisc_data->buf_free = true;
+ 	speakup_tty->disc_data = ldisc_data;
++	mutex_unlock(&speakup_tty_mutex);
+ 
+ 	return 0;
+ }

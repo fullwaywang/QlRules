@@ -1,0 +1,50 @@
+commit 8c21c54a53ab21842f5050fa090f26b03c0313d6
+Author: Fedor Pchelkin <pchelkin@ispras.ru>
+Date:   Fri Aug 5 18:02:16 2022 +0300
+
+    can: j1939: j1939_session_destroy(): fix memory leak of skbs
+    
+    We need to drop skb references taken in j1939_session_skb_queue() when
+    destroying a session in j1939_session_destroy(). Otherwise those skbs
+    would be lost.
+    
+    Link to Syzkaller info and repro: https://forge.ispras.ru/issues/11743.
+    
+    Found by Linux Verification Center (linuxtesting.org) with Syzkaller.
+    
+    V1: https://lore.kernel.org/all/20220708175949.539064-1-pchelkin@ispras.ru
+    
+    Fixes: 9d71dd0c7009 ("can: add support of SAE J1939 protocol")
+    Suggested-by: Oleksij Rempel <o.rempel@pengutronix.de>
+    Signed-off-by: Fedor Pchelkin <pchelkin@ispras.ru>
+    Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+    Acked-by: Oleksij Rempel <o.rempel@pengutronix.de>
+    Link: https://lore.kernel.org/all/20220805150216.66313-1-pchelkin@ispras.ru
+    Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+
+diff --git a/net/can/j1939/transport.c b/net/can/j1939/transport.c
+index 307ee1174a6e..d7d86c944d76 100644
+--- a/net/can/j1939/transport.c
++++ b/net/can/j1939/transport.c
+@@ -260,6 +260,8 @@ static void __j1939_session_drop(struct j1939_session *session)
+ 
+ static void j1939_session_destroy(struct j1939_session *session)
+ {
++	struct sk_buff *skb;
++
+ 	if (session->transmission) {
+ 		if (session->err)
+ 			j1939_sk_errqueue(session, J1939_ERRQUEUE_TX_ABORT);
+@@ -274,7 +276,11 @@ static void j1939_session_destroy(struct j1939_session *session)
+ 	WARN_ON_ONCE(!list_empty(&session->sk_session_queue_entry));
+ 	WARN_ON_ONCE(!list_empty(&session->active_session_list_entry));
+ 
+-	skb_queue_purge(&session->skb_queue);
++	while ((skb = skb_dequeue(&session->skb_queue)) != NULL) {
++		/* drop ref taken in j1939_session_skb_queue() */
++		skb_unref(skb);
++		kfree_skb(skb);
++	}
+ 	__j1939_session_drop(session);
+ 	j1939_priv_put(session->priv);
+ 	kfree(session);

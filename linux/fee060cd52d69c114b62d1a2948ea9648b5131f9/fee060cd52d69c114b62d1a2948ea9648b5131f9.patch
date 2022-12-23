@@ -1,0 +1,102 @@
+commit fee060cd52d69c114b62d1a2948ea9648b5131f9
+Author: Sean Christopherson <seanjc@google.com>
+Date:   Fri Mar 11 03:27:41 2022 +0000
+
+    KVM: x86: avoid calling x86 emulator without a decoded instruction
+    
+    Whenever x86_decode_emulated_instruction() detects a breakpoint, it
+    returns the value that kvm_vcpu_check_breakpoint() writes into its
+    pass-by-reference second argument.  Unfortunately this is completely
+    bogus because the expected outcome of x86_decode_emulated_instruction
+    is an EMULATION_* value.
+    
+    Then, if kvm_vcpu_check_breakpoint() does "*r = 0" (corresponding to
+    a KVM_EXIT_DEBUG userspace exit), it is misunderstood as EMULATION_OK
+    and x86_emulate_instruction() is called without having decoded the
+    instruction.  This causes various havoc from running with a stale
+    emulation context.
+    
+    The fix is to move the call to kvm_vcpu_check_breakpoint() where it was
+    before commit 4aa2691dcbd3 ("KVM: x86: Factor out x86 instruction
+    emulation with decoding") introduced x86_decode_emulated_instruction().
+    The other caller of the function does not need breakpoint checks,
+    because it is invoked as part of a vmexit and the processor has already
+    checked those before executing the instruction that #GP'd.
+    
+    This fixes CVE-2022-1852.
+    
+    Reported-by: Qiuhao Li <qiuhao@sysec.org>
+    Reported-by: Gaoning Pan <pgn@zju.edu.cn>
+    Reported-by: Yongkang Jia <kangel@zju.edu.cn>
+    Fixes: 4aa2691dcbd3 ("KVM: x86: Factor out x86 instruction emulation with decoding")
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Sean Christopherson <seanjc@google.com>
+    Message-Id: <20220311032801.3467418-2-seanjc@google.com>
+    [Rewrote commit message according to Qiuhao's report, since a patch
+     already existed to fix the bug. - Paolo]
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index bc507d6414f4..b81ef4f497f4 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -8296,7 +8296,7 @@ int kvm_skip_emulated_instruction(struct kvm_vcpu *vcpu)
+ }
+ EXPORT_SYMBOL_GPL(kvm_skip_emulated_instruction);
+ 
+-static bool kvm_vcpu_check_breakpoint(struct kvm_vcpu *vcpu, int *r)
++static bool kvm_vcpu_check_code_breakpoint(struct kvm_vcpu *vcpu, int *r)
+ {
+ 	if (unlikely(vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) &&
+ 	    (vcpu->arch.guest_debug_dr7 & DR7_BP_EN_MASK)) {
+@@ -8365,25 +8365,23 @@ static bool is_vmware_backdoor_opcode(struct x86_emulate_ctxt *ctxt)
+ }
+ 
+ /*
+- * Decode to be emulated instruction. Return EMULATION_OK if success.
++ * Decode an instruction for emulation.  The caller is responsible for handling
++ * code breakpoints.  Note, manually detecting code breakpoints is unnecessary
++ * (and wrong) when emulating on an intercepted fault-like exception[*], as
++ * code breakpoints have higher priority and thus have already been done by
++ * hardware.
++ *
++ * [*] Except #MC, which is higher priority, but KVM should never emulate in
++ *     response to a machine check.
+  */
+ int x86_decode_emulated_instruction(struct kvm_vcpu *vcpu, int emulation_type,
+ 				    void *insn, int insn_len)
+ {
+-	int r = EMULATION_OK;
+ 	struct x86_emulate_ctxt *ctxt = vcpu->arch.emulate_ctxt;
++	int r;
+ 
+ 	init_emulate_ctxt(vcpu);
+ 
+-	/*
+-	 * We will reenter on the same instruction since we do not set
+-	 * complete_userspace_io. This does not handle watchpoints yet,
+-	 * those would be handled in the emulate_ops.
+-	 */
+-	if (!(emulation_type & EMULTYPE_SKIP) &&
+-	    kvm_vcpu_check_breakpoint(vcpu, &r))
+-		return r;
+-
+ 	r = x86_decode_insn(ctxt, insn, insn_len, emulation_type);
+ 
+ 	trace_kvm_emulate_insn_start(vcpu);
+@@ -8416,6 +8414,15 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu, gpa_t cr2_or_gpa,
+ 	if (!(emulation_type & EMULTYPE_NO_DECODE)) {
+ 		kvm_clear_exception_queue(vcpu);
+ 
++		/*
++		 * Return immediately if RIP hits a code breakpoint, such #DBs
++		 * are fault-like and are higher priority than any faults on
++		 * the code fetch itself.
++		 */
++		if (!(emulation_type & EMULTYPE_SKIP) &&
++		    kvm_vcpu_check_code_breakpoint(vcpu, &r))
++			return r;
++
+ 		r = x86_decode_emulated_instruction(vcpu, emulation_type,
+ 						    insn, insn_len);
+ 		if (r != EMULATION_OK)  {

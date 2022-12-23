@@ -1,0 +1,243 @@
+commit 27ae357fa82be5ab73b2ef8d39dcb8ca2563483a
+Author: David Rientjes <rientjes@google.com>
+Date:   Fri May 11 16:02:04 2018 -0700
+
+    mm, oom: fix concurrent munlock and oom reaper unmap, v3
+    
+    Since exit_mmap() is done without the protection of mm->mmap_sem, it is
+    possible for the oom reaper to concurrently operate on an mm until
+    MMF_OOM_SKIP is set.
+    
+    This allows munlock_vma_pages_all() to concurrently run while the oom
+    reaper is operating on a vma.  Since munlock_vma_pages_range() depends
+    on clearing VM_LOCKED from vm_flags before actually doing the munlock to
+    determine if any other vmas are locking the same memory, the check for
+    VM_LOCKED in the oom reaper is racy.
+    
+    This is especially noticeable on architectures such as powerpc where
+    clearing a huge pmd requires serialize_against_pte_lookup().  If the pmd
+    is zapped by the oom reaper during follow_page_mask() after the check
+    for pmd_none() is bypassed, this ends up deferencing a NULL ptl or a
+    kernel oops.
+    
+    Fix this by manually freeing all possible memory from the mm before
+    doing the munlock and then setting MMF_OOM_SKIP.  The oom reaper can not
+    run on the mm anymore so the munlock is safe to do in exit_mmap().  It
+    also matches the logic that the oom reaper currently uses for
+    determining when to set MMF_OOM_SKIP itself, so there's no new risk of
+    excessive oom killing.
+    
+    This issue fixes CVE-2018-1000200.
+    
+    Link: http://lkml.kernel.org/r/alpine.DEB.2.21.1804241526320.238665@chino.kir.corp.google.com
+    Fixes: 212925802454 ("mm: oom: let oom_reap_task and exit_mmap run concurrently")
+    Signed-off-by: David Rientjes <rientjes@google.com>
+    Suggested-by: Tetsuo Handa <penguin-kernel@I-love.SAKURA.ne.jp>
+    Acked-by: Michal Hocko <mhocko@suse.com>
+    Cc: Andrea Arcangeli <aarcange@redhat.com>
+    Cc: <stable@vger.kernel.org>    [4.14+]
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/include/linux/oom.h b/include/linux/oom.h
+index 5bad038ac012..6adac113e96d 100644
+--- a/include/linux/oom.h
++++ b/include/linux/oom.h
+@@ -95,6 +95,8 @@ static inline int check_stable_address_space(struct mm_struct *mm)
+ 	return 0;
+ }
+ 
++void __oom_reap_task_mm(struct mm_struct *mm);
++
+ extern unsigned long oom_badness(struct task_struct *p,
+ 		struct mem_cgroup *memcg, const nodemask_t *nodemask,
+ 		unsigned long totalpages);
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 9d5968d1e8e3..d6836566e4e5 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -3024,6 +3024,32 @@ void exit_mmap(struct mm_struct *mm)
+ 	/* mm's last user has gone, and its about to be pulled down */
+ 	mmu_notifier_release(mm);
+ 
++	if (unlikely(mm_is_oom_victim(mm))) {
++		/*
++		 * Manually reap the mm to free as much memory as possible.
++		 * Then, as the oom reaper does, set MMF_OOM_SKIP to disregard
++		 * this mm from further consideration.  Taking mm->mmap_sem for
++		 * write after setting MMF_OOM_SKIP will guarantee that the oom
++		 * reaper will not run on this mm again after mmap_sem is
++		 * dropped.
++		 *
++		 * Nothing can be holding mm->mmap_sem here and the above call
++		 * to mmu_notifier_release(mm) ensures mmu notifier callbacks in
++		 * __oom_reap_task_mm() will not block.
++		 *
++		 * This needs to be done before calling munlock_vma_pages_all(),
++		 * which clears VM_LOCKED, otherwise the oom reaper cannot
++		 * reliably test it.
++		 */
++		mutex_lock(&oom_lock);
++		__oom_reap_task_mm(mm);
++		mutex_unlock(&oom_lock);
++
++		set_bit(MMF_OOM_SKIP, &mm->flags);
++		down_write(&mm->mmap_sem);
++		up_write(&mm->mmap_sem);
++	}
++
+ 	if (mm->locked_vm) {
+ 		vma = mm->mmap;
+ 		while (vma) {
+@@ -3045,24 +3071,6 @@ void exit_mmap(struct mm_struct *mm)
+ 	/* update_hiwater_rss(mm) here? but nobody should be looking */
+ 	/* Use -1 here to ensure all VMAs in the mm are unmapped */
+ 	unmap_vmas(&tlb, vma, 0, -1);
+-
+-	if (unlikely(mm_is_oom_victim(mm))) {
+-		/*
+-		 * Wait for oom_reap_task() to stop working on this
+-		 * mm. Because MMF_OOM_SKIP is already set before
+-		 * calling down_read(), oom_reap_task() will not run
+-		 * on this "mm" post up_write().
+-		 *
+-		 * mm_is_oom_victim() cannot be set from under us
+-		 * either because victim->mm is already set to NULL
+-		 * under task_lock before calling mmput and oom_mm is
+-		 * set not NULL by the OOM killer only if victim->mm
+-		 * is found not NULL while holding the task_lock.
+-		 */
+-		set_bit(MMF_OOM_SKIP, &mm->flags);
+-		down_write(&mm->mmap_sem);
+-		up_write(&mm->mmap_sem);
+-	}
+ 	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, USER_PGTABLES_CEILING);
+ 	tlb_finish_mmu(&tlb, 0, -1);
+ 
+diff --git a/mm/oom_kill.c b/mm/oom_kill.c
+index ff992fa8760a..8ba6cb88cf58 100644
+--- a/mm/oom_kill.c
++++ b/mm/oom_kill.c
+@@ -469,7 +469,6 @@ bool process_shares_mm(struct task_struct *p, struct mm_struct *mm)
+ 	return false;
+ }
+ 
+-
+ #ifdef CONFIG_MMU
+ /*
+  * OOM Reaper kernel thread which tries to reap the memory used by the OOM
+@@ -480,16 +479,54 @@ static DECLARE_WAIT_QUEUE_HEAD(oom_reaper_wait);
+ static struct task_struct *oom_reaper_list;
+ static DEFINE_SPINLOCK(oom_reaper_lock);
+ 
+-static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
++void __oom_reap_task_mm(struct mm_struct *mm)
+ {
+-	struct mmu_gather tlb;
+ 	struct vm_area_struct *vma;
++
++	/*
++	 * Tell all users of get_user/copy_from_user etc... that the content
++	 * is no longer stable. No barriers really needed because unmapping
++	 * should imply barriers already and the reader would hit a page fault
++	 * if it stumbled over a reaped memory.
++	 */
++	set_bit(MMF_UNSTABLE, &mm->flags);
++
++	for (vma = mm->mmap ; vma; vma = vma->vm_next) {
++		if (!can_madv_dontneed_vma(vma))
++			continue;
++
++		/*
++		 * Only anonymous pages have a good chance to be dropped
++		 * without additional steps which we cannot afford as we
++		 * are OOM already.
++		 *
++		 * We do not even care about fs backed pages because all
++		 * which are reclaimable have already been reclaimed and
++		 * we do not want to block exit_mmap by keeping mm ref
++		 * count elevated without a good reason.
++		 */
++		if (vma_is_anonymous(vma) || !(vma->vm_flags & VM_SHARED)) {
++			const unsigned long start = vma->vm_start;
++			const unsigned long end = vma->vm_end;
++			struct mmu_gather tlb;
++
++			tlb_gather_mmu(&tlb, mm, start, end);
++			mmu_notifier_invalidate_range_start(mm, start, end);
++			unmap_page_range(&tlb, vma, start, end, NULL);
++			mmu_notifier_invalidate_range_end(mm, start, end);
++			tlb_finish_mmu(&tlb, start, end);
++		}
++	}
++}
++
++static bool oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
++{
+ 	bool ret = true;
+ 
+ 	/*
+ 	 * We have to make sure to not race with the victim exit path
+ 	 * and cause premature new oom victim selection:
+-	 * __oom_reap_task_mm		exit_mm
++	 * oom_reap_task_mm		exit_mm
+ 	 *   mmget_not_zero
+ 	 *				  mmput
+ 	 *				    atomic_dec_and_test
+@@ -534,39 +571,8 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
+ 
+ 	trace_start_task_reaping(tsk->pid);
+ 
+-	/*
+-	 * Tell all users of get_user/copy_from_user etc... that the content
+-	 * is no longer stable. No barriers really needed because unmapping
+-	 * should imply barriers already and the reader would hit a page fault
+-	 * if it stumbled over a reaped memory.
+-	 */
+-	set_bit(MMF_UNSTABLE, &mm->flags);
+-
+-	for (vma = mm->mmap ; vma; vma = vma->vm_next) {
+-		if (!can_madv_dontneed_vma(vma))
+-			continue;
++	__oom_reap_task_mm(mm);
+ 
+-		/*
+-		 * Only anonymous pages have a good chance to be dropped
+-		 * without additional steps which we cannot afford as we
+-		 * are OOM already.
+-		 *
+-		 * We do not even care about fs backed pages because all
+-		 * which are reclaimable have already been reclaimed and
+-		 * we do not want to block exit_mmap by keeping mm ref
+-		 * count elevated without a good reason.
+-		 */
+-		if (vma_is_anonymous(vma) || !(vma->vm_flags & VM_SHARED)) {
+-			const unsigned long start = vma->vm_start;
+-			const unsigned long end = vma->vm_end;
+-
+-			tlb_gather_mmu(&tlb, mm, start, end);
+-			mmu_notifier_invalidate_range_start(mm, start, end);
+-			unmap_page_range(&tlb, vma, start, end, NULL);
+-			mmu_notifier_invalidate_range_end(mm, start, end);
+-			tlb_finish_mmu(&tlb, start, end);
+-		}
+-	}
+ 	pr_info("oom_reaper: reaped process %d (%s), now anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
+ 			task_pid_nr(tsk), tsk->comm,
+ 			K(get_mm_counter(mm, MM_ANONPAGES)),
+@@ -587,14 +593,13 @@ static void oom_reap_task(struct task_struct *tsk)
+ 	struct mm_struct *mm = tsk->signal->oom_mm;
+ 
+ 	/* Retry the down_read_trylock(mmap_sem) a few times */
+-	while (attempts++ < MAX_OOM_REAP_RETRIES && !__oom_reap_task_mm(tsk, mm))
++	while (attempts++ < MAX_OOM_REAP_RETRIES && !oom_reap_task_mm(tsk, mm))
+ 		schedule_timeout_idle(HZ/10);
+ 
+ 	if (attempts <= MAX_OOM_REAP_RETRIES ||
+ 	    test_bit(MMF_OOM_SKIP, &mm->flags))
+ 		goto done;
+ 
+-
+ 	pr_info("oom_reaper: unable to reap pid:%d (%s)\n",
+ 		task_pid_nr(tsk), tsk->comm);
+ 	debug_show_all_locks();

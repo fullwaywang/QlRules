@@ -1,0 +1,76 @@
+commit a246b4d547708f33ff4d4b9a7a5dbac741dc89d8
+Author: Johan Hovold <johan@kernel.org>
+Date:   Fri Jan 3 17:35:11 2020 +0100
+
+    media: xirlink_cit: add missing descriptor sanity checks
+    
+    Make sure to check that we have two alternate settings and at least one
+    endpoint before accessing the second altsetting structure and
+    dereferencing the endpoint arrays.
+    
+    This specifically avoids dereferencing NULL-pointers or corrupting
+    memory when a device does not have the expected descriptors.
+    
+    Note that the sanity check in cit_get_packet_size() is not redundant as
+    the driver is mixing looking up altsettings by index and by number,
+    which may not coincide.
+    
+    Fixes: 659fefa0eb17 ("V4L/DVB: gspca_xirlink_cit: Add support for camera with a bcd version of 0.01")
+    Fixes: 59f8b0bf3c12 ("V4L/DVB: gspca_xirlink_cit: support bandwidth changing for devices with 1 alt setting")
+    Cc: stable <stable@vger.kernel.org>     # 2.6.37
+    Cc: Hans de Goede <hdegoede@redhat.com>
+    Signed-off-by: Johan Hovold <johan@kernel.org>
+    Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+    Signed-off-by: Mauro Carvalho Chehab <mchehab+huawei@kernel.org>
+
+diff --git a/drivers/media/usb/gspca/xirlink_cit.c b/drivers/media/usb/gspca/xirlink_cit.c
+index 934a90bd78c2..c579b100f066 100644
+--- a/drivers/media/usb/gspca/xirlink_cit.c
++++ b/drivers/media/usb/gspca/xirlink_cit.c
+@@ -1442,6 +1442,9 @@ static int cit_get_packet_size(struct gspca_dev *gspca_dev)
+ 		return -EIO;
+ 	}
+ 
++	if (alt->desc.bNumEndpoints < 1)
++		return -ENODEV;
++
+ 	return le16_to_cpu(alt->endpoint[0].desc.wMaxPacketSize);
+ }
+ 
+@@ -2626,6 +2629,7 @@ static int sd_start(struct gspca_dev *gspca_dev)
+ 
+ static int sd_isoc_init(struct gspca_dev *gspca_dev)
+ {
++	struct usb_interface_cache *intfc;
+ 	struct usb_host_interface *alt;
+ 	int max_packet_size;
+ 
+@@ -2641,8 +2645,17 @@ static int sd_isoc_init(struct gspca_dev *gspca_dev)
+ 		break;
+ 	}
+ 
++	intfc = gspca_dev->dev->actconfig->intf_cache[0];
++
++	if (intfc->num_altsetting < 2)
++		return -ENODEV;
++
++	alt = &intfc->altsetting[1];
++
++	if (alt->desc.bNumEndpoints < 1)
++		return -ENODEV;
++
+ 	/* Start isoc bandwidth "negotiation" at max isoc bandwidth */
+-	alt = &gspca_dev->dev->actconfig->intf_cache[0]->altsetting[1];
+ 	alt->endpoint[0].desc.wMaxPacketSize = cpu_to_le16(max_packet_size);
+ 
+ 	return 0;
+@@ -2665,6 +2678,9 @@ static int sd_isoc_nego(struct gspca_dev *gspca_dev)
+ 		break;
+ 	}
+ 
++	/*
++	 * Existence of altsetting and endpoint was verified in sd_isoc_init()
++	 */
+ 	alt = &gspca_dev->dev->actconfig->intf_cache[0]->altsetting[1];
+ 	packet_size = le16_to_cpu(alt->endpoint[0].desc.wMaxPacketSize);
+ 	if (packet_size <= min_packet_size)

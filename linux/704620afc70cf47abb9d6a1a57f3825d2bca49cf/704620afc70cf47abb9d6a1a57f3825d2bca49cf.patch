@@ -1,0 +1,93 @@
+commit 704620afc70cf47abb9d6a1a57f3825d2bca49cf
+Author: Mathias Payer <mathias.payer@nebelwelt.net>
+Date:   Wed Dec 5 21:19:59 2018 +0100
+
+    USB: check usb_get_extra_descriptor for proper size
+    
+    When reading an extra descriptor, we need to properly check the minimum
+    and maximum size allowed, to prevent from invalid data being sent by a
+    device.
+    
+    Reported-by: Hui Peng <benquike@gmail.com>
+    Reported-by: Mathias Payer <mathias.payer@nebelwelt.net>
+    Co-developed-by: Linus Torvalds <torvalds@linux-foundation.org>
+    Signed-off-by: Hui Peng <benquike@gmail.com>
+    Signed-off-by: Mathias Payer <mathias.payer@nebelwelt.net>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+    Cc: stable <stable@kernel.org>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index 528664059a12..f76b2e0aba9d 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -2251,7 +2251,7 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
+ 		/* descriptor may appear anywhere in config */
+ 		err = __usb_get_extra_descriptor(udev->rawdescriptors[0],
+ 				le16_to_cpu(udev->config[0].desc.wTotalLength),
+-				USB_DT_OTG, (void **) &desc);
++				USB_DT_OTG, (void **) &desc, sizeof(*desc));
+ 		if (err || !(desc->bmAttributes & USB_OTG_HNP))
+ 			return 0;
+ 
+diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
+index 79d8bd7a612e..4ebfbd737905 100644
+--- a/drivers/usb/core/usb.c
++++ b/drivers/usb/core/usb.c
+@@ -832,14 +832,14 @@ EXPORT_SYMBOL_GPL(usb_get_current_frame_number);
+  */
+ 
+ int __usb_get_extra_descriptor(char *buffer, unsigned size,
+-			       unsigned char type, void **ptr)
++			       unsigned char type, void **ptr, size_t minsize)
+ {
+ 	struct usb_descriptor_header *header;
+ 
+ 	while (size >= sizeof(struct usb_descriptor_header)) {
+ 		header = (struct usb_descriptor_header *)buffer;
+ 
+-		if (header->bLength < 2) {
++		if (header->bLength < 2 || header->bLength > size) {
+ 			printk(KERN_ERR
+ 				"%s: bogus descriptor, type %d length %d\n",
+ 				usbcore_name,
+@@ -848,7 +848,7 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
+ 			return -1;
+ 		}
+ 
+-		if (header->bDescriptorType == type) {
++		if (header->bDescriptorType == type && header->bLength >= minsize) {
+ 			*ptr = header;
+ 			return 0;
+ 		}
+diff --git a/drivers/usb/host/hwa-hc.c b/drivers/usb/host/hwa-hc.c
+index 684d6f074c3a..09a8ebd95588 100644
+--- a/drivers/usb/host/hwa-hc.c
++++ b/drivers/usb/host/hwa-hc.c
+@@ -640,7 +640,7 @@ static int hwahc_security_create(struct hwahc *hwahc)
+ 	top = itr + itr_size;
+ 	result = __usb_get_extra_descriptor(usb_dev->rawdescriptors[index],
+ 			le16_to_cpu(usb_dev->actconfig->desc.wTotalLength),
+-			USB_DT_SECURITY, (void **) &secd);
++			USB_DT_SECURITY, (void **) &secd, sizeof(*secd));
+ 	if (result == -1) {
+ 		dev_warn(dev, "BUG? WUSB host has no security descriptors\n");
+ 		return 0;
+diff --git a/include/linux/usb.h b/include/linux/usb.h
+index 4cdd515a4385..5e49e82c4368 100644
+--- a/include/linux/usb.h
++++ b/include/linux/usb.h
+@@ -407,11 +407,11 @@ struct usb_host_bos {
+ };
+ 
+ int __usb_get_extra_descriptor(char *buffer, unsigned size,
+-	unsigned char type, void **ptr);
++	unsigned char type, void **ptr, size_t min);
+ #define usb_get_extra_descriptor(ifpoint, type, ptr) \
+ 				__usb_get_extra_descriptor((ifpoint)->extra, \
+ 				(ifpoint)->extralen, \
+-				type, (void **)ptr)
++				type, (void **)ptr, sizeof(**(ptr)))
+ 
+ /* ----------------------------------------------------------------------- */
+ 

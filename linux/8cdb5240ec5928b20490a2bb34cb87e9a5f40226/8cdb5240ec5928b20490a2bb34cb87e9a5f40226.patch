@@ -1,0 +1,34 @@
+commit 8cdb5240ec5928b20490a2bb34cb87e9a5f40226
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Sat Jun 16 15:40:48 2018 -0400
+
+    ext4: never move the system.data xattr out of the inode body
+    
+    When expanding the extra isize space, we must never move the
+    system.data xattr out of the inode body.  For performance reasons, it
+    doesn't make any sense, and the inline data implementation assumes
+    that system.data xattr is never in the external xattr block.
+    
+    This addresses CVE-2018-10880
+    
+    https://bugzilla.kernel.org/show_bug.cgi?id=200005
+    
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+    Cc: stable@kernel.org
+
+diff --git a/fs/ext4/xattr.c b/fs/ext4/xattr.c
+index 0263692979ec..72377b77fbd7 100644
+--- a/fs/ext4/xattr.c
++++ b/fs/ext4/xattr.c
+@@ -2657,6 +2657,11 @@ static int ext4_xattr_make_inode_space(handle_t *handle, struct inode *inode,
+ 		last = IFIRST(header);
+ 		/* Find the entry best suited to be pushed into EA block */
+ 		for (; !IS_LAST_ENTRY(last); last = EXT4_XATTR_NEXT(last)) {
++			/* never move system.data out of the inode */
++			if ((last->e_name_len == 4) &&
++			    (last->e_name_index == EXT4_XATTR_INDEX_SYSTEM) &&
++			    !memcmp(last->e_name, "data", 4))
++				continue;
+ 			total_size = EXT4_XATTR_LEN(last->e_name_len);
+ 			if (!last->e_value_inum)
+ 				total_size += EXT4_XATTR_SIZE(

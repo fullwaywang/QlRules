@@ -1,0 +1,39 @@
+commit 7807dafda21a549403d922da98dde0ddfeb70d08
+Author: Ilya Dryomov <idryomov@gmail.com>
+Date:   Wed Apr 14 10:38:40 2021 +0200
+
+    libceph: bump CephXAuthenticate encoding version
+    
+    A dummy v3 encoding (exactly the same as v2) was introduced so that
+    the monitors can distinguish broken clients that may not include their
+    auth ticket in CEPHX_GET_AUTH_SESSION_KEY request on reconnects, thus
+    failing to prove previous possession of their global_id (one part of
+    CVE-2021-20288).
+    
+    The kernel client has always included its auth ticket, so it is
+    compatible with enforcing mode as is.  However we want to bump the
+    encoding version to avoid having to authenticate twice on the initial
+    connect -- all legacy (CephXAuthenticate < v3) are now forced do so in
+    order to expose insecure global_id reclaim.
+    
+    Marking for stable since at least for 5.11 and 5.12 it is trivial
+    (v2 -> v3).
+    
+    Cc: stable@vger.kernel.org # 5.11+
+    URL: https://tracker.ceph.com/issues/50452
+    Signed-off-by: Ilya Dryomov <idryomov@gmail.com>
+    Reviewed-by: Sage Weil <sage@redhat.com>
+
+diff --git a/net/ceph/auth_x.c b/net/ceph/auth_x.c
+index ca44c327bace..79641c4afee9 100644
+--- a/net/ceph/auth_x.c
++++ b/net/ceph/auth_x.c
+@@ -526,7 +526,7 @@ static int ceph_x_build_request(struct ceph_auth_client *ac,
+ 		if (ret < 0)
+ 			return ret;
+ 
+-		auth->struct_v = 2;  /* nautilus+ */
++		auth->struct_v = 3;  /* nautilus+ */
+ 		auth->key = 0;
+ 		for (u = (u64 *)enc_buf; u + 1 <= (u64 *)(enc_buf + ret); u++)
+ 			auth->key ^= *(__le64 *)u;

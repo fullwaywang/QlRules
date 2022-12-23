@@ -1,0 +1,39 @@
+commit 613317bd212c585c20796c10afe5daaa95d4b0a1
+Author: Ryan Ware <ware@linux.intel.com>
+Date:   Thu Feb 11 15:58:44 2016 -0800
+
+    EVM: Use crypto_memneq() for digest comparisons
+    
+    This patch fixes vulnerability CVE-2016-2085.  The problem exists
+    because the vm_verify_hmac() function includes a use of memcmp().
+    Unfortunately, this allows timing side channel attacks; specifically
+    a MAC forgery complexity drop from 2^128 to 2^12.  This patch changes
+    the memcmp() to the cryptographically safe crypto_memneq().
+    
+    Reported-by: Xiaofei Rex Guo <xiaofei.rex.guo@intel.com>
+    Signed-off-by: Ryan Ware <ware@linux.intel.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Mimi Zohar <zohar@linux.vnet.ibm.com>
+    Signed-off-by: James Morris <james.l.morris@oracle.com>
+
+diff --git a/security/integrity/evm/evm_main.c b/security/integrity/evm/evm_main.c
+index f7160253f17f..e6ea9d4b1de9 100644
+--- a/security/integrity/evm/evm_main.c
++++ b/security/integrity/evm/evm_main.c
+@@ -23,6 +23,7 @@
+ #include <linux/integrity.h>
+ #include <linux/evm.h>
+ #include <crypto/hash.h>
++#include <crypto/algapi.h>
+ #include "evm.h"
+ 
+ int evm_initialized;
+@@ -148,7 +149,7 @@ static enum integrity_status evm_verify_hmac(struct dentry *dentry,
+ 				   xattr_value_len, calc.digest);
+ 		if (rc)
+ 			break;
+-		rc = memcmp(xattr_data->digest, calc.digest,
++		rc = crypto_memneq(xattr_data->digest, calc.digest,
+ 			    sizeof(calc.digest));
+ 		if (rc)
+ 			rc = -EINVAL;

@@ -1,0 +1,53 @@
+commit 073c516ff73557a8f7315066856c04b50383ac34
+Author: Cong Wang <xiyou.wangcong@gmail.com>
+Date:   Wed Apr 19 15:11:00 2017 -0700
+
+    nsfs: mark dentry with DCACHE_RCUACCESS
+    
+    Andrey reported a use-after-free in __ns_get_path():
+    
+      spin_lock include/linux/spinlock.h:299 [inline]
+      lockref_get_not_dead+0x19/0x80 lib/lockref.c:179
+      __ns_get_path+0x197/0x860 fs/nsfs.c:66
+      open_related_ns+0xda/0x200 fs/nsfs.c:143
+      sock_ioctl+0x39d/0x440 net/socket.c:1001
+      vfs_ioctl fs/ioctl.c:45 [inline]
+      do_vfs_ioctl+0x1bf/0x1780 fs/ioctl.c:685
+      SYSC_ioctl fs/ioctl.c:700 [inline]
+      SyS_ioctl+0x8f/0xc0 fs/ioctl.c:691
+    
+    We are under rcu read lock protection at that point:
+    
+            rcu_read_lock();
+            d = atomic_long_read(&ns->stashed);
+            if (!d)
+                    goto slow;
+            dentry = (struct dentry *)d;
+            if (!lockref_get_not_dead(&dentry->d_lockref))
+                    goto slow;
+            rcu_read_unlock();
+    
+    but don't use a proper RCU API on the free path, therefore a parallel
+    __d_free() could free it at the same time.  We need to mark the stashed
+    dentry with DCACHE_RCUACCESS so that __d_free() will be called after all
+    readers leave RCU.
+    
+    Fixes: e149ed2b805f ("take the targets of /proc/*/ns/* symlinks to separate fs")
+    Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+    Cc: Andrew Morton <akpm@linux-foundation.org>
+    Reported-by: Andrey Konovalov <andreyknvl@google.com>
+    Signed-off-by: Cong Wang <xiyou.wangcong@gmail.com>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/nsfs.c b/fs/nsfs.c
+index 1656843e87d2..323f492e0822 100644
+--- a/fs/nsfs.c
++++ b/fs/nsfs.c
+@@ -91,6 +91,7 @@ static void *__ns_get_path(struct path *path, struct ns_common *ns)
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 	d_instantiate(dentry, inode);
++	dentry->d_flags |= DCACHE_RCUACCESS;
+ 	dentry->d_fsdata = (void *)ns->ops;
+ 	d = atomic_long_cmpxchg(&ns->stashed, 0, (unsigned long)dentry);
+ 	if (d) {

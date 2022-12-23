@@ -1,0 +1,61 @@
+commit f65886606c2d3b562716de030706dfe1bea4ed5e
+Author: Rustam Kovhaev <rkovhaev@gmail.com>
+Date:   Mon Sep 7 11:55:35 2020 -0700
+
+    KVM: fix memory leak in kvm_io_bus_unregister_dev()
+    
+    when kmalloc() fails in kvm_io_bus_unregister_dev(), before removing
+    the bus, we should iterate over all other devices linked to it and call
+    kvm_iodevice_destructor() for them
+    
+    Fixes: 90db10434b16 ("KVM: kvm_io_bus_unregister_dev() should never fail")
+    Cc: stable@vger.kernel.org
+    Reported-and-tested-by: syzbot+f196caa45793d6374707@syzkaller.appspotmail.com
+    Link: https://syzkaller.appspot.com/bug?extid=f196caa45793d6374707
+    Signed-off-by: Rustam Kovhaev <rkovhaev@gmail.com>
+    Reviewed-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+    Message-Id: <20200907185535.233114-1-rkovhaev@gmail.com>
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 67cd0b88a6b6..cf88233b819a 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -4332,7 +4332,7 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
+ void kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 			       struct kvm_io_device *dev)
+ {
+-	int i;
++	int i, j;
+ 	struct kvm_io_bus *new_bus, *bus;
+ 
+ 	bus = kvm_get_bus(kvm, bus_idx);
+@@ -4349,17 +4349,20 @@ void kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 
+ 	new_bus = kmalloc(struct_size(bus, range, bus->dev_count - 1),
+ 			  GFP_KERNEL_ACCOUNT);
+-	if (!new_bus)  {
++	if (new_bus) {
++		memcpy(new_bus, bus, sizeof(*bus) + i * sizeof(struct kvm_io_range));
++		new_bus->dev_count--;
++		memcpy(new_bus->range + i, bus->range + i + 1,
++		       (new_bus->dev_count - i) * sizeof(struct kvm_io_range));
++	} else {
+ 		pr_err("kvm: failed to shrink bus, removing it completely\n");
+-		goto broken;
++		for (j = 0; j < bus->dev_count; j++) {
++			if (j == i)
++				continue;
++			kvm_iodevice_destructor(bus->range[j].dev);
++		}
+ 	}
+ 
+-	memcpy(new_bus, bus, sizeof(*bus) + i * sizeof(struct kvm_io_range));
+-	new_bus->dev_count--;
+-	memcpy(new_bus->range + i, bus->range + i + 1,
+-	       (new_bus->dev_count - i) * sizeof(struct kvm_io_range));
+-
+-broken:
+ 	rcu_assign_pointer(kvm->buses[bus_idx], new_bus);
+ 	synchronize_srcu_expedited(&kvm->srcu);
+ 	kfree(bus);

@@ -1,0 +1,31 @@
+commit 307c8de2b02344805ebead3440d8feed28f2f010
+Author: Roger Pau Monne <roger.pau@citrix.com>
+Date:   Wed Apr 6 17:38:04 2022 +0200
+
+    xen/netfront: fix leaking data in shared pages
+    
+    When allocating pages to be used for shared communication with the
+    backend always zero them, this avoids leaking unintended data present
+    on the pages.
+    
+    This is CVE-2022-33740, part of XSA-403.
+    
+    Signed-off-by: Roger Pau Monné <roger.pau@citrix.com>
+    Reviewed-by: Jan Beulich <jbeulich@suse.com>
+    Reviewed-by: Juergen Gross <jgross@suse.com>
+    Signed-off-by: Juergen Gross <jgross@suse.com>
+
+diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
+index 8c0b9546d5a2..e3165139629d 100644
+--- a/drivers/net/xen-netfront.c
++++ b/drivers/net/xen-netfront.c
+@@ -271,7 +271,8 @@ static struct sk_buff *xennet_alloc_one_rx_buffer(struct netfront_queue *queue)
+ 	if (unlikely(!skb))
+ 		return NULL;
+ 
+-	page = page_pool_dev_alloc_pages(queue->page_pool);
++	page = page_pool_alloc_pages(queue->page_pool,
++				     GFP_ATOMIC | __GFP_NOWARN | __GFP_ZERO);
+ 	if (unlikely(!page)) {
+ 		kfree_skb(skb);
+ 		return NULL;

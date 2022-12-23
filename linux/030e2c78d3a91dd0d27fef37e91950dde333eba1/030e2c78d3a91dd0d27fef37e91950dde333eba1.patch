@@ -1,0 +1,29 @@
+commit 030e2c78d3a91dd0d27fef37e91950dde333eba1
+Author: Takashi Iwai <tiwai@suse.de>
+Date:   Tue Jan 12 12:38:02 2016 +0100
+
+    ALSA: seq: Fix missing NULL check at remove_events ioctl
+    
+    snd_seq_ioctl_remove_events() calls snd_seq_fifo_clear()
+    unconditionally even if there is no FIFO assigned, and this leads to
+    an Oops due to NULL dereference.  The fix is just to add a proper NULL
+    check.
+    
+    Reported-by: Dmitry Vyukov <dvyukov@google.com>
+    Tested-by: Dmitry Vyukov <dvyukov@google.com>
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+
+diff --git a/sound/core/seq/seq_clientmgr.c b/sound/core/seq/seq_clientmgr.c
+index b64f20deba90..13cfa815732d 100644
+--- a/sound/core/seq/seq_clientmgr.c
++++ b/sound/core/seq/seq_clientmgr.c
+@@ -1962,7 +1962,7 @@ static int snd_seq_ioctl_remove_events(struct snd_seq_client *client,
+ 		 * No restrictions so for a user client we can clear
+ 		 * the whole fifo
+ 		 */
+-		if (client->type == USER_CLIENT)
++		if (client->type == USER_CLIENT && client->data.user.fifo)
+ 			snd_seq_fifo_clear(client->data.user.fifo);
+ 	}
+ 

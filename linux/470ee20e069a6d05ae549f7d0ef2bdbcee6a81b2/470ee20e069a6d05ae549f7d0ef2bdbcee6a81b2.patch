@@ -1,0 +1,52 @@
+commit 470ee20e069a6d05ae549f7d0ef2bdbcee6a81b2
+Author: Thadeu Lima de Souza Cascardo <cascardo@canonical.com>
+Date:   Tue Aug 9 14:01:46 2022 -0300
+
+    netfilter: nf_tables: do not allow SET_ID to refer to another table
+    
+    When doing lookups for sets on the same batch by using its ID, a set from a
+    different table can be used.
+    
+    Then, when the table is removed, a reference to the set may be kept after
+    the set is freed, leading to a potential use-after-free.
+    
+    When looking for sets by ID, use the table that was used for the lookup by
+    name, and only return sets belonging to that same table.
+    
+    This fixes CVE-2022-2586, also reported as ZDI-CAN-17470.
+    
+    Reported-by: Team Orca of Sea Security (@seasecresponse)
+    Fixes: 958bee14d071 ("netfilter: nf_tables: use new transaction infrastructure to handle sets")
+    Signed-off-by: Thadeu Lima de Souza Cascardo <cascardo@canonical.com>
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Pablo Neira Ayuso <pablo@netfilter.org>
+
+diff --git a/net/netfilter/nf_tables_api.c b/net/netfilter/nf_tables_api.c
+index 3b09e13b9b5c..41c529b0001c 100644
+--- a/net/netfilter/nf_tables_api.c
++++ b/net/netfilter/nf_tables_api.c
+@@ -3842,6 +3842,7 @@ static struct nft_set *nft_set_lookup_byhandle(const struct nft_table *table,
+ }
+ 
+ static struct nft_set *nft_set_lookup_byid(const struct net *net,
++					   const struct nft_table *table,
+ 					   const struct nlattr *nla, u8 genmask)
+ {
+ 	struct nftables_pernet *nft_net = nft_pernet(net);
+@@ -3853,6 +3854,7 @@ static struct nft_set *nft_set_lookup_byid(const struct net *net,
+ 			struct nft_set *set = nft_trans_set(trans);
+ 
+ 			if (id == nft_trans_set_id(trans) &&
++			    set->table == table &&
+ 			    nft_active_genmask(set, genmask))
+ 				return set;
+ 		}
+@@ -3873,7 +3875,7 @@ struct nft_set *nft_set_lookup_global(const struct net *net,
+ 		if (!nla_set_id)
+ 			return set;
+ 
+-		set = nft_set_lookup_byid(net, nla_set_id, genmask);
++		set = nft_set_lookup_byid(net, table, nla_set_id, genmask);
+ 	}
+ 	return set;
+ }

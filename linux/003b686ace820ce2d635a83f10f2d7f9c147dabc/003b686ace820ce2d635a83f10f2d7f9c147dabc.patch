@@ -1,0 +1,40 @@
+commit 003b686ace820ce2d635a83f10f2d7f9c147dabc
+Author: YueHaibing <yuehaibing@huawei.com>
+Date:   Tue Mar 12 15:03:58 2019 +0800
+
+    mwifiex: Fix mem leak in mwifiex_tm_cmd
+    
+    'hostcmd' is alloced by kzalloc, should be freed before
+    leaving from the error handling cases, otherwise it will
+    cause mem leak.
+    
+    Fixes: 3935ccc14d2c ("mwifiex: add cfg80211 testmode support")
+    Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+    Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
+
+diff --git a/drivers/net/wireless/marvell/mwifiex/cfg80211.c b/drivers/net/wireless/marvell/mwifiex/cfg80211.c
+index c46f0a54a0c7..e582d9b3e50c 100644
+--- a/drivers/net/wireless/marvell/mwifiex/cfg80211.c
++++ b/drivers/net/wireless/marvell/mwifiex/cfg80211.c
+@@ -4082,16 +4082,20 @@ static int mwifiex_tm_cmd(struct wiphy *wiphy, struct wireless_dev *wdev,
+ 
+ 		if (mwifiex_send_cmd(priv, 0, 0, 0, hostcmd, true)) {
+ 			dev_err(priv->adapter->dev, "Failed to process hostcmd\n");
++			kfree(hostcmd);
+ 			return -EFAULT;
+ 		}
+ 
+ 		/* process hostcmd response*/
+ 		skb = cfg80211_testmode_alloc_reply_skb(wiphy, hostcmd->len);
+-		if (!skb)
++		if (!skb) {
++			kfree(hostcmd);
+ 			return -ENOMEM;
++		}
+ 		err = nla_put(skb, MWIFIEX_TM_ATTR_DATA,
+ 			      hostcmd->len, hostcmd->cmd);
+ 		if (err) {
++			kfree(hostcmd);
+ 			kfree_skb(skb);
+ 			return -EMSGSIZE;
+ 		}

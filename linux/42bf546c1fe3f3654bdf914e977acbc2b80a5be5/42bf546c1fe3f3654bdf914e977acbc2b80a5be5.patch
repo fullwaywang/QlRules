@@ -1,0 +1,92 @@
+commit 42bf546c1fe3f3654bdf914e977acbc2b80a5be5
+Author: Chao Yu <yuchao0@huawei.com>
+Date:   Sat Jun 23 00:12:36 2018 +0800
+
+    f2fs: fix to do sanity check with secs_per_zone
+    
+    As Wen Xu reported in below link:
+    
+    https://bugzilla.kernel.org/show_bug.cgi?id=200183
+    
+    - Overview
+    Divide zero in reset_curseg() when mounting a crafted f2fs image
+    
+    - Reproduce
+    
+    - Kernel message
+    [  588.281510] divide error: 0000 [#1] SMP KASAN PTI
+    [  588.282701] CPU: 0 PID: 1293 Comm: mount Not tainted 4.18.0-rc1+ #4
+    [  588.284000] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS Ubuntu-1.8.2-1ubuntu1 04/01/2014
+    [  588.286178] RIP: 0010:reset_curseg+0x94/0x1a0
+    [  588.298166] RSP: 0018:ffff8801e88d7940 EFLAGS: 00010246
+    [  588.299360] RAX: 0000000000000014 RBX: ffff8801e1d46d00 RCX: ffffffffb88bf60b
+    [  588.300809] RDX: 0000000000000000 RSI: dffffc0000000000 RDI: ffff8801e1d46d64
+    [  588.305272] R13: 0000000000000000 R14: 0000000000000014 R15: 0000000000000000
+    [  588.306822] FS:  00007fad85008840(0000) GS:ffff8801f6e00000(0000) knlGS:0000000000000000
+    [  588.308456] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+    [  588.309623] CR2: 0000000001705078 CR3: 00000001f30f8000 CR4: 00000000000006f0
+    [  588.311085] Call Trace:
+    [  588.311637]  f2fs_build_segment_manager+0x103f/0x3410
+    [  588.316136]  ? f2fs_commit_super+0x1b0/0x1b0
+    [  588.317031]  ? set_blocksize+0x90/0x140
+    [  588.319473]  f2fs_mount+0x15/0x20
+    [  588.320166]  mount_fs+0x60/0x1a0
+    [  588.320847]  ? alloc_vfsmnt+0x309/0x360
+    [  588.321647]  vfs_kern_mount+0x6b/0x1a0
+    [  588.322432]  do_mount+0x34a/0x18c0
+    [  588.323175]  ? strndup_user+0x46/0x70
+    [  588.323937]  ? copy_mount_string+0x20/0x20
+    [  588.324793]  ? memcg_kmem_put_cache+0x1b/0xa0
+    [  588.325702]  ? kasan_check_write+0x14/0x20
+    [  588.326562]  ? _copy_from_user+0x6a/0x90
+    [  588.327375]  ? memdup_user+0x42/0x60
+    [  588.328118]  ksys_mount+0x83/0xd0
+    [  588.328808]  __x64_sys_mount+0x67/0x80
+    [  588.329607]  do_syscall_64+0x78/0x170
+    [  588.330400]  entry_SYSCALL_64_after_hwframe+0x44/0xa9
+    [  588.331461] RIP: 0033:0x7fad848e8b9a
+    [  588.336022] RSP: 002b:00007ffd7c5b6be8 EFLAGS: 00000206 ORIG_RAX: 00000000000000a5
+    [  588.337547] RAX: ffffffffffffffda RBX: 00000000016f8030 RCX: 00007fad848e8b9a
+    [  588.338999] RDX: 00000000016f8210 RSI: 00000000016f9f30 RDI: 0000000001700ec0
+    [  588.340442] RBP: 0000000000000000 R08: 0000000000000000 R09: 0000000000000013
+    [  588.341887] R10: 00000000c0ed0000 R11: 0000000000000206 R12: 0000000001700ec0
+    [  588.343341] R13: 00000000016f8210 R14: 0000000000000000 R15: 0000000000000003
+    [  588.354891] ---[ end trace 4ce02f25ff7d3df5 ]---
+    [  588.355862] RIP: 0010:reset_curseg+0x94/0x1a0
+    [  588.360742] RSP: 0018:ffff8801e88d7940 EFLAGS: 00010246
+    [  588.361812] RAX: 0000000000000014 RBX: ffff8801e1d46d00 RCX: ffffffffb88bf60b
+    [  588.363485] RDX: 0000000000000000 RSI: dffffc0000000000 RDI: ffff8801e1d46d64
+    [  588.365213] RBP: ffff8801e88d7968 R08: ffffed003c32266f R09: ffffed003c32266f
+    [  588.366661] R10: 0000000000000001 R11: ffffed003c32266e R12: ffff8801f0337700
+    [  588.368110] R13: 0000000000000000 R14: 0000000000000014 R15: 0000000000000000
+    [  588.370057] FS:  00007fad85008840(0000) GS:ffff8801f6e00000(0000) knlGS:0000000000000000
+    [  588.372099] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+    [  588.373291] CR2: 0000000001705078 CR3: 00000001f30f8000 CR4: 00000000000006f0
+    
+    - Location
+    https://elixir.bootlin.com/linux/latest/source/fs/f2fs/segment.c#L2147
+            curseg->zone = GET_ZONE_FROM_SEG(sbi, curseg->segno);
+    
+    If secs_per_zone is corrupted due to fuzzing test, it will cause divide
+    zero operation when using GET_ZONE_FROM_SEG macro, so we should do more
+    sanity check with secs_per_zone during mount to avoid this issue.
+    
+    Signed-off-by: Chao Yu <yuchao0@huawei.com>
+    Signed-off-by: Jaegeuk Kim <jaegeuk@kernel.org>
+
+diff --git a/fs/f2fs/super.c b/fs/f2fs/super.c
+index 01d1cb6081fc..a041ee20492d 100644
+--- a/fs/f2fs/super.c
++++ b/fs/f2fs/super.c
+@@ -2227,9 +2227,9 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
+ 		return 1;
+ 	}
+ 
+-	if (secs_per_zone > total_sections) {
++	if (secs_per_zone > total_sections || !secs_per_zone) {
+ 		f2fs_msg(sb, KERN_INFO,
+-			"Wrong secs_per_zone (%u > %u)",
++			"Wrong secs_per_zone / total_sections (%u, %u)",
+ 			secs_per_zone, total_sections);
+ 		return 1;
+ 	}

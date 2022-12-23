@@ -1,0 +1,76 @@
+commit f94b47c6bde624d6c07f43054087607c52054a95
+Author: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+Date:   Wed May 18 15:59:57 2022 +0800
+
+    staging: r8188eu: add check for kzalloc
+    
+    As kzalloc() may return null pointer, it should be better to
+    check the return value and return error if fails in order
+    to avoid dereference of null pointer.
+    Moreover, the return value of rtw_alloc_hwxmits() should also
+    be dealt with.
+    
+    Fixes: 15865124feed ("staging: r8188eu: introduce new core dir for RTL8188eu driver")
+    Reviewed-by: Dan Carpenter <dan.carpenter@oracle.com>
+    Signed-off-by: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+    Link: https://lore.kernel.org/r/20220518075957.514603-1-jiasheng@iscas.ac.cn
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/staging/r8188eu/core/rtw_xmit.c b/drivers/staging/r8188eu/core/rtw_xmit.c
+index f209f5379af8..3d8e9dea7651 100644
+--- a/drivers/staging/r8188eu/core/rtw_xmit.c
++++ b/drivers/staging/r8188eu/core/rtw_xmit.c
+@@ -178,7 +178,12 @@ s32	_rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, struct adapter *padapter)
+ 
+ 	pxmitpriv->free_xmit_extbuf_cnt = num_xmit_extbuf;
+ 
+-	rtw_alloc_hwxmits(padapter);
++	res = rtw_alloc_hwxmits(padapter);
++	if (res) {
++		res = _FAIL;
++		goto exit;
++	}
++
+ 	rtw_init_hwxmits(pxmitpriv->hwxmits, pxmitpriv->hwxmit_entry);
+ 
+ 	for (i = 0; i < 4; i++)
+@@ -1465,7 +1470,7 @@ s32 rtw_xmit_classifier(struct adapter *padapter, struct xmit_frame *pxmitframe)
+ 	return res;
+ }
+ 
+-void rtw_alloc_hwxmits(struct adapter *padapter)
++int rtw_alloc_hwxmits(struct adapter *padapter)
+ {
+ 	struct hw_xmit *hwxmits;
+ 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+@@ -1473,6 +1478,8 @@ void rtw_alloc_hwxmits(struct adapter *padapter)
+ 	pxmitpriv->hwxmit_entry = HWXMIT_ENTRY;
+ 
+ 	pxmitpriv->hwxmits = kzalloc(sizeof(struct hw_xmit) * pxmitpriv->hwxmit_entry, GFP_KERNEL);
++	if (!pxmitpriv->hwxmits)
++		return -ENOMEM;
+ 
+ 	hwxmits = pxmitpriv->hwxmits;
+ 
+@@ -1489,6 +1496,8 @@ void rtw_alloc_hwxmits(struct adapter *padapter)
+ 		hwxmits[3] .sta_queue = &pxmitpriv->bk_pending;
+ 	} else {
+ 	}
++
++	return 0;
+ }
+ 
+ void rtw_free_hwxmits(struct adapter *padapter)
+diff --git a/drivers/staging/r8188eu/include/rtw_xmit.h b/drivers/staging/r8188eu/include/rtw_xmit.h
+index 54c2bdf68acc..034a9f8f51c9 100644
+--- a/drivers/staging/r8188eu/include/rtw_xmit.h
++++ b/drivers/staging/r8188eu/include/rtw_xmit.h
+@@ -341,7 +341,7 @@ s32 rtw_txframes_sta_ac_pending(struct adapter *padapter,
+ void rtw_init_hwxmits(struct hw_xmit *phwxmit, int entry);
+ s32 _rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, struct adapter *padapter);
+ void _rtw_free_xmit_priv(struct xmit_priv *pxmitpriv);
+-void rtw_alloc_hwxmits(struct adapter *padapter);
++int rtw_alloc_hwxmits(struct adapter *padapter);
+ void rtw_free_hwxmits(struct adapter *padapter);
+ s32 rtw_xmit(struct adapter *padapter, struct sk_buff **pkt);
+ 

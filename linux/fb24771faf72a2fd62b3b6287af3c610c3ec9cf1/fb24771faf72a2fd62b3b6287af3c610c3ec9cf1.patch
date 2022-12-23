@@ -1,0 +1,45 @@
+commit fb24771faf72a2fd62b3b6287af3c610c3ec9cf1
+Author: Jeff Layton <jlayton@kernel.org>
+Date:   Fri Aug 5 06:42:45 2022 -0400
+
+    fscache: don't leak cookie access refs if invalidation is in progress or failed
+    
+    It's possible for a request to invalidate a fscache_cookie will come in
+    while we're already processing an invalidation. If that happens we
+    currently take an extra access reference that will leak. Only call
+    __fscache_begin_cookie_access if the FSCACHE_COOKIE_DO_INVALIDATE bit
+    was previously clear.
+    
+    Also, ensure that we attempt to clear the bit when the cookie is
+    "FAILED" and put the reference to avoid an access leak.
+    
+    Fixes: 85e4ea1049c7 ("fscache: Fix invalidation/lookup race")
+    Suggested-by: David Howells <dhowells@redhat.com>
+    Signed-off-by: Jeff Layton <jlayton@kernel.org>
+    Signed-off-by: David Howells <dhowells@redhat.com>
+
+diff --git a/fs/fscache/cookie.c b/fs/fscache/cookie.c
+index 74920826d8f6..26a6d395737a 100644
+--- a/fs/fscache/cookie.c
++++ b/fs/fscache/cookie.c
+@@ -739,6 +739,9 @@ static void fscache_cookie_state_machine(struct fscache_cookie *cookie)
+ 		fallthrough;
+ 
+ 	case FSCACHE_COOKIE_STATE_FAILED:
++		if (test_and_clear_bit(FSCACHE_COOKIE_DO_INVALIDATE, &cookie->flags))
++			fscache_end_cookie_access(cookie, fscache_access_invalidate_cookie_end);
++
+ 		if (atomic_read(&cookie->n_accesses) != 0)
+ 			break;
+ 		if (test_bit(FSCACHE_COOKIE_DO_RELINQUISH, &cookie->flags)) {
+@@ -1063,8 +1066,8 @@ void __fscache_invalidate(struct fscache_cookie *cookie,
+ 		return;
+ 
+ 	case FSCACHE_COOKIE_STATE_LOOKING_UP:
+-		__fscache_begin_cookie_access(cookie, fscache_access_invalidate_cookie);
+-		set_bit(FSCACHE_COOKIE_DO_INVALIDATE, &cookie->flags);
++		if (!test_and_set_bit(FSCACHE_COOKIE_DO_INVALIDATE, &cookie->flags))
++			__fscache_begin_cookie_access(cookie, fscache_access_invalidate_cookie);
+ 		fallthrough;
+ 	case FSCACHE_COOKIE_STATE_CREATING:
+ 		spin_unlock(&cookie->lock);

@@ -1,0 +1,31 @@
+commit 61a1d87a324ad5e3ed27c6699dfc93218fcf3201
+Author: Jan Kara <jack@suse.cz>
+Date:   Mon Aug 22 13:48:32 2022 +0200
+
+    ext4: fix check for block being out of directory size
+    
+    The check in __ext4_read_dirblock() for block being outside of directory
+    size was wrong because it compared block number against directory size
+    in bytes. Fix it.
+    
+    Fixes: 65f8ea4cd57d ("ext4: check if directory block is within i_size")
+    CVE: CVE-2022-1184
+    CC: stable@vger.kernel.org
+    Signed-off-by: Jan Kara <jack@suse.cz>
+    Reviewed-by: Lukas Czerner <lczerner@redhat.com>
+    Link: https://lore.kernel.org/r/20220822114832.1482-1-jack@suse.cz
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 3a31b662f661..bc2e0612ec32 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -126,7 +126,7 @@ static struct buffer_head *__ext4_read_dirblock(struct inode *inode,
+ 	struct ext4_dir_entry *dirent;
+ 	int is_dx_block = 0;
+ 
+-	if (block >= inode->i_size) {
++	if (block >= inode->i_size >> inode->i_blkbits) {
+ 		ext4_error_inode(inode, func, line, block,
+ 		       "Attempting to read directory block (%u) that is past i_size (%llu)",
+ 		       block, inode->i_size);

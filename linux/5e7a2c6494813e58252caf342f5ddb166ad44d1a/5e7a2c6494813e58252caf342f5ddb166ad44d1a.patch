@@ -1,0 +1,29 @@
+commit 5e7a2c6494813e58252caf342f5ddb166ad44d1a
+Merge: 59607863c54e d4826d17b393
+Author: David S. Miller <davem@davemloft.net>
+Date:   Thu Jun 3 15:17:33 2021 -0700
+
+    Merge tag 'wireless-drivers-2021-06-03' of git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/wireless-drivers
+    
+    Kalle Valo says:
+    
+    ====================
+    wireless-drivers fixes for v5.13
+    
+    We have only mt76 fixes this time, most important being the fix for
+    A-MSDU injection attacks.
+    
+    mt76
+    
+    * mitigate A-MSDU injection attacks (CVE-2020-24588)
+    
+    * fix possible array out of bound access in mt7921_mcu_tx_rate_report
+    
+    * various aggregation and HE setting fixes
+    
+    * suspend/resume fix for pci devices
+    
+    * mt7615: fix crash when runtime-pm is not supported
+    ====================
+    
+    Signed-off-by: David S. Miller <davem@davemloft.net>

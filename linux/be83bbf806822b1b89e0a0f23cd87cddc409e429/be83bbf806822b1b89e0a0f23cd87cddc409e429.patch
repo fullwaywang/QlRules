@@ -1,0 +1,118 @@
+commit be83bbf806822b1b89e0a0f23cd87cddc409e429
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Fri May 11 09:52:01 2018 -0700
+
+    mmap: introduce sane default mmap limits
+    
+    The internal VM "mmap()" interfaces are based on the mmap target doing
+    everything using page indexes rather than byte offsets, because
+    traditionally (ie 32-bit) we had the situation that the byte offset
+    didn't fit in a register.  So while the mmap virtual address was limited
+    by the word size of the architecture, the backing store was not.
+    
+    So we're basically passing "pgoff" around as a page index, in order to
+    be able to describe backing store locations that are much bigger than
+    the word size (think files larger than 4GB etc).
+    
+    But while this all makes a ton of sense conceptually, we've been dogged
+    by various drivers that don't really understand this, and internally
+    work with byte offsets, and then try to work with the page index by
+    turning it into a byte offset with "pgoff << PAGE_SHIFT".
+    
+    Which obviously can overflow.
+    
+    Adding the size of the mapping to it to get the byte offset of the end
+    of the backing store just exacerbates the problem, and if you then use
+    this overflow-prone value to check various limits of your device driver
+    mmap capability, you're just setting yourself up for problems.
+    
+    The correct thing for drivers to do is to do their limit math in page
+    indices, the way the interface is designed.  Because the generic mmap
+    code _does_ test that the index doesn't overflow, since that's what the
+    mmap code really cares about.
+    
+    HOWEVER.
+    
+    Finding and fixing various random drivers is a sisyphean task, so let's
+    just see if we can just make the core mmap() code do the limiting for
+    us.  Realistically, the only "big" backing stores we need to care about
+    are regular files and block devices, both of which are known to do this
+    properly, and which have nice well-defined limits for how much data they
+    can access.
+    
+    So let's special-case just those two known cases, and then limit other
+    random mmap users to a backing store that still fits in "unsigned long".
+    Realistically, that's not much of a limit at all on 64-bit, and on
+    32-bit architectures the only worry might be the GPU drivers, which can
+    have big physical address spaces.
+    
+    To make it possible for drivers like that to say that they are 64-bit
+    clean, this patch does repurpose the "FMODE_UNSIGNED_OFFSET" bit in the
+    file flags to allow drivers to mark their file descriptors as safe in
+    the full 64-bit mmap address space.
+    
+    [ The timing for doing this is less than optimal, and this should really
+      go in a merge window. But realistically, this needs wide testing more
+      than it needs anything else, and being main-line is the only way to do
+      that.
+    
+      So the earlier the better, even if it's outside the proper development
+      cycle        - Linus ]
+    
+    Cc: Kees Cook <keescook@chromium.org>
+    Cc: Dan Carpenter <dan.carpenter@oracle.com>
+    Cc: Al Viro <viro@zeniv.linux.org.uk>
+    Cc: Willy Tarreau <w@1wt.eu>
+    Cc: Dave Airlie <airlied@redhat.com>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 9d5968d1e8e3..6fc435760086 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -1324,6 +1324,35 @@ static inline int mlock_future_check(struct mm_struct *mm,
+ 	return 0;
+ }
+ 
++static inline u64 file_mmap_size_max(struct file *file, struct inode *inode)
++{
++	if (S_ISREG(inode->i_mode))
++		return inode->i_sb->s_maxbytes;
++
++	if (S_ISBLK(inode->i_mode))
++		return MAX_LFS_FILESIZE;
++
++	/* Special "we do even unsigned file positions" case */
++	if (file->f_mode & FMODE_UNSIGNED_OFFSET)
++		return 0;
++
++	/* Yes, random drivers might want more. But I'm tired of buggy drivers */
++	return ULONG_MAX;
++}
++
++static inline bool file_mmap_ok(struct file *file, struct inode *inode,
++				unsigned long pgoff, unsigned long len)
++{
++	u64 maxsize = file_mmap_size_max(file, inode);
++
++	if (maxsize && len > maxsize)
++		return false;
++	maxsize -= len;
++	if (pgoff > maxsize >> PAGE_SHIFT)
++		return false;
++	return true;
++}
++
+ /*
+  * The caller must hold down_write(&current->mm->mmap_sem).
+  */
+@@ -1409,6 +1438,9 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
+ 		struct inode *inode = file_inode(file);
+ 		unsigned long flags_mask;
+ 
++		if (!file_mmap_ok(file, inode, pgoff, len))
++			return -EOVERFLOW;
++
+ 		flags_mask = LEGACY_MAP_MASK | file->f_op->mmap_supported_flags;
+ 
+ 		switch (flags & MAP_TYPE) {

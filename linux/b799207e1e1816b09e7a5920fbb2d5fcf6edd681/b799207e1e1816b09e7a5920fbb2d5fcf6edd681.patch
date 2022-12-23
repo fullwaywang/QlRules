@@ -1,0 +1,53 @@
+commit b799207e1e1816b09e7a5920fbb2d5fcf6edd681
+Author: Jann Horn <jannh@google.com>
+Date:   Fri Oct 5 18:17:59 2018 +0200
+
+    bpf: 32-bit RSH verification must truncate input before the ALU op
+    
+    When I wrote commit 468f6eafa6c4 ("bpf: fix 32-bit ALU op verification"), I
+    assumed that, in order to emulate 64-bit arithmetic with 32-bit logic, it
+    is sufficient to just truncate the output to 32 bits; and so I just moved
+    the register size coercion that used to be at the start of the function to
+    the end of the function.
+    
+    That assumption is true for almost every op, but not for 32-bit right
+    shifts, because those can propagate information towards the least
+    significant bit. Fix it by always truncating inputs for 32-bit ops to 32
+    bits.
+    
+    Also get rid of the coerce_reg_to_size() after the ALU op, since that has
+    no effect.
+    
+    Fixes: 468f6eafa6c4 ("bpf: fix 32-bit ALU op verification")
+    Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+    Signed-off-by: Jann Horn <jannh@google.com>
+    Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+
+diff --git a/kernel/bpf/verifier.c b/kernel/bpf/verifier.c
+index bb07e74b34a2..465952a8e465 100644
+--- a/kernel/bpf/verifier.c
++++ b/kernel/bpf/verifier.c
+@@ -2896,6 +2896,15 @@ static int adjust_scalar_min_max_vals(struct bpf_verifier_env *env,
+ 	u64 umin_val, umax_val;
+ 	u64 insn_bitness = (BPF_CLASS(insn->code) == BPF_ALU64) ? 64 : 32;
+ 
++	if (insn_bitness == 32) {
++		/* Relevant for 32-bit RSH: Information can propagate towards
++		 * LSB, so it isn't sufficient to only truncate the output to
++		 * 32 bits.
++		 */
++		coerce_reg_to_size(dst_reg, 4);
++		coerce_reg_to_size(&src_reg, 4);
++	}
++
+ 	smin_val = src_reg.smin_value;
+ 	smax_val = src_reg.smax_value;
+ 	umin_val = src_reg.umin_value;
+@@ -3131,7 +3140,6 @@ static int adjust_scalar_min_max_vals(struct bpf_verifier_env *env,
+ 	if (BPF_CLASS(insn->code) != BPF_ALU64) {
+ 		/* 32-bit ALU ops are (32,32)->32 */
+ 		coerce_reg_to_size(dst_reg, 4);
+-		coerce_reg_to_size(&src_reg, 4);
+ 	}
+ 
+ 	__reg_deduce_bounds(dst_reg);

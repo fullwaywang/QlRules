@@ -1,0 +1,14 @@
+commit 579028dec182c026b9a85725682f1dfbdc825eaa
+Merge: 1a8024239dac 1f14a620f30b
+Author: David S. Miller <davem@davemloft.net>
+Date:   Thu Jun 3 15:32:21 2021 -0700
+
+    Merge tag 'for-net-2021-06-03' of git://git.kernel.org/pub/scm/linux/kernel/git/bluetooth/bluetooth
+    
+    bluetooth pull request for net:
+    
+     - Fixes UAF and CVE-2021-3564
+     - Fix VIRTIO_ID_BT to use an unassigned ID
+     - Fix firmware loading on some Intel Controllers
+    
+    Signed-off-by: David S. Miller <davem@davemloft.net>

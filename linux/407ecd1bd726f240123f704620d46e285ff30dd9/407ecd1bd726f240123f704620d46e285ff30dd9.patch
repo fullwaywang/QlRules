@@ -1,0 +1,28 @@
+commit 407ecd1bd726f240123f704620d46e285ff30dd9
+Author: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+Date:   Wed Dec 15 22:37:31 2021 +0800
+
+    sfc_ef100: potential dereference of null pointer
+    
+    The return value of kmalloc() needs to be checked.
+    To avoid use in efx_nic_update_stats() in case of the failure of alloc.
+    
+    Fixes: b593b6f1b492 ("sfc_ef100: statistics gathering")
+    Signed-off-by: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+    Reported-by: kernel test robot <lkp@intel.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/ethernet/sfc/ef100_nic.c b/drivers/net/ethernet/sfc/ef100_nic.c
+index 6aa81229b68a..e77a5cb4e40d 100644
+--- a/drivers/net/ethernet/sfc/ef100_nic.c
++++ b/drivers/net/ethernet/sfc/ef100_nic.c
+@@ -609,6 +609,9 @@ static size_t ef100_update_stats(struct efx_nic *efx,
+ 	ef100_common_stat_mask(mask);
+ 	ef100_ethtool_stat_mask(mask);
+ 
++	if (!mc_stats)
++		return 0;
++
+ 	efx_nic_copy_stats(efx, mc_stats);
+ 	efx_nic_update_stats(ef100_stat_desc, EF100_STAT_COUNT, mask,
+ 			     stats, mc_stats, false);

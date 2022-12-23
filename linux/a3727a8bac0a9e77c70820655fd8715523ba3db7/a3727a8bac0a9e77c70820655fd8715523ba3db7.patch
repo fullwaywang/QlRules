@@ -1,0 +1,76 @@
+commit a3727a8bac0a9e77c70820655fd8715523ba3db7
+Author: Paul Moore <paul@paul-moore.com>
+Date:   Thu Sep 23 09:50:11 2021 -0400
+
+    selinux,smack: fix subjective/objective credential use mixups
+    
+    Jann Horn reported a problem with commit eb1231f73c4d ("selinux:
+    clarify task subjective and objective credentials") where some LSM
+    hooks were attempting to access the subjective credentials of a task
+    other than the current task.  Generally speaking, it is not safe to
+    access another task's subjective credentials and doing so can cause
+    a number of problems.
+    
+    Further, while looking into the problem, I realized that Smack was
+    suffering from a similar problem brought about by a similar commit
+    1fb057dcde11 ("smack: differentiate between subjective and objective
+    task credentials").
+    
+    This patch addresses this problem by restoring the use of the task's
+    objective credentials in those cases where the task is other than the
+    current executing task.  Not only does this resolve the problem
+    reported by Jann, it is arguably the correct thing to do in these
+    cases.
+    
+    Cc: stable@vger.kernel.org
+    Fixes: eb1231f73c4d ("selinux: clarify task subjective and objective credentials")
+    Fixes: 1fb057dcde11 ("smack: differentiate between subjective and objective task credentials")
+    Reported-by: Jann Horn <jannh@google.com>
+    Acked-by: Eric W. Biederman <ebiederm@xmission.com>
+    Acked-by: Casey Schaufler <casey@schaufler-ca.com>
+    Signed-off-by: Paul Moore <paul@paul-moore.com>
+
+diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
+index 6517f221d52c..e7ebd45ca345 100644
+--- a/security/selinux/hooks.c
++++ b/security/selinux/hooks.c
+@@ -2157,7 +2157,7 @@ static int selinux_ptrace_access_check(struct task_struct *child,
+ static int selinux_ptrace_traceme(struct task_struct *parent)
+ {
+ 	return avc_has_perm(&selinux_state,
+-			    task_sid_subj(parent), task_sid_obj(current),
++			    task_sid_obj(parent), task_sid_obj(current),
+ 			    SECCLASS_PROCESS, PROCESS__PTRACE, NULL);
+ }
+ 
+@@ -6222,7 +6222,7 @@ static int selinux_msg_queue_msgrcv(struct kern_ipc_perm *msq, struct msg_msg *m
+ 	struct ipc_security_struct *isec;
+ 	struct msg_security_struct *msec;
+ 	struct common_audit_data ad;
+-	u32 sid = task_sid_subj(target);
++	u32 sid = task_sid_obj(target);
+ 	int rc;
+ 
+ 	isec = selinux_ipc(msq);
+diff --git a/security/smack/smack_lsm.c b/security/smack/smack_lsm.c
+index cacbe7518519..21a0e7c3b8de 100644
+--- a/security/smack/smack_lsm.c
++++ b/security/smack/smack_lsm.c
+@@ -2016,7 +2016,7 @@ static int smk_curacc_on_task(struct task_struct *p, int access,
+ 				const char *caller)
+ {
+ 	struct smk_audit_info ad;
+-	struct smack_known *skp = smk_of_task_struct_subj(p);
++	struct smack_known *skp = smk_of_task_struct_obj(p);
+ 	int rc;
+ 
+ 	smk_ad_init(&ad, caller, LSM_AUDIT_DATA_TASK);
+@@ -3480,7 +3480,7 @@ static void smack_d_instantiate(struct dentry *opt_dentry, struct inode *inode)
+  */
+ static int smack_getprocattr(struct task_struct *p, char *name, char **value)
+ {
+-	struct smack_known *skp = smk_of_task_struct_subj(p);
++	struct smack_known *skp = smk_of_task_struct_obj(p);
+ 	char *cp;
+ 	int slen;
+ 

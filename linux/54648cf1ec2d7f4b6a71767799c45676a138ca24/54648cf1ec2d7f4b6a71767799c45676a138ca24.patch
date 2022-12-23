@@ -1,0 +1,39 @@
+commit 54648cf1ec2d7f4b6a71767799c45676a138ca24
+Author: xiao jin <jin.xiao@intel.com>
+Date:   Mon Jul 30 14:11:12 2018 +0800
+
+    block: blk_init_allocated_queue() set q->fq as NULL in the fail case
+    
+    We find the memory use-after-free issue in __blk_drain_queue()
+    on the kernel 4.14. After read the latest kernel 4.18-rc6 we
+    think it has the same problem.
+    
+    Memory is allocated for q->fq in the blk_init_allocated_queue().
+    If the elevator init function called with error return, it will
+    run into the fail case to free the q->fq.
+    
+    Then the __blk_drain_queue() uses the same memory after the free
+    of the q->fq, it will lead to the unpredictable event.
+    
+    The patch is to set q->fq as NULL in the fail case of
+    blk_init_allocated_queue().
+    
+    Fixes: commit 7c94e1c157a2 ("block: introduce blk_flush_queue to drive flush machinery")
+    Cc: <stable@vger.kernel.org>
+    Reviewed-by: Ming Lei <ming.lei@redhat.com>
+    Reviewed-by: Bart Van Assche <bart.vanassche@wdc.com>
+    Signed-off-by: xiao jin <jin.xiao@intel.com>
+    Signed-off-by: Jens Axboe <axboe@kernel.dk>
+
+diff --git a/block/blk-core.c b/block/blk-core.c
+index 03a4ea93a5f3..23cd1b7770e7 100644
+--- a/block/blk-core.c
++++ b/block/blk-core.c
+@@ -1184,6 +1184,7 @@ int blk_init_allocated_queue(struct request_queue *q)
+ 		q->exit_rq_fn(q, q->fq->flush_rq);
+ out_free_flush_queue:
+ 	blk_free_flush_queue(q->fq);
++	q->fq = NULL;
+ 	return -ENOMEM;
+ }
+ EXPORT_SYMBOL(blk_init_allocated_queue);

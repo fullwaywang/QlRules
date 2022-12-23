@@ -1,0 +1,53 @@
+commit 8c2f870890fd28e023b0fcf49dcee333f2c8bad7
+Author: Takashi Iwai <tiwai@suse.de>
+Date:   Tue Apr 16 15:25:00 2019 +0200
+
+    ALSA: info: Fix racy addition/deletion of nodes
+    
+    The ALSA proc helper manages the child nodes in a linked list, but its
+    addition and deletion is done without any lock.  This leads to a
+    corruption if they are operated concurrently.  Usually this isn't a
+    problem because the proc entries are added sequentially in the driver
+    probe procedure itself.  But the card registrations are done often
+    asynchronously, and the crash could be actually reproduced with
+    syzkaller.
+    
+    This patch papers over it by protecting the link addition and deletion
+    with the parent's mutex.  There is "access" mutex that is used for the
+    file access, and this can be reused for this purpose as well.
+    
+    Reported-by: syzbot+48df349490c36f9f54ab@syzkaller.appspotmail.com
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+
+diff --git a/sound/core/info.c b/sound/core/info.c
+index 96a074019c33..0eb169acc850 100644
+--- a/sound/core/info.c
++++ b/sound/core/info.c
+@@ -713,8 +713,11 @@ snd_info_create_entry(const char *name, struct snd_info_entry *parent,
+ 	INIT_LIST_HEAD(&entry->list);
+ 	entry->parent = parent;
+ 	entry->module = module;
+-	if (parent)
++	if (parent) {
++		mutex_lock(&parent->access);
+ 		list_add_tail(&entry->list, &parent->children);
++		mutex_unlock(&parent->access);
++	}
+ 	return entry;
+ }
+ 
+@@ -792,7 +795,12 @@ void snd_info_free_entry(struct snd_info_entry * entry)
+ 	list_for_each_entry_safe(p, n, &entry->children, list)
+ 		snd_info_free_entry(p);
+ 
+-	list_del(&entry->list);
++	p = entry->parent;
++	if (p) {
++		mutex_lock(&p->access);
++		list_del(&entry->list);
++		mutex_unlock(&p->access);
++	}
+ 	kfree(entry->name);
+ 	if (entry->private_free)
+ 		entry->private_free(entry);

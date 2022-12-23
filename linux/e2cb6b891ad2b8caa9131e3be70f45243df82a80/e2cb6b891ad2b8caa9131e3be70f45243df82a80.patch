@@ -1,0 +1,49 @@
+commit e2cb6b891ad2b8caa9131e3be70f45243df82a80
+Author: Lin Ma <linma@zju.edu.cn>
+Date:   Mon Apr 12 19:17:57 2021 +0800
+
+    bluetooth: eliminate the potential race condition when removing the HCI controller
+    
+    There is a possible race condition vulnerability between issuing a HCI
+    command and removing the cont.  Specifically, functions hci_req_sync()
+    and hci_dev_do_close() can race each other like below:
+    
+    thread-A in hci_req_sync()      |   thread-B in hci_dev_do_close()
+                                    |   hci_req_sync_lock(hdev);
+    test_bit(HCI_UP, &hdev->flags); |
+    ...                             |   test_and_clear_bit(HCI_UP, &hdev->flags)
+    hci_req_sync_lock(hdev);        |
+                                    |
+    In this commit we alter the sequence in function hci_req_sync(). Hence,
+    the thread-A cannot issue th.
+    
+    Signed-off-by: Lin Ma <linma@zju.edu.cn>
+    Cc: Marcel Holtmann <marcel@holtmann.org>
+    Fixes: 7c6a329e4447 ("[Bluetooth] Fix regression from using default link policy")
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/net/bluetooth/hci_request.c b/net/bluetooth/hci_request.c
+index e55976db4403..805ce546b813 100644
+--- a/net/bluetooth/hci_request.c
++++ b/net/bluetooth/hci_request.c
+@@ -272,12 +272,16 @@ int hci_req_sync(struct hci_dev *hdev, int (*req)(struct hci_request *req,
+ {
+ 	int ret;
+ 
+-	if (!test_bit(HCI_UP, &hdev->flags))
+-		return -ENETDOWN;
+-
+ 	/* Serialize all requests */
+ 	hci_req_sync_lock(hdev);
+-	ret = __hci_req_sync(hdev, req, opt, timeout, hci_status);
++	/* check the state after obtaing the lock to protect the HCI_UP
++	 * against any races from hci_dev_do_close when the controller
++	 * gets removed.
++	 */
++	if (test_bit(HCI_UP, &hdev->flags))
++		ret = __hci_req_sync(hdev, req, opt, timeout, hci_status);
++	else
++		ret = -ENETDOWN;
+ 	hci_req_sync_unlock(hdev);
+ 
+ 	return ret;

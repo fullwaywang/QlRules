@@ -1,0 +1,61 @@
+commit a58d9166a756a0f4a6618e4f593232593d6df134
+Author: Paolo Bonzini <pbonzini@redhat.com>
+Date:   Wed Mar 31 06:24:43 2021 -0400
+
+    KVM: SVM: load control fields from VMCB12 before checking them
+    
+    Avoid races between check and use of the nested VMCB controls.  This
+    for example ensures that the VMRUN intercept is always reflected to the
+    nested hypervisor, instead of being processed by the host.  Without this
+    patch, it is possible to end up with svm->nested.hsave pointing to
+    the MSR permission bitmap for nested guests.
+    
+    This bug is CVE-2021-29657.
+    
+    Reported-by: Felix Wilhelm <fwilhelm@google.com>
+    Cc: stable@vger.kernel.org
+    Fixes: 2fcf4876ada ("KVM: nSVM: implement on demand allocation of the nested state")
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/svm/nested.c b/arch/x86/kvm/svm/nested.c
+index 9e4c226dbf7d..061a00f91af5 100644
+--- a/arch/x86/kvm/svm/nested.c
++++ b/arch/x86/kvm/svm/nested.c
+@@ -225,7 +225,7 @@ static bool nested_vmcb_check_controls(struct vmcb_control_area *control)
+ 	return true;
+ }
+ 
+-static bool nested_vmcb_checks(struct vcpu_svm *svm, struct vmcb *vmcb12)
++static bool nested_vmcb_check_save(struct vcpu_svm *svm, struct vmcb *vmcb12)
+ {
+ 	bool vmcb12_lma;
+ 
+@@ -257,7 +257,7 @@ static bool nested_vmcb_checks(struct vcpu_svm *svm, struct vmcb *vmcb12)
+ 	if (kvm_valid_cr4(&svm->vcpu, vmcb12->save.cr4))
+ 		return false;
+ 
+-	return nested_vmcb_check_controls(&vmcb12->control);
++	return true;
+ }
+ 
+ static void load_nested_vmcb_control(struct vcpu_svm *svm,
+@@ -440,7 +440,6 @@ int enter_svm_guest_mode(struct vcpu_svm *svm, u64 vmcb12_gpa,
+ 	int ret;
+ 
+ 	svm->nested.vmcb12_gpa = vmcb12_gpa;
+-	load_nested_vmcb_control(svm, &vmcb12->control);
+ 	nested_prepare_vmcb_save(svm, vmcb12);
+ 	nested_prepare_vmcb_control(svm);
+ 
+@@ -484,7 +483,10 @@ int nested_svm_vmrun(struct vcpu_svm *svm)
+ 	if (WARN_ON_ONCE(!svm->nested.initialized))
+ 		return -EINVAL;
+ 
+-	if (!nested_vmcb_checks(svm, vmcb12)) {
++	load_nested_vmcb_control(svm, &vmcb12->control);
++
++	if (!nested_vmcb_check_save(svm, vmcb12) ||
++	    !nested_vmcb_check_controls(&svm->nested.ctl)) {
+ 		vmcb12->control.exit_code    = SVM_EXIT_ERR;
+ 		vmcb12->control.exit_code_hi = 0;
+ 		vmcb12->control.exit_info_1  = 0;

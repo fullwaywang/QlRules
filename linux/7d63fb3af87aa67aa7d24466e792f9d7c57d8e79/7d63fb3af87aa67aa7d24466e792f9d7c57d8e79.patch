@@ -1,0 +1,70 @@
+commit 7d63fb3af87aa67aa7d24466e792f9d7c57d8e79
+Author: Kees Cook <keescook@chromium.org>
+Date:   Tue Jul 10 16:22:22 2018 -0700
+
+    swiotlb: clean up reporting
+    
+    This removes needless use of '%p', and refactors the printk calls to
+    use pr_*() helpers instead.
+    
+    Signed-off-by: Kees Cook <keescook@chromium.org>
+    Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+    Signed-off-by: Christoph Hellwig <hch@lst.de>
+
+diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+index 904541055792..4f8a6dbf0b60 100644
+--- a/kernel/dma/swiotlb.c
++++ b/kernel/dma/swiotlb.c
+@@ -17,6 +17,8 @@
+  * 08/12/11 beckyb	Add highmem support
+  */
+ 
++#define pr_fmt(fmt) "software IO TLB: " fmt
++
+ #include <linux/cache.h>
+ #include <linux/dma-direct.h>
+ #include <linux/mm.h>
+@@ -162,20 +164,16 @@ static bool no_iotlb_memory;
+ void swiotlb_print_info(void)
+ {
+ 	unsigned long bytes = io_tlb_nslabs << IO_TLB_SHIFT;
+-	unsigned char *vstart, *vend;
+ 
+ 	if (no_iotlb_memory) {
+-		pr_warn("software IO TLB: No low mem\n");
++		pr_warn("No low mem\n");
+ 		return;
+ 	}
+ 
+-	vstart = phys_to_virt(io_tlb_start);
+-	vend = phys_to_virt(io_tlb_end);
+-
+-	printk(KERN_INFO "software IO TLB [mem %#010llx-%#010llx] (%luMB) mapped at [%p-%p]\n",
++	pr_info("mapped [mem %#010llx-%#010llx] (%luMB)\n",
+ 	       (unsigned long long)io_tlb_start,
+ 	       (unsigned long long)io_tlb_end,
+-	       bytes >> 20, vstart, vend - 1);
++	       bytes >> 20);
+ }
+ 
+ /*
+@@ -275,7 +273,7 @@ swiotlb_init(int verbose)
+ 	if (io_tlb_start)
+ 		memblock_free_early(io_tlb_start,
+ 				    PAGE_ALIGN(io_tlb_nslabs << IO_TLB_SHIFT));
+-	pr_warn("Cannot allocate SWIOTLB buffer");
++	pr_warn("Cannot allocate buffer");
+ 	no_iotlb_memory = true;
+ }
+ 
+@@ -317,8 +315,8 @@ swiotlb_late_init_with_default_size(size_t default_size)
+ 		return -ENOMEM;
+ 	}
+ 	if (order != get_order(bytes)) {
+-		printk(KERN_WARNING "Warning: only able to allocate %ld MB "
+-		       "for software IO TLB\n", (PAGE_SIZE << order) >> 20);
++		pr_warn("only able to allocate %ld MB\n",
++			(PAGE_SIZE << order) >> 20);
+ 		io_tlb_nslabs = SLABS_PER_PAGE << order;
+ 	}
+ 	rc = swiotlb_late_init_with_tbl(vstart, io_tlb_nslabs);

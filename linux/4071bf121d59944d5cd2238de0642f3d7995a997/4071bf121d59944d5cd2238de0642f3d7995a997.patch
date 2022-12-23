@@ -1,0 +1,60 @@
+commit 4071bf121d59944d5cd2238de0642f3d7995a997
+Author: Duoming Zhou <duoming@zju.edu.cn>
+Date:   Wed May 4 13:58:47 2022 +0800
+
+    NFC: netlink: fix sleep in atomic bug when firmware download timeout
+    
+    There are sleep in atomic bug that could cause kernel panic during
+    firmware download process. The root cause is that nlmsg_new with
+    GFP_KERNEL parameter is called in fw_dnld_timeout which is a timer
+    handler. The call trace is shown below:
+    
+    BUG: sleeping function called from invalid context at include/linux/sched/mm.h:265
+    Call Trace:
+    kmem_cache_alloc_node
+    __alloc_skb
+    nfc_genl_fw_download_done
+    call_timer_fn
+    __run_timers.part.0
+    run_timer_softirq
+    __do_softirq
+    ...
+    
+    The nlmsg_new with GFP_KERNEL parameter may sleep during memory
+    allocation process, and the timer handler is run as the result of
+    a "software interrupt" that should not call any other function
+    that could sleep.
+    
+    This patch changes allocation mode of netlink message from GFP_KERNEL
+    to GFP_ATOMIC in order to prevent sleep in atomic bug. The GFP_ATOMIC
+    flag makes memory allocation operation could be used in atomic context.
+    
+    Fixes: 9674da8759df ("NFC: Add firmware upload netlink command")
+    Fixes: 9ea7187c53f6 ("NFC: netlink: Rename CMD_FW_UPLOAD to CMD_FW_DOWNLOAD")
+    Signed-off-by: Duoming Zhou <duoming@zju.edu.cn>
+    Reviewed-by: Krzysztof Kozlowski <krzysztof.kozlowski@linaro.org>
+    Link: https://lore.kernel.org/r/20220504055847.38026-1-duoming@zju.edu.cn
+    Signed-off-by: Paolo Abeni <pabeni@redhat.com>
+
+diff --git a/net/nfc/netlink.c b/net/nfc/netlink.c
+index f184b0db79d4..7c62417ccfd7 100644
+--- a/net/nfc/netlink.c
++++ b/net/nfc/netlink.c
+@@ -1244,7 +1244,7 @@ int nfc_genl_fw_download_done(struct nfc_dev *dev, const char *firmware_name,
+ 	struct sk_buff *msg;
+ 	void *hdr;
+ 
+-	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
++	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_ATOMIC);
+ 	if (!msg)
+ 		return -ENOMEM;
+ 
+@@ -1260,7 +1260,7 @@ int nfc_genl_fw_download_done(struct nfc_dev *dev, const char *firmware_name,
+ 
+ 	genlmsg_end(msg, hdr);
+ 
+-	genlmsg_multicast(&nfc_genl_family, msg, 0, 0, GFP_KERNEL);
++	genlmsg_multicast(&nfc_genl_family, msg, 0, 0, GFP_ATOMIC);
+ 
+ 	return 0;
+ 

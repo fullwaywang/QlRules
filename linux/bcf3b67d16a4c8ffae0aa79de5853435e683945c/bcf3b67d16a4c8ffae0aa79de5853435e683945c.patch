@@ -1,0 +1,71 @@
+commit bcf3b67d16a4c8ffae0aa79de5853435e683945c
+Author: Jason Yan <yanaijie@huawei.com>
+Date:   Fri Feb 15 19:50:27 2019 +0800
+
+    scsi: megaraid_sas: return error when create DMA pool failed
+    
+    when create DMA pool for cmd frames failed, we should return -ENOMEM,
+    instead of 0.
+    In some case in:
+    
+        megasas_init_adapter_fusion()
+    
+        -->megasas_alloc_cmds()
+           -->megasas_create_frame_pool
+              create DMA pool failed,
+            --> megasas_free_cmds() [1]
+    
+        -->megasas_alloc_cmds_fusion()
+           failed, then goto fail_alloc_cmds.
+        -->megasas_free_cmds() [2]
+    
+    we will call megasas_free_cmds twice, [1] will kfree cmd_list,
+    [2] will use cmd_list.it will cause a problem:
+    
+    Unable to handle kernel NULL pointer dereference at virtual address
+    00000000
+    pgd = ffffffc000f70000
+    [00000000] *pgd=0000001fbf893003, *pud=0000001fbf893003,
+    *pmd=0000001fbf894003, *pte=006000006d000707
+    Internal error: Oops: 96000005 [#1] SMP
+     Modules linked in:
+     CPU: 18 PID: 1 Comm: swapper/0 Not tainted
+     task: ffffffdfb9290000 ti: ffffffdfb923c000 task.ti: ffffffdfb923c000
+     PC is at megasas_free_cmds+0x30/0x70
+     LR is at megasas_free_cmds+0x24/0x70
+     ...
+     Call trace:
+     [<ffffffc0005b779c>] megasas_free_cmds+0x30/0x70
+     [<ffffffc0005bca74>] megasas_init_adapter_fusion+0x2f4/0x4d8
+     [<ffffffc0005b926c>] megasas_init_fw+0x2dc/0x760
+     [<ffffffc0005b9ab0>] megasas_probe_one+0x3c0/0xcd8
+     [<ffffffc0004a5abc>] local_pci_probe+0x4c/0xb4
+     [<ffffffc0004a5c40>] pci_device_probe+0x11c/0x14c
+     [<ffffffc00053a5e4>] driver_probe_device+0x1ec/0x430
+     [<ffffffc00053a92c>] __driver_attach+0xa8/0xb0
+     [<ffffffc000538178>] bus_for_each_dev+0x74/0xc8
+      [<ffffffc000539e88>] driver_attach+0x28/0x34
+     [<ffffffc000539a18>] bus_add_driver+0x16c/0x248
+     [<ffffffc00053b234>] driver_register+0x6c/0x138
+     [<ffffffc0004a5350>] __pci_register_driver+0x5c/0x6c
+     [<ffffffc000ce3868>] megasas_init+0xc0/0x1a8
+     [<ffffffc000082a58>] do_one_initcall+0xe8/0x1ec
+     [<ffffffc000ca7be8>] kernel_init_freeable+0x1c8/0x284
+     [<ffffffc0008d90b8>] kernel_init+0x1c/0xe4
+    
+    Signed-off-by: Jason Yan <yanaijie@huawei.com>
+    Acked-by: Sumit Saxena <sumit.saxena@broadcom.com>
+    Signed-off-by: Martin K. Petersen <martin.petersen@oracle.com>
+
+diff --git a/drivers/scsi/megaraid/megaraid_sas_base.c b/drivers/scsi/megaraid/megaraid_sas_base.c
+index ed730d054052..8a2ee4cf26b0 100644
+--- a/drivers/scsi/megaraid/megaraid_sas_base.c
++++ b/drivers/scsi/megaraid/megaraid_sas_base.c
+@@ -4188,6 +4188,7 @@ int megasas_alloc_cmds(struct megasas_instance *instance)
+ 	if (megasas_create_frame_pool(instance)) {
+ 		dev_printk(KERN_DEBUG, &instance->pdev->dev, "Error creating frame DMA pool\n");
+ 		megasas_free_cmds(instance);
++		return -ENOMEM;
+ 	}
+ 
+ 	return 0;

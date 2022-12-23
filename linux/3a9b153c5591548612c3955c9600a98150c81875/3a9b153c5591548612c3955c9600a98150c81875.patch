@@ -1,0 +1,30 @@
+commit 3a9b153c5591548612c3955c9600a98150c81875
+Author: Qing Xu <m1s5p6688@gmail.com>
+Date:   Thu Jan 2 10:39:26 2020 +0800
+
+    mwifiex: Fix possible buffer overflows in mwifiex_ret_wmm_get_status()
+    
+    mwifiex_ret_wmm_get_status() calls memcpy() without checking the
+    destination size.Since the source is given from remote AP which
+    contains illegal wmm elements , this may trigger a heap buffer
+    overflow.
+    Fix it by putting the length check before calling memcpy().
+    
+    Signed-off-by: Qing Xu <m1s5p6688@gmail.com>
+    Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
+
+diff --git a/drivers/net/wireless/marvell/mwifiex/wmm.c b/drivers/net/wireless/marvell/mwifiex/wmm.c
+index 41f0231376c0..132f9e8ed68c 100644
+--- a/drivers/net/wireless/marvell/mwifiex/wmm.c
++++ b/drivers/net/wireless/marvell/mwifiex/wmm.c
+@@ -970,6 +970,10 @@ int mwifiex_ret_wmm_get_status(struct mwifiex_private *priv,
+ 				    "WMM Parameter Set Count: %d\n",
+ 				    wmm_param_ie->qos_info_bitmap & mask);
+ 
++			if (wmm_param_ie->vend_hdr.len + 2 >
++				sizeof(struct ieee_types_wmm_parameter))
++				break;
++
+ 			memcpy((u8 *) &priv->curr_bss_params.bss_descriptor.
+ 			       wmm_ie, wmm_param_ie,
+ 			       wmm_param_ie->vend_hdr.len + 2);

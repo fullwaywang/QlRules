@@ -1,0 +1,65 @@
+commit f8be156be163a052a067306417cd0ff679068c97
+Author: Nicholas Piggin <npiggin@gmail.com>
+Date:   Thu Jun 24 08:29:04 2021 -0400
+
+    KVM: do not allow mapping valid but non-reference-counted pages
+    
+    It's possible to create a region which maps valid but non-refcounted
+    pages (e.g., tail pages of non-compound higher order allocations). These
+    host pages can then be returned by gfn_to_page, gfn_to_pfn, etc., family
+    of APIs, which take a reference to the page, which takes it from 0 to 1.
+    When the reference is dropped, this will free the page incorrectly.
+    
+    Fix this by only taking a reference on valid pages if it was non-zero,
+    which indicates it is participating in normal refcounting (and can be
+    released with put_page).
+    
+    This addresses CVE-2021-22543.
+    
+    Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+    Tested-by: Paolo Bonzini <pbonzini@redhat.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 6a6bc7af0e28..46fb042837d2 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2055,6 +2055,13 @@ static bool vma_is_valid(struct vm_area_struct *vma, bool write_fault)
+ 	return true;
+ }
+ 
++static int kvm_try_get_pfn(kvm_pfn_t pfn)
++{
++	if (kvm_is_reserved_pfn(pfn))
++		return 1;
++	return get_page_unless_zero(pfn_to_page(pfn));
++}
++
+ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
+ 			       unsigned long addr, bool *async,
+ 			       bool write_fault, bool *writable,
+@@ -2104,13 +2111,21 @@ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
+ 	 * Whoever called remap_pfn_range is also going to call e.g.
+ 	 * unmap_mapping_range before the underlying pages are freed,
+ 	 * causing a call to our MMU notifier.
++	 *
++	 * Certain IO or PFNMAP mappings can be backed with valid
++	 * struct pages, but be allocated without refcounting e.g.,
++	 * tail pages of non-compound higher order allocations, which
++	 * would then underflow the refcount when the caller does the
++	 * required put_page. Don't allow those pages here.
+ 	 */ 
+-	kvm_get_pfn(pfn);
++	if (!kvm_try_get_pfn(pfn))
++		r = -EFAULT;
+ 
+ out:
+ 	pte_unmap_unlock(ptep, ptl);
+ 	*p_pfn = pfn;
+-	return 0;
++
++	return r;
+ }
+ 
+ /*

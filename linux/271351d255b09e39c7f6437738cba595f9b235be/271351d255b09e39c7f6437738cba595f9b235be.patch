@@ -1,0 +1,42 @@
+commit 271351d255b09e39c7f6437738cba595f9b235be
+Author: Xin Long <lucien.xin@gmail.com>
+Date:   Mon Nov 15 07:45:24 2021 -0500
+
+    tipc: only accept encrypted MSG_CRYPTO msgs
+    
+    The MSG_CRYPTO msgs are always encrypted and sent to other nodes
+    for keys' deployment. But when receiving in peers, if those nodes
+    do not validate it and make sure it's encrypted, one could craft
+    a malicious MSG_CRYPTO msg to deploy its key with no need to know
+    other nodes' keys.
+    
+    This patch is to do that by checking TIPC_SKB_CB(skb)->decrypted
+    and discard it if this packet never got decrypted.
+    
+    Note that this is also a supplementary fix to CVE-2021-43267 that
+    can be triggered by an unencrypted malicious MSG_CRYPTO msg.
+    
+    Fixes: 1ef6f7c9390f ("tipc: add automatic session key exchange")
+    Acked-by: Ying Xue <ying.xue@windriver.com>
+    Acked-by: Jon Maloy <jmaloy@redhat.com>
+    Signed-off-by: Xin Long <lucien.xin@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/tipc/link.c b/net/tipc/link.c
+index 1b7a487c8841..09ae8448f394 100644
+--- a/net/tipc/link.c
++++ b/net/tipc/link.c
+@@ -1298,8 +1298,11 @@ static bool tipc_data_input(struct tipc_link *l, struct sk_buff *skb,
+ 		return false;
+ #ifdef CONFIG_TIPC_CRYPTO
+ 	case MSG_CRYPTO:
+-		tipc_crypto_msg_rcv(l->net, skb);
+-		return true;
++		if (TIPC_SKB_CB(skb)->decrypted) {
++			tipc_crypto_msg_rcv(l->net, skb);
++			return true;
++		}
++		fallthrough;
+ #endif
+ 	default:
+ 		pr_warn("Dropping received illegal msg type\n");

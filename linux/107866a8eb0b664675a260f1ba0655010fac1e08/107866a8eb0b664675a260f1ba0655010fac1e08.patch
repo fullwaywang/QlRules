@@ -1,0 +1,49 @@
+commit 107866a8eb0b664675a260f1ba0655010fac1e08
+Author: Roger Pau Monne <roger.pau@citrix.com>
+Date:   Mon Jun 7 15:13:15 2021 +0200
+
+    xen-netback: take a reference to the RX task thread
+    
+    Do this in order to prevent the task from being freed if the thread
+    returns (which can be triggered by the frontend) before the call to
+    kthread_stop done as part of the backend tear down. Not taking the
+    reference will lead to a use-after-free in that scenario. Such
+    reference was taken before but dropped as part of the rework done in
+    2ac061ce97f4.
+    
+    Reintroduce the reference taking and add a comment this time
+    explaining why it's needed.
+    
+    This is XSA-374 / CVE-2021-28691.
+    
+    Fixes: 2ac061ce97f4 ('xen/netback: cleanup init and deinit code')
+    Signed-off-by: Roger Pau Monné <roger.pau@citrix.com>
+    Cc: stable@vger.kernel.org
+    Reviewed-by: Jan Beulich <jbeulich@suse.com>
+    Reviewed-by: Juergen Gross <jgross@suse.com>
+    Signed-off-by: Juergen Gross <jgross@suse.com>
+
+diff --git a/drivers/net/xen-netback/interface.c b/drivers/net/xen-netback/interface.c
+index 193b723fe3bd..c58996c1e230 100644
+--- a/drivers/net/xen-netback/interface.c
++++ b/drivers/net/xen-netback/interface.c
+@@ -684,6 +684,7 @@ static void xenvif_disconnect_queue(struct xenvif_queue *queue)
+ {
+ 	if (queue->task) {
+ 		kthread_stop(queue->task);
++		put_task_struct(queue->task);
+ 		queue->task = NULL;
+ 	}
+ 
+@@ -745,6 +746,11 @@ int xenvif_connect_data(struct xenvif_queue *queue,
+ 	if (IS_ERR(task))
+ 		goto kthread_err;
+ 	queue->task = task;
++	/*
++	 * Take a reference to the task in order to prevent it from being freed
++	 * if the thread function returns before kthread_stop is called.
++	 */
++	get_task_struct(task);
+ 
+ 	task = kthread_run(xenvif_dealloc_kthread, queue,
+ 			   "%s-dealloc", queue->name);

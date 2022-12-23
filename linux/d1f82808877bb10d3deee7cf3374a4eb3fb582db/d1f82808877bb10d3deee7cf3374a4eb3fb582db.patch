@@ -1,0 +1,44 @@
+commit d1f82808877bb10d3deee7cf3374a4eb3fb582db
+Author: Thadeu Lima de Souza Cascardo <cascardo@canonical.com>
+Date:   Wed May 5 09:47:06 2021 -0300
+
+    io_uring: truncate lengths larger than MAX_RW_COUNT on provide buffers
+    
+    Read and write operations are capped to MAX_RW_COUNT. Some read ops rely on
+    that limit, and that is not guaranteed by the IORING_OP_PROVIDE_BUFFERS.
+    
+    Truncate those lengths when doing io_add_buffers, so buffer addresses still
+    use the uncapped length.
+    
+    Also, take the chance and change struct io_buffer len member to __u32, so
+    it matches struct io_provide_buffer len member.
+    
+    This fixes CVE-2021-3491, also reported as ZDI-CAN-13546.
+    
+    Fixes: ddf0322db79c ("io_uring: add IORING_OP_PROVIDE_BUFFERS")
+    Reported-by: Billy Jheng Bing-Jhong (@st424204)
+    Signed-off-by: Thadeu Lima de Souza Cascardo <cascardo@canonical.com>
+    Signed-off-by: Jens Axboe <axboe@kernel.dk>
+
+diff --git a/fs/io_uring.c b/fs/io_uring.c
+index 7a2e83bc005d..f46acbbeed57 100644
+--- a/fs/io_uring.c
++++ b/fs/io_uring.c
+@@ -251,7 +251,7 @@ struct io_rsrc_data {
+ struct io_buffer {
+ 	struct list_head list;
+ 	__u64 addr;
+-	__s32 len;
++	__u32 len;
+ 	__u16 bid;
+ };
+ 
+@@ -3986,7 +3986,7 @@ static int io_add_buffers(struct io_provide_buf *pbuf, struct io_buffer **head)
+ 			break;
+ 
+ 		buf->addr = addr;
+-		buf->len = pbuf->len;
++		buf->len = min_t(__u32, pbuf->len, MAX_RW_COUNT);
+ 		buf->bid = bid;
+ 		addr += pbuf->len;
+ 		bid++;

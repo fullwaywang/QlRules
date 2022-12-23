@@ -1,0 +1,96 @@
+commit 7dac4a1726a9c64a517d595c40e95e2d0d135f6f
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Mon Mar 26 23:54:10 2018 -0400
+
+    ext4: add validity checks for bitmap block numbers
+    
+    An privileged attacker can cause a crash by mounting a crafted ext4
+    image which triggers a out-of-bounds read in the function
+    ext4_valid_block_bitmap() in fs/ext4/balloc.c.
+    
+    This issue has been assigned CVE-2018-1093.
+    
+    BugLink: https://bugzilla.kernel.org/show_bug.cgi?id=199181
+    BugLink: https://bugzilla.redhat.com/show_bug.cgi?id=1560782
+    Reported-by: Wen Xu <wen.xu@gatech.edu>
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+    Cc: stable@vger.kernel.org
+
+diff --git a/fs/ext4/balloc.c b/fs/ext4/balloc.c
+index f82c4966f4ce..a33d8fb1bf2a 100644
+--- a/fs/ext4/balloc.c
++++ b/fs/ext4/balloc.c
+@@ -338,20 +338,25 @@ static ext4_fsblk_t ext4_valid_block_bitmap(struct super_block *sb,
+ 	/* check whether block bitmap block number is set */
+ 	blk = ext4_block_bitmap(sb, desc);
+ 	offset = blk - group_first_block;
+-	if (!ext4_test_bit(EXT4_B2C(sbi, offset), bh->b_data))
++	if (offset < 0 || EXT4_B2C(sbi, offset) >= sb->s_blocksize ||
++	    !ext4_test_bit(EXT4_B2C(sbi, offset), bh->b_data))
+ 		/* bad block bitmap */
+ 		return blk;
+ 
+ 	/* check whether the inode bitmap block number is set */
+ 	blk = ext4_inode_bitmap(sb, desc);
+ 	offset = blk - group_first_block;
+-	if (!ext4_test_bit(EXT4_B2C(sbi, offset), bh->b_data))
++	if (offset < 0 || EXT4_B2C(sbi, offset) >= sb->s_blocksize ||
++	    !ext4_test_bit(EXT4_B2C(sbi, offset), bh->b_data))
+ 		/* bad block bitmap */
+ 		return blk;
+ 
+ 	/* check whether the inode table block number is set */
+ 	blk = ext4_inode_table(sb, desc);
+ 	offset = blk - group_first_block;
++	if (offset < 0 || EXT4_B2C(sbi, offset) >= sb->s_blocksize ||
++	    EXT4_B2C(sbi, offset + sbi->s_itb_per_group) >= sb->s_blocksize)
++		return blk;
+ 	next_zero_bit = ext4_find_next_zero_bit(bh->b_data,
+ 			EXT4_B2C(sbi, offset + sbi->s_itb_per_group),
+ 			EXT4_B2C(sbi, offset));
+@@ -417,6 +422,7 @@ struct buffer_head *
+ ext4_read_block_bitmap_nowait(struct super_block *sb, ext4_group_t block_group)
+ {
+ 	struct ext4_group_desc *desc;
++	struct ext4_sb_info *sbi = EXT4_SB(sb);
+ 	struct buffer_head *bh;
+ 	ext4_fsblk_t bitmap_blk;
+ 	int err;
+@@ -425,6 +431,12 @@ ext4_read_block_bitmap_nowait(struct super_block *sb, ext4_group_t block_group)
+ 	if (!desc)
+ 		return ERR_PTR(-EFSCORRUPTED);
+ 	bitmap_blk = ext4_block_bitmap(sb, desc);
++	if ((bitmap_blk <= le32_to_cpu(sbi->s_es->s_first_data_block)) ||
++	    (bitmap_blk >= ext4_blocks_count(sbi->s_es))) {
++		ext4_error(sb, "Invalid block bitmap block %llu in "
++			   "block_group %u", bitmap_blk, block_group);
++		return ERR_PTR(-EFSCORRUPTED);
++	}
+ 	bh = sb_getblk(sb, bitmap_blk);
+ 	if (unlikely(!bh)) {
+ 		ext4_error(sb, "Cannot get buffer for block bitmap - "
+diff --git a/fs/ext4/ialloc.c b/fs/ext4/ialloc.c
+index 3fa93665b4a3..df92e3ec9913 100644
+--- a/fs/ext4/ialloc.c
++++ b/fs/ext4/ialloc.c
+@@ -122,6 +122,7 @@ static struct buffer_head *
+ ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
+ {
+ 	struct ext4_group_desc *desc;
++	struct ext4_sb_info *sbi = EXT4_SB(sb);
+ 	struct buffer_head *bh = NULL;
+ 	ext4_fsblk_t bitmap_blk;
+ 	int err;
+@@ -131,6 +132,12 @@ ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
+ 		return ERR_PTR(-EFSCORRUPTED);
+ 
+ 	bitmap_blk = ext4_inode_bitmap(sb, desc);
++	if ((bitmap_blk <= le32_to_cpu(sbi->s_es->s_first_data_block)) ||
++	    (bitmap_blk >= ext4_blocks_count(sbi->s_es))) {
++		ext4_error(sb, "Invalid inode bitmap blk %llu in "
++			   "block_group %u", bitmap_blk, block_group);
++		return ERR_PTR(-EFSCORRUPTED);
++	}
+ 	bh = sb_getblk(sb, bitmap_blk);
+ 	if (unlikely(!bh)) {
+ 		ext4_error(sb, "Cannot read inode bitmap - "

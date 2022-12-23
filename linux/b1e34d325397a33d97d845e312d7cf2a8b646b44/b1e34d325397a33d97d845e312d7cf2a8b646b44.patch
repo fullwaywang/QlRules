@@ -1,0 +1,61 @@
+commit b1e34d325397a33d97d845e312d7cf2a8b646b44
+Author: Vitaly Kuznetsov <vkuznets@redhat.com>
+Date:   Fri Mar 25 14:21:40 2022 +0100
+
+    KVM: x86: Forbid VMM to set SYNIC/STIMER MSRs when SynIC wasn't activated
+    
+    Setting non-zero values to SYNIC/STIMER MSRs activates certain features,
+    this should not happen when KVM_CAP_HYPERV_SYNIC{,2} was not activated.
+    
+    Note, it would've been better to forbid writing anything to SYNIC/STIMER
+    MSRs, including zeroes, however, at least QEMU tries clearing
+    HV_X64_MSR_STIMER0_CONFIG without SynIC. HV_X64_MSR_EOM MSR is somewhat
+    'special' as writing zero there triggers an action, this also should not
+    happen when SynIC wasn't activated.
+    
+    Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+    Message-Id: <20220325132140.25650-4-vkuznets@redhat.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/hyperv.c b/arch/x86/kvm/hyperv.c
+index f715b5a2b0e4..4177c17a26bf 100644
+--- a/arch/x86/kvm/hyperv.c
++++ b/arch/x86/kvm/hyperv.c
+@@ -239,7 +239,7 @@ static int synic_set_msr(struct kvm_vcpu_hv_synic *synic,
+ 	struct kvm_vcpu *vcpu = hv_synic_to_vcpu(synic);
+ 	int ret;
+ 
+-	if (!synic->active && !host)
++	if (!synic->active && (!host || data))
+ 		return 1;
+ 
+ 	trace_kvm_hv_synic_set_msr(vcpu->vcpu_id, msr, data, host);
+@@ -285,6 +285,9 @@ static int synic_set_msr(struct kvm_vcpu_hv_synic *synic,
+ 	case HV_X64_MSR_EOM: {
+ 		int i;
+ 
++		if (!synic->active)
++			break;
++
+ 		for (i = 0; i < ARRAY_SIZE(synic->sint); i++)
+ 			kvm_hv_notify_acked_sint(vcpu, i);
+ 		break;
+@@ -664,7 +667,7 @@ static int stimer_set_config(struct kvm_vcpu_hv_stimer *stimer, u64 config,
+ 	struct kvm_vcpu_hv *hv_vcpu = to_hv_vcpu(vcpu);
+ 	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
+ 
+-	if (!synic->active && !host)
++	if (!synic->active && (!host || config))
+ 		return 1;
+ 
+ 	if (unlikely(!host && hv_vcpu->enforce_cpuid && new_config.direct_mode &&
+@@ -693,7 +696,7 @@ static int stimer_set_count(struct kvm_vcpu_hv_stimer *stimer, u64 count,
+ 	struct kvm_vcpu *vcpu = hv_stimer_to_vcpu(stimer);
+ 	struct kvm_vcpu_hv_synic *synic = to_hv_synic(vcpu);
+ 
+-	if (!synic->active && !host)
++	if (!synic->active && (!host || count))
+ 		return 1;
+ 
+ 	trace_kvm_hv_stimer_set_count(hv_stimer_to_vcpu(stimer)->vcpu_id,

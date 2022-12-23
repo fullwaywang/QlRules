@@ -1,0 +1,41 @@
+commit 7b38460dc8e4eafba06c78f8e37099d3b34d473c
+Author: Darrick J. Wong <darrick.wong@oracle.com>
+Date:   Tue Apr 17 19:10:15 2018 -0700
+
+    xfs: don't fail when converting shortform attr to long form during ATTR_REPLACE
+    
+    Kanda Motohiro reported that expanding a tiny xattr into a large xattr
+    fails on XFS because we remove the tiny xattr from a shortform fork and
+    then try to re-add it after converting the fork to extents format having
+    not removed the ATTR_REPLACE flag.  This fails because the attr is no
+    longer present, causing a fs shutdown.
+    
+    This is derived from the patch in his bug report, but we really
+    shouldn't ignore a nonzero retval from the remove call.
+    
+    Bugzilla: https://bugzilla.kernel.org/show_bug.cgi?id=199119
+    Reported-by: kanda.motohiro@gmail.com
+    Reviewed-by: Dave Chinner <dchinner@redhat.com>
+    Reviewed-by: Christoph Hellwig <hch@lst.de>
+    Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
+
+diff --git a/fs/xfs/libxfs/xfs_attr.c b/fs/xfs/libxfs/xfs_attr.c
+index ce4a34a2751d..35a124400d60 100644
+--- a/fs/xfs/libxfs/xfs_attr.c
++++ b/fs/xfs/libxfs/xfs_attr.c
+@@ -511,7 +511,14 @@ xfs_attr_shortform_addname(xfs_da_args_t *args)
+ 		if (args->flags & ATTR_CREATE)
+ 			return retval;
+ 		retval = xfs_attr_shortform_remove(args);
+-		ASSERT(retval == 0);
++		if (retval)
++			return retval;
++		/*
++		 * Since we have removed the old attr, clear ATTR_REPLACE so
++		 * that the leaf format add routine won't trip over the attr
++		 * not being around.
++		 */
++		args->flags &= ~ATTR_REPLACE;
+ 	}
+ 
+ 	if (args->namelen >= XFS_ATTR_SF_ENTSIZE_MAX ||

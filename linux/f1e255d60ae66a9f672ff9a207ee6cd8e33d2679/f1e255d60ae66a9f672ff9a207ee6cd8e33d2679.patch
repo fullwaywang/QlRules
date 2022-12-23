@@ -1,0 +1,64 @@
+commit f1e255d60ae66a9f672ff9a207ee6cd8e33d2679
+Author: Jann Horn <jannh@google.com>
+Date:   Fri Jul 6 17:12:56 2018 +0200
+
+    USB: yurex: fix out-of-bounds uaccess in read handler
+    
+    In general, accessing userspace memory beyond the length of the supplied
+    buffer in VFS read/write handlers can lead to both kernel memory corruption
+    (via kernel_read()/kernel_write(), which can e.g. be triggered via
+    sys_splice()) and privilege escalation inside userspace.
+    
+    Fix it by using simple_read_from_buffer() instead of custom logic.
+    
+    Fixes: 6bc235a2e24a ("USB: add driver for Meywa-Denki & Kayac YUREX")
+    Signed-off-by: Jann Horn <jannh@google.com>
+    Cc: stable <stable@vger.kernel.org>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/usb/misc/yurex.c b/drivers/usb/misc/yurex.c
+index 8abb6cbbd98a..3be40eaa1ac9 100644
+--- a/drivers/usb/misc/yurex.c
++++ b/drivers/usb/misc/yurex.c
+@@ -396,8 +396,7 @@ static ssize_t yurex_read(struct file *file, char __user *buffer, size_t count,
+ 			  loff_t *ppos)
+ {
+ 	struct usb_yurex *dev;
+-	int retval = 0;
+-	int bytes_read = 0;
++	int len = 0;
+ 	char in_buffer[20];
+ 	unsigned long flags;
+ 
+@@ -405,26 +404,16 @@ static ssize_t yurex_read(struct file *file, char __user *buffer, size_t count,
+ 
+ 	mutex_lock(&dev->io_mutex);
+ 	if (!dev->interface) {		/* already disconnected */
+-		retval = -ENODEV;
+-		goto exit;
++		mutex_unlock(&dev->io_mutex);
++		return -ENODEV;
+ 	}
+ 
+ 	spin_lock_irqsave(&dev->lock, flags);
+-	bytes_read = snprintf(in_buffer, 20, "%lld\n", dev->bbu);
++	len = snprintf(in_buffer, 20, "%lld\n", dev->bbu);
+ 	spin_unlock_irqrestore(&dev->lock, flags);
+-
+-	if (*ppos < bytes_read) {
+-		if (copy_to_user(buffer, in_buffer + *ppos, bytes_read - *ppos))
+-			retval = -EFAULT;
+-		else {
+-			retval = bytes_read - *ppos;
+-			*ppos += bytes_read;
+-		}
+-	}
+-
+-exit:
+ 	mutex_unlock(&dev->io_mutex);
+-	return retval;
++
++	return simple_read_from_buffer(buffer, count, ppos, in_buffer, len);
+ }
+ 
+ static ssize_t yurex_write(struct file *file, const char __user *user_buffer,

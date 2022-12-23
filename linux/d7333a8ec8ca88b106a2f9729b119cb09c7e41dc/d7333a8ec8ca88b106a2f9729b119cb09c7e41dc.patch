@@ -1,0 +1,18 @@
+commit d7333a8ec8ca88b106a2f9729b119cb09c7e41dc
+Merge: a427aca0a931 c1b9ca365dea
+Author: Kalle Valo <kvalo@codeaurora.org>
+Date:   Thu Oct 28 16:23:52 2021 +0300
+
+    Merge ath-next from git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/ath.git
+    
+    ath.git patches for v5.16. Major changes:
+    
+    ath11k
+    
+    * fix QCA6390 A-MSDU handling (CVE-2020-24588)
+    
+    wcn36xx
+    
+    * enable hardware scan offload for 5Ghz band
+    
+    * add missing 5GHz channels 136 and 144

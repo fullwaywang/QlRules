@@ -1,0 +1,50 @@
+commit aa9f7d5172fac9bf1f09e678c35e287a40a7b7dd
+Author: Randy Dunlap <rdunlap@infradead.org>
+Date:   Wed Apr 1 21:10:58 2020 -0700
+
+    mm: mempolicy: require at least one nodeid for MPOL_PREFERRED
+    
+    Using an empty (malformed) nodelist that is not caught during mount option
+    parsing leads to a stack-out-of-bounds access.
+    
+    The option string that was used was: "mpol=prefer:,".  However,
+    MPOL_PREFERRED requires a single node number, which is not being provided
+    here.
+    
+    Add a check that 'nodes' is not empty after parsing for MPOL_PREFERRED's
+    nodeid.
+    
+    Fixes: 095f1fc4ebf3 ("mempolicy: rework shmem mpol parsing and display")
+    Reported-by: Entropy Moe <3ntr0py1337@gmail.com>
+    Reported-by: syzbot+b055b1a6b2b958707a21@syzkaller.appspotmail.com
+    Signed-off-by: Randy Dunlap <rdunlap@infradead.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Tested-by: syzbot+b055b1a6b2b958707a21@syzkaller.appspotmail.com
+    Cc: Lee Schermerhorn <lee.schermerhorn@hp.com>
+    Link: http://lkml.kernel.org/r/89526377-7eb6-b662-e1d8-4430928abde9@infradead.org
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/mm/mempolicy.c b/mm/mempolicy.c
+index 460683bbe58c..5fb427aed612 100644
+--- a/mm/mempolicy.c
++++ b/mm/mempolicy.c
+@@ -2898,7 +2898,9 @@ int mpol_parse_str(char *str, struct mempolicy **mpol)
+ 	switch (mode) {
+ 	case MPOL_PREFERRED:
+ 		/*
+-		 * Insist on a nodelist of one node only
++		 * Insist on a nodelist of one node only, although later
++		 * we use first_node(nodes) to grab a single node, so here
++		 * nodelist (or nodes) cannot be empty.
+ 		 */
+ 		if (nodelist) {
+ 			char *rest = nodelist;
+@@ -2906,6 +2908,8 @@ int mpol_parse_str(char *str, struct mempolicy **mpol)
+ 				rest++;
+ 			if (*rest)
+ 				goto out;
++			if (nodes_empty(nodes))
++				goto out;
+ 		}
+ 		break;
+ 	case MPOL_INTERLEAVE:

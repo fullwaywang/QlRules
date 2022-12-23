@@ -1,0 +1,135 @@
+commit 5f501d555653f8968011a1e65ebb121c8b43c144
+Author: Kees Cook <keescook@chromium.org>
+Date:   Mon Nov 8 18:33:37 2021 -0800
+
+    binfmt_elf: reintroduce using MAP_FIXED_NOREPLACE
+    
+    Commit b212921b13bd ("elf: don't use MAP_FIXED_NOREPLACE for elf
+    executable mappings") reverted back to using MAP_FIXED to map ELF LOAD
+    segments because it was found that the segments in some binaries overlap
+    and can cause MAP_FIXED_NOREPLACE to fail.
+    
+    The original intent of MAP_FIXED_NOREPLACE in the ELF loader was to
+    prevent the silent clobbering of an existing mapping (e.g.  stack) by
+    the ELF image, which could lead to exploitable conditions.  Quoting
+    commit 4ed28639519c ("fs, elf: drop MAP_FIXED usage from elf_map"),
+    which originally introduced the use of MAP_FIXED_NOREPLACE in the
+    loader:
+    
+        Both load_elf_interp and load_elf_binary rely on elf_map to map
+        segments [to a specific] address and they use MAP_FIXED to enforce
+        that. This is however [a] dangerous thing prone to silent data
+        corruption which can be even exploitable.
+        ...
+        Let's take CVE-2017-1000253 as an example ... we could end up mapping
+        [the executable] over the existing stack ... The [stack layout] issue
+        has been fixed since then ... So we should be safe and any [similar]
+        attack should be impractical. On the other hand this is just too
+        subtle [an] assumption ... it can break quite easily and [be] hard to
+        spot.
+        ...
+        Address this [weakness] by changing MAP_FIXED to the newly added
+        MAP_FIXED_NOREPLACE. This will mean that mmap will fail if there is
+        an existing mapping clashing with the requested one [instead of
+        silently] clobbering it.
+    
+    Then processing ET_DYN binaries the loader already calculates a total
+    size for the image when the first segment is mapped, maps the entire
+    image, and then unmaps the remainder before the remaining segments are
+    then individually mapped.
+    
+    To avoid the earlier problems (legitimate overlapping LOAD segments
+    specified in the ELF), apply the same logic to ET_EXEC binaries as well.
+    
+    For both ET_EXEC and ET_DYN+INTERP use MAP_FIXED_NOREPLACE for the
+    initial total size mapping and then use MAP_FIXED to build the final
+    (possibly legitimately overlapping) mappings.  For ET_DYN w/out INTERP,
+    continue to map at a system-selected address in the mmap region.
+    
+    Link: https://lkml.kernel.org/r/20210916215947.3993776-1-keescook@chromium.org
+    Link: https://lore.kernel.org/lkml/1595869887-23307-2-git-send-email-anthony.yznaga@oracle.com
+    Co-developed-by: Anthony Yznaga <anthony.yznaga@oracle.com>
+    Signed-off-by: Anthony Yznaga <anthony.yznaga@oracle.com>
+    Signed-off-by: Kees Cook <keescook@chromium.org>
+    Cc: Russell King <linux@armlinux.org.uk>
+    Cc: Michal Hocko <mhocko@suse.com>
+    Cc: Eric Biederman <ebiederm@xmission.com>
+    Cc: Chen Jingwen <chenjingwen6@huawei.com>
+    Cc: Alexander Viro <viro@zeniv.linux.org.uk>
+    Cc: Andrei Vagin <avagin@openvz.org>
+    Cc: Khalid Aziz <khalid.aziz@oracle.com>
+    Cc: Michael Ellerman <mpe@ellerman.id.au>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index a813b70f594e..7537a19f0484 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -1074,20 +1074,26 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 
+ 		vaddr = elf_ppnt->p_vaddr;
+ 		/*
+-		 * If we are loading ET_EXEC or we have already performed
+-		 * the ET_DYN load_addr calculations, proceed normally.
++		 * The first time through the loop, load_addr_set is false:
++		 * layout will be calculated. Once set, use MAP_FIXED since
++		 * we know we've already safely mapped the entire region with
++		 * MAP_FIXED_NOREPLACE in the once-per-binary logic following.
+ 		 */
+-		if (elf_ex->e_type == ET_EXEC || load_addr_set) {
++		if (load_addr_set) {
+ 			elf_flags |= MAP_FIXED;
++		} else if (elf_ex->e_type == ET_EXEC) {
++			/*
++			 * This logic is run once for the first LOAD Program
++			 * Header for ET_EXEC binaries. No special handling
++			 * is needed.
++			 */
++			elf_flags |= MAP_FIXED_NOREPLACE;
+ 		} else if (elf_ex->e_type == ET_DYN) {
+ 			/*
+ 			 * This logic is run once for the first LOAD Program
+ 			 * Header for ET_DYN binaries to calculate the
+ 			 * randomization (load_bias) for all the LOAD
+-			 * Program Headers, and to calculate the entire
+-			 * size of the ELF mapping (total_size). (Note that
+-			 * load_addr_set is set to true later once the
+-			 * initial mapping is performed.)
++			 * Program Headers.
+ 			 *
+ 			 * There are effectively two types of ET_DYN
+ 			 * binaries: programs (i.e. PIE: ET_DYN with INTERP)
+@@ -1108,7 +1114,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 			 * Therefore, programs are loaded offset from
+ 			 * ELF_ET_DYN_BASE and loaders are loaded into the
+ 			 * independently randomized mmap region (0 load_bias
+-			 * without MAP_FIXED).
++			 * without MAP_FIXED nor MAP_FIXED_NOREPLACE).
+ 			 */
+ 			if (interpreter) {
+ 				load_bias = ELF_ET_DYN_BASE;
+@@ -1117,7 +1123,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 				alignment = maximum_alignment(elf_phdata, elf_ex->e_phnum);
+ 				if (alignment)
+ 					load_bias &= ~(alignment - 1);
+-				elf_flags |= MAP_FIXED;
++				elf_flags |= MAP_FIXED_NOREPLACE;
+ 			} else
+ 				load_bias = 0;
+ 
+@@ -1129,7 +1135,14 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 			 * is then page aligned.
+ 			 */
+ 			load_bias = ELF_PAGESTART(load_bias - vaddr);
++		}
+ 
++		/*
++		 * Calculate the entire size of the ELF mapping (total_size).
++		 * (Note that load_addr_set is set to true later once the
++		 * initial mapping is performed.)
++		 */
++		if (!load_addr_set) {
+ 			total_size = total_mapping_size(elf_phdata,
+ 							elf_ex->e_phnum);
+ 			if (!total_size) {

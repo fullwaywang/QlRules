@@ -1,0 +1,29 @@
+commit ed713e2bc093239ccd380c2ce8ae9e4162f5c037
+Author: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+Date:   Thu Mar 10 16:02:57 2022 +0800
+
+    clk: imx: Add check for kcalloc
+    
+    As the potential failure of the kcalloc(),
+    it should be better to check it in order to
+    avoid the dereference of the NULL pointer.
+    
+    Fixes: 379c9a24cc23 ("clk: imx: Fix reparenting of UARTs not associated with stdout")
+    Signed-off-by: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+    Reviewed-by: Abel Vesa <abel.vesa@nxp.com>
+    Link: https://lore.kernel.org/r/20220310080257.1988412-1-jiasheng@iscas.ac.cn
+    Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+
+diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
+index 4bd6ad060eea..5582f18dd632 100644
+--- a/drivers/clk/imx/clk.c
++++ b/drivers/clk/imx/clk.c
+@@ -176,6 +176,8 @@ void imx_register_uart_clocks(unsigned int clk_count)
+ 		int i;
+ 
+ 		imx_uart_clocks = kcalloc(clk_count, sizeof(struct clk *), GFP_KERNEL);
++		if (!imx_uart_clocks)
++			return;
+ 
+ 		if (!of_stdout)
+ 			return;

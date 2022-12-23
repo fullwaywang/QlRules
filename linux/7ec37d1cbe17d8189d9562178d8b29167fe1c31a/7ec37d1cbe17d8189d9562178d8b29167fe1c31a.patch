@@ -1,0 +1,34 @@
+commit 7ec37d1cbe17d8189d9562178d8b29167fe1c31a
+Author: Vitaly Kuznetsov <vkuznets@redhat.com>
+Date:   Fri Mar 25 14:21:38 2022 +0100
+
+    KVM: x86: Check lapic_in_kernel() before attempting to set a SynIC irq
+    
+    When KVM_CAP_HYPERV_SYNIC{,2} is activated, KVM already checks for
+    irqchip_in_kernel() so normally SynIC irqs should never be set. It is,
+    however,  possible for a misbehaving VMM to write to SYNIC/STIMER MSRs
+    causing erroneous behavior.
+    
+    The immediate issue being fixed is that kvm_irq_delivery_to_apic()
+    (kvm_irq_delivery_to_apic_fast()) crashes when called with
+    'irq.shorthand = APIC_DEST_SELF' and 'src == NULL'.
+    
+    Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+    Message-Id: <20220325132140.25650-2-vkuznets@redhat.com>
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/hyperv.c b/arch/x86/kvm/hyperv.c
+index a32f54ab84a2..f715b5a2b0e4 100644
+--- a/arch/x86/kvm/hyperv.c
++++ b/arch/x86/kvm/hyperv.c
+@@ -449,6 +449,9 @@ static int synic_set_irq(struct kvm_vcpu_hv_synic *synic, u32 sint)
+ 	struct kvm_lapic_irq irq;
+ 	int ret, vector;
+ 
++	if (KVM_BUG_ON(!lapic_in_kernel(vcpu), vcpu->kvm))
++		return -EINVAL;
++
+ 	if (sint >= ARRAY_SIZE(synic->sint))
+ 		return -EINVAL;
+ 

@@ -1,0 +1,42 @@
+commit f4351a199cc120ff9d59e06d02e8657d08e6cc46
+Author: Takashi Iwai <tiwai@suse.de>
+Date:   Wed Dec 19 12:36:27 2018 +0100
+
+    ALSA: usb-audio: Avoid access before bLength check in build_audio_procunit()
+    
+    The parser for the processing unit reads bNrInPins field before the
+    bLength sanity check, which may lead to an out-of-bound access when a
+    malformed descriptor is given.  Fix it by assignment after the bLength
+    check.
+    
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+
+diff --git a/sound/usb/mixer.c b/sound/usb/mixer.c
+index c63c84b54969..0131de348cf6 100644
+--- a/sound/usb/mixer.c
++++ b/sound/usb/mixer.c
+@@ -2314,7 +2314,7 @@ static int build_audio_procunit(struct mixer_build *state, int unitid,
+ 				char *name)
+ {
+ 	struct uac_processing_unit_descriptor *desc = raw_desc;
+-	int num_ins = desc->bNrInPins;
++	int num_ins;
+ 	struct usb_mixer_elem_info *cval;
+ 	struct snd_kcontrol *kctl;
+ 	int i, err, nameid, type, len;
+@@ -2329,7 +2329,13 @@ static int build_audio_procunit(struct mixer_build *state, int unitid,
+ 		0, NULL, default_value_info
+ 	};
+ 
+-	if (desc->bLength < 13 || desc->bLength < 13 + num_ins ||
++	if (desc->bLength < 13) {
++		usb_audio_err(state->chip, "invalid %s descriptor (id %d)\n", name, unitid);
++		return -EINVAL;
++	}
++
++	num_ins = desc->bNrInPins;
++	if (desc->bLength < 13 + num_ins ||
+ 	    desc->bLength < num_ins + uac_processing_unit_bControlSize(desc, state->mixer->protocol)) {
+ 		usb_audio_err(state->chip, "invalid %s descriptor (id %d)\n", name, unitid);
+ 		return -EINVAL;

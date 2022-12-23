@@ -1,0 +1,102 @@
+commit 397d425dc26da728396e66d392d5dcb8dac30c37
+Author: Eric W. Biederman <ebiederm@xmission.com>
+Date:   Sat Aug 15 20:27:13 2015 -0500
+
+    vfs: Test for and handle paths that are unreachable from their mnt_root
+    
+    In rare cases a directory can be renamed out from under a bind mount.
+    In those cases without special handling it becomes possible to walk up
+    the directory tree to the root dentry of the filesystem and down
+    from the root dentry to every other file or directory on the filesystem.
+    
+    Like division by zero .. from an unconnected path can not be given
+    a useful semantic as there is no predicting at which path component
+    the code will realize it is unconnected.  We certainly can not match
+    the current behavior as the current behavior is a security hole.
+    
+    Therefore when encounting .. when following an unconnected path
+    return -ENOENT.
+    
+    - Add a function path_connected to verify path->dentry is reachable
+      from path->mnt.mnt_root.  AKA to validate that rename did not do
+      something nasty to the bind mount.
+    
+      To avoid races path_connected must be called after following a path
+      component to it's next path component.
+    
+    Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
+    Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+
+diff --git a/fs/namei.c b/fs/namei.c
+index 1c2105ed20c5..29b927938b8c 100644
+--- a/fs/namei.c
++++ b/fs/namei.c
+@@ -560,6 +560,24 @@ static int __nd_alloc_stack(struct nameidata *nd)
+ 	return 0;
+ }
+ 
++/**
++ * path_connected - Verify that a path->dentry is below path->mnt.mnt_root
++ * @path: nameidate to verify
++ *
++ * Rename can sometimes move a file or directory outside of a bind
++ * mount, path_connected allows those cases to be detected.
++ */
++static bool path_connected(const struct path *path)
++{
++	struct vfsmount *mnt = path->mnt;
++
++	/* Only bind mounts can have disconnected paths */
++	if (mnt->mnt_root == mnt->mnt_sb->s_root)
++		return true;
++
++	return is_subdir(path->dentry, mnt->mnt_root);
++}
++
+ static inline int nd_alloc_stack(struct nameidata *nd)
+ {
+ 	if (likely(nd->depth != EMBEDDED_LEVELS))
+@@ -1296,6 +1314,8 @@ static int follow_dotdot_rcu(struct nameidata *nd)
+ 				return -ECHILD;
+ 			nd->path.dentry = parent;
+ 			nd->seq = seq;
++			if (unlikely(!path_connected(&nd->path)))
++				return -ENOENT;
+ 			break;
+ 		} else {
+ 			struct mount *mnt = real_mount(nd->path.mnt);
+@@ -1396,7 +1416,7 @@ static void follow_mount(struct path *path)
+ 	}
+ }
+ 
+-static void follow_dotdot(struct nameidata *nd)
++static int follow_dotdot(struct nameidata *nd)
+ {
+ 	if (!nd->root.mnt)
+ 		set_root(nd);
+@@ -1412,6 +1432,8 @@ static void follow_dotdot(struct nameidata *nd)
+ 			/* rare case of legitimate dget_parent()... */
+ 			nd->path.dentry = dget_parent(nd->path.dentry);
+ 			dput(old);
++			if (unlikely(!path_connected(&nd->path)))
++				return -ENOENT;
+ 			break;
+ 		}
+ 		if (!follow_up(&nd->path))
+@@ -1419,6 +1441,7 @@ static void follow_dotdot(struct nameidata *nd)
+ 	}
+ 	follow_mount(&nd->path);
+ 	nd->inode = nd->path.dentry->d_inode;
++	return 0;
+ }
+ 
+ /*
+@@ -1634,7 +1657,7 @@ static inline int handle_dots(struct nameidata *nd, int type)
+ 		if (nd->flags & LOOKUP_RCU) {
+ 			return follow_dotdot_rcu(nd);
+ 		} else
+-			follow_dotdot(nd);
++			return follow_dotdot(nd);
+ 	}
+ 	return 0;
+ }

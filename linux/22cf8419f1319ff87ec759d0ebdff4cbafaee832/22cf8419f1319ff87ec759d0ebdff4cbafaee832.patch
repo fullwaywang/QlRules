@@ -1,0 +1,50 @@
+commit 22cf8419f1319ff87ec759d0ebdff4cbafaee832
+Author: J. Bruce Fields <bfields@redhat.com>
+Date:   Tue Jun 16 16:43:18 2020 -0400
+
+    nfsd: apply umask on fs without ACL support
+    
+    The server is failing to apply the umask when creating new objects on
+    filesystems without ACL support.
+    
+    To reproduce this, you need to use NFSv4.2 and a client and server
+    recent enough to support umask, and you need to export a filesystem that
+    lacks ACL support (for example, ext4 with the "noacl" mount option).
+    
+    Filesystems with ACL support are expected to take care of the umask
+    themselves (usually by calling posix_acl_create).
+    
+    For filesystems without ACL support, this is up to the caller of
+    vfs_create(), vfs_mknod(), or vfs_mkdir().
+    
+    Reported-by: Elliott Mitchell <ehem+debian@m5p.com>
+    Reported-by: Salvatore Bonaccorso <carnil@debian.org>
+    Tested-by: Salvatore Bonaccorso <carnil@debian.org>
+    Fixes: 47057abde515 ("nfsd: add support for the umask attribute")
+    Cc: stable@vger.kernel.org
+    Signed-off-by: J. Bruce Fields <bfields@redhat.com>
+
+diff --git a/fs/nfsd/vfs.c b/fs/nfsd/vfs.c
+index c3fbab1753ec..d22a056da477 100644
+--- a/fs/nfsd/vfs.c
++++ b/fs/nfsd/vfs.c
+@@ -1226,6 +1226,9 @@ nfsd_create_locked(struct svc_rqst *rqstp, struct svc_fh *fhp,
+ 		iap->ia_mode = 0;
+ 	iap->ia_mode = (iap->ia_mode & S_IALLUGO) | type;
+ 
++	if (!IS_POSIXACL(dirp))
++		iap->ia_mode &= ~current_umask();
++
+ 	err = 0;
+ 	host_err = 0;
+ 	switch (type) {
+@@ -1458,6 +1461,9 @@ do_nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
+ 		goto out;
+ 	}
+ 
++	if (!IS_POSIXACL(dirp))
++		iap->ia_mode &= ~current_umask();
++
+ 	host_err = vfs_create(dirp, dchild, iap->ia_mode, true);
+ 	if (host_err < 0) {
+ 		fh_drop_write(fhp);

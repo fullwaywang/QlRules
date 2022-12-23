@@ -1,0 +1,86 @@
+commit 056ad39ee9253873522f6469c3364964a322912b
+Author: Alan Stern <stern@rowland.harvard.edu>
+Date:   Sat Mar 28 16:18:11 2020 -0400
+
+    USB: core: Fix free-while-in-use bug in the USB S-Glibrary
+    
+    FuzzUSB (a variant of syzkaller) found a free-while-still-in-use bug
+    in the USB scatter-gather library:
+    
+    BUG: KASAN: use-after-free in atomic_read
+    include/asm-generic/atomic-instrumented.h:26 [inline]
+    BUG: KASAN: use-after-free in usb_hcd_unlink_urb+0x5f/0x170
+    drivers/usb/core/hcd.c:1607
+    Read of size 4 at addr ffff888065379610 by task kworker/u4:1/27
+    
+    CPU: 1 PID: 27 Comm: kworker/u4:1 Not tainted 5.5.11 #2
+    Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS
+    1.10.2-1ubuntu1 04/01/2014
+    Workqueue: scsi_tmf_2 scmd_eh_abort_handler
+    Call Trace:
+     __dump_stack lib/dump_stack.c:77 [inline]
+     dump_stack+0xce/0x128 lib/dump_stack.c:118
+     print_address_description.constprop.4+0x21/0x3c0 mm/kasan/report.c:374
+     __kasan_report+0x153/0x1cb mm/kasan/report.c:506
+     kasan_report+0x12/0x20 mm/kasan/common.c:639
+     check_memory_region_inline mm/kasan/generic.c:185 [inline]
+     check_memory_region+0x152/0x1b0 mm/kasan/generic.c:192
+     __kasan_check_read+0x11/0x20 mm/kasan/common.c:95
+     atomic_read include/asm-generic/atomic-instrumented.h:26 [inline]
+     usb_hcd_unlink_urb+0x5f/0x170 drivers/usb/core/hcd.c:1607
+     usb_unlink_urb+0x72/0xb0 drivers/usb/core/urb.c:657
+     usb_sg_cancel+0x14e/0x290 drivers/usb/core/message.c:602
+     usb_stor_stop_transport+0x5e/0xa0 drivers/usb/storage/transport.c:937
+    
+    This bug occurs when cancellation of the S-G transfer races with
+    transfer completion.  When that happens, usb_sg_cancel() may continue
+    to access the transfer's URBs after usb_sg_wait() has freed them.
+    
+    The bug is caused by the fact that usb_sg_cancel() does not take any
+    sort of reference to the transfer, and so there is nothing to prevent
+    the URBs from being deallocated while the routine is trying to use
+    them.  The fix is to take such a reference by incrementing the
+    transfer's io->count field while the cancellation is in progres and
+    decrementing it afterward.  The transfer's URBs are not deallocated
+    until io->complete is triggered, which happens when io->count reaches
+    zero.
+    
+    Signed-off-by: Alan Stern <stern@rowland.harvard.edu>
+    Reported-and-tested-by: Kyungtae Kim <kt0755@gmail.com>
+    CC: <stable@vger.kernel.org>
+    
+    Link: https://lore.kernel.org/r/Pine.LNX.4.44L0.2003281615140.14837-100000@netrider.rowland.org
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
+index d5f834f16993..a48678a0c83a 100644
+--- a/drivers/usb/core/message.c
++++ b/drivers/usb/core/message.c
+@@ -589,12 +589,13 @@ void usb_sg_cancel(struct usb_sg_request *io)
+ 	int i, retval;
+ 
+ 	spin_lock_irqsave(&io->lock, flags);
+-	if (io->status) {
++	if (io->status || io->count == 0) {
+ 		spin_unlock_irqrestore(&io->lock, flags);
+ 		return;
+ 	}
+ 	/* shut everything down */
+ 	io->status = -ECONNRESET;
++	io->count++;		/* Keep the request alive until we're done */
+ 	spin_unlock_irqrestore(&io->lock, flags);
+ 
+ 	for (i = io->entries - 1; i >= 0; --i) {
+@@ -608,6 +609,12 @@ void usb_sg_cancel(struct usb_sg_request *io)
+ 			dev_warn(&io->dev->dev, "%s, unlink --> %d\n",
+ 				 __func__, retval);
+ 	}
++
++	spin_lock_irqsave(&io->lock, flags);
++	io->count--;
++	if (!io->count)
++		complete(&io->complete);
++	spin_unlock_irqrestore(&io->lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(usb_sg_cancel);
+ 

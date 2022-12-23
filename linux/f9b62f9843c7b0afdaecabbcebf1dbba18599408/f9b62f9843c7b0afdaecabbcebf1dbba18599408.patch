@@ -1,0 +1,33 @@
+commit f9b62f9843c7b0afdaecabbcebf1dbba18599408
+Author: Phil Turnbull <philipturnbull@github.com>
+Date:   Wed Nov 23 10:35:42 2022 -0500
+
+    wifi: wilc1000: validate length of IEEE80211_P2P_ATTR_CHANNEL_LIST attribute
+    
+    Validate that the IEEE80211_P2P_ATTR_CHANNEL_LIST attribute contains
+    enough space for a 'struct wilc_attr_oper_ch'. If the attribute is too
+    small then it can trigger an out-of-bounds write later in the function.
+    
+    'struct wilc_attr_oper_ch' is variable sized so also check 'attr_len'
+    does not extend beyond the end of 'buf'.
+    
+    Signed-off-by: Phil Turnbull <philipturnbull@github.com>
+    Tested-by: Ajay Kathat <ajay.kathat@microchip.com>
+    Acked-by: Ajay Kathat <ajay.kathat@microchip.com>
+    Signed-off-by: Kalle Valo <kvalo@kernel.org>
+    Link: https://lore.kernel.org/r/20221123153543.8568-4-philipturnbull@github.com
+
+diff --git a/drivers/net/wireless/microchip/wilc1000/cfg80211.c b/drivers/net/wireless/microchip/wilc1000/cfg80211.c
+index aedf0e8b69b9..c4d5a272ccc0 100644
+--- a/drivers/net/wireless/microchip/wilc1000/cfg80211.c
++++ b/drivers/net/wireless/microchip/wilc1000/cfg80211.c
+@@ -967,7 +967,8 @@ static inline void wilc_wfi_cfg_parse_ch_attr(u8 *buf, u32 len, u8 sta_ch)
+ 		if (index + sizeof(*e) + attr_size > len)
+ 			return;
+ 
+-		if (e->attr_type == IEEE80211_P2P_ATTR_CHANNEL_LIST)
++		if (e->attr_type == IEEE80211_P2P_ATTR_CHANNEL_LIST &&
++		    attr_size >= (sizeof(struct wilc_attr_ch_list) - sizeof(*e)))
+ 			ch_list_idx = index;
+ 		else if (e->attr_type == IEEE80211_P2P_ATTR_OPER_CHANNEL &&
+ 			 attr_size == (sizeof(struct wilc_attr_oper_ch) - sizeof(*e)))

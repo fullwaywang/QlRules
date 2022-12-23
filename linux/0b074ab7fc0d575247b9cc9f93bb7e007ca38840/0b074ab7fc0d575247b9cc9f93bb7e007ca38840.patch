@@ -1,0 +1,138 @@
+commit 0b074ab7fc0d575247b9cc9f93bb7e007ca38840
+Author: Takashi Iwai <tiwai@suse.de>
+Date:   Tue May 28 08:39:44 2019 +0200
+
+    ALSA: line6: Assure canceling delayed work at disconnection
+    
+    The current code performs the cancel of a delayed work at the late
+    stage of disconnection procedure, which may lead to the access to the
+    already cleared state.
+    
+    This patch assures to call cancel_delayed_work_sync() at the beginning
+    of the disconnection procedure for avoiding that race.  The delayed
+    work object is now assigned in the common line6 object instead of its
+    derivative, so that we can call cancel_delayed_work_sync().
+    
+    Along with the change, the startup function is called via the new
+    callback instead.  This will make it easier to port other LINE6
+    drivers to use the delayed work for startup in later patches.
+    
+    Reported-by: syzbot+5255458d5e0a2b10bbb9@syzkaller.appspotmail.com
+    Fixes: 7f84ff68be05 ("ALSA: line6: toneport: Fix broken usage of timer for delayed execution")
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+
+diff --git a/sound/usb/line6/driver.c b/sound/usb/line6/driver.c
+index b61f65bed4e4..2b57854335b3 100644
+--- a/sound/usb/line6/driver.c
++++ b/sound/usb/line6/driver.c
+@@ -720,6 +720,15 @@ static int line6_init_cap_control(struct usb_line6 *line6)
+ 	return 0;
+ }
+ 
++static void line6_startup_work(struct work_struct *work)
++{
++	struct usb_line6 *line6 =
++		container_of(work, struct usb_line6, startup_work.work);
++
++	if (line6->startup)
++		line6->startup(line6);
++}
++
+ /*
+ 	Probe USB device.
+ */
+@@ -755,6 +764,7 @@ int line6_probe(struct usb_interface *interface,
+ 	line6->properties = properties;
+ 	line6->usbdev = usbdev;
+ 	line6->ifcdev = &interface->dev;
++	INIT_DELAYED_WORK(&line6->startup_work, line6_startup_work);
+ 
+ 	strcpy(card->id, properties->id);
+ 	strcpy(card->driver, driver_name);
+@@ -825,6 +835,8 @@ void line6_disconnect(struct usb_interface *interface)
+ 	if (WARN_ON(usbdev != line6->usbdev))
+ 		return;
+ 
++	cancel_delayed_work(&line6->startup_work);
++
+ 	if (line6->urb_listen != NULL)
+ 		line6_stop_listen(line6);
+ 
+diff --git a/sound/usb/line6/driver.h b/sound/usb/line6/driver.h
+index 61425597eb61..650d909c9c4f 100644
+--- a/sound/usb/line6/driver.h
++++ b/sound/usb/line6/driver.h
+@@ -178,11 +178,15 @@ struct usb_line6 {
+ 			fifo;
+ 	} messages;
+ 
++	/* Work for delayed PCM startup */
++	struct delayed_work startup_work;
++
+ 	/* If MIDI is supported, buffer_message contains the pre-processed data;
+ 	 * otherwise the data is only in urb_listen (buffer_incoming).
+ 	 */
+ 	void (*process_message)(struct usb_line6 *);
+ 	void (*disconnect)(struct usb_line6 *line6);
++	void (*startup)(struct usb_line6 *line6);
+ };
+ 
+ extern char *line6_alloc_sysex_buffer(struct usb_line6 *line6, int code1,
+diff --git a/sound/usb/line6/toneport.c b/sound/usb/line6/toneport.c
+index e28368d8eba2..55865f7e437d 100644
+--- a/sound/usb/line6/toneport.c
++++ b/sound/usb/line6/toneport.c
+@@ -54,9 +54,6 @@ struct usb_line6_toneport {
+ 	/* Firmware version (x 100) */
+ 	u8 firmware_version;
+ 
+-	/* Work for delayed PCM startup */
+-	struct delayed_work pcm_work;
+-
+ 	/* Device type */
+ 	enum line6_device_type type;
+ 
+@@ -241,12 +238,8 @@ static int snd_toneport_source_put(struct snd_kcontrol *kcontrol,
+ 	return 1;
+ }
+ 
+-static void toneport_start_pcm(struct work_struct *work)
++static void toneport_startup(struct usb_line6 *line6)
+ {
+-	struct usb_line6_toneport *toneport =
+-		container_of(work, struct usb_line6_toneport, pcm_work.work);
+-	struct usb_line6 *line6 = &toneport->line6;
+-
+ 	line6_pcm_acquire(line6->line6pcm, LINE6_STREAM_MONITOR, true);
+ }
+ 
+@@ -394,7 +387,7 @@ static int toneport_setup(struct usb_line6_toneport *toneport)
+ 	if (toneport_has_led(toneport))
+ 		toneport_update_led(toneport);
+ 
+-	schedule_delayed_work(&toneport->pcm_work,
++	schedule_delayed_work(&toneport->line6.startup_work,
+ 			      msecs_to_jiffies(TONEPORT_PCM_DELAY * 1000));
+ 	return 0;
+ }
+@@ -407,8 +400,6 @@ static void line6_toneport_disconnect(struct usb_line6 *line6)
+ 	struct usb_line6_toneport *toneport =
+ 		(struct usb_line6_toneport *)line6;
+ 
+-	cancel_delayed_work_sync(&toneport->pcm_work);
+-
+ 	if (toneport_has_led(toneport))
+ 		toneport_remove_leds(toneport);
+ }
+@@ -424,9 +415,9 @@ static int toneport_init(struct usb_line6 *line6,
+ 	struct usb_line6_toneport *toneport =  (struct usb_line6_toneport *) line6;
+ 
+ 	toneport->type = id->driver_info;
+-	INIT_DELAYED_WORK(&toneport->pcm_work, toneport_start_pcm);
+ 
+ 	line6->disconnect = line6_toneport_disconnect;
++	line6->startup = toneport_startup;
+ 
+ 	/* initialize PCM subsystem: */
+ 	err = line6_init_pcm(line6, &toneport_pcm_properties);

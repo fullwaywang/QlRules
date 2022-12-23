@@ -1,0 +1,52 @@
+commit 2e83b79b2d6c78bf1b4aa227938a214dcbddc83f
+Author: Mateusz Guzik <mguzik@redhat.com>
+Date:   Wed Mar 2 09:51:09 2016 +1100
+
+    xfs: fix two memory leaks in xfs_attr_list.c error paths
+    
+    This plugs 2 trivial leaks in xfs_attr_shortform_list and
+    xfs_attr3_leaf_list_int.
+    
+    Signed-off-by: Mateusz Guzik <mguzik@redhat.com>
+    Cc: <stable@vger.kernel.org>
+    Reviewed-by: Eric Sandeen <sandeen@redhat.com>
+    Signed-off-by: Dave Chinner <david@fromorbit.com>
+
+diff --git a/fs/xfs/xfs_attr_list.c b/fs/xfs/xfs_attr_list.c
+index 0ef7c2ed3f8a..4fa14820e2e2 100644
+--- a/fs/xfs/xfs_attr_list.c
++++ b/fs/xfs/xfs_attr_list.c
+@@ -202,8 +202,10 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
+ 					sbp->namelen,
+ 					sbp->valuelen,
+ 					&sbp->name[sbp->namelen]);
+-		if (error)
++		if (error) {
++			kmem_free(sbuf);
+ 			return error;
++		}
+ 		if (context->seen_enough)
+ 			break;
+ 		cursor->offset++;
+@@ -454,14 +456,13 @@ xfs_attr3_leaf_list_int(
+ 				args.rmtblkcnt = xfs_attr3_rmt_blocks(
+ 							args.dp->i_mount, valuelen);
+ 				retval = xfs_attr_rmtval_get(&args);
+-				if (retval)
+-					return retval;
+-				retval = context->put_listent(context,
+-						entry->flags,
+-						name_rmt->name,
+-						(int)name_rmt->namelen,
+-						valuelen,
+-						args.value);
++				if (!retval)
++					retval = context->put_listent(context,
++							entry->flags,
++							name_rmt->name,
++							(int)name_rmt->namelen,
++							valuelen,
++							args.value);
+ 				kmem_free(args.value);
+ 			} else {
+ 				retval = context->put_listent(context,

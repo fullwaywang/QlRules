@@ -1,0 +1,56 @@
+commit 32f8807a48ae55be0e76880cfe8607a18b5bb0df
+Merge: 7f678def99d2 9d02831e517a
+Author: Jakub Kicinski <kuba@kernel.org>
+Date:   Fri Oct 22 12:36:47 2021 -0700
+
+    Merge branch 'sctp-enhancements-for-the-verification-tag'
+    
+    Xin Long says:
+    
+    ====================
+    sctp: enhancements for the verification tag
+    
+    This patchset is to address CVE-2021-3772:
+    
+      A flaw was found in the Linux SCTP stack. A blind attacker may be able to
+      kill an existing SCTP association through invalid chunks if the attacker
+      knows the IP-addresses and port numbers being used and the attacker can
+      send packets with spoofed IP addresses.
+    
+    This is caused by the missing VTAG verification for the received chunks
+    and the incorrect vtag for the ABORT used to reply to these invalid
+    chunks.
+    
+    This patchset is to go over all processing functions for the received
+    chunks and do:
+    
+    1. Make sure sctp_vtag_verify() is called firstly to verify the vtag from
+       the received chunk and discard this chunk if it fails. With some
+       exceptions:
+    
+       a. sctp_sf_do_5_1B_init()/5_2_2_dupinit()/9_2_reshutack(), processing
+          INIT chunk, as sctphdr vtag is always 0 in INIT chunk.
+    
+       b. sctp_sf_do_5_2_4_dupcook(), processing dupicate COOKIE_ECHO chunk,
+          as the vtag verification will be done by sctp_tietags_compare() and
+          then it takes right actions according to the return.
+    
+       c. sctp_sf_shut_8_4_5(), processing SHUTDOWN_ACK chunk for cookie_wait
+          and cookie_echoed state, as RFC demand sending a SHUTDOWN_COMPLETE
+          even if the vtag verification failed.
+    
+       d. sctp_sf_ootb(), called in many types of chunks for closed state or
+          no asoc, as the same reason to c.
+    
+    2. Always use the vtag from the received INIT chunk to make the response
+       ABORT in sctp_ootb_pkt_new().
+    
+    3. Fix the order for some checks and add some missing checks for the
+       received chunk.
+    
+    This patch series has been tested with SCTP TAHI testing to make sure no
+    regression caused on protocol conformance.
+    ====================
+    
+    Link: https://lore.kernel.org/r/cover.1634730082.git.lucien.xin@gmail.com
+    Signed-off-by: Jakub Kicinski <kuba@kernel.org>

@@ -1,0 +1,37 @@
+commit 28131d896d6d316bc1f6f305d1a9ed6d96c3f2a1
+Merge: 7444d706be31 2619f904b25c
+Author: Jakub Kicinski <kuba@kernel.org>
+Date:   Fri Oct 29 08:58:39 2021 -0700
+
+    Merge tag 'wireless-drivers-next-2021-10-29' of git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/wireless-drivers-next
+    
+    Kalle Valo says:
+    
+    ====================
+    wireless-drivers-next patches for v5.16
+    
+    Fourth set of patches for v5.16. Mostly fixes this time, wcn36xx and
+    iwlwifi have some new features but nothing really out of ordinary.
+    We have one conflict with kspp tree.
+    
+    Major changes:
+    
+    ath11k
+     * fix QCA6390 A-MSDU handling (CVE-2020-24588)
+    
+    wcn36xx
+     * enable hardware scan offload for 5Ghz band
+     * add missing 5GHz channels 136 and 144
+    
+    iwlwifi
+     * support a new ACPI table revision
+     * improvements in the device selection code
+     * new hardware support
+     * support for WiFi 6E enablement via BIOS
+     * support firmware API version 67
+     * support for 160MHz in ranging measurements
+    
+    ====================
+    
+    Link: https://lore.kernel.org/r/20211029134707.DE2B0C4360D@smtp.codeaurora.org
+    Signed-off-by: Jakub Kicinski <kuba@kernel.org>

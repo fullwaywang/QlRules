@@ -1,0 +1,48 @@
+commit 15b3cd8ef46ad1b100e0d3c7e38774f330726820
+Author: Ben Hutchings <ben@decadent.org.uk>
+Date:   Tue Jun 4 19:00:39 2019 +0100
+
+    Revert "consolemap: Fix a memory leaking bug in drivers/tty/vt/consolemap.c"
+    
+    This reverts commit 84ecc2f6eb1cb12e6d44818f94fa49b50f06e6ac.
+    
+    con_insert_unipair() is working with a sparse 3-dimensional array:
+    
+    - p->uni_pgdir[] is the top layer
+    - p1 points to a middle layer
+    - p2 points to a bottom layer
+    
+    If it needs to allocate a new middle layer, and then fails to allocate
+    a new bottom layer, it would previously free only p2, and now it frees
+    both p1 and p2.  But since the new middle layer was already registered
+    in the top layer, it was not leaked.
+    
+    However, if it looks up an *existing* middle layer and then fails to
+    allocate a bottom layer, it now frees both p1 and p2 but does *not*
+    free any other bottom layers under p1.  So it *introduces* a memory
+    leak.
+    
+    The error path also cleared the wrong index in p->uni_pgdir[],
+    introducing a use-after-free.
+    
+    Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+    Fixes: 84ecc2f6eb1c ("consolemap: Fix a memory leaking bug in drivers/tty/vt/consolemap.c")
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/tty/vt/consolemap.c b/drivers/tty/vt/consolemap.c
+index 79fcc96cc7c0..b28aa0d289f8 100644
+--- a/drivers/tty/vt/consolemap.c
++++ b/drivers/tty/vt/consolemap.c
+@@ -489,11 +489,7 @@ con_insert_unipair(struct uni_pagedir *p, u_short unicode, u_short fontpos)
+ 	p2 = p1[n = (unicode >> 6) & 0x1f];
+ 	if (!p2) {
+ 		p2 = p1[n] = kmalloc_array(64, sizeof(u16), GFP_KERNEL);
+-		if (!p2) {
+-			kfree(p1);
+-			p->uni_pgdir[n] = NULL;
+-			return -ENOMEM;
+-		}
++		if (!p2) return -ENOMEM;
+ 		memset(p2, 0xff, 64*sizeof(u16)); /* No glyphs for the characters (yet) */
+ 	}
+ 

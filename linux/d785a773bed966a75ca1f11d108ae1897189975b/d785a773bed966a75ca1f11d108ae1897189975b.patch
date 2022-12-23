@@ -1,0 +1,31 @@
+commit d785a773bed966a75ca1f11d108ae1897189975b
+Author: Jens Axboe <axboe@kernel.dk>
+Date:   Sat Jul 9 07:02:10 2022 -0600
+
+    io_uring: check that we have a file table when allocating update slots
+    
+    If IORING_FILE_INDEX_ALLOC is set asking for an allocated slot, the
+    helper doesn't check if we actually have a file table or not. The non
+    alloc path does do that correctly, and returns -ENXIO if we haven't set
+    one up.
+    
+    Do the same for the allocated path, avoiding a NULL pointer dereference
+    when trying to find a free bit.
+    
+    Fixes: a7c41b4687f5 ("io_uring: let IORING_OP_FILES_UPDATE support choosing fixed file slots")
+    Signed-off-by: Jens Axboe <axboe@kernel.dk>
+
+diff --git a/fs/io_uring.c b/fs/io_uring.c
+index cddc0e8490af..a01ea49f3017 100644
+--- a/fs/io_uring.c
++++ b/fs/io_uring.c
+@@ -7973,6 +7973,9 @@ static int io_files_update_with_index_alloc(struct io_kiocb *req,
+ 	struct file *file;
+ 	int ret, fd;
+ 
++	if (!req->ctx->file_data)
++		return -ENXIO;
++
+ 	for (done = 0; done < req->rsrc_update.nr_args; done++) {
+ 		if (copy_from_user(&fd, &fds[done], sizeof(fd))) {
+ 			ret = -EFAULT;

@@ -1,0 +1,52 @@
+commit e09463f220ca9a1a1ecfda84fcda658f99a1f12a
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Sat Jun 16 20:21:45 2018 -0400
+
+    jbd2: don't mark block as modified if the handle is out of credits
+    
+    Do not set the b_modified flag in block's journal head should not
+    until after we're sure that jbd2_journal_dirty_metadat() will not
+    abort with an error due to there not being enough space reserved in
+    the jbd2 handle.
+    
+    Otherwise, future attempts to modify the buffer may lead a large
+    number of spurious errors and warnings.
+    
+    This addresses CVE-2018-10883.
+    
+    https://bugzilla.kernel.org/show_bug.cgi?id=200071
+    
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+    Cc: stable@kernel.org
+
+diff --git a/fs/jbd2/transaction.c b/fs/jbd2/transaction.c
+index 51dd68e67b0f..c0b66a7a795b 100644
+--- a/fs/jbd2/transaction.c
++++ b/fs/jbd2/transaction.c
+@@ -1361,6 +1361,13 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
+ 		if (jh->b_transaction == transaction &&
+ 		    jh->b_jlist != BJ_Metadata) {
+ 			jbd_lock_bh_state(bh);
++			if (jh->b_transaction == transaction &&
++			    jh->b_jlist != BJ_Metadata)
++				pr_err("JBD2: assertion failure: h_type=%u "
++				       "h_line_no=%u block_no=%llu jlist=%u\n",
++				       handle->h_type, handle->h_line_no,
++				       (unsigned long long) bh->b_blocknr,
++				       jh->b_jlist);
+ 			J_ASSERT_JH(jh, jh->b_transaction != transaction ||
+ 					jh->b_jlist == BJ_Metadata);
+ 			jbd_unlock_bh_state(bh);
+@@ -1380,11 +1387,11 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
+ 		 * of the transaction. This needs to be done
+ 		 * once a transaction -bzzz
+ 		 */
+-		jh->b_modified = 1;
+ 		if (handle->h_buffer_credits <= 0) {
+ 			ret = -ENOSPC;
+ 			goto out_unlock_bh;
+ 		}
++		jh->b_modified = 1;
+ 		handle->h_buffer_credits--;
+ 	}
+ 

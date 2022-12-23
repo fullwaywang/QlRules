@@ -1,0 +1,38 @@
+commit 40413955ee265a5e42f710940ec78f5450d49149
+Author: yujuan.qi <yujuan.qi@mediatek.com>
+Date:   Mon Jul 31 11:23:01 2017 +0800
+
+    Cipso: cipso_v4_optptr enter infinite loop
+    
+    in for(),if((optlen > 0) && (optptr[1] == 0)), enter infinite loop.
+    
+    Test: receive a packet which the ip length > 20 and the first byte of ip option is 0, produce this issue
+    
+    Signed-off-by: yujuan.qi <yujuan.qi@mediatek.com>
+    Acked-by: Paul Moore <paul@paul-moore.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/ipv4/cipso_ipv4.c b/net/ipv4/cipso_ipv4.c
+index c4c6e1969ed0..2ae8f54cb321 100644
+--- a/net/ipv4/cipso_ipv4.c
++++ b/net/ipv4/cipso_ipv4.c
+@@ -1523,9 +1523,17 @@ unsigned char *cipso_v4_optptr(const struct sk_buff *skb)
+ 	int taglen;
+ 
+ 	for (optlen = iph->ihl*4 - sizeof(struct iphdr); optlen > 0; ) {
+-		if (optptr[0] == IPOPT_CIPSO)
++		switch (optptr[0]) {
++		case IPOPT_CIPSO:
+ 			return optptr;
+-		taglen = optptr[1];
++		case IPOPT_END:
++			return NULL;
++		case IPOPT_NOOP:
++			taglen = 1;
++			break;
++		default:
++			taglen = optptr[1];
++		}
+ 		optlen -= taglen;
+ 		optptr += taglen;
+ 	}

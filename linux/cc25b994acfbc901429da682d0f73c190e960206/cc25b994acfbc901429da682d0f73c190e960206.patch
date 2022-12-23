@@ -1,0 +1,81 @@
+commit cc25b994acfbc901429da682d0f73c190e960206
+Author: David Howells <dhowells@redhat.com>
+Date:   Thu Nov 12 09:36:40 2015 +0000
+
+    X.509: Fix the time validation [ver #2]
+    
+    This fixes CVE-2015-5327.  It affects kernels from 4.3-rc1 onwards.
+    
+    Fix the X.509 time validation to use month number-1 when looking up the
+    number of days in that month.  Also put the month number validation before
+    doing the lookup so as not to risk overrunning the array.
+    
+    This can be tested by doing the following:
+    
+    cat <<EOF | openssl x509 -outform DER | keyctl padd asymmetric "" @s
+    -----BEGIN CERTIFICATE-----
+    MIIDbjCCAlagAwIBAgIJAN/lUld+VR4hMA0GCSqGSIb3DQEBCwUAMCkxETAPBgNV
+    BAoMCGxvY2FsLWNhMRQwEgYDVQQDDAtzaWduaW5nIGtleTAeFw0xNTA5MDEyMTMw
+    MThaFw0xNjA4MzEyMTMwMThaMCkxETAPBgNVBAoMCGxvY2FsLWNhMRQwEgYDVQQD
+    DAtzaWduaW5nIGtleTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANrn
+    crcMfMeG67nagX4+m02Xk9rkmsMKI5XTUxbikROe7GSUVJ27sPVPZp4mgzoWlvhh
+    jfK8CC/qhEhwep8Pgg4EJZyWOjhZb7R97ckGvLIoUC6IO3FC2ZnR7WtmWDgo2Jcj
+    VlXwJdHhKU1VZwulh81O61N8IBKqz2r/kDhIWiicUCUkI/Do/RMRfKAoDBcSh86m
+    gOeIAGfq62vbiZhVsX5dOE8Oo2TK5weAvwUIOR7OuGBl5AqwFlPnXQolewiHzKry
+    THg9e44HfzG4Mi6wUvcJxVaQT1h5SrKD779Z5+8+wf1JLaooetcEUArvWyuxCU59
+    qxA4lsTjBwl4cmEki+cCAwEAAaOBmDCBlTAMBgNVHRMEBTADAQH/MAsGA1UdDwQE
+    AwIHgDAdBgNVHQ4EFgQUyND/eKUis7ep/hXMJ8iZMdUhI+IwWQYDVR0jBFIwUIAU
+    yND/eKUis7ep/hXMJ8iZMdUhI+KhLaQrMCkxETAPBgNVBAoMCGxvY2FsLWNhMRQw
+    EgYDVQQDDAtzaWduaW5nIGtleYIJAN/lUld+VR4hMA0GCSqGSIb3DQEBCwUAA4IB
+    AQAMqm1N1yD5pimUELLhT5eO2lRdGUfTozljRxc7e2QT3RLk2TtGhg65JFFN6eml
+    XS58AEPVcAsSLDlR6WpOpOLB2giM0+fV/eYFHHmh22yqTJl4YgkdUwyzPdCHNOZL
+    hmSKeY9xliHb6PNrNWWtZwhYYvRaO2DX4GXOMR0Oa2O4vaYu6/qGlZOZv3U6qZLY
+    wwHEJSrqeBDyMuwN+eANHpoSpiBzD77S4e+7hUDJnql4j6xzJ65+nWJ89fCrQypR
+    4sN5R3aGeIh3QAQUIKpHilwek0CtEaYERgc5m+jGyKSc1rezJW62hWRTaitOc+d5
+    G5hh+9YpnYcxQHEKnZ7rFNKJ
+    -----END CERTIFICATE-----
+    EOF
+    
+    If it works, it emit a key ID; if it fails, it should give a bad message
+    error.
+    
+    Reported-by: Mimi Zohar <zohar@linux.vnet.ibm.com>
+    Signed-off-by: David Howells <dhowells@redhat.com>
+    Tested-by: Mimi Zohar <zohar@linux.vnet.ibm.com>
+    Acked-by: David Woodhouse <David.Woodhouse@intel.com>
+    Signed-off-by: James Morris <james.l.morris@oracle.com>
+
+diff --git a/crypto/asymmetric_keys/x509_cert_parser.c b/crypto/asymmetric_keys/x509_cert_parser.c
+index 3000ea3b6687..021d39c0ba75 100644
+--- a/crypto/asymmetric_keys/x509_cert_parser.c
++++ b/crypto/asymmetric_keys/x509_cert_parser.c
+@@ -531,7 +531,11 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
+ 	if (*p != 'Z')
+ 		goto unsupported_time;
+ 
+-	mon_len = month_lengths[mon];
++	if (year < 1970 ||
++	    mon < 1 || mon > 12)
++		goto invalid_time;
++
++	mon_len = month_lengths[mon - 1];
+ 	if (mon == 2) {
+ 		if (year % 4 == 0) {
+ 			mon_len = 29;
+@@ -543,14 +547,12 @@ int x509_decode_time(time64_t *_t,  size_t hdrlen,
+ 		}
+ 	}
+ 
+-	if (year < 1970 ||
+-	    mon < 1 || mon > 12 ||
+-	    day < 1 || day > mon_len ||
++	if (day < 1 || day > mon_len ||
+ 	    hour > 23 ||
+ 	    min > 59 ||
+ 	    sec > 59)
+ 		goto invalid_time;
+-	
++
+ 	*_t = mktime64(year, mon, day, hour, min, sec);
+ 	return 0;
+ 

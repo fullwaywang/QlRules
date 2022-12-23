@@ -1,0 +1,102 @@
+commit c518adafa39f37858697ac9309c6cf1805581446
+Author: Alexander Popov <alex.popov@linux.com>
+Date:   Mon Feb 1 11:47:19 2021 +0300
+
+    vsock: fix the race conditions in multi-transport support
+    
+    There are multiple similar bugs implicitly introduced by the
+    commit c0cfa2d8a788fcf4 ("vsock: add multi-transports support") and
+    commit 6a2c0962105ae8ce ("vsock: prevent transport modules unloading").
+    
+    The bug pattern:
+     [1] vsock_sock.transport pointer is copied to a local variable,
+     [2] lock_sock() is called,
+     [3] the local variable is used.
+    VSOCK multi-transport support introduced the race condition:
+    vsock_sock.transport value may change between [1] and [2].
+    
+    Let's copy vsock_sock.transport pointer to local variables after
+    the lock_sock() call.
+    
+    Fixes: c0cfa2d8a788fcf4 ("vsock: add multi-transports support")
+    Signed-off-by: Alexander Popov <alex.popov@linux.com>
+    Reviewed-by: Stefano Garzarella <sgarzare@redhat.com>
+    Reviewed-by: Jorgen Hansen <jhansen@vmware.com>
+    Link: https://lore.kernel.org/r/20210201084719.2257066-1-alex.popov@linux.com
+    Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+
+diff --git a/net/vmw_vsock/af_vsock.c b/net/vmw_vsock/af_vsock.c
+index b12d3a322242..6894f21dc147 100644
+--- a/net/vmw_vsock/af_vsock.c
++++ b/net/vmw_vsock/af_vsock.c
+@@ -1014,9 +1014,12 @@ static __poll_t vsock_poll(struct file *file, struct socket *sock,
+ 			mask |= EPOLLOUT | EPOLLWRNORM | EPOLLWRBAND;
+ 
+ 	} else if (sock->type == SOCK_STREAM) {
+-		const struct vsock_transport *transport = vsk->transport;
++		const struct vsock_transport *transport;
++
+ 		lock_sock(sk);
+ 
++		transport = vsk->transport;
++
+ 		/* Listening sockets that have connections in their accept
+ 		 * queue can be read.
+ 		 */
+@@ -1099,10 +1102,11 @@ static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
+ 	err = 0;
+ 	sk = sock->sk;
+ 	vsk = vsock_sk(sk);
+-	transport = vsk->transport;
+ 
+ 	lock_sock(sk);
+ 
++	transport = vsk->transport;
++
+ 	err = vsock_auto_bind(vsk);
+ 	if (err)
+ 		goto out;
+@@ -1561,10 +1565,11 @@ static int vsock_stream_setsockopt(struct socket *sock,
+ 	err = 0;
+ 	sk = sock->sk;
+ 	vsk = vsock_sk(sk);
+-	transport = vsk->transport;
+ 
+ 	lock_sock(sk);
+ 
++	transport = vsk->transport;
++
+ 	switch (optname) {
+ 	case SO_VM_SOCKETS_BUFFER_SIZE:
+ 		COPY_IN(val);
+@@ -1697,7 +1702,6 @@ static int vsock_stream_sendmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	sk = sock->sk;
+ 	vsk = vsock_sk(sk);
+-	transport = vsk->transport;
+ 	total_written = 0;
+ 	err = 0;
+ 
+@@ -1706,6 +1710,8 @@ static int vsock_stream_sendmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	lock_sock(sk);
+ 
++	transport = vsk->transport;
++
+ 	/* Callers should not provide a destination with stream sockets. */
+ 	if (msg->msg_namelen) {
+ 		err = sk->sk_state == TCP_ESTABLISHED ? -EISCONN : -EOPNOTSUPP;
+@@ -1840,11 +1846,12 @@ vsock_stream_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
+ 
+ 	sk = sock->sk;
+ 	vsk = vsock_sk(sk);
+-	transport = vsk->transport;
+ 	err = 0;
+ 
+ 	lock_sock(sk);
+ 
++	transport = vsk->transport;
++
+ 	if (!transport || sk->sk_state != TCP_ESTABLISHED) {
+ 		/* Recvmsg is supposed to return 0 if a peer performs an
+ 		 * orderly shutdown. Differentiate between that case and when a

@@ -1,0 +1,40 @@
+commit 2f446ffe9d737e9a844b97887919c4fda18246e7
+Author: Roger Pau Monne <roger.pau@citrix.com>
+Date:   Fri Jul 1 08:23:54 2022 +0200
+
+    xen/blkfront: fix leaking data in shared pages
+    
+    When allocating pages to be used for shared communication with the
+    backend always zero them, this avoids leaking unintended data present
+    on the pages.
+    
+    This is CVE-2022-26365, part of XSA-403.
+    
+    Signed-off-by: Roger Pau Monné <roger.pau@citrix.com>
+    Reviewed-by: Jan Beulich <jbeulich@suse.com>
+    Reviewed-by: Juergen Gross <jgross@suse.com>
+    Signed-off-by: Juergen Gross <jgross@suse.com>
+
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index 33f04ef78984..4b3bef6ace68 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -311,7 +311,7 @@ static int fill_grant_buffer(struct blkfront_ring_info *rinfo, int num)
+ 			goto out_of_memory;
+ 
+ 		if (info->feature_persistent) {
+-			granted_page = alloc_page(GFP_NOIO);
++			granted_page = alloc_page(GFP_NOIO | __GFP_ZERO);
+ 			if (!granted_page) {
+ 				kfree(gnt_list_entry);
+ 				goto out_of_memory;
+@@ -2183,7 +2183,8 @@ static int blkfront_setup_indirect(struct blkfront_ring_info *rinfo)
+ 
+ 		BUG_ON(!list_empty(&rinfo->indirect_pages));
+ 		for (i = 0; i < num; i++) {
+-			struct page *indirect_page = alloc_page(GFP_KERNEL);
++			struct page *indirect_page = alloc_page(GFP_KERNEL |
++								__GFP_ZERO);
+ 			if (!indirect_page)
+ 				goto out_of_memory;
+ 			list_add(&indirect_page->lru, &rinfo->indirect_pages);

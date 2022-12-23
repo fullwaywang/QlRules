@@ -1,0 +1,46 @@
+commit 65f8ea4cd57dbd46ea13b41dc8bac03176b04233
+Author: Lukas Czerner <lczerner@redhat.com>
+Date:   Mon Jul 4 16:27:20 2022 +0200
+
+    ext4: check if directory block is within i_size
+    
+    Currently ext4 directory handling code implicitly assumes that the
+    directory blocks are always within the i_size. In fact ext4_append()
+    will attempt to allocate next directory block based solely on i_size and
+    the i_size is then appropriately increased after a successful
+    allocation.
+    
+    However, for this to work it requires i_size to be correct. If, for any
+    reason, the directory inode i_size is corrupted in a way that the
+    directory tree refers to a valid directory block past i_size, we could
+    end up corrupting parts of the directory tree structure by overwriting
+    already used directory blocks when modifying the directory.
+    
+    Fix it by catching the corruption early in __ext4_read_dirblock().
+    
+    Addresses Red-Hat-Bugzilla: #2070205
+    CVE: CVE-2022-1184
+    Signed-off-by: Lukas Czerner <lczerner@redhat.com>
+    Cc: stable@vger.kernel.org
+    Reviewed-by: Andreas Dilger <adilger@dilger.ca>
+    Link: https://lore.kernel.org/r/20220704142721.157985-1-lczerner@redhat.com
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+
+diff --git a/fs/ext4/namei.c b/fs/ext4/namei.c
+index 1c6725ecca1a..7fced54e2891 100644
+--- a/fs/ext4/namei.c
++++ b/fs/ext4/namei.c
+@@ -110,6 +110,13 @@ static struct buffer_head *__ext4_read_dirblock(struct inode *inode,
+ 	struct ext4_dir_entry *dirent;
+ 	int is_dx_block = 0;
+ 
++	if (block >= inode->i_size) {
++		ext4_error_inode(inode, func, line, block,
++		       "Attempting to read directory block (%u) that is past i_size (%llu)",
++		       block, inode->i_size);
++		return ERR_PTR(-EFSCORRUPTED);
++	}
++
+ 	if (ext4_simulate_fail(inode->i_sb, EXT4_SIM_DIRBLOCK_EIO))
+ 		bh = ERR_PTR(-EIO);
+ 	else

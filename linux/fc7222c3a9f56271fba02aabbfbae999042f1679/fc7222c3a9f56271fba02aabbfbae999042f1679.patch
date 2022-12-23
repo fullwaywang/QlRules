@@ -1,0 +1,28 @@
+commit fc7222c3a9f56271fba02aabbfbae999042f1679
+Author: Jens Axboe <axboe@kernel.dk>
+Date:   Thu Sep 15 11:44:35 2022 -0600
+
+    io_uring/msg_ring: check file type before putting
+    
+    If we're invoked with a fixed file, follow the normal rules of not
+    calling io_fput_file(). Fixed files are permanently registered to the
+    ring, and do not need putting separately.
+    
+    Cc: stable@vger.kernel.org
+    Fixes: aa184e8671f0 ("io_uring: don't attempt to IOPOLL for MSG_RING requests")
+    Signed-off-by: Jens Axboe <axboe@kernel.dk>
+
+diff --git a/io_uring/msg_ring.c b/io_uring/msg_ring.c
+index 976c4ba68ee7..4a7e5d030c78 100644
+--- a/io_uring/msg_ring.c
++++ b/io_uring/msg_ring.c
+@@ -165,7 +165,8 @@ int io_msg_ring(struct io_kiocb *req, unsigned int issue_flags)
+ 		req_set_fail(req);
+ 	io_req_set_res(req, ret, 0);
+ 	/* put file to avoid an attempt to IOPOLL the req */
+-	io_put_file(req->file);
++	if (!(req->flags & REQ_F_FIXED_FILE))
++		io_put_file(req->file);
+ 	req->file = NULL;
+ 	return IOU_OK;
+ }

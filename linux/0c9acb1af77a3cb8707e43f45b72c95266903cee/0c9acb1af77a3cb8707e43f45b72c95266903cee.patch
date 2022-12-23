@@ -1,0 +1,33 @@
+commit 0c9acb1af77a3cb8707e43f45b72c95266903cee
+Author: Nicolas Pitre <nico@fluxnic.net>
+Date:   Tue Nov 5 10:33:16 2019 +0100
+
+    vcs: prevent write access to vcsu devices
+    
+    Commit d21b0be246bf ("vt: introduce unicode mode for /dev/vcs") guarded
+    against using devices containing attributes as this is not yet
+    implemented. It however failed to guard against writes to any devices
+    as this is also unimplemented.
+    
+    Reported-by: Or Cohen <orcohen@paloaltonetworks.com>
+    Signed-off-by: Nicolas Pitre <npitre@baylibre.com>
+    Cc: <stable@vger.kernel.org> # v4.19+
+    Cc: Jiri Slaby <jslaby@suse.com>
+    Fixes: d21b0be246bf ("vt: introduce unicode mode for /dev/vcs")
+    Link: https://lore.kernel.org/r/nycvar.YSQ.7.76.1911051030580.30289@knanqh.ubzr
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+diff --git a/drivers/tty/vt/vc_screen.c b/drivers/tty/vt/vc_screen.c
+index 1f042346e722..778f83ea2249 100644
+--- a/drivers/tty/vt/vc_screen.c
++++ b/drivers/tty/vt/vc_screen.c
+@@ -456,6 +456,9 @@ vcs_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+ 	size_t ret;
+ 	char *con_buf;
+ 
++	if (use_unicode(inode))
++		return -EOPNOTSUPP;
++
+ 	con_buf = (char *) __get_free_page(GFP_KERNEL);
+ 	if (!con_buf)
+ 		return -ENOMEM;

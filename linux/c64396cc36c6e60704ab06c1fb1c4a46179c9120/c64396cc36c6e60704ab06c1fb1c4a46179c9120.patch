@@ -1,0 +1,36 @@
+commit c64396cc36c6e60704ab06c1fb1c4a46179c9120
+Merge: e5ff2cb9cf67 34b1a1ce1458
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Thu Jan 28 11:18:43 2021 -0800
+
+    Merge tag 'locking-urgent-2021-01-28' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
+    
+    Pull locking fixes from Thomas Gleixner:
+     "A set of PI futex fixes:
+    
+       - Address a longstanding issue where the user space part of the PI
+         futex is not writeable. The kernel returns with inconsistent state
+         which can in the worst case result in a UAF of a tasks kernel
+         stack.
+    
+         The solution is to establish consistent kernel state which makes
+         future operations on the futex fail because user space and kernel
+         space state are inconsistent. Not a problem as PI futexes
+         fundamentaly require a functional RW mapping and if user space
+         pulls the rug under it, then it can keep the pieces it asked for.
+    
+       - Address an issue where the return value is incorrect in case that
+         the futex was acquired after a timeout/signal made the waiter drop
+         out of the rtmutex wait.
+    
+         In one of the corner cases the kernel returned an error code
+         despite having successfully acquired the futex"
+    
+    * tag 'locking-urgent-2021-01-28' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip:
+      futex: Handle faults correctly for PI futexes
+      futex: Simplify fixup_pi_state_owner()
+      futex: Use pi_state_update_owner() in put_pi_state()
+      rtmutex: Remove unused argument from rt_mutex_proxy_unlock()
+      futex: Provide and use pi_state_update_owner()
+      futex: Replace pointless printk in fixup_owner()
+      futex: Ensure the correct return value from futex_lock_pi()

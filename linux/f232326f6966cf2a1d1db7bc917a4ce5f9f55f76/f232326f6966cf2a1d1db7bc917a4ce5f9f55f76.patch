@@ -1,0 +1,78 @@
+commit f232326f6966cf2a1d1db7bc917a4ce5f9f55f76
+Author: Piotr Krysiuk <piotras@gmail.com>
+Date:   Tue Mar 16 09:47:02 2021 +0100
+
+    bpf: Prohibit alu ops for pointer types not defining ptr_limit
+    
+    The purpose of this patch is to streamline error propagation and in particular
+    to propagate retrieve_ptr_limit() errors for pointer types that are not defining
+    a ptr_limit such that register-based alu ops against these types can be rejected.
+    
+    The main rationale is that a gap has been identified by Piotr in the existing
+    protection against speculatively out-of-bounds loads, for example, in case of
+    ctx pointers, unprivileged programs can still perform pointer arithmetic. This
+    can be abused to execute speculatively out-of-bounds loads without restrictions
+    and thus extract contents of kernel memory.
+    
+    Fix this by rejecting unprivileged programs that attempt any pointer arithmetic
+    on unprotected pointer types. The two affected ones are pointer to ctx as well
+    as pointer to map. Field access to a modified ctx' pointer is rejected at a
+    later point in time in the verifier, and 7c6967326267 ("bpf: Permit map_ptr
+    arithmetic with opcode add and offset 0") only relevant for root-only use cases.
+    Risk of unprivileged program breakage is considered very low.
+    
+    Fixes: 7c6967326267 ("bpf: Permit map_ptr arithmetic with opcode add and offset 0")
+    Fixes: b2157399cc98 ("bpf: prevent out-of-bounds speculation")
+    Signed-off-by: Piotr Krysiuk <piotras@gmail.com>
+    Co-developed-by: Daniel Borkmann <daniel@iogearbox.net>
+    Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+    Acked-by: Alexei Starovoitov <ast@kernel.org>
+
+diff --git a/kernel/bpf/verifier.c b/kernel/bpf/verifier.c
+index 4192a9e56654..1c8cbef7cc14 100644
+--- a/kernel/bpf/verifier.c
++++ b/kernel/bpf/verifier.c
+@@ -5934,6 +5934,7 @@ static int sanitize_ptr_alu(struct bpf_verifier_env *env,
+ 	u32 alu_state, alu_limit;
+ 	struct bpf_reg_state tmp;
+ 	bool ret;
++	int err;
+ 
+ 	if (can_skip_alu_sanitation(env, insn))
+ 		return 0;
+@@ -5949,10 +5950,13 @@ static int sanitize_ptr_alu(struct bpf_verifier_env *env,
+ 	alu_state |= ptr_is_dst_reg ?
+ 		     BPF_ALU_SANITIZE_SRC : BPF_ALU_SANITIZE_DST;
+ 
+-	if (retrieve_ptr_limit(ptr_reg, &alu_limit, opcode, off_is_neg))
+-		return 0;
+-	if (update_alu_sanitation_state(aux, alu_state, alu_limit))
+-		return -EACCES;
++	err = retrieve_ptr_limit(ptr_reg, &alu_limit, opcode, off_is_neg);
++	if (err < 0)
++		return err;
++
++	err = update_alu_sanitation_state(aux, alu_state, alu_limit);
++	if (err < 0)
++		return err;
+ do_sim:
+ 	/* Simulate and find potential out-of-bounds access under
+ 	 * speculative execution from truncation as a result of
+@@ -6103,7 +6107,7 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
+ 	case BPF_ADD:
+ 		ret = sanitize_ptr_alu(env, insn, ptr_reg, dst_reg, smin_val < 0);
+ 		if (ret < 0) {
+-			verbose(env, "R%d tried to add from different maps or paths\n", dst);
++			verbose(env, "R%d tried to add from different maps, paths, or prohibited types\n", dst);
+ 			return ret;
+ 		}
+ 		/* We can take a fixed offset as long as it doesn't overflow
+@@ -6158,7 +6162,7 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
+ 	case BPF_SUB:
+ 		ret = sanitize_ptr_alu(env, insn, ptr_reg, dst_reg, smin_val < 0);
+ 		if (ret < 0) {
+-			verbose(env, "R%d tried to sub from different maps or paths\n", dst);
++			verbose(env, "R%d tried to sub from different maps, paths, or prohibited types\n", dst);
+ 			return ret;
+ 		}
+ 		if (dst_reg == off_reg) {

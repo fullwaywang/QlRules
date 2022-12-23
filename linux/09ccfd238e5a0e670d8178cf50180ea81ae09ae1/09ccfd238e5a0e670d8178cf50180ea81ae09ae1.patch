@@ -1,0 +1,34 @@
+commit 09ccfd238e5a0e670d8178cf50180ea81ae09ae1
+Author: WANG Cong <xiyou.wangcong@gmail.com>
+Date:   Mon Dec 14 13:48:36 2015 -0800
+
+    pptp: verify sockaddr_len in pptp_bind() and pptp_connect()
+    
+    Reported-by: Dmitry Vyukov <dvyukov@gmail.com>
+    Signed-off-by: Cong Wang <xiyou.wangcong@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/ppp/pptp.c b/drivers/net/ppp/pptp.c
+index fc69e41d0950..597c53e0a2ec 100644
+--- a/drivers/net/ppp/pptp.c
++++ b/drivers/net/ppp/pptp.c
+@@ -419,6 +419,9 @@ static int pptp_bind(struct socket *sock, struct sockaddr *uservaddr,
+ 	struct pptp_opt *opt = &po->proto.pptp;
+ 	int error = 0;
+ 
++	if (sockaddr_len < sizeof(struct sockaddr_pppox))
++		return -EINVAL;
++
+ 	lock_sock(sk);
+ 
+ 	opt->src_addr = sp->sa_addr.pptp;
+@@ -440,6 +443,9 @@ static int pptp_connect(struct socket *sock, struct sockaddr *uservaddr,
+ 	struct flowi4 fl4;
+ 	int error = 0;
+ 
++	if (sockaddr_len < sizeof(struct sockaddr_pppox))
++		return -EINVAL;
++
+ 	if (sp->sa_protocol != PX_PROTO_PPTP)
+ 		return -EINVAL;
+ 

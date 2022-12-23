@@ -1,0 +1,33 @@
+commit 3a359798b176183ef09efb7a3dc59abad1cc7104
+Author: Ori Nimron <orinimron123@gmail.com>
+Date:   Fri Sep 20 09:35:49 2019 +0200
+
+    nfc: enforce CAP_NET_RAW for raw sockets
+    
+    When creating a raw AF_NFC socket, CAP_NET_RAW needs to be checked
+    first.
+    
+    Signed-off-by: Ori Nimron <orinimron123@gmail.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/nfc/llcp_sock.c b/net/nfc/llcp_sock.c
+index 9b8742947aff..8dfea26536c9 100644
+--- a/net/nfc/llcp_sock.c
++++ b/net/nfc/llcp_sock.c
+@@ -1004,10 +1004,13 @@ static int llcp_sock_create(struct net *net, struct socket *sock,
+ 	    sock->type != SOCK_RAW)
+ 		return -ESOCKTNOSUPPORT;
+ 
+-	if (sock->type == SOCK_RAW)
++	if (sock->type == SOCK_RAW) {
++		if (!capable(CAP_NET_RAW))
++			return -EPERM;
+ 		sock->ops = &llcp_rawsock_ops;
+-	else
++	} else {
+ 		sock->ops = &llcp_sock_ops;
++	}
+ 
+ 	sk = nfc_llcp_sock_alloc(sock, sock->type, GFP_ATOMIC, kern);
+ 	if (sk == NULL)

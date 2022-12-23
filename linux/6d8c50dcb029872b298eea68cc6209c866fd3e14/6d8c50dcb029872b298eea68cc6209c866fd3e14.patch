@@ -1,0 +1,85 @@
+commit 6d8c50dcb029872b298eea68cc6209c866fd3e14
+Author: Cong Wang <xiyou.wangcong@gmail.com>
+Date:   Thu Jun 7 13:39:49 2018 -0700
+
+    socket: close race condition between sock_close() and sockfs_setattr()
+    
+    fchownat() doesn't even hold refcnt of fd until it figures out
+    fd is really needed (otherwise is ignored) and releases it after
+    it resolves the path. This means sock_close() could race with
+    sockfs_setattr(), which leads to a NULL pointer dereference
+    since typically we set sock->sk to NULL in ->release().
+    
+    As pointed out by Al, this is unique to sockfs. So we can fix this
+    in socket layer by acquiring inode_lock in sock_close() and
+    checking against NULL in sockfs_setattr().
+    
+    sock_release() is called in many places, only the sock_close()
+    path matters here. And fortunately, this should not affect normal
+    sock_close() as it is only called when the last fd refcnt is gone.
+    It only affects sock_close() with a parallel sockfs_setattr() in
+    progress, which is not common.
+    
+    Fixes: 86741ec25462 ("net: core: Add a UID field to struct sock.")
+    Reported-by: shankarapailoor <shankarapailoor@gmail.com>
+    Cc: Tetsuo Handa <penguin-kernel@i-love.sakura.ne.jp>
+    Cc: Lorenzo Colitti <lorenzo@google.com>
+    Cc: Al Viro <viro@zeniv.linux.org.uk>
+    Signed-off-by: Cong Wang <xiyou.wangcong@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/socket.c b/net/socket.c
+index af57d85bcb48..8a109012608a 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -541,7 +541,10 @@ static int sockfs_setattr(struct dentry *dentry, struct iattr *iattr)
+ 	if (!err && (iattr->ia_valid & ATTR_UID)) {
+ 		struct socket *sock = SOCKET_I(d_inode(dentry));
+ 
+-		sock->sk->sk_uid = iattr->ia_uid;
++		if (sock->sk)
++			sock->sk->sk_uid = iattr->ia_uid;
++		else
++			err = -ENOENT;
+ 	}
+ 
+ 	return err;
+@@ -590,12 +593,16 @@ EXPORT_SYMBOL(sock_alloc);
+  *	an inode not a file.
+  */
+ 
+-void sock_release(struct socket *sock)
++static void __sock_release(struct socket *sock, struct inode *inode)
+ {
+ 	if (sock->ops) {
+ 		struct module *owner = sock->ops->owner;
+ 
++		if (inode)
++			inode_lock(inode);
+ 		sock->ops->release(sock);
++		if (inode)
++			inode_unlock(inode);
+ 		sock->ops = NULL;
+ 		module_put(owner);
+ 	}
+@@ -609,6 +616,11 @@ void sock_release(struct socket *sock)
+ 	}
+ 	sock->file = NULL;
+ }
++
++void sock_release(struct socket *sock)
++{
++	__sock_release(sock, NULL);
++}
+ EXPORT_SYMBOL(sock_release);
+ 
+ void __sock_tx_timestamp(__u16 tsflags, __u8 *tx_flags)
+@@ -1171,7 +1183,7 @@ static int sock_mmap(struct file *file, struct vm_area_struct *vma)
+ 
+ static int sock_close(struct inode *inode, struct file *filp)
+ {
+-	sock_release(SOCKET_I(inode));
++	__sock_release(SOCKET_I(inode), inode);
+ 	return 0;
+ }
+ 

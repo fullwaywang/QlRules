@@ -1,0 +1,37 @@
+commit 4a9800c81d2f34afb66b4b42e0330ae8298019a2
+Author: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+Date:   Thu Jan 20 17:29:36 2022 +0800
+
+    lkdtm/bugs: Check for the NULL pointer after calling kmalloc
+    
+    As the possible failure of the kmalloc(), the not_checked and checked
+    could be NULL pointer.
+    Therefore, it should be better to check it in order to avoid the
+    dereference of the NULL pointer.
+    Also, we need to kfree the 'not_checked' and 'checked' to avoid
+    the memory leak if fails.
+    And since it is just a test, it may directly return without error
+    number.
+    
+    Fixes: ae2e1aad3e48 ("drivers/misc/lkdtm/bugs.c: add arithmetic overflow and array bounds checks")
+    Signed-off-by: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+    Acked-by: Dan Carpenter <dan.carpenter@oracle.com>
+    Signed-off-by: Kees Cook <keescook@chromium.org>
+    Link: https://lore.kernel.org/r/20220120092936.1874264-1-jiasheng@iscas.ac.cn
+
+diff --git a/drivers/misc/lkdtm/bugs.c b/drivers/misc/lkdtm/bugs.c
+index f21854ac5cc2..4f2808b2ca3c 100644
+--- a/drivers/misc/lkdtm/bugs.c
++++ b/drivers/misc/lkdtm/bugs.c
+@@ -327,6 +327,11 @@ void lkdtm_ARRAY_BOUNDS(void)
+ 
+ 	not_checked = kmalloc(sizeof(*not_checked) * 2, GFP_KERNEL);
+ 	checked = kmalloc(sizeof(*checked) * 2, GFP_KERNEL);
++	if (!not_checked || !checked) {
++		kfree(not_checked);
++		kfree(checked);
++		return;
++	}
+ 
+ 	pr_info("Array access within bounds ...\n");
+ 	/* For both, touch all bytes in the actual member size. */

@@ -1,0 +1,41 @@
+commit b32a7dc8aef1882fbf983eb354837488cc9d54dc
+Author: Eric Biggers <ebiggers@google.com>
+Date:   Mon Nov 27 23:23:05 2017 -0800
+
+    crypto: algif_aead - fix reference counting of null skcipher
+    
+    In the AEAD interface for AF_ALG, the reference to the "null skcipher"
+    held by each tfm was being dropped in the wrong place -- when each
+    af_alg_ctx was freed instead of when the aead_tfm was freed.  As
+    discovered by syzkaller, a specially crafted program could use this to
+    cause the null skcipher to be freed while it is still in use.
+    
+    Fix it by dropping the reference in the right place.
+    
+    Fixes: 72548b093ee3 ("crypto: algif_aead - copy AAD from src to dst")
+    Reported-by: syzbot <syzkaller@googlegroups.com>
+    Cc: <stable@vger.kernel.org> # v4.14+
+    Signed-off-by: Eric Biggers <ebiggers@google.com>
+    Reviewed-by: Stephan Mueller <smueller@chronox.de>
+    Signed-off-by: Herbert Xu <herbert@gondor.apana.org.au>
+
+diff --git a/crypto/algif_aead.c b/crypto/algif_aead.c
+index aacae0837aff..9d73be28cf01 100644
+--- a/crypto/algif_aead.c
++++ b/crypto/algif_aead.c
+@@ -487,6 +487,7 @@ static void aead_release(void *private)
+ 	struct aead_tfm *tfm = private;
+ 
+ 	crypto_free_aead(tfm->aead);
++	crypto_put_default_null_skcipher2();
+ 	kfree(tfm);
+ }
+ 
+@@ -519,7 +520,6 @@ static void aead_sock_destruct(struct sock *sk)
+ 	unsigned int ivlen = crypto_aead_ivsize(tfm);
+ 
+ 	af_alg_pull_tsgl(sk, ctx->used, NULL, 0);
+-	crypto_put_default_null_skcipher2();
+ 	sock_kzfree_s(sk, ctx->iv, ivlen);
+ 	sock_kfree_s(sk, ctx, ctx->len);
+ 	af_alg_release_parent(sk);

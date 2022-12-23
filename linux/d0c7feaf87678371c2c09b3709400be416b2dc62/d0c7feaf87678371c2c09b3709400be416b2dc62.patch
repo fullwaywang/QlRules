@@ -1,0 +1,102 @@
+commit d0c7feaf87678371c2c09b3709400be416b2dc62
+Author: Zheng Bin <zhengbin13@huawei.com>
+Date:   Fri Feb 21 07:38:20 2020 -0800
+
+    xfs: add agf freeblocks verify in xfs_agf_verify
+    
+    We recently used fuzz(hydra) to test XFS and automatically generate
+    tmp.img(XFS v5 format, but some metadata is wrong)
+    
+    xfs_repair information(just one AG):
+    agf_freeblks 0, counted 3224 in ag 0
+    agf_longest 536874136, counted 3224 in ag 0
+    sb_fdblocks 613, counted 3228
+    
+    Test as follows:
+    mount tmp.img tmpdir
+    cp file1M tmpdir
+    sync
+    
+    In 4.19-stable, sync will stuck, the reason is:
+    xfs_mountfs
+      xfs_check_summary_counts
+        if ((!xfs_sb_version_haslazysbcount(&mp->m_sb) ||
+           XFS_LAST_UNMOUNT_WAS_CLEAN(mp)) &&
+           !xfs_fs_has_sickness(mp, XFS_SICK_FS_COUNTERS))
+            return 0;  -->just return, incore sb_fdblocks still be 613
+        xfs_initialize_perag_data
+    
+    cp file1M tmpdir -->ok(write file to pagecache)
+    sync -->stuck(write pagecache to disk)
+    xfs_map_blocks
+      xfs_iomap_write_allocate
+        while (count_fsb != 0) {
+          nimaps = 0;
+          while (nimaps == 0) { --> endless loop
+             nimaps = 1;
+             xfs_bmapi_write(..., &nimaps) --> nimaps becomes 0 again
+    xfs_bmapi_write
+      xfs_bmap_alloc
+        xfs_bmap_btalloc
+          xfs_alloc_vextent
+            xfs_alloc_fix_freelist
+              xfs_alloc_space_available -->fail(agf_freeblks is 0)
+    
+    In linux-next, sync not stuck, cause commit c2b3164320b5 ("xfs:
+    use the latest extent at writeback delalloc conversion time") remove
+    the above while, dmesg is as follows:
+    [   55.250114] XFS (loop0): page discard on page ffffea0008bc7380, inode 0x1b0c, offset 0.
+    
+    Users do not know why this page is discard, the better soultion is:
+    1. Like xfs_repair, make sure sb_fdblocks is equal to counted
+    (xfs_initialize_perag_data did this, who is not called at this mount)
+    2. Add agf verify, if fail, will tell users to repair
+    
+    This patch use the second soultion.
+    
+    Signed-off-by: Zheng Bin <zhengbin13@huawei.com>
+    Signed-off-by: Ren Xudong <renxudong1@huawei.com>
+    Reviewed-by: Darrick J. Wong <darrick.wong@oracle.com>
+    Signed-off-by: Darrick J. Wong <darrick.wong@oracle.com>
+
+diff --git a/fs/xfs/libxfs/xfs_alloc.c b/fs/xfs/libxfs/xfs_alloc.c
+index d8053bc96c4d..183dc2587092 100644
+--- a/fs/xfs/libxfs/xfs_alloc.c
++++ b/fs/xfs/libxfs/xfs_alloc.c
+@@ -2858,6 +2858,13 @@ xfs_agf_verify(
+ 	      be32_to_cpu(agf->agf_flcount) <= xfs_agfl_size(mp)))
+ 		return __this_address;
+ 
++	if (be32_to_cpu(agf->agf_length) > mp->m_sb.sb_dblocks)
++		return __this_address;
++
++	if (be32_to_cpu(agf->agf_freeblks) < be32_to_cpu(agf->agf_longest) ||
++	    be32_to_cpu(agf->agf_freeblks) > be32_to_cpu(agf->agf_length))
++		return __this_address;
++
+ 	if (be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]) < 1 ||
+ 	    be32_to_cpu(agf->agf_levels[XFS_BTNUM_CNT]) < 1 ||
+ 	    be32_to_cpu(agf->agf_levels[XFS_BTNUM_BNO]) > XFS_BTREE_MAXLEVELS ||
+@@ -2869,6 +2876,10 @@ xfs_agf_verify(
+ 	     be32_to_cpu(agf->agf_levels[XFS_BTNUM_RMAP]) > XFS_BTREE_MAXLEVELS))
+ 		return __this_address;
+ 
++	if (xfs_sb_version_hasrmapbt(&mp->m_sb) &&
++	    be32_to_cpu(agf->agf_rmap_blocks) > be32_to_cpu(agf->agf_length))
++		return __this_address;
++
+ 	/*
+ 	 * during growfs operations, the perag is not fully initialised,
+ 	 * so we can't use it for any useful checking. growfs ensures we can't
+@@ -2882,6 +2893,11 @@ xfs_agf_verify(
+ 	    be32_to_cpu(agf->agf_btreeblks) > be32_to_cpu(agf->agf_length))
+ 		return __this_address;
+ 
++	if (xfs_sb_version_hasreflink(&mp->m_sb) &&
++	    be32_to_cpu(agf->agf_refcount_blocks) >
++	    be32_to_cpu(agf->agf_length))
++		return __this_address;
++
+ 	if (xfs_sb_version_hasreflink(&mp->m_sb) &&
+ 	    (be32_to_cpu(agf->agf_refcount_level) < 1 ||
+ 	     be32_to_cpu(agf->agf_refcount_level) > XFS_BTREE_MAXLEVELS))

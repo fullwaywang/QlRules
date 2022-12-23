@@ -1,0 +1,53 @@
+commit 819b23f1c501b17b9694325471789e6b5cc2d0d2
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Wed Jun 13 23:00:48 2018 -0400
+
+    ext4: always check block group bounds in ext4_init_block_bitmap()
+    
+    Regardless of whether the flex_bg feature is set, we should always
+    check to make sure the bits we are setting in the block bitmap are
+    within the block group bounds.
+    
+    https://bugzilla.kernel.org/show_bug.cgi?id=199865
+    
+    Signed-off-by: Theodore Ts'o <tytso@mit.edu>
+    Cc: stable@kernel.org
+
+diff --git a/fs/ext4/balloc.c b/fs/ext4/balloc.c
+index b00481c475cb..8a2e202ade8a 100644
+--- a/fs/ext4/balloc.c
++++ b/fs/ext4/balloc.c
+@@ -184,7 +184,6 @@ static int ext4_init_block_bitmap(struct super_block *sb,
+ 	unsigned int bit, bit_max;
+ 	struct ext4_sb_info *sbi = EXT4_SB(sb);
+ 	ext4_fsblk_t start, tmp;
+-	int flex_bg = 0;
+ 
+ 	J_ASSERT_BH(bh, buffer_locked(bh));
+ 
+@@ -207,22 +206,19 @@ static int ext4_init_block_bitmap(struct super_block *sb,
+ 
+ 	start = ext4_group_first_block_no(sb, block_group);
+ 
+-	if (ext4_has_feature_flex_bg(sb))
+-		flex_bg = 1;
+-
+ 	/* Set bits for block and inode bitmaps, and inode table */
+ 	tmp = ext4_block_bitmap(sb, gdp);
+-	if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
++	if (ext4_block_in_group(sb, tmp, block_group))
+ 		ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+ 
+ 	tmp = ext4_inode_bitmap(sb, gdp);
+-	if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
++	if (ext4_block_in_group(sb, tmp, block_group))
+ 		ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+ 
+ 	tmp = ext4_inode_table(sb, gdp);
+ 	for (; tmp < ext4_inode_table(sb, gdp) +
+ 		     sbi->s_itb_per_group; tmp++) {
+-		if (!flex_bg || ext4_block_in_group(sb, tmp, block_group))
++		if (ext4_block_in_group(sb, tmp, block_group))
+ 			ext4_set_bit(EXT4_B2C(sbi, tmp - start), bh->b_data);
+ 	}
+ 

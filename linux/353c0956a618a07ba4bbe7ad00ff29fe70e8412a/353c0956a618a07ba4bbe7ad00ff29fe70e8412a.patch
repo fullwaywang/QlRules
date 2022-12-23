@@ -1,0 +1,41 @@
+commit 353c0956a618a07ba4bbe7ad00ff29fe70e8412a
+Author: Paolo Bonzini <pbonzini@redhat.com>
+Date:   Tue Jan 29 18:41:16 2019 +0100
+
+    KVM: x86: work around leak of uninitialized stack contents (CVE-2019-7222)
+    
+    Bugzilla: 1671930
+    
+    Emulation of certain instructions (VMXON, VMCLEAR, VMPTRLD, VMWRITE with
+    memory operand, INVEPT, INVVPID) can incorrectly inject a page fault
+    when passed an operand that points to an MMIO address.  The page fault
+    will use uninitialized kernel stack memory as the CR2 and error code.
+    
+    The right behavior would be to abort the VM with a KVM_EXIT_INTERNAL_ERROR
+    exit to userspace; however, it is not an easy fix, so for now just
+    ensure that the error code and CR2 are zero.
+    
+    Embargoed until Feb 7th 2019.
+    
+    Reported-by: Felix Wilhelm <fwilhelm@google.com>
+    Cc: stable@kernel.org
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 3d27206f6c01..e67ecf25e690 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -5116,6 +5116,13 @@ int kvm_read_guest_virt(struct kvm_vcpu *vcpu,
+ {
+ 	u32 access = (kvm_x86_ops->get_cpl(vcpu) == 3) ? PFERR_USER_MASK : 0;
+ 
++	/*
++	 * FIXME: this should call handle_emulation_failure if X86EMUL_IO_NEEDED
++	 * is returned, but our callers are not ready for that and they blindly
++	 * call kvm_inject_page_fault.  Ensure that they at least do not leak
++	 * uninitialized kernel stack memory into cr2 and error code.
++	 */
++	memset(exception, 0, sizeof(*exception));
+ 	return kvm_read_guest_virt_helper(addr, val, bytes, vcpu, access,
+ 					  exception);
+ }

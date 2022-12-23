@@ -1,0 +1,44 @@
+commit b4487b93545214a9db8cbf32e86411677b0cca21
+Author: Jeffrey Mitchell <jeffrey.mitchell@starlab.io>
+Date:   Wed Aug 5 12:23:19 2020 -0500
+
+    nfs: Fix getxattr kernel panic and memory overflow
+    
+    Move the buffer size check to decode_attr_security_label() before memcpy()
+    Only call memcpy() if the buffer is large enough
+    
+    Fixes: aa9c2669626c ("NFS: Client implementation of Labeled-NFS")
+    Signed-off-by: Jeffrey Mitchell <jeffrey.mitchell@starlab.io>
+    [Trond: clean up duplicate test of label->len != 0]
+    Signed-off-by: Trond Myklebust <trond.myklebust@hammerspace.com>
+
+diff --git a/fs/nfs/nfs4proc.c b/fs/nfs/nfs4proc.c
+index 113e0d6dd3d3..5db240688d4e 100644
+--- a/fs/nfs/nfs4proc.c
++++ b/fs/nfs/nfs4proc.c
+@@ -5856,8 +5856,6 @@ static int _nfs4_get_security_label(struct inode *inode, void *buf,
+ 		return ret;
+ 	if (!(fattr.valid & NFS_ATTR_FATTR_V4_SECURITY_LABEL))
+ 		return -ENOENT;
+-	if (buflen < label.len)
+-		return -ERANGE;
+ 	return 0;
+ }
+ 
+diff --git a/fs/nfs/nfs4xdr.c b/fs/nfs/nfs4xdr.c
+index 388ac520b104..79018938d6b3 100644
+--- a/fs/nfs/nfs4xdr.c
++++ b/fs/nfs/nfs4xdr.c
+@@ -4166,7 +4166,11 @@ static int decode_attr_security_label(struct xdr_stream *xdr, uint32_t *bitmap,
+ 			return -EIO;
+ 		if (len < NFS4_MAXLABELLEN) {
+ 			if (label) {
+-				memcpy(label->label, p, len);
++				if (label->len) {
++					if (label->len < len)
++						return -ERANGE;
++					memcpy(label->label, p, len);
++				}
+ 				label->len = len;
+ 				label->pi = pi;
+ 				label->lfs = lfs;

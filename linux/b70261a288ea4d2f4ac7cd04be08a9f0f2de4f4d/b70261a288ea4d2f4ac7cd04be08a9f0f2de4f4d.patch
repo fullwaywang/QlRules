@@ -1,0 +1,33 @@
+commit b70261a288ea4d2f4ac7cd04be08a9f0f2de4f4d
+Author: Qing Xu <m1s5p6688@gmail.com>
+Date:   Thu Jan 2 10:39:27 2020 +0800
+
+    mwifiex: Fix possible buffer overflows in mwifiex_cmd_append_vsie_tlv()
+    
+    mwifiex_cmd_append_vsie_tlv() calls memcpy() without checking
+    the destination size may trigger a buffer overflower,
+    which a local user could use to cause denial of service
+    or the execution of arbitrary code.
+    Fix it by putting the length check before calling memcpy().
+    
+    Signed-off-by: Qing Xu <m1s5p6688@gmail.com>
+    Signed-off-by: Kalle Valo <kvalo@codeaurora.org>
+
+diff --git a/drivers/net/wireless/marvell/mwifiex/scan.c b/drivers/net/wireless/marvell/mwifiex/scan.c
+index 98f942b797f7..a7968a84aaf8 100644
+--- a/drivers/net/wireless/marvell/mwifiex/scan.c
++++ b/drivers/net/wireless/marvell/mwifiex/scan.c
+@@ -2884,6 +2884,13 @@ mwifiex_cmd_append_vsie_tlv(struct mwifiex_private *priv,
+ 			vs_param_set->header.len =
+ 				cpu_to_le16((((u16) priv->vs_ie[id].ie[1])
+ 				& 0x00FF) + 2);
++			if (le16_to_cpu(vs_param_set->header.len) >
++				MWIFIEX_MAX_VSIE_LEN) {
++				mwifiex_dbg(priv->adapter, ERROR,
++					    "Invalid param length!\n");
++				break;
++			}
++
+ 			memcpy(vs_param_set->ie, priv->vs_ie[id].ie,
+ 			       le16_to_cpu(vs_param_set->header.len));
+ 			*buffer += le16_to_cpu(vs_param_set->header.len) +

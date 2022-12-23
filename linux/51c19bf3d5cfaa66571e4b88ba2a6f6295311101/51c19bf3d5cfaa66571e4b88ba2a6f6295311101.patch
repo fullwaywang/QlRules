@@ -1,0 +1,33 @@
+commit 51c19bf3d5cfaa66571e4b88ba2a6f6295311101
+Author: Peilin Ye <yepeilin.cs@gmail.com>
+Date:   Fri Jul 10 12:09:15 2020 -0400
+
+    Bluetooth: Fix slab-out-of-bounds read in hci_extended_inquiry_result_evt()
+    
+    Check upon `num_rsp` is insufficient. A malformed event packet with a
+    large `num_rsp` number makes hci_extended_inquiry_result_evt() go out
+    of bounds. Fix it.
+    
+    This patch fixes the following syzbot bug:
+    
+        https://syzkaller.appspot.com/bug?id=4bf11aa05c4ca51ce0df86e500fce486552dc8d2
+    
+    Reported-by: syzbot+d8489a79b781849b9c46@syzkaller.appspotmail.com
+    Cc: stable@vger.kernel.org
+    Signed-off-by: Peilin Ye <yepeilin.cs@gmail.com>
+    Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+    Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
+
+diff --git a/net/bluetooth/hci_event.c b/net/bluetooth/hci_event.c
+index 03a0759f2fc2..13d8802b8137 100644
+--- a/net/bluetooth/hci_event.c
++++ b/net/bluetooth/hci_event.c
+@@ -4375,7 +4375,7 @@ static void hci_extended_inquiry_result_evt(struct hci_dev *hdev,
+ 
+ 	BT_DBG("%s num_rsp %d", hdev->name, num_rsp);
+ 
+-	if (!num_rsp)
++	if (!num_rsp || skb->len < num_rsp * sizeof(*info) + 1)
+ 		return;
+ 
+ 	if (hci_dev_test_flag(hdev, HCI_PERIODIC_INQ))

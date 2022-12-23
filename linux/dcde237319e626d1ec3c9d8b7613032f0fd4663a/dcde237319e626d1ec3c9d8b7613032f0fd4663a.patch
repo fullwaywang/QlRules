@@ -1,0 +1,88 @@
+commit dcde237319e626d1ec3c9d8b7613032f0fd4663a
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Wed Feb 19 12:31:56 2020 +0000
+
+    mm: Avoid creating virtual address aliases in brk()/mmap()/mremap()
+    
+    Currently the arm64 kernel ignores the top address byte passed to brk(),
+    mmap() and mremap(). When the user is not aware of the 56-bit address
+    limit or relies on the kernel to return an error, untagging such
+    pointers has the potential to create address aliases in user-space.
+    Passing a tagged address to munmap(), madvise() is permitted since the
+    tagged pointer is expected to be inside an existing mapping.
+    
+    The current behaviour breaks the existing glibc malloc() implementation
+    which relies on brk() with an address beyond 56-bit to be rejected by
+    the kernel.
+    
+    Remove untagging in the above functions by partially reverting commit
+    ce18d171cb73 ("mm: untag user pointers in mmap/munmap/mremap/brk"). In
+    addition, update the arm64 tagged-address-abi.rst document accordingly.
+    
+    Link: https://bugzilla.redhat.com/1797052
+    Fixes: ce18d171cb73 ("mm: untag user pointers in mmap/munmap/mremap/brk")
+    Cc: <stable@vger.kernel.org> # 5.4.x-
+    Cc: Florian Weimer <fweimer@redhat.com>
+    Reviewed-by: Andrew Morton <akpm@linux-foundation.org>
+    Reported-by: Victor Stinner <vstinner@redhat.com>
+    Acked-by: Will Deacon <will@kernel.org>
+    Acked-by: Andrey Konovalov <andreyknvl@google.com>
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+    Signed-off-by: Will Deacon <will@kernel.org>
+
+diff --git a/Documentation/arm64/tagged-address-abi.rst b/Documentation/arm64/tagged-address-abi.rst
+index d4a85d535bf9..4a9d9c794ee5 100644
+--- a/Documentation/arm64/tagged-address-abi.rst
++++ b/Documentation/arm64/tagged-address-abi.rst
+@@ -44,8 +44,15 @@ The AArch64 Tagged Address ABI has two stages of relaxation depending
+ how the user addresses are used by the kernel:
+ 
+ 1. User addresses not accessed by the kernel but used for address space
+-   management (e.g. ``mmap()``, ``mprotect()``, ``madvise()``). The use
+-   of valid tagged pointers in this context is always allowed.
++   management (e.g. ``mprotect()``, ``madvise()``). The use of valid
++   tagged pointers in this context is allowed with the exception of
++   ``brk()``, ``mmap()`` and the ``new_address`` argument to
++   ``mremap()`` as these have the potential to alias with existing
++   user addresses.
++
++   NOTE: This behaviour changed in v5.6 and so some earlier kernels may
++   incorrectly accept valid tagged pointers for the ``brk()``,
++   ``mmap()`` and ``mremap()`` system calls.
+ 
+ 2. User addresses accessed by the kernel (e.g. ``write()``). This ABI
+    relaxation is disabled by default and the application thread needs to
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 6756b8bb0033..d681a20eb4ea 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -195,8 +195,6 @@ SYSCALL_DEFINE1(brk, unsigned long, brk)
+ 	bool downgraded = false;
+ 	LIST_HEAD(uf);
+ 
+-	brk = untagged_addr(brk);
+-
+ 	if (down_write_killable(&mm->mmap_sem))
+ 		return -EINTR;
+ 
+@@ -1557,8 +1555,6 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
+ 	struct file *file = NULL;
+ 	unsigned long retval;
+ 
+-	addr = untagged_addr(addr);
+-
+ 	if (!(flags & MAP_ANONYMOUS)) {
+ 		audit_mmap_fd(fd, flags);
+ 		file = fget(fd);
+diff --git a/mm/mremap.c b/mm/mremap.c
+index 122938dcec15..af363063ea23 100644
+--- a/mm/mremap.c
++++ b/mm/mremap.c
+@@ -607,7 +607,6 @@ SYSCALL_DEFINE5(mremap, unsigned long, addr, unsigned long, old_len,
+ 	LIST_HEAD(uf_unmap);
+ 
+ 	addr = untagged_addr(addr);
+-	new_addr = untagged_addr(new_addr);
+ 
+ 	if (flags & ~(MREMAP_FIXED | MREMAP_MAYMOVE))
+ 		return ret;

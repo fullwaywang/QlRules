@@ -1,0 +1,59 @@
+commit d80b64ff297e40c2b6f7d7abc1b3eba70d22a068
+Author: Miaohe Lin <linmiaohe@huawei.com>
+Date:   Sat Jan 4 16:56:49 2020 +0800
+
+    KVM: SVM: Fix potential memory leak in svm_cpu_init()
+    
+    When kmalloc memory for sd->sev_vmcbs failed, we forget to free the page
+    held by sd->save_area. Also get rid of the var r as '-ENOMEM' is actually
+    the only possible outcome here.
+    
+    Reviewed-by: Liran Alon <liran.alon@oracle.com>
+    Reviewed-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+    Signed-off-by: Miaohe Lin <linmiaohe@huawei.com>
+    Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+
+diff --git a/arch/x86/kvm/svm.c b/arch/x86/kvm/svm.c
+index 8787a123b8e7..ff02aeb23616 100644
+--- a/arch/x86/kvm/svm.c
++++ b/arch/x86/kvm/svm.c
+@@ -1005,33 +1005,32 @@ static void svm_cpu_uninit(int cpu)
+ static int svm_cpu_init(int cpu)
+ {
+ 	struct svm_cpu_data *sd;
+-	int r;
+ 
+ 	sd = kzalloc(sizeof(struct svm_cpu_data), GFP_KERNEL);
+ 	if (!sd)
+ 		return -ENOMEM;
+ 	sd->cpu = cpu;
+-	r = -ENOMEM;
+ 	sd->save_area = alloc_page(GFP_KERNEL);
+ 	if (!sd->save_area)
+-		goto err_1;
++		goto free_cpu_data;
+ 
+ 	if (svm_sev_enabled()) {
+-		r = -ENOMEM;
+ 		sd->sev_vmcbs = kmalloc_array(max_sev_asid + 1,
+ 					      sizeof(void *),
+ 					      GFP_KERNEL);
+ 		if (!sd->sev_vmcbs)
+-			goto err_1;
++			goto free_save_area;
+ 	}
+ 
+ 	per_cpu(svm_data, cpu) = sd;
+ 
+ 	return 0;
+ 
+-err_1:
++free_save_area:
++	__free_page(sd->save_area);
++free_cpu_data:
+ 	kfree(sd);
+-	return r;
++	return -ENOMEM;
+ 
+ }
+ 

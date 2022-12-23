@@ -1,0 +1,140 @@
+commit 3bff7e3f1f16dc7305d12905c51c278b54970f0e
+Author: David Hildenbrand <david@redhat.com>
+Date:   Thu Mar 24 18:13:43 2022 -0700
+
+    mm/huge_memory: streamline COW logic in do_huge_pmd_wp_page()
+    
+    We currently have a different COW logic for anon THP than we have for
+    ordinary anon pages in do_wp_page(): the effect is that the issue reported
+    in CVE-2020-29374 is currently still possible for anon THP: an unintended
+    information leak from the parent to the child.
+    
+    Let's apply the same logic (page_count() == 1), with similar optimizations
+    to remove additional references first as we really want to avoid
+    PTE-mapping the THP and copying individual pages best we can.
+    
+    If we end up with a page that has page_count() != 1, we'll have to PTE-map
+    the THP and fallback to do_wp_page(), which will always copy the page.
+    
+    Note that KSM does not apply to THP.
+    
+    I. Interaction with the swapcache and writeback
+    
+    While a THP is in the swapcache, the swapcache holds one reference on each
+    subpage of the THP.  So with PageSwapCache() set, we expect as many
+    additional references as we have subpages.  If we manage to remove the THP
+    from the swapcache, all these references will be gone.
+    
+    Usually, a THP is not split when entered into the swapcache and stays a
+    compound page.  However, try_to_unmap() will PTE-map the THP and use PTE
+    swap entries.  There are no PMD swap entries for that purpose,
+    consequently, we always only swapin subpages into PTEs.
+    
+    Removing a page from the swapcache can fail either when there are
+    remaining swap entries (in which case COW is the right thing to do) or if
+    the page is currently under writeback.
+    
+    Having a locked, R/O PMD-mapped THP that is in the swapcache seems to be
+    possible only in corner cases, for example, if try_to_unmap() failed after
+    adding the page to the swapcache.  However, it's comparatively easy to
+    handle.
+    
+    As we have to fully unmap a THP before starting writeback, and swapin is
+    always done on the PTE level, we shouldn't find a R/O PMD-mapped THP in
+    the swapcache that is under writeback.  This should at least leave
+    writeback out of the picture.
+    
+    II. Interaction with GUP references
+    
+    Having a R/O PMD-mapped THP with GUP references (i.e., R/O references)
+    will result in PTE-mapping the THP on a write fault.  Similar to ordinary
+    anon pages, do_wp_page() will have to copy sub-pages and result in a
+    disconnect between the GUP references and the pages actually mapped into
+    the page tables.  To improve the situation in the future, we'll need
+    additional handling to mark anonymous pages as definitely exclusive to a
+    single process, only allow GUP pins on exclusive anon pages, and disallow
+    sharing of exclusive anon pages with GUP pins e.g., during fork().
+    
+    III. Interaction with references from LRU pagevecs
+    
+    There is no need to try draining the (local) LRU pagevecs in case we would
+    stumble over a !PageLRU() page: folio_add_lru() and friends will always
+    flush the affected pagevec after adding a compound page to it immediately
+    -- pagevec_add_and_need_flush() always returns "true" for them.  Note that
+    the LRU pagevecs will hold a reference on the compound page for a very
+    short time, between adding the page to the pagevec and draining it
+    immediately afterwards.
+    
+    IV. Interaction with speculative/temporary references
+    
+    Similar to ordinary anon pages, other speculative/temporary references on
+    the THP, for example, from the pagecache or page migration code, will
+    disallow exclusive reuse of the page.  We'll have to PTE-map the THP.
+    
+    Link: https://lkml.kernel.org/r/20220131162940.210846-6-david@redhat.com
+    Signed-off-by: David Hildenbrand <david@redhat.com>
+    Acked-by: Vlastimil Babka <vbabka@suse.cz>
+    Cc: Andrea Arcangeli <aarcange@redhat.com>
+    Cc: Christoph Hellwig <hch@lst.de>
+    Cc: David Rientjes <rientjes@google.com>
+    Cc: Don Dutile <ddutile@redhat.com>
+    Cc: Hugh Dickins <hughd@google.com>
+    Cc: Jan Kara <jack@suse.cz>
+    Cc: Jann Horn <jannh@google.com>
+    Cc: Jason Gunthorpe <jgg@nvidia.com>
+    Cc: John Hubbard <jhubbard@nvidia.com>
+    Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+    Cc: Liang Zhang <zhangliang5@huawei.com>
+    Cc: Matthew Wilcox (Oracle) <willy@infradead.org>
+    Cc: Michal Hocko <mhocko@kernel.org>
+    Cc: Mike Kravetz <mike.kravetz@oracle.com>
+    Cc: Mike Rapoport <rppt@linux.ibm.com>
+    Cc: Nadav Amit <nadav.amit@gmail.com>
+    Cc: Oleg Nesterov <oleg@redhat.com>
+    Cc: Peter Xu <peterx@redhat.com>
+    Cc: Rik van Riel <riel@surriel.com>
+    Cc: Roman Gushchin <roman.gushchin@linux.dev>
+    Cc: Shakeel Butt <shakeelb@google.com>
+    Cc: Yang Shi <shy828301@gmail.com>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index 057b13bde82d..a5f651c6df4e 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -1303,7 +1303,6 @@ vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
+ 	page = pmd_page(orig_pmd);
+ 	VM_BUG_ON_PAGE(!PageHead(page), page);
+ 
+-	/* Lock page for reuse_swap_page() */
+ 	if (!trylock_page(page)) {
+ 		get_page(page);
+ 		spin_unlock(vmf->ptl);
+@@ -1319,10 +1318,15 @@ vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
+ 	}
+ 
+ 	/*
+-	 * We can only reuse the page if nobody else maps the huge page or it's
+-	 * part.
++	 * See do_wp_page(): we can only map the page writable if there are
++	 * no additional references. Note that we always drain the LRU
++	 * pagevecs immediately after adding a THP.
+ 	 */
+-	if (reuse_swap_page(page)) {
++	if (page_count(page) > 1 + PageSwapCache(page) * thp_nr_pages(page))
++		goto unlock_fallback;
++	if (PageSwapCache(page))
++		try_to_free_swap(page);
++	if (page_count(page) == 1) {
+ 		pmd_t entry;
+ 		entry = pmd_mkyoung(orig_pmd);
+ 		entry = maybe_pmd_mkwrite(pmd_mkdirty(entry), vma);
+@@ -1333,6 +1337,7 @@ vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
+ 		return VM_FAULT_WRITE;
+ 	}
+ 
++unlock_fallback:
+ 	unlock_page(page);
+ 	spin_unlock(vmf->ptl);
+ fallback:

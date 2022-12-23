@@ -1,0 +1,63 @@
+commit 89c6efa61f5709327ecfa24bff18e57a4e80c7fa
+Author: Jeremy Compostella <jeremy.compostella@intel.com>
+Date:   Wed Nov 15 12:31:44 2017 -0700
+
+    i2c: core-smbus: prevent stack corruption on read I2C_BLOCK_DATA
+    
+    On a I2C_SMBUS_I2C_BLOCK_DATA read request, if data->block[0] is
+    greater than I2C_SMBUS_BLOCK_MAX + 1, the underlying I2C driver writes
+    data out of the msgbuf1 array boundary.
+    
+    It is possible from a user application to run into that issue by
+    calling the I2C_SMBUS ioctl with data.block[0] greater than
+    I2C_SMBUS_BLOCK_MAX + 1.
+    
+    This patch makes the code compliant with
+    Documentation/i2c/dev-interface by raising an error when the requested
+    size is larger than 32 bytes.
+    
+    Call Trace:
+     [<ffffffff8139f695>] dump_stack+0x67/0x92
+     [<ffffffff811802a4>] panic+0xc5/0x1eb
+     [<ffffffff810ecb5f>] ? vprintk_default+0x1f/0x30
+     [<ffffffff817456d3>] ? i2cdev_ioctl_smbus+0x303/0x320
+     [<ffffffff8109a68b>] __stack_chk_fail+0x1b/0x20
+     [<ffffffff817456d3>] i2cdev_ioctl_smbus+0x303/0x320
+     [<ffffffff81745aed>] i2cdev_ioctl+0x4d/0x1e0
+     [<ffffffff811f761a>] do_vfs_ioctl+0x2ba/0x490
+     [<ffffffff81336e43>] ? security_file_ioctl+0x43/0x60
+     [<ffffffff811f7869>] SyS_ioctl+0x79/0x90
+     [<ffffffff81a22e97>] entry_SYSCALL_64_fastpath+0x12/0x6a
+    
+    Signed-off-by: Jeremy Compostella <jeremy.compostella@intel.com>
+    Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+    Cc: stable@kernel.org
+
+diff --git a/drivers/i2c/i2c-core-smbus.c b/drivers/i2c/i2c-core-smbus.c
+index 4bb9927afd01..a1082c04ac5c 100644
+--- a/drivers/i2c/i2c-core-smbus.c
++++ b/drivers/i2c/i2c-core-smbus.c
+@@ -397,16 +397,17 @@ static s32 i2c_smbus_xfer_emulated(struct i2c_adapter *adapter, u16 addr,
+ 				   the underlying bus driver */
+ 		break;
+ 	case I2C_SMBUS_I2C_BLOCK_DATA:
++		if (data->block[0] > I2C_SMBUS_BLOCK_MAX) {
++			dev_err(&adapter->dev, "Invalid block %s size %d\n",
++				read_write == I2C_SMBUS_READ ? "read" : "write",
++				data->block[0]);
++			return -EINVAL;
++		}
++
+ 		if (read_write == I2C_SMBUS_READ) {
+ 			msg[1].len = data->block[0];
+ 		} else {
+ 			msg[0].len = data->block[0] + 1;
+-			if (msg[0].len > I2C_SMBUS_BLOCK_MAX + 1) {
+-				dev_err(&adapter->dev,
+-					"Invalid block write size %d\n",
+-					data->block[0]);
+-				return -EINVAL;
+-			}
+ 			for (i = 1; i <= data->block[0]; i++)
+ 				msgbuf0[i] = data->block[i];
+ 		}

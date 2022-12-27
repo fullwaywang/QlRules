@@ -1,0 +1,25 @@
+commit d314046f897fbb0e3141108012b668374e665020
+Author: Nick Wellnhofer <wellnhofer@aevum.de>
+Date:   Sat Apr 23 17:41:44 2022 +0200
+
+    Don't try to copy children of entity references
+    
+    This would result in an error, aborting the whole copy operation.
+    Regressed in commit 7618a3b1.
+    
+    Fixes #371.
+
+diff --git a/tree.c b/tree.c
+index 07499484..2b02df3d 100644
+--- a/tree.c
++++ b/tree.c
+@@ -4372,7 +4372,8 @@ xmlStaticCopyNode(xmlNodePtr node, xmlDocPtr doc, xmlNodePtr parent,
+                 insert->last = copy;
+             }
+ 
+-            if (cur->children != NULL) {
++            if ((cur->type != XML_ENTITY_REF_NODE) &&
++                (cur->children != NULL)) {
+                 cur = cur->children;
+                 insert = copy;
+                 continue;

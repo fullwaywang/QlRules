@@ -1,0 +1,31 @@
+commit cbb271655cadeb8dbb258a64701d9a3a0c4835b4
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to cbb271655cadeb8dbb258a64701d9a3a0c4835b4
+Author: Pranjal Jumde <pjumde@apple.com>
+Date:   Mon Mar 7 06:34:26 2016 -0800
+
+    Bug 757711: heap-buffer-overflow in xmlFAParsePosCharGroup <https://bugzilla.gnome.org/show_bug.cgi?id=757711>
+    
+    * xmlregexp.c:
+    (xmlFAParseCharRange): Only advance to the next character if
+    there is no error.  Advancing to the next character in case of
+    an error while parsing regexp leads to an out of bounds access.
+
+diff --git a/xmlregexp.c b/xmlregexp.c
+index 727fef4d..ca3b4f46 100644
+--- a/xmlregexp.c
++++ b/xmlregexp.c
+@@ -5057,11 +5057,12 @@ xmlFAParseCharRange(xmlRegParserCtxtPtr ctxt) {
+ 	ERROR("Expecting the end of a char range");
+ 	return;
+     }
+-    NEXTL(len);
++
+     /* TODO check that the values are acceptable character ranges for XML */
+     if (end < start) {
+ 	ERROR("End of range is before start of range");
+     } else {
++        NEXTL(len);
+         xmlRegAtomAddRange(ctxt, ctxt->atom, ctxt->neg,
+ 		           XML_REGEXP_CHARVAL, start, end, NULL);
+     }

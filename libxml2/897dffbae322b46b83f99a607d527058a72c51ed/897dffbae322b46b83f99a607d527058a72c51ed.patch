@@ -1,0 +1,58 @@
+commit 897dffbae322b46b83f99a607d527058a72c51ed
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to 897dffbae322b46b83f99a607d527058a72c51ed
+Author: Nick Wellnhofer <wellnhofer@aevum.de>
+Date:   Tue Jun 6 13:21:14 2017 +0200
+
+    Check for integer overflow in memory debug code
+    
+    Fixes bug 783026.
+    
+    Thanks to Pranjal Jumde for the report.
+
+diff --git a/xmlmemory.c b/xmlmemory.c
+index f08c8c3d..c53141fb 100644
+--- a/xmlmemory.c
++++ b/xmlmemory.c
+@@ -172,6 +172,13 @@ xmlMallocLoc(size_t size, const char * file, int line)
+ 
+     TEST_POINT
+ 
++    if (size > (MAX_SIZE_T - RESERVE_SIZE)) {
++	xmlGenericError(xmlGenericErrorContext,
++		"xmlMallocLoc : Unsigned overflow\n");
++	xmlMemoryDump();
++	return(NULL);
++    }
++
+     p = (MEMHDR *) malloc(RESERVE_SIZE+size);
+ 
+     if (!p) {
+@@ -352,6 +359,13 @@ xmlReallocLoc(void *ptr,size_t size, const char * file, int line)
+ #endif
+     xmlMutexUnlock(xmlMemMutex);
+ 
++    if (size > (MAX_SIZE_T - RESERVE_SIZE)) {
++	xmlGenericError(xmlGenericErrorContext,
++		"xmlMallocLoc : Unsigned overflow\n");
++	xmlMemoryDump();
++	return(NULL);
++    }
++
+     tmp = (MEMHDR *) realloc(p,RESERVE_SIZE+size);
+     if (!tmp) {
+ 	 free(p);
+@@ -499,6 +513,13 @@ xmlMemStrdupLoc(const char *str, const char *file, int line)
+     if (!xmlMemInitialized) xmlInitMemory();
+     TEST_POINT
+ 
++    if (size > (MAX_SIZE_T - RESERVE_SIZE)) {
++	xmlGenericError(xmlGenericErrorContext,
++		"xmlMallocLoc : Unsigned overflow\n");
++	xmlMemoryDump();
++	return(NULL);
++    }
++
+     p = (MEMHDR *) malloc(RESERVE_SIZE+size);
+     if (!p) {
+       goto error;

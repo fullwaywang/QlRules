@@ -1,0 +1,90 @@
+commit 899a5d9f0ed13b8e32449a08a361e0de127dd961
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to 899a5d9f0ed13b8e32449a08a361e0de127dd961
+Author: Nick Wellnhofer <wellnhofer@aevum.de>
+Date:   Tue Jul 25 14:59:49 2017 +0200
+
+    Detect infinite recursion in parameter entities
+    
+    When expanding a parameter entity in a DTD, infinite recursion could
+    lead to an infinite loop or memory exhaustion.
+    
+    Thanks to Wei Lei for the first of many reports.
+    
+    Fixes bug 759579.
+
+diff --git a/parser.c b/parser.c
+index 6286cad6..51452a25 100644
+--- a/parser.c
++++ b/parser.c
+@@ -2250,6 +2250,13 @@ xmlPushInput(xmlParserCtxtPtr ctxt, xmlParserInputPtr input) {
+ 	xmlGenericError(xmlGenericErrorContext,
+ 		"Pushing input %d : %.30s\n", ctxt->inputNr+1, input->cur);
+     }
++    if (((ctxt->inputNr > 40) && ((ctxt->options & XML_PARSE_HUGE) == 0)) ||
++        (ctxt->inputNr > 1024)) {
++        xmlFatalErr(ctxt, XML_ERR_ENTITY_LOOP, NULL);
++        while (ctxt->inputNr > 1)
++            xmlFreeInputStream(inputPop(ctxt));
++	return(-1);
++    }
+     ret = inputPush(ctxt, input);
+     if (ctxt->instate == XML_PARSER_EOF)
+         return(-1);
+@@ -7916,8 +7923,10 @@ xmlParsePEReference(xmlParserCtxtPtr ctxt)
+ 		return;
+ 
+ 	    input = xmlNewEntityInputStream(ctxt, entity);
+-	    if (xmlPushInput(ctxt, input) < 0)
++	    if (xmlPushInput(ctxt, input) < 0) {
++                xmlFreeInputStream(input);
+ 		return;
++            }
+ 
+ 	    if (entity->etype == XML_EXTERNAL_PARAMETER_ENTITY) {
+                 /*
+diff --git a/result/errors/759579.xml b/result/errors/759579.xml
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/result/errors/759579.xml.err b/result/errors/759579.xml.err
+new file mode 100644
+index 00000000..288026e6
+--- /dev/null
++++ b/result/errors/759579.xml.err
+@@ -0,0 +1,6 @@
++Entity: line 2: parser error : Detected an entity reference loop
++        %z; %z; %z; %z; %z;
++           ^
++Entity: line 2: 
++        %z; %z; %z; %z; %z;
++           ^
+diff --git a/result/errors/759579.xml.str b/result/errors/759579.xml.str
+new file mode 100644
+index 00000000..09408f52
+--- /dev/null
++++ b/result/errors/759579.xml.str
+@@ -0,0 +1,7 @@
++Entity: line 2: parser error : Detected an entity reference loop
++        %z; %z; %z; %z; %z;
++           ^
++Entity: line 2: 
++        %z; %z; %z; %z; %z;
++           ^
++./test/errors/759579.xml : failed to parse
+diff --git a/test/errors/759579.xml b/test/errors/759579.xml
+new file mode 100644
+index 00000000..7fadd702
+--- /dev/null
++++ b/test/errors/759579.xml
+@@ -0,0 +1,11 @@
++<!DOCTYPE doc [
++    <!ENTITY % z '
++        &#37;z; &#37;z; &#37;z; &#37;z; &#37;z;
++        &#37;z; &#37;z; &#37;z; &#37;z; &#37;z;
++        &#37;z; &#37;z; &#37;z; &#37;z; &#37;z;
++        &#37;z; &#37;z; &#37;z; &#37;z; &#37;z;
++        &#37;z; &#37;z; &#37;z; &#37;z; &#37;z;
++    '>
++    %z;
++]>
++<doc/>

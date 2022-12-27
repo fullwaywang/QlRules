@@ -1,0 +1,46 @@
+commit 8fbbf5513d609c1770b391b99e33314cd0742704
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to 8fbbf5513d609c1770b391b99e33314cd0742704
+Author: Pranjal Jumde <pjumde@apple.com>
+Date:   Tue Mar 8 17:29:00 2016 -0800
+
+    Bug 763071: heap-buffer-overflow in xmlStrncat <https://bugzilla.gnome.org/show_bug.cgi?id=763071>
+    
+    * xmlstring.c:
+    (xmlStrncat): Return NULL if xmlStrlen returns a negative length.
+    (xmlStrncatNew): Ditto.
+
+diff --git a/xmlstring.c b/xmlstring.c
+index b89c9e9f..00287d4c 100644
+--- a/xmlstring.c
++++ b/xmlstring.c
+@@ -457,6 +457,8 @@ xmlStrncat(xmlChar *cur, const xmlChar *add, int len) {
+         return(xmlStrndup(add, len));
+ 
+     size = xmlStrlen(cur);
++    if (size < 0)
++        return(NULL);
+     ret = (xmlChar *) xmlRealloc(cur, (size + len + 1) * sizeof(xmlChar));
+     if (ret == NULL) {
+         xmlErrMemory(NULL, NULL);
+@@ -484,14 +486,19 @@ xmlStrncatNew(const xmlChar *str1, const xmlChar *str2, int len) {
+     int size;
+     xmlChar *ret;
+ 
+-    if (len < 0)
++    if (len < 0) {
+         len = xmlStrlen(str2);
++        if (len < 0)
++            return(NULL);
++    }
+     if ((str2 == NULL) || (len == 0))
+         return(xmlStrdup(str1));
+     if (str1 == NULL)
+         return(xmlStrndup(str2, len));
+ 
+     size = xmlStrlen(str1);
++    if (size < 0)
++        return(NULL);
+     ret = (xmlChar *) xmlMalloc((size + len + 1) * sizeof(xmlChar));
+     if (ret == NULL) {
+         xmlErrMemory(NULL, NULL);

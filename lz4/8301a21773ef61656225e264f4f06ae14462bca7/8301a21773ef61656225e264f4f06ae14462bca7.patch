@@ -1,0 +1,21 @@
+commit 8301a21773ef61656225e264f4f06ae14462bca7
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to 8301a21773ef61656225e264f4f06ae14462bca7
+Author: Jasper Lievisse Adriaanse <j@jasper.la>
+Date:   Fri Feb 26 15:21:20 2021 +0100
+
+    Fix potential memory corruption with negative memmove() size
+
+diff --git a/lib/lz4.c b/lib/lz4.c
+index 5f524d0..c2f504e 100644
+--- a/lib/lz4.c
++++ b/lib/lz4.c
+@@ -1749,7 +1749,7 @@ LZ4_decompress_generic(
+                  const size_t dictSize         /* note : = 0 if noDict */
+                  )
+ {
+-    if (src == NULL) { return -1; }
++    if ((src == NULL) || (outputSize < 0)) { return -1; }
+ 
+     {   const BYTE* ip = (const BYTE*) src;
+         const BYTE* const iend = ip + srcSize;

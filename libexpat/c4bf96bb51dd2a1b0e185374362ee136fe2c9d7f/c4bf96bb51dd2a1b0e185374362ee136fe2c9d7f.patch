@@ -1,0 +1,25 @@
+commit c4bf96bb51dd2a1b0e185374362ee136fe2c9d7f
+Author: Rhodri James <rhodri@kynesim.co.uk>
+Date:   Wed Jun 14 23:45:07 2017 +0200
+
+    xmlparse.c: Fix external entity infinite loop bug (CVE-2017-9233)
+
+diff --git a/expat/lib/xmlparse.c b/expat/lib/xmlparse.c
+index 7818f8df..21145964 100644
+--- a/expat/lib/xmlparse.c
++++ b/expat/lib/xmlparse.c
+@@ -3981,6 +3981,14 @@ entityValueInitProcessor(XML_Parser parser,
+       *nextPtr = next;
+       return XML_ERROR_NONE;
+     }
++    /* If we get this token, we have the start of what might be a
++       normal tag, but not a declaration (i.e. it doesn't begin with
++       "<!").  In a DTD context, that isn't legal.
++    */
++    else if (tok == XML_TOK_INSTANCE_START) {
++      *nextPtr = next;
++      return XML_ERROR_SYNTAX;
++    }
+     start = next;
+     eventPtr = start;
+   }

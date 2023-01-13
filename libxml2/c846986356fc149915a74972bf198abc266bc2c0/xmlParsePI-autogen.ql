@@ -60,12 +60,8 @@ predicate func_6(Function func) {
 predicate func_7(Variable vlen_5160, Variable vtarget_5163, Variable vstate_5164, Parameter vctxt_5158, Variable vbuf_5159, Variable vxmlFree) {
 	exists(LogicalAndExpr target_7 |
 		target_7.getAnOperand().(RelationalOperation).getGreaterOperand().(VariableAccess).getTarget()=vlen_5160
-		and target_7.getAnOperand().(RelationalOperation).getLesserOperand() instanceof Literal
-		and target_7.getAnOperand().(EqualityOperation).getAnOperand() instanceof BitwiseAndExpr
-		and target_7.getAnOperand().(EqualityOperation).getAnOperand() instanceof Literal
 		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("xmlFatalErrMsgStr")
 		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vctxt_5158
-		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(StringLiteral).getValue()="PI %s too big found"
 		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(3).(VariableAccess).getTarget()=vtarget_5163
 		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vxmlFree
 		and target_7.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(VariableCall).getArgument(0).(VariableAccess).getTarget()=vbuf_5159
@@ -84,11 +80,7 @@ predicate func_8(Variable vlen_5160, Variable vtarget_5163, Parameter vctxt_5158
 		and target_8.getCondition().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
 		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("xmlFatalErrMsgStr")
 		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vctxt_5158
-		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(StringLiteral).getValue()="PI %s too big found"
 		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(3).(VariableAccess).getTarget()=vtarget_5163
-		and target_8.getThen().(BlockStmt).getStmt(1) instanceof ExprStmt
-		and target_8.getThen().(BlockStmt).getStmt(2) instanceof ExprStmt
-		and target_8.getThen().(BlockStmt).getStmt(3).(ReturnStmt).toString() = "return ..."
 		and target_8.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(EqualityOperation).getAnOperand().(VariableAccess).getTarget()=vtarget_5163
 		and target_8.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(EqualityOperation).getAnOperand().(Literal).getValue()="0")
 }

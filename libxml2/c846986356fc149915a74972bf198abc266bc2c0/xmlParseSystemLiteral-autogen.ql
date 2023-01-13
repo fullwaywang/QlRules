@@ -45,12 +45,8 @@ predicate func_5(Function func) {
 predicate func_6(Parameter vctxt_4192, Variable vbuf_4193, Variable vsize_4195, Variable vstate_4198, Variable vxmlFree) {
 	exists(LogicalAndExpr target_6 |
 		target_6.getAnOperand().(RelationalOperation).getGreaterOperand().(VariableAccess).getTarget()=vsize_4195
-		and target_6.getAnOperand().(RelationalOperation).getLesserOperand() instanceof Literal
-		and target_6.getAnOperand().(EqualityOperation).getAnOperand() instanceof BitwiseAndExpr
-		and target_6.getAnOperand().(EqualityOperation).getAnOperand() instanceof Literal
 		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("xmlFatalErr")
 		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vctxt_4192
-		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(StringLiteral).getValue()="SystemLiteral"
 		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vxmlFree
 		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(VariableCall).getArgument(0).(VariableAccess).getTarget()=vbuf_4193
 		and target_6.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="instate"

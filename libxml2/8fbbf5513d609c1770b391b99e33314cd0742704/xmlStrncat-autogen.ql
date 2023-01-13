@@ -24,11 +24,19 @@ predicate func_1(Parameter vcur_448, Variable vsize_449) {
 		and target_1.getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vcur_448)
 }
 
+predicate func_2(Parameter vcur_448, Variable vsize_449) {
+    exists(FunctionCall target_2 |
+        target_2.getTarget().hasName("xmlRealloc")
+        and target_2.getArgument(0).(VariableAccess).getTarget()=vcur_448
+        and target_2.getArgument(1).getAChild*().(VariableAccess).getTarget()=vsize_449)
+}
+
 from Function func, Parameter vcur_448, Variable vsize_449
 where
 not func_0(vsize_449, func)
 and vsize_449.getType().hasName("int")
 and func_1(vcur_448, vsize_449)
+and func_2(vcur_448, vsize_449)
 and vcur_448.getParentScope+() = func
 and vsize_449.getParentScope+() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

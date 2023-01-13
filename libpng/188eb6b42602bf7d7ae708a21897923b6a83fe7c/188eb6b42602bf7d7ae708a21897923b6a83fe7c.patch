@@ -1,0 +1,857 @@
+commit 188eb6b42602bf7d7ae708a21897923b6a83fe7c
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Fri Jun 18 21:32:02 2010 -0500
+
+    [master] Imported from libpng-1.4.3beta04.tar
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index 6463edc77..afc6b6604 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,5 +1,5 @@
+ 
+-Libpng 1.4.3beta02 - June 18, 2010
++Libpng 1.4.3beta04 - June 19, 2010
+ 
+ This is not intended to be a public release.  It will be replaced
+ within a few weeks by a public version or by another test version.
+@@ -9,20 +9,20 @@ Files available for download:
+ Source files with LF line endings (for Unix/Linux) and with a
+ "configure" script
+ 
+-   1.4.3beta02.tar.xz (LZMA-compressed, recommended)
+-   1.4.3beta02.tar.gz
+-   1.4.3beta02.tar.bz2
++   1.4.3beta04.tar.xz (LZMA-compressed, recommended)
++   1.4.3beta04.tar.gz
++   1.4.3beta04.tar.bz2
+ 
+ Source files with CRLF line endings (for Windows), without the
+ "configure" script
+ 
+-   lp143b02.zip
+-   lp143b02.7z
++   lp143b04.zip
++   lp143b04.7z
+ 
+ Other information:
+ 
+-   1.4.3beta02-README.txt
+-   1.4.3beta02-LICENSE.txt
++   1.4.3beta04-README.txt
++   1.4.3beta04-LICENSE.txt
+ 
+ Changes since the last public release (1.4.2):
+ 
+@@ -30,8 +30,17 @@ version 1.4.3beta01 [June 18, 2010]
+   Added missing quotation marks in the aix block of configure.ac
+   The new "vstudio" project was missing from the zip and 7z distributions.
+   In pngpread.c: png_push_have_row() add check for new_row > height
++
++version 1.4.3beta02 [June 18, 2010]
+   Removed the now-redundant check for out-of-bounds new_row from example.c
+ 
++version 1.4.3beta03 [June 18, 2010]
++  In pngpread.c: png_push_finish_row() add check for too many rows.
++
++version 1.4.3beta04 [June 19, 2010]
++  In pngpread.c: png_push_process_row() add check for too many rows.
++  Removed the checks added in beta01 and beta03, as they are now redundant.
++
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+ https://lists.sourceforge.net/lists/listinfo/png-mng-implement).
+diff --git a/CHANGES b/CHANGES
+index 8e677dcb5..85b842c84 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2580,8 +2580,18 @@ version 1.4.3beta01 [June 18, 2010]
+   Added missing quotation marks in the aix block of configure.ac
+   The new "vstudio" project was missing from the zip and 7z distributions.
+   In pngpread.c: png_push_have_row() add check for new_row > height
++
++version 1.4.3beta02 [June 18, 2010]
+   Removed the now-redundant check for out-of-bounds new_row from example.c
+ 
++version 1.4.3beta03 [June 19, 2010]
++  In pngpread.c: png_push_finish_row() add check for too many rows.
++
++version 1.4.3beta04 [June 19, 2010]
++  In pngpread.c: png_push_process_row() add check for too many rows.
++  Removed the checks added in beta01 and beta03, as they are now redundant.
++
++
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+ https://lists.sourceforge.net/lists/listinfo/png-mng-implement).
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 937d2741e..6efd11417 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -213,7 +213,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libpng-config.in
+ # SET UP LINKS
+ if(PNG_SHARED)
+   set_target_properties(${PNG_LIB_NAME} PROPERTIES
+-#   VERSION 14.${PNGLIB_RELEASE}.1.4.3beta02
++#   VERSION 14.${PNGLIB_RELEASE}.1.4.3beta04
+     VERSION 14.${PNGLIB_RELEASE}.0
+     SOVERSION 14
+     CLEAN_DIRECT_OUTPUT 1)
+diff --git a/INSTALL b/INSTALL
+index d497458bf..63cebd73a 100644
+--- a/INSTALL
++++ b/INSTALL
+@@ -1,5 +1,5 @@
+ 
+-Installing libpng version 1.4.3beta02 - June 18, 2010
++Installing libpng version 1.4.3beta04 - June 19, 2010
+ 
+ On Unix/Linux and similar systems, you can simply type
+ 
+@@ -46,7 +46,7 @@ to have access to the zlib.h and zconf.h include files that
+ correspond to the version of zlib that's installed.
+ 
+ You can rename the directories that you downloaded (they
+-might be called "libpng-1.4.3beta02" or "libpng14" and "zlib-1.2.3"
++might be called "libpng-1.4.3beta04" or "libpng14" and "zlib-1.2.3"
+ or "zlib123") so that you have directories called "zlib" and "libpng".
+ 
+ Your directory structure should look like this:
+diff --git a/LICENSE b/LICENSE
+index cca742973..4aeacbccd 100644
+--- a/LICENSE
++++ b/LICENSE
+@@ -10,7 +10,7 @@ this sentence.
+ 
+ This code is released under the libpng license.
+ 
+-libpng versions 1.2.6, August 15, 2004, through 1.4.3beta02, June 18, 2010, are
++libpng versions 1.2.6, August 15, 2004, through 1.4.3beta04, June 19, 2010, are
+ Copyright (c) 2004, 2006-2007 Glenn Randers-Pehrson, and are
+ distributed according to the same disclaimer and license as libpng-1.2.5
+ with the following individual added to the list of Contributing Authors
+@@ -108,4 +108,4 @@ certification mark of the Open Source Initiative.
+ 
+ Glenn Randers-Pehrson
+ glennrp at users.sourceforge.net
+-June 18, 2010
++June 19, 2010
+diff --git a/Makefile.am b/Makefile.am
+index c09dece11..5160c3fa9 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -73,7 +73,7 @@ EXTRA_DIST= \
+ 	${srcdir}/contrib/pngsuite/* \
+ 	${srcdir}/contrib/visupng/* \
+ 	$(TESTS) \
+-	example.c libpng-1.4.3beta02.txt
++	example.c libpng-1.4.3beta04.txt
+ 
+ CLEANFILES= pngout.png libpng@PNGLIB_MAJOR@@PNGLIB_MINOR@.pc libpng@PNGLIB_MAJOR@@PNGLIB_MINOR@-config libpng.vers \
+ libpng.sym
+diff --git a/Makefile.in b/Makefile.in
+index b2af5eca4..43c7a623d 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -333,7 +333,7 @@ EXTRA_DIST = \
+ 	${srcdir}/contrib/pngsuite/* \
+ 	${srcdir}/contrib/visupng/* \
+ 	$(TESTS) \
+-	example.c libpng-1.4.3beta02.txt
++	example.c libpng-1.4.3beta04.txt
+ 
+ CLEANFILES = pngout.png libpng@PNGLIB_MAJOR@@PNGLIB_MINOR@.pc libpng@PNGLIB_MAJOR@@PNGLIB_MINOR@-config libpng.vers \
+ libpng.sym
+diff --git a/README b/README
+index ed7f9896a..2a1e3a15d 100644
+--- a/README
++++ b/README
+@@ -1,4 +1,4 @@
+-README for libpng version 1.4.3beta02 - June 18, 2010 (shared library 14.0)
++README for libpng version 1.4.3beta04 - June 19, 2010 (shared library 14.0)
+ See the note about version numbers near the top of png.h
+ 
+ See INSTALL for instructions on how to install libpng.
+@@ -185,9 +185,9 @@ Files in this distribution:
+        makefile.std     =>  Generic UNIX makefile (cc, creates static
+                             libpng.a)
+        makefile.elf     =>  Linux/ELF makefile symbol versioning,
+-                            gcc, creates libpng14.so.14.1.4.3beta02)
++                            gcc, creates libpng14.so.14.1.4.3beta04)
+        makefile.linux   =>  Linux/ELF makefile
+-                            (gcc, creates libpng14.so.14.1.4.3beta02)
++                            (gcc, creates libpng14.so.14.1.4.3beta04)
+        makefile.gcc     =>  Generic makefile (gcc, creates static libpng.a)
+        makefile.knr     =>  Archaic UNIX Makefile that converts files with
+                             ansi2knr (Requires ansi2knr.c from
+@@ -209,12 +209,12 @@ Files in this distribution:
+        makefile.openbsd =>  OpenBSD makefile
+        makefile.sgi     =>  Silicon Graphics IRIX (cc, creates static lib)
+        makefile.sggcc   =>  Silicon Graphics
+-                            (gcc, creates libpng14.so.14.1.4.3beta02)
++                            (gcc, creates libpng14.so.14.1.4.3beta04)
+        makefile.sunos   =>  Sun makefile
+        makefile.solaris =>  Solaris 2.X makefile
+-                            (gcc, creates libpng14.so.14.1.4.3beta02)
++                            (gcc, creates libpng14.so.14.1.4.3beta04)
+        makefile.so9     =>  Solaris 9 makefile
+-                            (gcc, creates libpng14.so.14.1.4.3beta02)
++                            (gcc, creates libpng14.so.14.1.4.3beta04)
+        makefile.32sunu  =>  Sun Ultra 32-bit makefile
+        makefile.64sunu  =>  Sun Ultra 64-bit makefile
+        makefile.sco     =>  For SCO OSr5  ELF and Unixware 7 with Native cc
+diff --git a/configure b/configure
+index 570a3bebf..2d06be96e 100755
+--- a/configure
++++ b/configure
+@@ -1,6 +1,6 @@
+ #! /bin/sh
+ # Guess values for system-dependent variables and create Makefiles.
+-# Generated by GNU Autoconf 2.65 for libpng 1.4.3beta02.
++# Generated by GNU Autoconf 2.65 for libpng 1.4.3beta04.
+ #
+ # Report bugs to <png-mng-implement@lists.sourceforge.net>.
+ #
+@@ -701,8 +701,8 @@ MAKEFLAGS=
+ # Identity of this package.
+ PACKAGE_NAME='libpng'
+ PACKAGE_TARNAME='libpng'
+-PACKAGE_VERSION='1.4.3beta02'
+-PACKAGE_STRING='libpng 1.4.3beta02'
++PACKAGE_VERSION='1.4.3beta04'
++PACKAGE_STRING='libpng 1.4.3beta04'
+ PACKAGE_BUGREPORT='png-mng-implement@lists.sourceforge.net'
+ PACKAGE_URL=''
+ 
+@@ -1432,7 +1432,7 @@ if test "$ac_init_help" = "long"; then
+   # Omit some internal or obsolete options to make the list less imposing.
+   # This message is too long to be a string in the A/UX 3.1 sh.
+   cat <<_ACEOF
+-\`configure' configures libpng 1.4.3beta02 to adapt to many kinds of systems.
++\`configure' configures libpng 1.4.3beta04 to adapt to many kinds of systems.
+ 
+ Usage: $0 [OPTION]... [VAR=VALUE]...
+ 
+@@ -1502,7 +1502,7 @@ fi
+ 
+ if test -n "$ac_init_help"; then
+   case $ac_init_help in
+-     short | recursive ) echo "Configuration of libpng 1.4.3beta02:";;
++     short | recursive ) echo "Configuration of libpng 1.4.3beta04:";;
+    esac
+   cat <<\_ACEOF
+ 
+@@ -1607,7 +1607,7 @@ fi
+ test -n "$ac_init_help" && exit $ac_status
+ if $ac_init_version; then
+   cat <<\_ACEOF
+-libpng configure 1.4.3beta02
++libpng configure 1.4.3beta04
+ generated by GNU Autoconf 2.65
+ 
+ Copyright (C) 2009 Free Software Foundation, Inc.
+@@ -2032,7 +2032,7 @@ cat >config.log <<_ACEOF
+ This file contains any messages produced by compilers while
+ running configure, to aid debugging if configure makes a mistake.
+ 
+-It was created by libpng $as_me 1.4.3beta02, which was
++It was created by libpng $as_me 1.4.3beta04, which was
+ generated by GNU Autoconf 2.65.  Invocation command line was
+ 
+   $ $0 $@
+@@ -2840,7 +2840,7 @@ fi
+ 
+ # Define the identity of the package.
+  PACKAGE='libpng'
+- VERSION='1.4.3beta02'
++ VERSION='1.4.3beta04'
+ 
+ 
+ cat >>confdefs.h <<_ACEOF
+@@ -2904,7 +2904,7 @@ fi
+ 
+ 
+ 
+-PNGLIB_VERSION=1.4.3beta02
++PNGLIB_VERSION=1.4.3beta04
+ PNGLIB_MAJOR=1
+ PNGLIB_MINOR=4
+ PNGLIB_RELEASE=3
+@@ -12032,7 +12032,7 @@ cat >>$CONFIG_STATUS <<\_ACEOF || ac_write_fail=1
+ # report actual input values of CONFIG_FILES etc. instead of their
+ # values after options handling.
+ ac_log="
+-This file was extended by libpng $as_me 1.4.3beta02, which was
++This file was extended by libpng $as_me 1.4.3beta04, which was
+ generated by GNU Autoconf 2.65.  Invocation command line was
+ 
+   CONFIG_FILES    = $CONFIG_FILES
+@@ -12098,7 +12098,7 @@ _ACEOF
+ cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
+ ac_cs_config="`$as_echo "$ac_configure_args" | sed 's/^ //; s/[\\""\`\$]/\\\\&/g'`"
+ ac_cs_version="\\
+-libpng config.status 1.4.3beta02
++libpng config.status 1.4.3beta04
+ configured by $0, generated by GNU Autoconf 2.65,
+   with options \\"\$ac_cs_config\\"
+ 
+diff --git a/configure.ac b/configure.ac
+index efc4dd8a9..6d4a8ce49 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -18,12 +18,12 @@ AC_PREREQ(2.59)
+ 
+ dnl Version number stuff here:
+ 
+-AC_INIT([libpng], [1.4.3beta02], [png-mng-implement@lists.sourceforge.net])
++AC_INIT([libpng], [1.4.3beta04], [png-mng-implement@lists.sourceforge.net])
+ AM_INIT_AUTOMAKE
+ dnl stop configure from automagically running automake
+ AM_MAINTAINER_MODE
+ 
+-PNGLIB_VERSION=1.4.3beta02
++PNGLIB_VERSION=1.4.3beta04
+ PNGLIB_MAJOR=1
+ PNGLIB_MINOR=4
+ PNGLIB_RELEASE=3
+diff --git a/libpng-1.4.3beta02.txt b/libpng-1.4.3beta04.txt
+similarity index 99%
+rename from libpng-1.4.3beta02.txt
+rename to libpng-1.4.3beta04.txt
+index 586443ef9..faa6496f4 100644
+--- a/libpng-1.4.3beta02.txt
++++ b/libpng-1.4.3beta04.txt
+@@ -1,6 +1,6 @@
+ libpng.txt - A description on how to use and modify libpng
+ 
+- libpng version 1.4.3beta02 - June 18, 2010
++ libpng version 1.4.3beta04 - June 19, 2010
+  Updated and distributed by Glenn Randers-Pehrson
+  <glennrp at users.sourceforge.net>
+  Copyright (c) 1998-2009 Glenn Randers-Pehrson
+@@ -11,7 +11,7 @@ libpng.txt - A description on how to use and modify libpng
+ 
+  Based on:
+ 
+- libpng versions 0.97, January 1998, through 1.4.3beta02 - June 18, 2010
++ libpng versions 0.97, January 1998, through 1.4.3beta04 - June 19, 2010
+  Updated and distributed by Glenn Randers-Pehrson
+  Copyright (c) 1998-2009 Glenn Randers-Pehrson
+ 
+@@ -903,7 +903,7 @@ things.
+ As of libpng version 1.2.9, png_set_expand_gray_1_2_4_to_8() was
+ added.  It expands the sample depth without changing tRNS to alpha.
+ 
+-As of libpng version 1.4.3beta02, not all possible expansions are supported.
++As of libpng version 1.4.3beta04, not all possible expansions are supported.
+ 
+ In the following table, the 01 means grayscale with depth<8, 31 means
+ indexed with depth<8, other numerals represent the color type, "T" means
+@@ -3297,13 +3297,13 @@ Other rules can be inferred by inspecting the libpng source.
+ 
+ XIII. Y2K Compliance in libpng
+ 
+-June 18, 2010
++June 19, 2010
+ 
+ Since the PNG Development group is an ad-hoc body, we can't make
+ an official declaration.
+ 
+ This is your unofficial assurance that libpng from version 0.71 and
+-upward through 1.4.3beta02 are Y2K compliant.  It is my belief that earlier
++upward through 1.4.3beta04 are Y2K compliant.  It is my belief that earlier
+ versions were also Y2K compliant.
+ 
+ Libpng only has three year fields.  One is a 2-byte unsigned integer that
+diff --git a/libpng.3 b/libpng.3
+index b50c34d8e..96aae57f2 100644
+--- a/libpng.3
++++ b/libpng.3
+@@ -1,6 +1,6 @@
+-.TH LIBPNG 3 "June 18, 2010"
++.TH LIBPNG 3 "June 19, 2010"
+ .SH NAME
+-libpng \- Portable Network Graphics (PNG) Reference Library 1.4.3beta02
++libpng \- Portable Network Graphics (PNG) Reference Library 1.4.3beta04
+ .SH SYNOPSIS
+ \fI\fB
+ 
+@@ -785,7 +785,7 @@ Following is a copy of the libpng.txt file that accompanies libpng.
+ .SH LIBPNG.TXT
+ libpng.txt - A description on how to use and modify libpng
+ 
+- libpng version 1.4.3beta02 - June 18, 2010
++ libpng version 1.4.3beta04 - June 19, 2010
+  Updated and distributed by Glenn Randers-Pehrson
+  <glennrp at users.sourceforge.net>
+  Copyright (c) 1998-2009 Glenn Randers-Pehrson
+@@ -796,7 +796,7 @@ libpng.txt - A description on how to use and modify libpng
+ 
+  Based on:
+ 
+- libpng versions 0.97, January 1998, through 1.4.3beta02 - June 18, 2010
++ libpng versions 0.97, January 1998, through 1.4.3beta04 - June 19, 2010
+  Updated and distributed by Glenn Randers-Pehrson
+  Copyright (c) 1998-2009 Glenn Randers-Pehrson
+ 
+@@ -1688,7 +1688,7 @@ things.
+ As of libpng version 1.2.9, png_set_expand_gray_1_2_4_to_8() was
+ added.  It expands the sample depth without changing tRNS to alpha.
+ 
+-As of libpng version 1.4.3beta02, not all possible expansions are supported.
++As of libpng version 1.4.3beta04, not all possible expansions are supported.
+ 
+ In the following table, the 01 means grayscale with depth<8, 31 means
+ indexed with depth<8, other numerals represent the color type, "T" means
+@@ -4082,13 +4082,13 @@ Other rules can be inferred by inspecting the libpng source.
+ 
+ .SH XIII. Y2K Compliance in libpng
+ 
+-June 18, 2010
++June 19, 2010
+ 
+ Since the PNG Development group is an ad-hoc body, we can't make
+ an official declaration.
+ 
+ This is your unofficial assurance that libpng from version 0.71 and
+-upward through 1.4.3beta02 are Y2K compliant.  It is my belief that earlier
++upward through 1.4.3beta04 are Y2K compliant.  It is my belief that earlier
+ versions were also Y2K compliant.
+ 
+ Libpng only has three year fields.  One is a 2-byte unsigned integer that
+@@ -4269,7 +4269,7 @@ the first widely used release:
+  1.4.2beta01         14    10402  14.so.14.2[.0]
+  1.4.2rc02-06        14    10402  14.so.14.2[.0]
+  1.4.2               14    10402  14.so.14.2[.0]
+- 1.4.3beta01         14    10403  14.so.14.3[.0]
++ 1.4.3beta01-04      14    10403  14.so.14.3[.0]
+ 
+ Henceforth the source version will match the shared-library minor
+ and patch numbers; the shared-library major version number will be
+@@ -4325,7 +4325,7 @@ possible without all of you.
+ 
+ Thanks to Frank J. T. Wojcik for helping with the documentation.
+ 
+-Libpng version 1.4.3beta02 - June 18, 2010:
++Libpng version 1.4.3beta04 - June 19, 2010:
+ Initially created in 1995 by Guy Eric Schalnat, then of Group 42, Inc.
+ Currently maintained by Glenn Randers-Pehrson (glennrp at users.sourceforge.net).
+ 
+@@ -4348,7 +4348,7 @@ this sentence.
+ 
+ This code is released under the libpng license.
+ 
+-libpng versions 1.2.6, August 15, 2004, through 1.4.3beta02, June 18, 2010, are
++libpng versions 1.2.6, August 15, 2004, through 1.4.3beta04, June 19, 2010, are
+ Copyright (c) 2004,2006-2007 Glenn Randers-Pehrson, and are
+ distributed according to the same disclaimer and license as libpng-1.2.5
+ with the following individual added to the list of Contributing Authors
+@@ -4447,7 +4447,7 @@ certification mark of the Open Source Initiative.
+ 
+ Glenn Randers-Pehrson
+ glennrp at users.sourceforge.net
+-June 18, 2010
++June 19, 2010
+ 
+ .\" end of man page
+ 
+diff --git a/libpngpf.3 b/libpngpf.3
+index 15974ec85..536cfb9ab 100644
+--- a/libpngpf.3
++++ b/libpngpf.3
+@@ -1,6 +1,6 @@
+-.TH LIBPNGPF 3 "June 18, 2010"
++.TH LIBPNGPF 3 "June 19, 2010"
+ .SH NAME
+-libpng \- Portable Network Graphics (PNG) Reference Library 1.4.3beta02
++libpng \- Portable Network Graphics (PNG) Reference Library 1.4.3beta04
+ (private functions)
+ .SH SYNOPSIS
+ \fB#include <png.h>\fP
+diff --git a/png.5 b/png.5
+index 7498149b6..23c3c8853 100644
+--- a/png.5
++++ b/png.5
+@@ -1,4 +1,4 @@
+-.TH PNG 5 "June 18, 2010"
++.TH PNG 5 "June 19, 2010"
+ .SH NAME
+ png \- Portable Network Graphics (PNG) format
+ .SH DESCRIPTION
+diff --git a/png.c b/png.c
+index df683e138..1fb22ab66 100644
+--- a/png.c
++++ b/png.c
+@@ -17,7 +17,7 @@
+ #include "pngpriv.h"
+ 
+ /* Generate a compiler error if there is an old png.h in the search path. */
+-typedef version_1_4_3beta02 Your_png_h_is_not_version_1_4_3beta02;
++typedef version_1_4_3beta04 Your_png_h_is_not_version_1_4_3beta04;
+ 
+ /* Version information for C files.  This had better match the version
+  * string defined in png.h.
+@@ -551,13 +551,13 @@ png_get_copyright(png_structp png_ptr)
+ #else
+ #ifdef __STDC__
+    return ((png_charp) PNG_STRING_NEWLINE \
+-     "libpng version 1.4.3beta02 - June 18, 2010" PNG_STRING_NEWLINE \
++     "libpng version 1.4.3beta04 - June 19, 2010" PNG_STRING_NEWLINE \
+      "Copyright (c) 1998-2010 Glenn Randers-Pehrson" PNG_STRING_NEWLINE \
+      "Copyright (c) 1996-1997 Andreas Dilger" PNG_STRING_NEWLINE \
+      "Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc." \
+      PNG_STRING_NEWLINE);
+ #else
+-      return ((png_charp) "libpng version 1.4.3beta02 - June 18, 2010\
++      return ((png_charp) "libpng version 1.4.3beta04 - June 19, 2010\
+       Copyright (c) 1998-2010 Glenn Randers-Pehrson\
+       Copyright (c) 1996-1997 Andreas Dilger\
+       Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.");
+diff --git a/png.h b/png.h
+index 367c6c590..66b441591 100644
+--- a/png.h
++++ b/png.h
+@@ -1,7 +1,7 @@
+ 
+ /* png.h - header file for PNG reference library
+  *
+- * libpng version 1.4.3beta02 - June 18, 2010
++ * libpng version 1.4.3beta04 - June 19, 2010
+  * Copyright (c) 1998-2010 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
+@@ -11,7 +11,7 @@
+  * Authors and maintainers:
+  *  libpng versions 0.71, May 1995, through 0.88, January 1996: Guy Schalnat
+  *  libpng versions 0.89c, June 1996, through 0.96, May 1997: Andreas Dilger
+- *  libpng versions 0.97, January 1998, through 1.4.3beta02 - June 18, 2010: Glenn
++ *  libpng versions 0.97, January 1998, through 1.4.3beta04 - June 19, 2010: Glenn
+  *  See also "Contributing Authors", below.
+  *
+  * Note about libpng version numbers:
+@@ -142,7 +142,7 @@
+  *    1.4.2beta01             14    10402  14.so.14.2[.0]
+  *    1.4.2rc02-06            14    10402  14.so.14.2[.0]
+  *    1.4.2                   14    10402  14.so.14.2[.0]
+- *    1.4.3beta01             14    10403  14.so.14.3[.0]
++ *    1.4.3beta01-04          14    10403  14.so.14.3[.0]
+  *
+  *    Henceforth the source version will match the shared-library major
+  *    and minor numbers; the shared-library major version number will be
+@@ -174,7 +174,7 @@
+  *
+  * This code is released under the libpng license.
+  *
+- * libpng versions 1.2.6, August 15, 2004, through 1.4.3beta02, June 18, 2010, are
++ * libpng versions 1.2.6, August 15, 2004, through 1.4.3beta04, June 19, 2010, are
+  * Copyright (c) 2004, 2006-2010 Glenn Randers-Pehrson, and are
+  * distributed according to the same disclaimer and license as libpng-1.2.5
+  * with the following individual added to the list of Contributing Authors:
+@@ -286,13 +286,13 @@
+  * Y2K compliance in libpng:
+  * =========================
+  *
+- *    June 18, 2010
++ *    June 19, 2010
+  *
+  *    Since the PNG Development group is an ad-hoc body, we can't make
+  *    an official declaration.
+  *
+  *    This is your unofficial assurance that libpng from version 0.71 and
+- *    upward through 1.4.3beta02 are Y2K compliant.  It is my belief that earlier
++ *    upward through 1.4.3beta04 are Y2K compliant.  It is my belief that earlier
+  *    versions were also Y2K compliant.
+  *
+  *    Libpng only has three year fields.  One is a 2-byte unsigned integer
+@@ -348,9 +348,9 @@
+  */
+ 
+ /* Version information for png.h - this should match the version in png.c */
+-#define PNG_LIBPNG_VER_STRING "1.4.3beta02"
++#define PNG_LIBPNG_VER_STRING "1.4.3beta04"
+ #define PNG_HEADER_VERSION_STRING \
+-   " libpng version 1.4.3beta02 - June 18, 2010\n"
++   " libpng version 1.4.3beta04 - June 19, 2010\n"
+ 
+ #define PNG_LIBPNG_VER_SONUM   14
+ #define PNG_LIBPNG_VER_DLLNUM  14
+@@ -363,7 +363,7 @@
+  * PNG_LIBPNG_VER_STRING, omitting any leading zero:
+  */
+ 
+-#define PNG_LIBPNG_VER_BUILD  02
++#define PNG_LIBPNG_VER_BUILD  04
+ 
+ /* Release Status */
+ #define PNG_LIBPNG_BUILD_ALPHA    1
+@@ -1472,7 +1472,7 @@ struct png_struct_def
+ /* This triggers a compiler error in png.c, if png.c and png.h
+  * do not agree upon the version number.
+  */
+-typedef png_structp version_1_4_3beta02;
++typedef png_structp version_1_4_3beta04;
+ 
+ typedef png_struct FAR * FAR * png_structpp;
+ 
+diff --git a/pngconf.h b/pngconf.h
+index ef9756146..4139d24c7 100644
+--- a/pngconf.h
++++ b/pngconf.h
+@@ -1,7 +1,7 @@
+ 
+ /* pngconf.h - machine configurable file for libpng
+  *
+- * libpng version 1.4.3beta02 - June 18, 2010
++ * libpng version 1.4.3beta04 - June 19, 2010
+  * For conditions of distribution and use, see copyright notice in png.h
+  * Copyright (c) 1998-2010 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+diff --git a/pngpread.c b/pngpread.c
+index 640674a68..798a583c2 100644
+--- a/pngpread.c
++++ b/pngpread.c
+@@ -1,7 +1,7 @@
+ 
+ /* pngpread.c - read a png file in push mode
+  *
+- * Last changed in libpng 1.4.1 [February 25, 2010]
++ * Last changed in libpng 1.4.3 [June 19, 2010]
+  * Copyright (c) 1998-2010 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
+@@ -890,6 +890,12 @@ png_process_IDAT_data(png_structp png_ptr, png_bytep buffer,
+ void /* PRIVATE */
+ png_push_process_row(png_structp png_ptr)
+ {
++   if (png_ptr->row_number >= png_ptr->num_rows)
++   {
++      png_benign_error(png_ptr, "Extra row in image");
++      return;
++   }
++
+    png_ptr->row_info.color_type = png_ptr->color_type;
+    png_ptr->row_info.width = png_ptr->iwidth;
+    png_ptr->row_info.channels = png_ptr->channels;
+@@ -1682,7 +1688,7 @@ png_push_have_end(png_structp png_ptr, png_infop info_ptr)
+ void /* PRIVATE */
+ png_push_have_row(png_structp png_ptr, png_bytep row)
+ {
+-   if (png_ptr->row_fn != NULL && png_ptr->row_number < png_ptr->height)
++   if (png_ptr->row_fn != NULL)
+       (*(png_ptr->row_fn))(png_ptr, row, png_ptr->row_number,
+          (int)png_ptr->pass);
+ }
+diff --git a/pngpriv.h b/pngpriv.h
+index 28c200ac0..fdae71199 100644
+--- a/pngpriv.h
++++ b/pngpriv.h
+@@ -1,7 +1,7 @@
+ 
+ /* pngpriv.h - private declarations for use inside libpng
+  *
+- * libpng version 1.4.3beta02 - June 18, 2010
++ * libpng version 1.4.3beta04 - June 19, 2010
+  * For conditions of distribution and use, see copyright notice in png.h
+  * Copyright (c) 1998-2010 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+diff --git a/pngtest.c b/pngtest.c
+index 1dfc0c6ce..a6cb388d2 100644
+--- a/pngtest.c
++++ b/pngtest.c
+@@ -1627,4 +1627,4 @@ main(int argc, char *argv[])
+ }
+ 
+ /* Generate a compiler error if there is an old png.h in the search path. */
+-typedef version_1_4_3beta02 your_png_h_is_not_version_1_4_3beta02;
++typedef version_1_4_3beta04 your_png_h_is_not_version_1_4_3beta04;
+diff --git a/projects/vstudio/readme.txt b/projects/vstudio/readme.txt
+index d8e3b0133..ac6affb66 100644
+--- a/projects/vstudio/readme.txt
++++ b/projects/vstudio/readme.txt
+@@ -1,7 +1,7 @@
+ 
+ VisualStudio instructions
+ 
+-libpng version 1.4.3beta02 - June 18, 2010
++libpng version 1.4.3beta04 - June 19, 2010
+ 
+ Copyright (c) 1998-2010 Glenn Randers-Pehrson
+ 
+diff --git a/projects/vstudio/zlib.props b/projects/vstudio/zlib.props
+index 0a902b34e..64aa511dd 100644
+--- a/projects/vstudio/zlib.props
++++ b/projects/vstudio/zlib.props
+@@ -2,7 +2,7 @@
+ <!--
+  * zlib.props - location of zlib source and build
+  *
+- * libpng version 1.4.3beta02 - June 18, 2010
++ * libpng version 1.4.3beta04 - June 19, 2010
+  *
+  * Copyright (c) 1998-2010 Glenn Randers-Pehrson
+  *
+diff --git a/projects/xcode/libpng.xcodeproj/project.pbxproj b/projects/xcode/libpng.xcodeproj/project.pbxproj
+index 9de62870e..5a3bf3f8d 100644
+--- a/projects/xcode/libpng.xcodeproj/project.pbxproj
++++ b/projects/xcode/libpng.xcodeproj/project.pbxproj
+@@ -226,7 +226,7 @@
+ 				COPY_PHASE_STRIP = NO;
+ 				DYLIB_COMPATIBILITY_VERSION = 14;
+ 				DYLIB_CURRENT_VERSION = 14;
+-				FRAMEWORK_VERSION = 1.4.3beta02;
++				FRAMEWORK_VERSION = 1.4.3beta04;
+ 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+ 				GCC_PREFIX_HEADER = "";
+ 				INFOPLIST_FILE = Info.plist;
+@@ -244,7 +244,7 @@
+ 			buildSettings = {
+ 				DYLIB_COMPATIBILITY_VERSION = 14;
+ 				DYLIB_CURRENT_VERSION = 14;
+-				FRAMEWORK_VERSION = 1.4.3beta02;
++				FRAMEWORK_VERSION = 1.4.3beta04;
+ 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
+ 				GCC_PREFIX_HEADER = "";
+ 				INFOPLIST_FILE = Info.plist;
+diff --git a/scripts/README.txt b/scripts/README.txt
+index 09b8266b8..54d4d212a 100644
+--- a/scripts/README.txt
++++ b/scripts/README.txt
+@@ -1,8 +1,8 @@
+ 
+-Makefiles for  libpng version 1.4.3beta02 - June 18, 2010
++Makefiles for  libpng version 1.4.3beta04 - June 19, 2010
+ 
+  makefile.linux    =>  Linux/ELF makefile
+-                       (gcc, creates libpng14.so.14.1.4.3beta02)
++                       (gcc, creates libpng14.so.14.1.4.3beta04)
+  makefile.gcc      =>  Generic makefile (gcc, creates static libpng.a)
+  makefile.knr      =>  Archaic UNIX Makefile that converts files with
+                        ansi2knr (Requires ansi2knr.c from
+@@ -20,7 +20,7 @@ Makefiles for  libpng version 1.4.3beta02 - June 18, 2010
+  makefile.dec      =>  DEC Alpha UNIX makefile
+  makefile.dj2      =>  DJGPP 2 makefile
+  makefile.elf      =>  Linux/ELF makefile symbol versioning,
+-                       gcc, creates libpng14.so.14.1.4.3beta02)
++                       gcc, creates libpng14.so.14.1.4.3beta04)
+  makefile.freebsd  =>  FreeBSD makefile
+  makefile.gcc      =>  Generic gcc makefile
+  makefile.hpgcc    =>  HPUX makefile using gcc
+@@ -36,12 +36,12 @@ Makefiles for  libpng version 1.4.3beta02 - June 18, 2010
+  makefile.os2      =>  OS/2 Makefile (gcc and emx, requires pngos2.def)
+  makefile.sco      =>  For SCO OSr5  ELF and Unixware 7 with Native cc
+  makefile.sggcc    =>  Silicon Graphics (gcc,
+-                       creates libpng14.so.14.1.4.3beta02)
++                       creates libpng14.so.14.1.4.3beta04)
+  makefile.sgi      =>  Silicon Graphics IRIX makefile (cc, creates static lib)
+  makefile.solaris  =>  Solaris 2.X makefile (gcc,
+-                       creates libpng14.so.14.1.4.3beta02)
++                       creates libpng14.so.14.1.4.3beta04)
+  makefile.so9      =>  Solaris 9 makefile (gcc,
+-                       creates libpng14.so.14.1.4.3beta02)
++                       creates libpng14.so.14.1.4.3beta04)
+  makefile.std      =>  Generic UNIX makefile (cc, creates static libpng.a)
+  makefile.sunos    =>  Sun makefile
+  makefile.32sunu   =>  Sun Ultra 32-bit makefile
+diff --git a/scripts/libpng-config-head.in b/scripts/libpng-config-head.in
+index 18b0f5dd3..f499046f8 100755
+--- a/scripts/libpng-config-head.in
++++ b/scripts/libpng-config-head.in
+@@ -11,7 +11,7 @@
+ 
+ # Modeled after libxml-config.
+ 
+-version=1.4.3beta02
++version=1.4.3beta04
+ prefix=""
+ libdir=""
+ libs=""
+diff --git a/scripts/libpng.pc.in b/scripts/libpng.pc.in
+index eed5cd661..b67a0af63 100644
+--- a/scripts/libpng.pc.in
++++ b/scripts/libpng.pc.in
+@@ -5,6 +5,6 @@ includedir=@includedir@/libpng14
+ 
+ Name: libpng
+ Description: Loads and saves PNG files
+-Version: 1.4.3beta02
++Version: 1.4.3beta04
+ Libs: -L${libdir} -lpng14
+ Cflags: -I${includedir}
+diff --git a/scripts/makefile.ne12bsd b/scripts/makefile.ne12bsd
+index 040135709..0bccdedaa 100644
+--- a/scripts/makefile.ne12bsd
++++ b/scripts/makefile.ne12bsd
+@@ -17,7 +17,7 @@ INCSDIR=${LOCALBASE}/include/libpng14
+ 
+ LIB=	png14
+ SHLIB_MAJOR=	0
+-SHLIB_MINOR=	1.4.3beta02
++SHLIB_MINOR=	1.4.3beta04
+ SRCS=	png.c pngset.c pngget.c pngrutil.c pngtrans.c pngwutil.c \
+ 	pngread.c pngrio.c pngwio.c pngwrite.c pngrtran.c \
+ 	pngwtran.c pngmem.c pngerror.c pngpread.c
+diff --git a/scripts/makefile.netbsd b/scripts/makefile.netbsd
+index 97830a513..36e4ecd91 100644
+--- a/scripts/makefile.netbsd
++++ b/scripts/makefile.netbsd
+@@ -17,7 +17,7 @@ INCSDIR=${LOCALBASE}/include
+ 
+ LIB=	png
+ SHLIB_MAJOR=	3
+-SHLIB_MINOR=	1.4.3beta02
++SHLIB_MINOR=	1.4.3beta04
+ SRCS=	png.c pngset.c pngget.c pngrutil.c pngtrans.c pngwutil.c \
+ 	pngread.c pngrio.c pngwio.c pngwrite.c pngrtran.c \
+ 	pngwtran.c pngmem.c pngerror.c pngpread.c
+diff --git a/scripts/makefile.openbsd b/scripts/makefile.openbsd
+index c7522c01d..9e9d2a440 100644
+--- a/scripts/makefile.openbsd
++++ b/scripts/makefile.openbsd
+@@ -11,7 +11,7 @@ LIBDIR=	${PREFIX}/lib
+ MANDIR= ${PREFIX}/man/cat
+ 
+ SHLIB_MAJOR=	0
+-SHLIB_MINOR=	1.4.3beta02
++SHLIB_MINOR=	1.4.3beta04
+ 
+ LIB=	png
+ SRCS=	png.c pngerror.c pngget.c pngmem.c pngpread.c \
+diff --git a/scripts/png32ce.def b/scripts/png32ce.def
+index 00de16d06..e2b1e67a0 100644
+--- a/scripts/png32ce.def
++++ b/scripts/png32ce.def
+@@ -15,7 +15,7 @@ LIBRARY lpngce
+  png_get_int_32
+ 
+ EXPORTS
+-;Version 1.4.3beta02
++;Version 1.4.3beta04
+   png_build_grayscale_palette  @1
+ ;  png_check_sig        @2
+   png_chunk_error      @3
+diff --git a/scripts/pngos2.def b/scripts/pngos2.def
+index de94625e3..57f64da09 100644
+--- a/scripts/pngos2.def
++++ b/scripts/pngos2.def
+@@ -2,7 +2,7 @@
+ ; PNG.LIB module definition file for OS/2
+ ;----------------------------------------
+ 
+-; Version 1.4.3beta02
++; Version 1.4.3beta04
+ 
+ LIBRARY		PNG
+ DESCRIPTION	"PNG image compression library for OS/2"
+diff --git a/scripts/pngwin.def b/scripts/pngwin.def
+index 963322565..67b2eac71 100644
+--- a/scripts/pngwin.def
++++ b/scripts/pngwin.def
+@@ -5,7 +5,7 @@
+ LIBRARY
+ 
+ EXPORTS
+-;Version 1.4.3beta02
++;Version 1.4.3beta04
+   png_build_grayscale_palette
+   png_chunk_error
+   png_chunk_warning

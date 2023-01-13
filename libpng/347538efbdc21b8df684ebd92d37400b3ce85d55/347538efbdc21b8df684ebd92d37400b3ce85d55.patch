@@ -1,0 +1,95 @@
+commit 347538efbdc21b8df684ebd92d37400b3ce85d55
+Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
+Reflog message: reset: moving to 347538efbdc21b8df684ebd92d37400b3ce85d55
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Wed Aug 2 19:21:19 2017 -0500
+
+    [libng16] Check length of all chunks except IDAT against user limit.
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index e5189324f..bd4148818 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,4 +1,4 @@
+-Libpng 1.6.32beta07 - August 2, 2017
++Libpng 1.6.32beta07 - August 3, 2017
+ 
+ This is not intended to be a public release. It will be replaced
+ within a few weeks by a public version or by another test version.
+@@ -54,7 +54,8 @@ Version 1.6.32beta05 [August 2, 2017]
+ Version 1.6.32beta06 [August 2, 2017]
+   Removed png_get_eXIf_1() and png_set_eXIf_1().
+ 
+-Version 1.6.32beta07 [August 2, 2017]
++Version 1.6.32beta07 [August 3, 2017]
++  Check length of all chunks except IDAT against user limit.
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index 82a787862..7544d7693 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -5937,7 +5937,8 @@ Version 1.6.32beta05 [August 2, 2017]
+ Version 1.6.32beta06 [August 2, 2017]
+   Removed png_get_eXIf_1() and png_set_eXIf_1().
+ 
+-Version 1.6.32beta07 [August 2, 2017]
++Version 1.6.32beta07 [August 3, 2017]
++  Check length of all chunks except IDAT against user limit.
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/pngpread.c b/pngpread.c
+index 650ba1e23..45b23a79c 100644
+--- a/pngpread.c
++++ b/pngpread.c
+@@ -223,6 +223,21 @@ png_push_read_chunk(png_structrp png_ptr, png_inforp info_ptr)
+          png_benign_error(png_ptr, "Too many IDATs found");
+    }
+ 
++   else
++   {
++      png_alloc_size_t limit = PNG_SIZE_MAX;
++# ifdef PNG_SET_USER_LIMITS_SUPPORTED
++      if (png_ptr->user_chunk_malloc_max > 0 &&
++          png_ptr->user_chunk_malloc_max < limit)
++         limit = png_ptr->user_chunk_malloc_max;
++# elif PNG_USER_CHUNK_MALLOC_MAX > 0
++      if (PNG_USER_CHUNK_MALLOC_MAX < limit)
++         limit = PNG_USER_CHUNK_MALLOC_MAX;
++# endif
++      if (png_ptr->push_length > limit)
++         png_chunk_error(png_ptr, "chunk data is too large");
++   }
++
+    if (chunk_name == png_IHDR)
+    {
+       if (png_ptr->push_length != 13)
+diff --git a/pngrutil.c b/pngrutil.c
+index 67c0875c4..60325f91b 100644
+--- a/pngrutil.c
++++ b/pngrutil.c
+@@ -181,6 +181,22 @@ png_read_chunk_header(png_structrp png_ptr)
+    /* Check to see if chunk name is valid. */
+    png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+ 
++   /* Check for too-large chunk length */
++   if (png_ptr->chunk_name != png_IDAT)
++   {
++      png_alloc_size_t limit = PNG_SIZE_MAX;
++# ifdef PNG_SET_USER_LIMITS_SUPPORTED
++      if (png_ptr->user_chunk_malloc_max > 0 &&
++          png_ptr->user_chunk_malloc_max < limit)
++         limit = png_ptr->user_chunk_malloc_max;
++# elif PNG_USER_CHUNK_MALLOC_MAX > 0
++      if (PNG_USER_CHUNK_MALLOC_MAX < limit)
++         limit = PNG_USER_CHUNK_MALLOC_MAX;
++# endif
++      if (length > limit)
++         png_chunk_error(png_ptr, "chunk data is too large");
++   }
++
+ #ifdef PNG_IO_STATE_SUPPORTED
+    png_ptr->io_state = PNG_IO_READING | PNG_IO_CHUNK_DATA;
+ #endif

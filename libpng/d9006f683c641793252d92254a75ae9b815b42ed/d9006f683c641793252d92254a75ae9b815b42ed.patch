@@ -1,0 +1,101 @@
+commit d9006f683c641793252d92254a75ae9b815b42ed
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Wed Dec 9 09:40:48 2015 -0600
+
+    [libpng15] Fixed an out-of-range read in png_check_keyword() (Bug report
+    
+    from Qixue Xiao).
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index e62c1f5ca..333f1fb50 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,36 +1,34 @@
+ 
+-Libpng 1.5.25 - December 3, 2015
++Libpng 1.5.26beta01 - December 9, 2015
+ 
+-This is a public release of libpng, intended for use in production codes.
++This is not intended to be a public release.  It will be replaced
++within a few weeks by a public version or by another test version.
+ 
+ Files available for download:
+ 
+ Source files with LF line endings (for Unix/Linux) and with a
+ "configure" script
+ 
+-   libpng-1.5.25.tar.xz (LZMA-compressed, recommended)
+-   libpng-1.5.25.tar.gz
++   1.5.26beta01.tar.xz (LZMA-compressed, recommended)
++   1.5.26beta01.tar.gz
+ 
+ Source files with CRLF line endings (for Windows), without the
+ "configure" script
+ 
+-   lpng1525.7z  (LZMA-compressed, recommended)
+-   lpng1525.zip
++   lp1526b01.7z  (LZMA-compressed, recommended)
++   lp1526b01.zip
+ 
+ Other information:
+ 
+-   libpng-1.5.25-README.txt
+-   libpng-1.5.25-LICENSE.txt
+-   libpng-1.5.25-*.asc (armored detached GPG signatures)
++   1.5.26beta01-README.txt
++   1.5.26beta01-LICENSE.txt
++   libpng-1.5.26beta01-*.asc (armored detached GPG signatures)
+ 
+-Changes since the last public release (1.5.24):
++Changes since the last public release (1.5.25):
+ 
+-  Avoid potential pointer overflow in png_handle_iTXt(), png_handle_zTXt(),
+-    png_handle_sPLT(), and png_handle_pCAL() (Bug report by John Regehr).
+-  Fixed incorrect implementation of png_set_PLTE() that uses png_ptr
+-    not info_ptr, that left png_set_PLTE() open to the CVE-2015-8126
+-    vulnerability.
+-  Backported tests from libpng-1.7.0beta69.
++version 1.5.26 [December 9, 2015]
++  Fixed an out-of-range read in png_check_keyword() (Bug report from
++    Qixue Xiao).
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index ccf7bce0d..2cfb7acc3 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -4431,7 +4431,7 @@ version 1.5.25beta01 [November 20, 2015]
+ version 1.5.25beta02 [November 23, 2015]
+   Fixed incorrect implementation of png_set_PLTE() that uses png_ptr
+     not info_ptr, that left png_set_PLTE() open to the CVE-2015-8126
+-    vulnerability.
++    vulnerability.  Fixes CVE-2015-8472.
+ 
+ version 1.5.25beta03 [November 24, 2015]
+   Backported tests from libpng-1.7.0beta69.
+@@ -4440,6 +4440,11 @@ version 1.5.25rc01 [November 26, 2015]
+   No changes.
+ 
+ version 1.5.25 [December 3, 2015]
++  No changes.
++
++version 1.5.26beta01 [December 9, 2015]
++  Fixed an out-of-range read in png_check_keyword() (Bug report from
++    Qixue Xiao).
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/pngwutil.c b/pngwutil.c
+index fe7e1e56c..010918152 100644
+--- a/pngwutil.c
++++ b/pngwutil.c
+@@ -1580,7 +1580,7 @@ png_check_keyword(png_structp png_ptr, png_const_charp key, png_charpp new_key)
+    {
+       png_warning(png_ptr, "trailing spaces removed from keyword");
+ 
+-      while (*kp == ' ')
++      while (key_len && *kp == ' ')
+       {
+          *(kp--) = '\0';
+          key_len--;

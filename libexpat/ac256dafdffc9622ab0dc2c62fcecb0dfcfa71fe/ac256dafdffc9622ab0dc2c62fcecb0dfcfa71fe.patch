@@ -1,0 +1,23 @@
+commit ac256dafdffc9622ab0dc2c62fcecb0dfcfa71fe
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Sat Jul 1 14:33:57 2017 +0200
+
+    xmlparse.c: Fix parser NULL dereference
+    
+    errorCode is a macro resolving to parser->m_errorCode.
+    Issue #59 is related.
+
+diff --git a/expat/lib/xmlparse.c b/expat/lib/xmlparse.c
+index 66a7f35e..d38c90db 100644
+--- a/expat/lib/xmlparse.c
++++ b/expat/lib/xmlparse.c
+@@ -1748,7 +1748,8 @@ enum XML_Status XMLCALL
+ XML_Parse(XML_Parser parser, const char *s, int len, int isFinal)
+ {
+   if ((parser == NULL) || (len < 0) || ((s == NULL) && (len != 0))) {
+-    errorCode = XML_ERROR_INVALID_ARGUMENT;
++    if (parser != NULL)
++      parser->m_errorCode = XML_ERROR_INVALID_ARGUMENT;
+     return XML_STATUS_ERROR;
+   }
+   switch (ps_parsing) {

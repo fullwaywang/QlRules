@@ -15,12 +15,6 @@ predicate func_0(Parameter vsize_7460, Variable vnewSize_7462) {
 		and target_0.getCondition().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
 		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vnewSize_7462
 		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(RelationalOperation).getGreaterOperand().(VariableAccess).getTarget()=vsize_7460
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(RelationalOperation).getLesserOperand().(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getLeftOperand().(Literal).getValue()="2147483647"
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(RelationalOperation).getLesserOperand().(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(Literal).getValue()="2"
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(RelationalOperation).getLesserOperand().(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(Literal).getValue()="1"
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(RelationalOperation).getLesserOperand().(SubExpr).getRightOperand().(Literal).getValue()="10"
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(AddExpr).getAnOperand().(MulExpr).getLeftOperand().(Literal).getValue()="2147483647"
-		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(Literal).getValue()="2"
 		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(AddExpr).getAnOperand().(Literal).getValue()="1"
 		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vsize_7460
 		and target_0.getThen().(ExprStmt).getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(AddExpr).getAnOperand().(Literal).getValue()="10"

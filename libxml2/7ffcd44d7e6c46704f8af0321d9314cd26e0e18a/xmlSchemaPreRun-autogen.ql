@@ -14,7 +14,7 @@ predicate func_0(Parameter vvctxt_28085) {
 		target_0.getTarget().getName()="xsiAssemble"
 		and target_0.getQualifier().(VariableAccess).getTarget()=vvctxt_28085
 		and target_0.getParent().(AssignExpr).getLValue() = target_0
-		and target_0.getParent().(AssignExpr).getRValue() instanceof Literal)
+		and target_0.getParent().(AssignExpr).getRValue().(Literal).getValue()="0")
 }
 
 predicate func_1(Function func) {

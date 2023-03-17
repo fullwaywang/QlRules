@@ -1,0 +1,132 @@
+commit 5a72f0fe6f2f8ce35c45242e99a421dc19251ab5
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Mon Mar 7 14:48:54 2022 +0000
+
+    core: Make sure and check that LimitXMLRequestBody fits in system memory.
+    
+    LimitXMLRequestBody can not exceed the size needed to ap_escape_html2() the
+    body without failing to allocate memory, so enforce this at load time based
+    on APR_SIZE_MAX, and make sure that ap_escape_html2() is within the bounds.
+    
+    Document the limits for LimitXMLRequestBody in our docs.
+    
+    
+    Merge r1898686 from trunk.
+    Submitted by: ylavic, rpluem
+    Reviewed by: ylavic, covener, rpluem
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1898693 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/changes-entries/AP_MAX_LIMIT_XML_BODY.diff b/changes-entries/AP_MAX_LIMIT_XML_BODY.diff
+new file mode 100644
+index 0000000000..07fef3c624
+--- /dev/null
++++ b/changes-entries/AP_MAX_LIMIT_XML_BODY.diff
+@@ -0,0 +1,2 @@
++  *) core: Make sure and check that LimitXMLRequestBody fits in system memory.
++     [Ruediger Pluem, Yann Ylavic]
+\ No newline at end of file
+diff --git a/docs/manual/mod/core.xml b/docs/manual/mod/core.xml
+index 428205b8c2..46cacd8829 100644
+--- a/docs/manual/mod/core.xml
++++ b/docs/manual/mod/core.xml
+@@ -3014,13 +3014,19 @@ LimitRequestLine 4094
+ <override>All</override>
+ 
+ <usage>
+-    <p>Limit (in bytes) on maximum size of an XML-based request
+-    body. A value of <code>0</code> will disable any checking.</p>
++    <p>Limit (in bytes) on the maximum size of an XML-based request
++    body. A value of <code>0</code> will apply a hard limit (depending on
++    32bit vs 64bit system) allowing for XML escaping within the bounds of
++    the system addressable memory, but it exists for compatibility only
++    and is not recommended since it does not account for memory consumed
++    elsewhere or concurrent requests, which might result in an overall
++    system out-of-memory.
+ 
+     <p>Example:</p>
+ 
+     <highlight language="config">
+-LimitXMLRequestBody 0
++# Limit of 1 MiB
++LimitXMLRequestBody 1073741824
+     </highlight>
+ 
+ </usage>
+diff --git a/server/core.c b/server/core.c
+index 798212b480..090e397642 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -72,6 +72,8 @@
+ /* LimitXMLRequestBody handling */
+ #define AP_LIMIT_UNSET                  ((long) -1)
+ #define AP_DEFAULT_LIMIT_XML_BODY       ((apr_size_t)1000000)
++/* Hard limit for ap_escape_html2() */
++#define AP_MAX_LIMIT_XML_BODY           ((apr_size_t)(APR_SIZE_MAX / 6 - 1))
+ 
+ #define AP_MIN_SENDFILE_BYTES           (256)
+ 
+@@ -3761,6 +3763,11 @@ static const char *set_limit_xml_req_body(cmd_parms *cmd, void *conf_,
+     if (conf->limit_xml_body < 0)
+         return "LimitXMLRequestBody requires a non-negative integer.";
+ 
++    /* zero is AP_MAX_LIMIT_XML_BODY (implicitly) */
++    if ((apr_size_t)conf->limit_xml_body > AP_MAX_LIMIT_XML_BODY)
++        return apr_psprintf(cmd->pool, "LimitXMLRequestBody must not exceed "
++                            "%" APR_SIZE_T_FMT, AP_MAX_LIMIT_XML_BODY);
++
+     return NULL;
+ }
+ 
+@@ -3849,6 +3856,8 @@ AP_DECLARE(apr_size_t) ap_get_limit_xml_body(const request_rec *r)
+     conf = ap_get_core_module_config(r->per_dir_config);
+     if (conf->limit_xml_body == AP_LIMIT_UNSET)
+         return AP_DEFAULT_LIMIT_XML_BODY;
++    if (conf->limit_xml_body == 0)
++        return AP_MAX_LIMIT_XML_BODY;
+ 
+     return (apr_size_t)conf->limit_xml_body;
+ }
+diff --git a/server/util.c b/server/util.c
+index 6cfe0035c4..604be1a1ce 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -2142,11 +2142,14 @@ AP_DECLARE(char *) ap_escape_urlencoded(apr_pool_t *p, const char *buffer)
+ 
+ AP_DECLARE(char *) ap_escape_html2(apr_pool_t *p, const char *s, int toasc)
+ {
+-    int i, j;
++    apr_size_t i, j;
+     char *x;
+ 
+     /* first, count the number of extra characters */
+-    for (i = 0, j = 0; s[i] != '\0'; i++)
++    for (i = 0, j = 0; s[i] != '\0'; i++) {
++        if (i + j > APR_SIZE_MAX - 6) {
++            abort();
++        }
+         if (s[i] == '<' || s[i] == '>')
+             j += 3;
+         else if (s[i] == '&')
+@@ -2155,6 +2158,7 @@ AP_DECLARE(char *) ap_escape_html2(apr_pool_t *p, const char *s, int toasc)
+             j += 5;
+         else if (toasc && !apr_isascii(s[i]))
+             j += 5;
++    }
+ 
+     if (j == 0)
+         return apr_pstrmemdup(p, s, i);
+diff --git a/server/util_xml.c b/server/util_xml.c
+index 4845194656..22806fa8a4 100644
+--- a/server/util_xml.c
++++ b/server/util_xml.c
+@@ -85,7 +85,7 @@ AP_DECLARE(int) ap_xml_parse_input(request_rec * r, apr_xml_doc **pdoc)
+             }
+ 
+             total_read += len;
+-            if (limit_xml_body && total_read > limit_xml_body) {
++            if (total_read > limit_xml_body) {
+                 ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(00539)
+                               "XML request body is larger than the configured "
+                               "limit of %lu", (unsigned long)limit_xml_body);

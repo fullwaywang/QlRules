@@ -1,0 +1,37 @@
+commit 7e09dd714fc62c08c5b0319ed7b9702594faf49b
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Mon Mar 1 20:13:54 2021 +0000
+
+    mod_session: account for the '&' in identity_concat().
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1887052 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/changes-entries/session_parsing.txt b/changes-entries/session_parsing.txt
+new file mode 100644
+index 0000000000..a996e82106
+--- /dev/null
++++ b/changes-entries/session_parsing.txt
+@@ -0,0 +1,2 @@
++  *) mod_session: Improve session parsing.  [Yann Yalvic]
++
+diff --git a/modules/session/mod_session.c b/modules/session/mod_session.c
+index 01f41fe5d0..a41e58444f 100644
+--- a/modules/session/mod_session.c
++++ b/modules/session/mod_session.c
+@@ -326,7 +326,7 @@ static apr_status_t ap_session_set(request_rec * r, session_rec * z,
+ static int identity_count(void *v, const char *key, const char *val)
+ {
+     int *count = v;
+-    *count += strlen(key) * 3 + strlen(val) * 3 + 1;
++    *count += strlen(key) * 3 + strlen(val) * 3 + 2;
+     return 1;
+ }
+ 
+@@ -362,7 +362,6 @@ static int identity_concat(void *v, const char *key, const char *val)
+  */
+ static apr_status_t session_identity_encode(request_rec * r, session_rec * z)
+ {
+-
+     char *buffer = NULL;
+     int length = 0;
+     if (z->expiry) {

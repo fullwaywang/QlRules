@@ -1,0 +1,47 @@
+commit 5bc61a05cf034980a85b81188032afca58b31468
+Author: Stefan Eissing <icing@apache.org>
+Date:   Tue May 11 13:36:45 2021 +0000
+
+    Merge r1889119 from trunk:
+    
+    mod_http2: fix incomplete sync with github and its version number.
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1889759 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/http2/h2_stream.c b/modules/http2/h2_stream.c
+index b717888ad9..4fec5377f7 100644
+--- a/modules/http2/h2_stream.c
++++ b/modules/http2/h2_stream.c
+@@ -638,7 +638,7 @@ void h2_stream_set_request(h2_stream *stream, const h2_request *r)
+ 
+ static void set_error_response(h2_stream *stream, int http_status)
+ {
+-    if (!h2_stream_is_ready(stream)) {
++    if (!h2_stream_is_ready(stream) && stream->rtmp) {
+         stream->rtmp->http_status = http_status;
+     }
+ }
+diff --git a/modules/http2/h2_version.h b/modules/http2/h2_version.h
+index 03651c998d..c8b1106439 100644
+--- a/modules/http2/h2_version.h
++++ b/modules/http2/h2_version.h
+@@ -27,7 +27,7 @@
+  * @macro
+  * Version number of the http2 module as c string
+  */
+-#define MOD_HTTP2_VERSION "1.15.17"
++#define MOD_HTTP2_VERSION "1.15.18"
+ 
+ /**
+  * @macro
+@@ -35,7 +35,7 @@
+  * release. This is a 24 bit number with 8 bits for major number, 8 bits
+  * for minor and 8 bits for patch. Version 1.2.3 becomes 0x010203.
+  */
+-#define MOD_HTTP2_VERSION_NUM 0x010f11
++#define MOD_HTTP2_VERSION_NUM 0x010f12
+ 
+ 
+ #endif /* mod_h2_h2_version_h */

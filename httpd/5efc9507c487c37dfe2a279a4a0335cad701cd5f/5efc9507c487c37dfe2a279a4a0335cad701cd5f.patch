@@ -1,0 +1,22 @@
+commit 5efc9507c487c37dfe2a279a4a0335cad701cd5f
+Author: Eric Covener <covener@apache.org>
+Date:   Tue Jan 10 13:19:07 2023 +0000
+
+    cleanup on error
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/trunk@1906540 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/proxy/mod_proxy_ajp.c b/modules/proxy/mod_proxy_ajp.c
+index 9cd7adbcbb..07f37392d8 100644
+--- a/modules/proxy/mod_proxy_ajp.c
++++ b/modules/proxy/mod_proxy_ajp.c
+@@ -255,6 +255,8 @@ static int ap_proxy_ajp_request(apr_pool_t *p, request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10396)
+                           "%s Transfer-Encoding is not supported",
+                           tenc);
++            /* We had a failure: Close connection to backend */
++            conn->close = 1;
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+     } else {

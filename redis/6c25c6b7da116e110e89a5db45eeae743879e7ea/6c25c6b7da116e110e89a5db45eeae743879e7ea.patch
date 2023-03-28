@@ -1,0 +1,115 @@
+commit 6c25c6b7da116e110e89a5db45eeae743879e7ea
+Author: Oran Agra <oran@redislabs.com>
+Date:   Thu Jan 12 17:40:23 2023 +0200
+
+    Avoid integer overflows in SETRANGE and SORT (CVE-2022-35977)
+    
+    Authenticated users issuing specially crafted SETRANGE and SORT(_RO)
+    commands can trigger an integer overflow, resulting with Redis attempting
+    to allocate impossible amounts of memory and abort with an OOM panic.
+
+diff --git a/src/sort.c b/src/sort.c
+index 62e7ad701..ecaca5a1e 100644
+--- a/src/sort.c
++++ b/src/sort.c
+@@ -328,8 +328,10 @@ void sortCommandGeneric(client *c, int readonly) {
+     default: vectorlen = 0; serverPanic("Bad SORT type"); /* Avoid GCC warning */
+     }
+ 
+-    /* Perform LIMIT start,count sanity checking. */
+-    start = (limit_start < 0) ? 0 : limit_start;
++    /* Perform LIMIT start,count sanity checking.
++     * And avoid integer overflow by limiting inputs to object sizes. */
++    start = min(max(limit_start, 0), vectorlen);
++    limit_count = min(max(limit_count, -1), vectorlen);
+     end = (limit_count < 0) ? vectorlen-1 : start+limit_count-1;
+     if (start >= vectorlen) {
+         start = vectorlen-1;
+diff --git a/src/t_string.c b/src/t_string.c
+index c7d2d898e..af58d7d54 100644
+--- a/src/t_string.c
++++ b/src/t_string.c
+@@ -37,8 +37,14 @@ int getGenericCommand(client *c);
+  * String Commands
+  *----------------------------------------------------------------------------*/
+ 
+-static int checkStringLength(client *c, long long size) {
+-    if (!mustObeyClient(c) && size > server.proto_max_bulk_len) {
++static int checkStringLength(client *c, long long size, long long append) {
++    if (mustObeyClient(c))
++        return C_OK;
++    /* 'uint64_t' cast is there just to prevent undefined behavior on overflow */
++    long long total = (uint64_t)size + append;
++    /* Test configured max-bulk-len represending a limit of the biggest string object,
++     * and also test for overflow. */
++    if (total > server.proto_max_bulk_len || total < size || total < append) {
+         addReplyError(c,"string exceeds maximum allowed size (proto-max-bulk-len)");
+         return C_ERR;
+     }
+@@ -456,7 +462,7 @@ void setrangeCommand(client *c) {
+         }
+ 
+         /* Return when the resulting string exceeds allowed size */
+-        if (checkStringLength(c,offset+sdslen(value)) != C_OK)
++        if (checkStringLength(c,offset,sdslen(value)) != C_OK)
+             return;
+ 
+         o = createObject(OBJ_STRING,sdsnewlen(NULL, offset+sdslen(value)));
+@@ -476,7 +482,7 @@ void setrangeCommand(client *c) {
+         }
+ 
+         /* Return when the resulting string exceeds allowed size */
+-        if (checkStringLength(c,offset+sdslen(value)) != C_OK)
++        if (checkStringLength(c,offset,sdslen(value)) != C_OK)
+             return;
+ 
+         /* Create a copy when the object is shared or encoded. */
+@@ -705,8 +711,7 @@ void appendCommand(client *c) {
+ 
+         /* "append" is an argument, so always an sds */
+         append = c->argv[2];
+-        totlen = stringObjectLen(o)+sdslen(append->ptr);
+-        if (checkStringLength(c,totlen) != C_OK)
++        if (checkStringLength(c,stringObjectLen(o),sdslen(append->ptr)) != C_OK)
+             return;
+ 
+         /* Append the value */
+diff --git a/tests/unit/sort.tcl b/tests/unit/sort.tcl
+index a9264eadf..5bc504315 100644
+--- a/tests/unit/sort.tcl
++++ b/tests/unit/sort.tcl
+@@ -327,4 +327,15 @@ start_server {
+             }
+         } {} {cluster:skip}
+     }
++
++    test {SETRANGE with huge offset} {
++        r lpush L 2 1 0
++        # expecting a different outcome on 32 and 64 bit systems
++        foreach value {9223372036854775807 2147483647} {
++            catch {[r sort_ro L by a limit 2 $value]} res
++            if {![string match "2" $res] && ![string match "*out of range*" $res]} {
++                assert_not_equal $res "expecting an error or 2"
++            }
++        }
++    }
+ }
+diff --git a/tests/unit/type/string.tcl b/tests/unit/type/string.tcl
+index d04bdff32..36b349e09 100644
+--- a/tests/unit/type/string.tcl
++++ b/tests/unit/type/string.tcl
+@@ -598,4 +598,14 @@ start_server {tags {"string"}} {
+     test {LCS indexes with match len and minimum match len} {
+         dict get [r LCS virus1{t} virus2{t} IDX WITHMATCHLEN MINMATCHLEN 5] matches
+     } {{{1 222} {13 234} 222}}
++
++    test {SETRANGE with huge offset} {
++        foreach value {9223372036854775807 2147483647} {
++            catch {[r setrange K $value A]} res
++            # expecting a different error on 32 and 64 bit systems
++            if {![string match "*string exceeds maximum allowed size*" $res] && ![string match "*out of range*" $res]} {
++                assert_equal $res "expecting an error"
++           }
++        }
++    }
+ }

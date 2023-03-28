@@ -1,0 +1,44 @@
+commit 5727d7ec2ff260b03c5aaadb2b7fb45cb6e7ef05
+Author: antirez <antirez@gmail.com>
+Date:   Tue Oct 31 09:41:22 2017 +0100
+
+    Fix buffer overflows occurring reading redis.conf.
+    
+    There was not enough sanity checking in the code loading the slots of
+    Redis Cluster from the nodes.conf file, this resulted into the
+    attacker's ability to write data at random addresses in the process
+    memory, by manipulating the index of the array. The bug seems
+    exploitable using the following techique: the config file may be altered so
+    that one of the nodes gets, as node ID (which is the first field inside the
+    structure) some data that is actually executable: then by writing this
+    address in selected places, this node ID part can be executed after a
+    jump. So it is mostly just a matter of effort in order to exploit the
+    bug. In practice however the issue is not very critical because the
+    bug requires an unprivileged user to be able to modify the Redis cluster
+    nodes configuration, and at the same time this should result in some
+    gain. However Redis normally is unprivileged as well. Yet much better to
+    have this fixed indeed.
+    
+    Fix #4278.
+
+diff --git a/src/cluster.c b/src/cluster.c
+index 6ca68367d..ee1738075 100644
+--- a/src/cluster.c
++++ b/src/cluster.c
+@@ -233,6 +233,7 @@ int clusterLoadConfig(char *filename) {
+                 *p = '\0';
+                 direction = p[1]; /* Either '>' or '<' */
+                 slot = atoi(argv[j]+1);
++                if (slot < 0 || slot >= CLUSTER_SLOTS) goto fmterr;
+                 p += 3;
+                 cn = clusterLookupNode(p);
+                 if (!cn) {
+@@ -252,6 +253,8 @@ int clusterLoadConfig(char *filename) {
+             } else {
+                 start = stop = atoi(argv[j]);
+             }
++            if (start < 0 || start >= CLUSTER_SLOTS) goto fmterr;
++            if (stop < 0 || stop >= CLUSTER_SLOTS) goto fmterr;
+             while(start <= stop) clusterAddSlot(n, start++);
+         }
+ 

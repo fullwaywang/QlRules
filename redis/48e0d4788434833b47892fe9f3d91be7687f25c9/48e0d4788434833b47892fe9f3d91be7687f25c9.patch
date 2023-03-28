@@ -1,0 +1,56 @@
+commit 48e0d4788434833b47892fe9f3d91be7687f25c9
+Author: Oran Agra <oran@redislabs.com>
+Date:   Mon Mar 20 18:50:44 2023 +0200
+
+    Avoid assertion when MSETNX is used with the same key twice (CVE-2023-28425) (#11940)
+    
+    Using the same key twice in MSETNX command would trigger an assertion.
+    
+    This reverts #11594 (introduced in Redis 7.0.8)
+
+diff --git a/src/t_string.c b/src/t_string.c
+index 6208d6a85..96bbf606d 100644
+--- a/src/t_string.c
++++ b/src/t_string.c
+@@ -559,7 +559,6 @@ void mgetCommand(client *c) {
+ 
+ void msetGenericCommand(client *c, int nx) {
+     int j;
+-    int setkey_flags = 0;
+ 
+     if ((c->argc % 2) == 0) {
+         addReplyErrorArity(c);
+@@ -575,12 +574,11 @@ void msetGenericCommand(client *c, int nx) {
+                 return;
+             }
+         }
+-        setkey_flags |= SETKEY_DOESNT_EXIST;
+     }
+ 
+     for (j = 1; j < c->argc; j += 2) {
+         c->argv[j+1] = tryObjectEncoding(c->argv[j+1]);
+-        setKey(c, c->db, c->argv[j], c->argv[j + 1], setkey_flags);
++        setKey(c, c->db, c->argv[j], c->argv[j + 1], 0);
+         notifyKeyspaceEvent(NOTIFY_STRING,"set",c->argv[j],c->db->id);
+     }
+     server.dirty += (c->argc-1)/2;
+diff --git a/tests/unit/type/string.tcl b/tests/unit/type/string.tcl
+index a9fa894dc..b25a14f4c 100644
+--- a/tests/unit/type/string.tcl
++++ b/tests/unit/type/string.tcl
+@@ -234,6 +234,15 @@ start_server {tags {"string"}} {
+         list [r msetnx x1{t} xxx y2{t} yyy] [r get x1{t}] [r get y2{t}]
+     } {1 xxx yyy}
+ 
++    test {MSETNX with not existing keys - same key twice} {
++        r del x1{t}
++        list [r msetnx x1{t} xxx x1{t} yyy] [r get x1{t}]
++    } {1 yyy}
++
++    test {MSETNX with already existing keys - same key twice} {
++        list [r msetnx x1{t} xxx x1{t} zzz] [r get x1{t}]
++    } {0 yyy}
++
+     test "STRLEN against non-existing key" {
+         assert_equal 0 [r strlen notakey]
+     }

@@ -1,0 +1,19 @@
+commit c04082cf138f1f51cedf05ee9ad36fb6763cafc6
+Author: michael-grunder <michael.grunder@gmail.com>
+Date:   Sun Jun 10 08:55:58 2018 -0700
+
+    Abort in XGROUP if the key is not a stream
+
+diff --git a/src/t_stream.c b/src/t_stream.c
+index 075386dd3..c48928018 100644
+--- a/src/t_stream.c
++++ b/src/t_stream.c
+@@ -1576,7 +1576,7 @@ NULL
+     /* Lookup the key now, this is common for all the subcommands but HELP. */
+     if (c->argc >= 4) {
+         robj *o = lookupKeyWriteOrReply(c,c->argv[2],shared.nokeyerr);
+-        if (o == NULL) return;
++        if (o == NULL || checkType(c,o,OBJ_STREAM)) return;
+         s = o->ptr;
+         grpname = c->argv[3]->ptr;
+ 

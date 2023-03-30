@@ -1,0 +1,43 @@
+commit bd578fc34b96abe0f8d99c1409814a09f51ee71c
+Author: dormando <dormando@rydia.net>
+Date:   Wed Oct 12 13:50:47 2016 -0700
+
+    CVE reported by cisco talos
+
+diff --git a/items.c b/items.c
+index 9e6d921..a1cca4a 100644
+--- a/items.c
++++ b/items.c
+@@ -148,6 +148,9 @@ item *do_item_alloc(char *key, const size_t nkey, const unsigned int flags,
+     uint8_t nsuffix;
+     item *it = NULL;
+     char suffix[40];
++    if (nbytes < 2 || nkey < 0)
++        return 0;
++
+     size_t ntotal = item_make_header(nkey + 1, flags, nbytes, suffix, &nsuffix);
+     if (settings.use_cas) {
+         ntotal += sizeof(uint64_t);
+diff --git a/memcached.c b/memcached.c
+index dc1f636..ad423a0 100644
+--- a/memcached.c
++++ b/memcached.c
+@@ -1997,10 +1997,16 @@ static bool authenticated(conn *c) {
+ static void dispatch_bin_command(conn *c) {
+     int protocol_error = 0;
+ 
+-    int extlen = c->binary_header.request.extlen;
+-    int keylen = c->binary_header.request.keylen;
++    uint8_t extlen = c->binary_header.request.extlen;
++    uint16_t keylen = c->binary_header.request.keylen;
+     uint32_t bodylen = c->binary_header.request.bodylen;
+ 
++    if (keylen > bodylen || keylen + extlen > bodylen) {
++        write_bin_error(c, PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND, NULL, 0);
++        c->write_and_go = conn_closing;
++        return;
++    }
++
+     if (settings.sasl && !authenticated(c)) {
+         write_bin_error(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, NULL, 0);
+         c->write_and_go = conn_closing;

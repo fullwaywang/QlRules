@@ -1,0 +1,26 @@
+commit 4f83478c88c2e05d6e8d79ca4557eb039354d2f3	4f83478c88
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Thu Apr 27 13:03:33 2017 +0100
+
+    Bug 697799: have .eqproc check its parameters
+    
+    The Ghostscript custom operator .eqproc was not check the number or type of
+    the parameters it was given.
+
+diff --git a/psi/zmisc3.c b/psi/zmisc3.c
+index 54b304246..37293ff4b 100644
+--- a/psi/zmisc3.c
++++ b/psi/zmisc3.c
+@@ -56,6 +56,12 @@ zeqproc(i_ctx_t *i_ctx_p)
+     ref2_t stack[MAX_DEPTH + 1];
+     ref2_t *top = stack;
+ 
++    if (ref_stack_count(&o_stack) < 2)
++        return_error(gs_error_stackunderflow);
++    if (!r_is_array(op - 1) || !r_is_array(op)) {
++        return_error(gs_error_typecheck);
++    }
++
+     make_array(&stack[0].proc1, 0, 1, op - 1);
+     make_array(&stack[0].proc2, 0, 1, op);
+     for (;;) {

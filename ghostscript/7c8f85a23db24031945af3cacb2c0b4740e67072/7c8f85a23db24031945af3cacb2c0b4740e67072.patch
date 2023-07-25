@@ -1,0 +1,143 @@
+commit 7c8f85a23db24031945af3cacb2c0b4740e67072	7c8f85a23db24031945af3cacb2c0b4740e67072
+Author: Ken Sharp <ken.sharp@artifex.com>
+Date:   Thu Nov 8 14:43:32 2018 +0000
+
+    PS interpreter - check the Implementation of a Pattern before use
+    
+    Bug #700141 "Type confusion in setpattern"
+    
+    As the bug thread says, we were not checking that the Implementation
+    of a pattern dictionary was a structure type, leading to a crash when
+    we tried to treat it as one.
+    
+    Here we make the st_pattern1_instance and st_pattern2_instance
+    structures public definitions and in zsetcolor we check the object
+    stored under the Implementation key in the supplied dictionary to see if
+    its a t_struct or t_astruct type, and if it is that its a
+    st_pattern1_instance or st_pattern2_instance structure.
+    
+    If either check fails we throw a typecheck error.
+    
+    We need to make the st_pattern1_instance and st_pattern2_instance
+    definitions public as they are defined in the graphics library and we
+    need to check in the interpreter.
+
+diff --git a/base/gsptype1.c b/base/gsptype1.c
+index 27fdd5a1b..e98dde18e 100644
+--- a/base/gsptype1.c
++++ b/base/gsptype1.c
+@@ -50,7 +50,7 @@
+ 
+ /* GC descriptors */
+ private_st_pattern1_template();
+-private_st_pattern1_instance();
++public_st_pattern1_instance();
+ 
+ /* GC procedures */
+ static ENUM_PTRS_BEGIN(pattern1_instance_enum_ptrs) {
+diff --git a/base/gsptype2.c b/base/gsptype2.c
+index 791e538c0..c53eb2e9f 100644
+--- a/base/gsptype2.c
++++ b/base/gsptype2.c
+@@ -33,7 +33,7 @@
+ 
+ /* GC descriptors */
+ private_st_pattern2_template();
+-private_st_pattern2_instance();
++public_st_pattern2_instance();
+ 
+ /* GC procedures */
+ static ENUM_PTRS_BEGIN(pattern2_instance_enum_ptrs) {
+@@ -206,10 +206,10 @@ gs_pattern2_set_color(const gs_client_color * pcc, gs_gstate * pgs)
+ 
+     pinst->saved->overprint_mode = pgs->overprint_mode;
+     pinst->saved->overprint = pgs->overprint;
+-    
++
+     num_comps = pgs->device->color_info.num_components;
+     for (k = 0; k < num_comps; k++) {
+-        pgs->color_component_map.color_map[k] = 
++        pgs->color_component_map.color_map[k] =
+             pinst->saved->color_component_map.color_map[k];
+     }
+     code = pcs->type->set_overprint(pcs, pgs);
+diff --git a/base/gsptype2.h b/base/gsptype2.h
+index f0f26d19b..4186201d0 100644
+--- a/base/gsptype2.h
++++ b/base/gsptype2.h
+@@ -57,8 +57,8 @@ typedef struct gs_pattern2_instance_s {
+     bool shfill;
+ } gs_pattern2_instance_t;
+ 
+-#define private_st_pattern2_instance() /* in gsptype2.c */\
+-  gs_private_st_composite(st_pattern2_instance, gs_pattern2_instance_t,\
++#define public_st_pattern2_instance() /* in gsptype2.c */\
++  gs_public_st_composite(st_pattern2_instance, gs_pattern2_instance_t,\
+     "gs_pattern2_instance_t", pattern2_instance_enum_ptrs,\
+     pattern2_instance_reloc_ptrs)
+ 
+diff --git a/base/gxcolor2.h b/base/gxcolor2.h
+index 62ec05e9b..d5b109573 100644
+--- a/base/gxcolor2.h
++++ b/base/gxcolor2.h
+@@ -92,8 +92,8 @@ struct gs_pattern1_instance_s {
+     gx_bitmap_id id;		/* key for cached bitmap (= id of mask) */
+ };
+ 
+-#define private_st_pattern1_instance() /* in gsptype1.c */\
+-  gs_private_st_composite(st_pattern1_instance, gs_pattern1_instance_t,\
++#define public_st_pattern1_instance() /* in gsptype1.c */\
++  gs_public_st_composite(st_pattern1_instance, gs_pattern1_instance_t,\
+     "gs_pattern1_instance_t", pattern1_instance_enum_ptrs,\
+     pattern1_instance_reloc_ptrs)
+ 
+diff --git a/psi/zcolor.c b/psi/zcolor.c
+index 74b428801..3b8849ff3 100644
+--- a/psi/zcolor.c
++++ b/psi/zcolor.c
+@@ -65,6 +65,8 @@ static const float default_0_1[] = {0, 1, 0, 1, 0, 1, 0, 1};
+ 
+ /* imported from gsht.c */
+ extern  void    gx_set_effective_transfer(gs_gstate *);
++extern_st(st_pattern1_instance);
++extern_st(st_pattern2_instance);
+ 
+ /* Essential forward declarations */
+ static int validate_spaces(i_ctx_t *i_ctx_p, ref *arr, int *depth);
+@@ -289,6 +291,9 @@ zsetcolor(i_ctx_t * i_ctx_p)
+                 code = array_get(imemory, pImpl, 0, &pPatInst);
+                 if (code < 0)
+                     return code;
++                if (!r_is_struct(&pPatInst) || (!r_has_stype(&pPatInst, imemory, st_pattern1_instance) && !r_has_stype(&pPatInst, imemory, st_pattern2_instance)))
++                    return_error(gs_error_typecheck);
++
+                 cc.pattern = r_ptr(&pPatInst, gs_pattern_instance_t);
+                 n_numeric_comps = ( pattern_instance_uses_base_space(cc.pattern)
+                       ? n_comps - 1
+@@ -4423,7 +4428,7 @@ static int setindexedspace(i_ctx_t * i_ctx_p, ref *r, int *stage, int *cont, int
+         /* If we have a named color profile and the base space is DeviceN or
+            Separation use a different set of procedures to ensure the named
+            color remapping code is used */
+-        if (igs->icc_manager->device_named != NULL && 
++        if (igs->icc_manager->device_named != NULL &&
+             (base_type == gs_color_space_index_Separation ||
+              base_type == gs_color_space_index_DeviceN))
+             pcs = gs_cspace_alloc(imemory, &gs_color_space_type_Indexed_Named);
+@@ -5585,7 +5590,7 @@ static int iccompareproc(i_ctx_t *i_ctx_p, ref *space, ref *testspace)
+         return 0;
+ 
+     /* As a quick check see if current is same as new */
+-    if (ICCdict1.value.bytes == ICCdict2.value.bytes) 
++    if (ICCdict1.value.bytes == ICCdict2.value.bytes)
+          return 1;
+ 
+     /* Need to check all the various parts */
+@@ -5605,7 +5610,7 @@ static int iccompareproc(i_ctx_t *i_ctx_p, ref *space, ref *testspace)
+     code2 = dict_find_string(&ICCdict2, "DataSource", &tempref2);
+     if (code2 <= 0)
+         return 0;
+-    if (r_size(tempref1) != r_size(tempref2)) 
++    if (r_size(tempref1) != r_size(tempref2))
+         return 0;
+ 
+     buff_size = r_size(tempref1);

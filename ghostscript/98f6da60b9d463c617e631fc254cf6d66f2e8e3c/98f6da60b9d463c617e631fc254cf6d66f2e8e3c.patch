@@ -1,0 +1,21 @@
+commit 98f6da60b9d463c617e631fc254cf6d66f2e8e3c	98f6da60b9d463c617e631fc254cf6d66f2e8e3c
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Mon Jun 12 13:15:17 2017 +0100
+
+    Bug 698026: bounds check zone pointers in Ins_IP()
+
+diff --git a/base/ttinterp.c b/base/ttinterp.c
+index f6a6d95fe..e7c9d68f7 100644
+--- a/base/ttinterp.c
++++ b/base/ttinterp.c
+@@ -4129,7 +4129,9 @@ static int nInstrCount=0;
+     Int         point;
+     (void)args;
+ 
+-    if ( CUR.top < CUR.GS.loop )
++    if ( CUR.top < CUR.GS.loop ||
++         BOUNDS(CUR.GS.rp1, CUR.zp0.n_points) ||
++         BOUNDS(CUR.GS.rp2, CUR.zp1.n_points))
+     {
+       CUR.error = TT_Err_Invalid_Reference;
+       return;

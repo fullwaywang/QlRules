@@ -1,0 +1,24 @@
+commit 0c0b0859ae1aba64861599f0e7f74f143f305932	0c0b0859
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Tue Jul 7 16:57:41 2015 +0100
+
+    Bug 696041: sanity check for memory allocation.
+    
+    In gs_heap_alloc_bytes(), add a sanity check to ensure we don't overflow the
+    variable holding the actual number of bytes we allocate.
+    
+    No cluster differences
+
+diff --git a/gs/base/gsmalloc.c b/gs/base/gsmalloc.c
+index 624552d78..cad79c2f3 100644
+--- a/gs/base/gsmalloc.c
++++ b/gs/base/gsmalloc.c
+@@ -178,7 +178,7 @@ gs_heap_alloc_bytes(gs_memory_t * mem, uint size, client_name_t cname)
+     } else {
+         uint added = size + sizeof(gs_malloc_block_t);
+ 
+-        if (mmem->limit - added < mmem->used)
++        if (added <= size || mmem->limit - added < mmem->used)
+             set_msg("exceeded limit");
+         else if ((ptr = (byte *) Memento_label(malloc(added), cname)) == 0)
+             set_msg("failed");

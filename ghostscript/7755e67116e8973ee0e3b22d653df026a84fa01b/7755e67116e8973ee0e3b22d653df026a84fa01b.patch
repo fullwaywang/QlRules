@@ -1,0 +1,20 @@
+commit 7755e67116e8973ee0e3b22d653df026a84fa01b	7755e67116e8973ee0e3b22d653df026a84fa01b
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Thu Jun 15 08:58:31 2017 +0100
+
+    Bug 698055: bounds check zone pointer in Ins_MDRP
+
+diff --git a/base/ttinterp.c b/base/ttinterp.c
+index e7c9d68f7..af457e89f 100644
+--- a/base/ttinterp.c
++++ b/base/ttinterp.c
+@@ -3770,7 +3770,8 @@ static int nInstrCount=0;
+ 
+     point = (Int)args[0];
+ 
+-    if ( BOUNDS( args[0], CUR.zp1.n_points ) )
++    if ( BOUNDS( args[0], CUR.zp1.n_points ) ||
++         BOUNDS( CUR.GS.rp0, CUR.zp0.n_points) )
+     {
+         /* Current version of FreeType silently ignores this out of bounds error
+          * and drops the instruction, see bug #691121

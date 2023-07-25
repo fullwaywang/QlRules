@@ -1,0 +1,38 @@
+commit d2ab84732936b6e7e5a461dc94344902965e9a06	d2ab84732936b6e7e5a461dc94344902965e9a06
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Mon Jun 12 12:59:38 2017 +0100
+
+    Bug 698025: validate offsets reading TTF name table in xps
+
+diff --git a/xps/xpsfont.c b/xps/xpsfont.c
+index 62c00db31..fa68e8281 100644
+--- a/xps/xpsfont.c
++++ b/xps/xpsfont.c
+@@ -182,12 +182,27 @@ xps_load_sfnt_name(xps_font_t *font, char *namep)
+         return;
+     }
+ 
++    /* validate the offset, and the data for the two
++     * values we're about to read
++     */
++    if (offset + 6 > font->length)
++    {
++        gs_warn("name table byte offset invalid");
++        return;
++    }
+     namedata = font->data + offset;
+ 
+     /*format = u16(namedata + 0);*/
+     count = u16(namedata + 2);
+     stringoffset = u16(namedata + 4);
+ 
++    if (stringoffset + offset > font->length
++        || offset + 6 + count * 12 > font->length)
++    {
++        gs_warn("name table invalid");
++        return;
++    }
++
+     if (length < 6 + (count * 12))
+     {
+         gs_warn("name table too short");

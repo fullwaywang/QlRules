@@ -1,0 +1,69 @@
+commit 362ec9daadb9992b0def3520cd1dc6fa52edd1c4	362ec9daadb9992b0def3520cd1dc6fa52edd1c4
+Author: Ray Johnston <ray.johnston@artifex.com>
+Date:   Tue Nov 21 12:48:54 2017 -0800
+
+    Fix bug 697459 Buffer overflow in fill_threshold_buffer
+    
+    There was an overflow check for ht_buffer size, but none for the larger
+    threshold_buffer. Note that this file didn't fail on Windows because the
+    combination of the ht_buffer and the size of the (miscalculated due to
+    overflow) threshold_buffer would have exceeded the 2Gb limit.
+
+diff --git a/base/gxht_thresh.c b/base/gxht_thresh.c
+index 3fb840213..726861685 100644
+--- a/base/gxht_thresh.c
++++ b/base/gxht_thresh.c
+@@ -711,7 +711,9 @@ gxht_thresh_image_init(gx_image_enum *penum)
+            space */
+         max_height = (int) ceil(fixed2float(any_abs(penum->dst_height)) /
+                                             (float) penum->Height);
+-        if ((max_height > 0) && (penum->ht_stride * spp_out > max_int / max_height))
++        if (max_height <= 0)
++            return -1;		/* shouldn't happen, but check so we don't div by zero */
++        if (penum->ht_stride * spp_out > max_int / max_height)
+             return -1;         /* overflow */
+ 
+         penum->ht_buffer =
+@@ -734,6 +736,11 @@ gxht_thresh_image_init(gx_image_enum *penum)
+            Also allow a 15 sample over run during the execution.  */
+         temp = (int) ceil((float) ((dev_width + 15.0) + 15.0)/16.0);
+         penum->line_size = bitmap_raster(temp * 16 * 8);  /* The stride */
++        if (penum->line_size > max_int / max_height) {
++            gs_free_object(penum->memory, penum->ht_buffer, "gxht_thresh");
++            penum->ht_buffer = NULL;
++            return -1;         /* thresh_buffer size overflow */
++        }
+         penum->line = gs_alloc_bytes(penum->memory, penum->line_size * spp_out,
+                                      "gxht_thresh");
+         penum->thresh_buffer = gs_alloc_bytes(penum->memory,
+@@ -754,7 +761,7 @@ gxht_thresh_image_init(gx_image_enum *penum)
+ }
+ 
+ static void
+-fill_threshhold_buffer(byte *dest_strip, byte *src_strip, int src_width,
++fill_threshold_buffer(byte *dest_strip, byte *src_strip, int src_width,
+                        int left_offset, int left_width, int num_tiles,
+                        int right_width)
+ {
+@@ -908,7 +915,7 @@ gxht_thresh_planes(gx_image_enum *penum, fixed xrun,
+                        to update with stride */
+                     position = contone_stride * k;
+                     /* Tile into the 128 bit aligned threshold strip */
+-                    fill_threshhold_buffer(&(thresh_align[position]),
++                    fill_threshold_buffer(&(thresh_align[position]),
+                                            thresh_tile, thresh_width, dx, left_width,
+                                            num_full_tiles, right_tile_width);
+                 }
+diff --git a/base/gxipixel.c b/base/gxipixel.c
+index edd40c52d..cb4f02a09 100644
+--- a/base/gxipixel.c
++++ b/base/gxipixel.c
+@@ -758,7 +758,7 @@ gx_image_enum_begin(gx_device * dev, const gs_gstate * pgs,
+     penum->memory = mem;
+     penum->buffer = buffer;
+     penum->buffer_size = bsize;
+-    penum->line = 0;
++    penum->line = NULL;
+     penum->icc_link = NULL;
+     penum->color_cache = NULL;
+     penum->ht_buffer = NULL;

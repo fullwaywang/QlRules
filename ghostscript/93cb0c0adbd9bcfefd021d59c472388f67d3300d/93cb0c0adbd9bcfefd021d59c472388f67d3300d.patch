@@ -1,0 +1,29 @@
+commit 93cb0c0adbd9bcfefd021d59c472388f67d3300d	93cb0c0adbd9bcfefd021d59c472388f67d3300d
+Author: Ray Johnston <ray.johnston@artifex.com>
+Date:   Sun Oct 27 19:44:35 2019 -0700
+
+    Fix Bug 701786: jetp3852 stack corruption caused by width/resolution
+    
+    This "contrib" driver has a questionable design where it collects the raster
+    data from the graphics library into a stack based array, but the size of the
+    array cannot accomodate high resolutions or wide pages. Issue an error and
+    fail (without stack corruption).
+
+diff --git a/devices/gdev3852.c b/devices/gdev3852.c
+index 2222ebe8b..b91aab5dd 100644
+--- a/devices/gdev3852.c
++++ b/devices/gdev3852.c
+@@ -77,6 +77,13 @@ jetp3852_print_page(gx_device_printer *pdev, gp_file *prn_stream)
+         int lnum;
+         int line_size = gdev_mem_bytes_per_scan_line((gx_device *)pdev);
+         int num_blank_lines = 0;
++
++        if (line_size > DATA_SIZE) {
++            emprintf2(pdev->memory, "invalid resolution and/or width gives line_size = %d, max. is %d\n",
++                      line_size, DATA_SIZE);
++            return_error(gs_error_rangecheck);
++        }
++
+         for ( lnum = 0; lnum < pdev->height; lnum++ ) {
+             byte *end_data = data + line_size;
+             gdev_prn_copy_scan_lines(pdev, lnum,

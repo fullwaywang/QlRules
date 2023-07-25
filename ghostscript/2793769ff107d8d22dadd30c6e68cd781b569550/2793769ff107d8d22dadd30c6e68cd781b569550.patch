@@ -1,0 +1,22 @@
+commit 2793769ff107d8d22dadd30c6e68cd781b569550	2793769ff107d8d22dadd30c6e68cd781b569550
+Author: Julian Smith <jules@op59.net>
+Date:   Mon Nov 4 12:30:33 2019 +0000
+
+    Bug 701819: fixed ordering in if expression to avoid out-of-bounds access.
+    
+    Fixes:
+        ./sanbin/gs -dBATCH -dNOPAUSE -r965 -sOutputFile=tmp -sDEVICE=pcx16 ../bug-701819.pdf
+
+diff --git a/devices/gdevpcx.c b/devices/gdevpcx.c
+index 1735851d2..91de4abb6 100644
+--- a/devices/gdevpcx.c
++++ b/devices/gdevpcx.c
+@@ -442,7 +442,7 @@ pcx_write_rle(const byte * from, const byte * end, int step, gp_file * file)
+         byte data = *from;
+ 
+         from += step;
+-        if (data != *from || from == end) {
++        if (from >= end || data != *from) {
+             if (data >= 0xc0)
+                 gp_fputc(0xc1, file);
+         } else {

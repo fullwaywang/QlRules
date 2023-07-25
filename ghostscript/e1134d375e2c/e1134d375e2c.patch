@@ -1,0 +1,18 @@
+commit e1134d375e2ca176068e19a2aa9b040baffe1c22	e1134d375e2c
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Tue Apr 12 14:09:55 2022 +0100
+
+    Bug 705156(1): Avoid double free of PCL error buffer
+
+diff --git a/pcl/pcl/pcstatus.c b/pcl/pcl/pcstatus.c
+index 0bc9ba345..4413e9013 100644
+--- a/pcl/pcl/pcstatus.c
++++ b/pcl/pcl/pcstatus.c
+@@ -52,6 +52,7 @@ pcl_status_read(byte * data, uint max_data, pcl_state_t * pcs)
+     pcs->status.read_pos += count;
+     if (pcs->status.read_pos == pcs->status.write_pos) {
+         gs_free_object(pcs->memory, pcs->status.buffer, "status buffer");
++        pcs->status.buffer = NULL;
+         pcs->status.write_pos = pcs->status.read_pos = 0;
+     }
+     return count;

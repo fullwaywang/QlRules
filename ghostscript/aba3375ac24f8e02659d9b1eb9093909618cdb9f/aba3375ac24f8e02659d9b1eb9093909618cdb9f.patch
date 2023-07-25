@@ -1,0 +1,30 @@
+commit aba3375ac24f8e02659d9b1eb9093909618cdb9f	aba3375ac24f8e02659d9b1eb9093909618cdb9f
+Author: Ken Sharp <ken.sharp@artifex.com>
+Date:   Sat Oct 26 15:04:26 2019 +0100
+
+    Prevent a heap-buffer overrun
+    
+    Bug #701791 "global-buffer-overflow at devices/gdevpjet.c:177 in pj_common_print_page"
+    
+    We were not setting the unused bytes at the end of a line to 0, which
+    later caused us to read uninitialised data from the line, and attempt
+    to use that as the index into an 8-byte table. If the uninitialised
+    data was greater than 16 then we would read off the end of the table.
+    
+    Its 'probably' benign since we aren't using tis data, and we probably
+    won't try to read from an invalid address, but its poor practice and
+    its easily fixed. Setting the buffer to 0x00 before we start ensures
+    that any padding bytes are in the valid range for the table.
+
+diff --git a/devices/gdevpjet.c b/devices/gdevpjet.c
+index 4b4741904..935b97464 100644
+--- a/devices/gdevpjet.c
++++ b/devices/gdevpjet.c
+@@ -117,6 +117,7 @@ pj_common_print_page(gx_device_printer *pdev, gp_file *prn_stream, int y_origin,
+                                 "paintjet_print_page(plane_data)");
+                 return_error(gs_error_VMerror);
+         }
++        memset(data, 0x00, DATA_SIZE);
+ 
+         /* set raster graphics resolution -- 90 or 180 dpi */
+         gp_fprintf(prn_stream, "\033*t%dR", X_DPI);

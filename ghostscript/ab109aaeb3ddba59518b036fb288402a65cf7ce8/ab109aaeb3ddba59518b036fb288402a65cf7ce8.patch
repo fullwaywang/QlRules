@@ -1,0 +1,73 @@
+commit ab109aaeb3ddba59518b036fb288402a65cf7ce8	ab109aaeb3ddba59518b036fb288402a65cf7ce8
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Sat Mar 5 14:56:03 2016 -0800
+
+    Bug 694724: Have filenameforall and getenv honor SAFER
+
+diff --git a/Resource/Init/gs_init.ps b/Resource/Init/gs_init.ps
+index fa33d886b..99888acaa 100644
+--- a/Resource/Init/gs_init.ps
++++ b/Resource/Init/gs_init.ps
+@@ -2021,6 +2021,7 @@ readonly def
+ 
+ /.locksafe {
+   .locksafe_userparams
++  systemdict /getenv {pop //false} put
+   % setpagedevice has the side effect of clearing the page, but
+   % we will just document that. Using setpagedevice keeps the device
+   % properties and pagedevice .LockSafetyParams in agreement even
+@@ -2039,6 +2040,7 @@ readonly def
+ %%
+ /.locksafeglobal {
+   .locksafe_userparams
++  systemdict /getenv {pop //false} put
+   % setpagedevice has the side effect of clearing the page, but
+   % we will just document that. Using setpagedevice keeps the device
+   % properties and pagedevice .LockSafetyParams in agreement even
+diff --git a/psi/zfile.c b/psi/zfile.c
+index 320ecd500..0b9f29949 100644
+--- a/psi/zfile.c
++++ b/psi/zfile.c
+@@ -371,22 +371,26 @@ file_continue(i_ctx_t *i_ctx_p)
+ 
+     if (len < devlen)
+         return_error(gs_error_rangecheck);     /* not even room for device len */
+-    memcpy((char *)pscratch->value.bytes, iodev->dname, devlen);
+-    code = iodev->procs.enumerate_next(pfen, (char *)pscratch->value.bytes + devlen,
+-                len - devlen);
+-    if (code == ~(uint) 0) {    /* all done */
+-        esp -= 5;               /* pop proc, pfen, devlen, iodev , mark */
+-        return o_pop_estack;
+-    } else if (code > len)      /* overran string */
+-        return_error(gs_error_rangecheck);
+-    else {
+-        push(1);
+-        ref_assign(op, pscratch);
+-        r_set_size(op, code + devlen);
+-        push_op_estack(file_continue);  /* come again */
+-        *++esp = pscratch[2];   /* proc */
+-        return o_push_estack;
+-    }
++
++    do {
++        memcpy((char *)pscratch->value.bytes, iodev->dname, devlen);
++        code = iodev->procs.enumerate_next(pfen, (char *)pscratch->value.bytes + devlen,
++                    len - devlen);
++        if (code == ~(uint) 0) {    /* all done */
++            esp -= 5;               /* pop proc, pfen, devlen, iodev , mark */
++            return o_pop_estack;
++        } else if (code > len)      /* overran string */
++            return_error(gs_error_rangecheck);
++        else if (iodev != iodev_default(imemory)
++              || (check_file_permissions_reduced(i_ctx_p, (char *)pscratch->value.bytes, code + devlen, "PermitFileReading")) == 0) {
++            push(1);
++            ref_assign(op, pscratch);
++            r_set_size(op, code + devlen);
++            push_op_estack(file_continue);  /* come again */
++            *++esp = pscratch[2];   /* proc */
++            return o_push_estack;
++        }
++    } while(1);
+ }
+ /* Cleanup procedure for enumerating files */
+ static int

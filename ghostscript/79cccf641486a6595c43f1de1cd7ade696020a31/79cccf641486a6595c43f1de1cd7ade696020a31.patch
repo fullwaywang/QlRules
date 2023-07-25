@@ -1,0 +1,49 @@
+commit 79cccf641486a6595c43f1de1cd7ade696020a31	79cccf641486a6595c43f1de1cd7ade696020a31
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Sat Aug 25 07:45:45 2018 +0100
+
+    Bug 699654(2): preserve LockSafetyParams in the nulldevice
+    
+    The nulldevice does not necessarily use the normal setpagedevice machinery,
+    but can be set using the nulldevice operator. In which case, we don't preserve
+    the settings from the original device (in the way setpagedevice does).
+    
+    Since nulldevice does nothing, this is not generally a problem, but in the case
+    of LockSafetyParams it *is* important when we restore back to the original
+    device, when LockSafetyParams not being set is "preserved" into the post-
+    restore configuration.
+    
+    We have to initialise the value to false because the nulldevice is used during
+    initialisation (before any other device exists), and *must* be writable for
+    that.
+
+diff --git a/base/gsdevice.c b/base/gsdevice.c
+index 06592208e..e38086dfd 100644
+--- a/base/gsdevice.c
++++ b/base/gsdevice.c
+@@ -691,7 +691,7 @@ int
+ gs_nulldevice(gs_gstate * pgs)
+ {
+     int code = 0;
+-
++    bool saveLockSafety = false;
+     if (pgs->device == 0 || !gx_device_is_null(pgs->device)) {
+         gx_device *ndev;
+         code = gs_copydevice(&ndev, (const gx_device *)&gs_null_device,
+@@ -699,6 +699,8 @@ gs_nulldevice(gs_gstate * pgs)
+ 
+         if (code < 0)
+             return code;
++        if (gs_currentdevice_inline(pgs) != NULL)
++            saveLockSafety = gs_currentdevice_inline(pgs)->LockSafetyParams;
+         /*
+          * Internal devices have a reference count of 0, not 1,
+          * aside from references from graphics states.
+@@ -718,6 +720,7 @@ gs_nulldevice(gs_gstate * pgs)
+ 
+         if ((code = gs_setdevice_no_erase(pgs, ndev)) < 0)
+             gs_free_object(pgs->memory, ndev, "gs_copydevice(device)");
++        gs_currentdevice_inline(pgs)->LockSafetyParams = saveLockSafety;
+     }
+     return code;
+ }

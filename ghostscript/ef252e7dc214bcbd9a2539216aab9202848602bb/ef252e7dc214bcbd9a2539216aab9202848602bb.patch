@@ -1,0 +1,27 @@
+commit ef252e7dc214bcbd9a2539216aab9202848602bb	ef252e7dc214bcbd9a2539216aab9202848602bb
+Author: Ken Sharp <ken.sharp@artifex.com>
+Date:   Wed Nov 14 09:27:00 2018 +0000
+
+    Bug #700168 - add a type check
+    
+    Bug #700168 "Type confusion in JBIG2Decode"
+    
+    The code was assuming that .jbig2globalctx was a structure allocated
+    by the graphics library, without checking.
+    
+    Add a check to see that it is a structure and that its the correct
+    type of structure.
+
+diff --git a/psi/zfjbig2.c b/psi/zfjbig2.c
+index a3d13a242..07b470f87 100644
+--- a/psi/zfjbig2.c
++++ b/psi/zfjbig2.c
+@@ -72,6 +72,8 @@ z_jbig2decode(i_ctx_t * i_ctx_p)
+     if (r_has_type(op, t_dictionary)) {
+         check_dict_read(*op);
+         if ( dict_find_string(op, ".jbig2globalctx", &sop) > 0) {
++            if (!r_is_struct(sop) || !r_has_stype(sop, imemory, st_jbig2_global_data_t))
++                return_error(gs_error_typecheck);
+             gref = r_ptr(sop, s_jbig2_global_data_t);
+             s_jbig2decode_set_global_data((stream_state*)&state, gref);
+         }

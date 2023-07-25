@@ -1,0 +1,35 @@
+commit 366ad48d076c1aa4c8f83c65011258a04e348207	366ad48d076c1aa4c8f83c65011258a04e348207
+Author: Julian Smith <jules@op59.net>
+Date:   Fri Nov 1 18:09:30 2019 +0000
+
+    Bug 701815: avoid uninitialised bytes being >7, which broke indexing.
+    
+    Fixes:
+        ./sanbin/gs -dBATCH -dNOPAUSE -sOutputFile=tmp -sDEVICE=jetp3852 ../bug-701815.pdf
+
+diff --git a/devices/gdev3852.c b/devices/gdev3852.c
+index b91aab5dd..d984fa102 100644
+--- a/devices/gdev3852.c
++++ b/devices/gdev3852.c
+@@ -69,6 +69,10 @@ jetp3852_print_page(gx_device_printer *pdev, gp_file *prn_stream)
+     byte data[DATA_SIZE];
+     byte plane_data[LINE_SIZE * 3];
+ 
++    /* Initialise data to zeros, otherwise later on, uninitialised bytes in
++    dp[] can be greater than 7, which breaks spr8[dp[]]. */
++    memset(data, 0x00, DATA_SIZE);
++
+     /* Set initial condition for printer */
+     gp_fputs("\033@",prn_stream);
+ 
+@@ -99,10 +103,6 @@ jetp3852_print_page(gx_device_printer *pdev, gp_file *prn_stream)
+                 byte *odp;
+                 byte *row;
+ 
+-                /* Pad with 0s to fill out the last */
+-                /* block of 8 bytes. */
+-                memset(end_data, 0, 7);
+-
+                 /* Transpose the data to get pixel planes. */
+                 for ( i = 0, odp = plane_data; i < DATA_SIZE;
+                       i += 8, odp++

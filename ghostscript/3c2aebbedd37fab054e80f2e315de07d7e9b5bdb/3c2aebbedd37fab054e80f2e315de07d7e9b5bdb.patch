@@ -1,0 +1,54 @@
+commit 3c2aebbedd37fab054e80f2e315de07d7e9b5bdb	3c2aebbedd37fab054e80f2e315de07d7e9b5bdb
+Author: Chris Liddell <chris.liddell@artifex.com>
+Date:   Wed Jun 14 09:30:45 2017 +0100
+
+    Bug 698044: restrict font name length to the buffer size.
+
+diff --git a/xps/ghostxps.h b/xps/ghostxps.h
+index c4816b6a5..623ea5df6 100644
+--- a/xps/ghostxps.h
++++ b/xps/ghostxps.h
+@@ -274,7 +274,7 @@ int xps_encode_font_char(xps_font_t *font, int key);
+ void xps_measure_font_glyph(xps_context_t *ctx, xps_font_t *font, int gid, xps_glyph_metrics_t *mtx);
+ 
+ int xps_find_sfnt_table(xps_font_t *font, const char *name, int *lengthp);
+-void xps_load_sfnt_name(xps_font_t *font, char *namep);
++void xps_load_sfnt_name(xps_font_t *font, char *namep, const int buflen);
+ int xps_init_truetype_font(xps_context_t *ctx, xps_font_t *font);
+ int xps_init_postscript_font(xps_context_t *ctx, xps_font_t *font);
+ 
+diff --git a/xps/xpsfont.c b/xps/xpsfont.c
+index fa68e8281..36aef4cf0 100644
+--- a/xps/xpsfont.c
++++ b/xps/xpsfont.c
+@@ -163,7 +163,7 @@ xps_find_sfnt_table(xps_font_t *font, const char *name, int *lengthp)
+  * Get the windows truetype font file name - position 4 in the name table.
+  */
+ void
+-xps_load_sfnt_name(xps_font_t *font, char *namep)
++xps_load_sfnt_name(xps_font_t *font, char *namep, const int buflen)
+ {
+     byte *namedata;
+     int offset, length;
+@@ -219,6 +219,8 @@ xps_load_sfnt_name(xps_font_t *font, char *namep)
+         length = u16(record + 8);
+         offset = u16(record + 10);
+ 
++        length = length > buflen - 1 ? buflen - 1: length;
++
+         /* Full font name or postscript name */
+         if (nameid == 4 || nameid == 6)
+         {
+diff --git a/xps/xpsttf.c b/xps/xpsttf.c
+index f7a289f9e..9fe424cd8 100644
+--- a/xps/xpsttf.c
++++ b/xps/xpsttf.c
+@@ -385,7 +385,7 @@ xps_init_truetype_font(xps_context_t *ctx, xps_font_t *font)
+         p42->procs.build_char = xps_true_callback_build_char;
+ 
+         memset(p42->font_name.chars, 0, sizeof(p42->font_name.chars));
+-        xps_load_sfnt_name(font, (char*)p42->font_name.chars);
++        xps_load_sfnt_name(font, (char*)p42->font_name.chars, sizeof(p42->font_name.chars));
+         p42->font_name.size = strlen((char*)p42->font_name.chars);
+ 
+         memset(p42->key_name.chars, 0, sizeof(p42->key_name.chars));

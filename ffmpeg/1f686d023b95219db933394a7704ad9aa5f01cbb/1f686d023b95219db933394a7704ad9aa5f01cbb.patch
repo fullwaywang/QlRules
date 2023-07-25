@@ -1,0 +1,25 @@
+commit 1f686d023b95219db933394a7704ad9aa5f01cbb
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri Feb 15 01:57:09 2019 +0100
+
+    avcodec/mpeg4videodec: Clear interlaced_dct for studio profile
+    
+    Fixes: Out of array access
+    Fixes: 13090/clusterfuzz-testcase-minimized-ffmpeg_AV_CODEC_ID_MPEG4_fuzzer-5408668986638336
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/projects/ffmpeg
+    Reviewed-by: Kieran Kunhya <kierank@obe.tv>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/mpeg4videodec.c b/libavcodec/mpeg4videodec.c
+index f44ee76bd4..ecd028a87c 100644
+--- a/libavcodec/mpeg4videodec.c
++++ b/libavcodec/mpeg4videodec.c
+@@ -3057,6 +3057,7 @@ static int decode_studio_vop_header(Mpeg4DecContext *ctx, GetBitContext *gb)
+         return 0;
+ 
+     s->partitioned_frame = 0;
++    s->interlaced_dct = 0;
+     s->decode_mb = mpeg4_decode_studio_mb;
+ 
+     decode_smpte_tc(ctx, gb);

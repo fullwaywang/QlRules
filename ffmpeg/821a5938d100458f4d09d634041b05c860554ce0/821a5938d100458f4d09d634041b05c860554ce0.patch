@@ -1,0 +1,25 @@
+commit 821a5938d100458f4d09d634041b05c860554ce0	821a5938d100458f4d09d634041b05c860554ce0
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sun Sep 15 16:33:27 2013 +0200
+
+    avcodec/g2meet: Fix order of align and pixel size multiplication.
+    
+    Fixes out of array accesses
+    Fixes Ticket2922
+    
+    Found-by: ami_stuff
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/g2meet.c b/libavcodec/g2meet.c
+index 9a228b8873..ccccf21834 100644
+--- a/libavcodec/g2meet.c
++++ b/libavcodec/g2meet.c
+@@ -453,7 +453,7 @@ static int g2m_init_buffers(G2MContext *c)
+     if (!c->synth_tile || !c->jpeg_tile ||
+         c->old_tile_w < c->tile_width ||
+         c->old_tile_h < c->tile_height) {
+-        c->tile_stride = FFALIGN(c->tile_width * 3, 16);
++        c->tile_stride = FFALIGN(c->tile_width, 16) * 3;
+         aligned_height = FFALIGN(c->tile_height,    16);
+         av_free(c->synth_tile);
+         av_free(c->jpeg_tile);

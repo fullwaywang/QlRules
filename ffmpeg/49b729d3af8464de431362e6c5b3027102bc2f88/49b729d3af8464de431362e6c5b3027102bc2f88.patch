@@ -1,0 +1,37 @@
+commit 49b729d3af8464de431362e6c5b3027102bc2f88	49b729d3af8464de431362e6c5b3027102bc2f88
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Jan 22 21:30:20 2013 +0100
+
+    sanm: check image dimensions before using them
+    
+    Avoids integer overflows and out of array accesses.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/sanm.c b/libavcodec/sanm.c
+index 7432fa273f..ff70f206e6 100644
+--- a/libavcodec/sanm.c
++++ b/libavcodec/sanm.c
+@@ -26,6 +26,7 @@
+ #include "bytestream.h"
+ #include "internal.h"
+ #include "libavutil/bswap.h"
++#include "libavutil/imgutils.h"
+ #include "libavcodec/dsputil.h"
+ #include "sanm_data.h"
+ 
+@@ -716,8 +717,11 @@ static int process_frame_obj(SANMVideoContext *ctx)
+     h     = bytestream2_get_le16u(&ctx->gb);
+ 
+     if (ctx->width < left + w || ctx->height < top + h) {
+-        ctx->avctx->width  = FFMAX(left + w, ctx->width);
+-        ctx->avctx->height = FFMAX(top + h, ctx->height);
++        if (av_image_check_size(FFMAX(left + w, ctx->width),
++                                FFMAX(top  + h, ctx->height), 0, ctx->avctx) < 0)
++            return AVERROR_INVALIDDATA;
++        avcodec_set_dimensions(ctx->avctx, FFMAX(left + w, ctx->width),
++                                           FFMAX(top  + h, ctx->height));
+         init_sizes(ctx, left + w, top + h);
+         if (init_buffers(ctx)) {
+             av_log(ctx->avctx, AV_LOG_ERROR, "error resizing buffers\n");

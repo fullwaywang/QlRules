@@ -1,0 +1,25 @@
+commit 247d30a7dba6684ccce4508424f35fd58465e535	247d30a7dba6684ccce4508424f35fd58465e535
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Jan 25 21:10:29 2012 +0100
+
+    vp3: Copy all 3 frames for thread updates.
+    
+    This fixes a double release of the current frame on deinit.
+    Fixes CVE-2011-3934
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/vp3.c b/libavcodec/vp3.c
+index 738ae9fd25..b5daafcefb 100644
+--- a/libavcodec/vp3.c
++++ b/libavcodec/vp3.c
+@@ -1859,7 +1859,7 @@ static int vp3_update_thread_context(AVCodecContext *dst, const AVCodecContext *
+         ||s->width != s1->width
+         ||s->height!= s1->height) {
+         if (s != s1)
+-            copy_fields(s, s1, golden_frame, current_frame);
++            copy_fields(s, s1, golden_frame, keyframe);
+         return -1;
+     }
+ 

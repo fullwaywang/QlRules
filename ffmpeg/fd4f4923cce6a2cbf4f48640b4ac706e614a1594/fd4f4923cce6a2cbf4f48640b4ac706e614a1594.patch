@@ -1,0 +1,22 @@
+commit fd4f4923cce6a2cbf4f48640b4ac706e614a1594	fd4f4923cce6a2cbf4f48640b4ac706e614a1594
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Nov 10 17:14:04 2012 +0100
+
+    alac: fix nb_samples < order case
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/alac.c b/libavcodec/alac.c
+index 5653e9aff5..f032ceb9cc 100644
+--- a/libavcodec/alac.c
++++ b/libavcodec/alac.c
+@@ -224,7 +224,7 @@ static void lpc_prediction(int32_t *error_buffer, int32_t *buffer_out,
+     }
+ 
+     /* read warm-up samples */
+-    for (i = 1; i <= lpc_order; i++)
++    for (i = 1; i <= lpc_order && i < nb_samples; i++)
+         buffer_out[i] = sign_extend(buffer_out[i - 1] + error_buffer[i], bps);
+ 
+     /* NOTE: 4 and 8 are very common cases that could be optimized. */

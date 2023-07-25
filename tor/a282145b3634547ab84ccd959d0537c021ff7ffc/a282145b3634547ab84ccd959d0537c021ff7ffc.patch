@@ -1,0 +1,40 @@
+commit a282145b3634547ab84ccd959d0537c021ff7ffc
+Author: David Goulet <dgoulet@torproject.org>
+Date:   Mon Dec 12 10:02:07 2022 -0500
+
+    socks: Make SafeSocks refuse SOCKS4 and accept SOCKS4a
+    
+    The logic was inverted. Introduced in commit
+    9155e08450fe7a609f8223202e8aa7dfbca20a6d.
+    
+    This was reported through our bug bounty program on H1. It fixes the
+    TROVE-2022-002.
+    
+    Fixes #40730
+    
+    Signed-off-by: David Goulet <dgoulet@torproject.org>
+
+diff --git a/changes/ticket40730 b/changes/ticket40730
+new file mode 100644
+index 0000000000..f6d4c9de3b
+--- /dev/null
++++ b/changes/ticket40730
+@@ -0,0 +1,5 @@
++  o Major bugfixes (TROVE-2022-002, client):
++    - The SafeSocks option had its logic inverted for SOCKS4 and SOCKS4a. It
++      would let the unsafe SOCKS4 pass but not the safe SOCKS4a one. This is
++      TROVE-2022-002 which was reported on Hackerone by "cojabo". Fixes bug
++      40730; bugfix on 0.3.5.1-alpha.
+diff --git a/src/core/proto/proto_socks.c b/src/core/proto/proto_socks.c
+index a7ee190b3f..97863d389e 100644
+--- a/src/core/proto/proto_socks.c
++++ b/src/core/proto/proto_socks.c
+@@ -233,7 +233,7 @@ static socks_result_t
+ process_socks4_request(const socks_request_t *req, int is_socks4a,
+                        int log_sockstype, int safe_socks)
+ {
+-  if (is_socks4a && !addressmap_have_mapping(req->address, 0)) {
++  if (!is_socks4a && !addressmap_have_mapping(req->address, 0)) {
+     log_unsafe_socks_warning(4, req->address, req->port, safe_socks);
+ 
+     if (safe_socks)

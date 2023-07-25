@@ -1,0 +1,23 @@
+commit ba9a7e0d71bd34f8b89ae99322b62a310be163a6	ba9a7e0d71bd34f8b89ae99322b62a310be163a6
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Sep 7 14:12:42 2011 +0200
+
+    rtp: Fix integer underflow that could allow remote code execution.
+    
+    Fixes MSVR-11-0088
+    Credit:  Jeong Wook Oh of Microsoft and Microsoft Vulnerability Research (MSVR)
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavformat/rtpdec_asf.c b/libavformat/rtpdec_asf.c
+index 4f776453d7..384aeb24f3 100644
+--- a/libavformat/rtpdec_asf.c
++++ b/libavformat/rtpdec_asf.c
+@@ -235,6 +235,8 @@ static int asfrtp_parse_packet(AVFormatContext *s, PayloadContext *asf,
+                 int prev_len = out_len;
+                 out_len += cur_len;
+                 asf->buf = av_realloc(asf->buf, out_len);
++                if(!asf->buf || FFMIN(cur_len, len - off)<0)
++                    return -1;
+                 memcpy(asf->buf + prev_len, buf + off,
+                        FFMIN(cur_len, len - off));
+                 avio_skip(pb, cur_len);

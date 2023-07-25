@@ -1,0 +1,19 @@
+commit 9e927affe3a021175f354af5fa01d22657c20585
+Author: JerikoOne <jeriko.one@gmx.us>
+Date:   Tue Jul 3 17:22:12 2018 -0500
+
+    Add alloc fail check in nntp_fetch_headers
+
+diff --git a/nntp.c b/nntp.c
+index 032b6e141..a0ffa609c 100644
+--- a/nntp.c
++++ b/nntp.c
+@@ -1288,6 +1288,8 @@ static int nntp_fetch_headers(struct Context *ctx, void *hc, anum_t first,
+   fc.last = last;
+   fc.restore = restore;
+   fc.messages = mutt_mem_calloc(last - first + 1, sizeof(unsigned char));
++  if (fc.messages == NULL)
++	  return -1;
+ #ifdef USE_HCACHE
+   fc.hc = hc;
+ #endif

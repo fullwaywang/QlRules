@@ -1,0 +1,23 @@
+commit c55ca98769759ceb8aa56854caa405a0f73ac1a4	c55ca98769759ceb8aa56854caa405a0f73ac1a4
+Author: Kostya Shishkov <kostya.shishkov@gmail.com>
+Date:   Mon May 14 19:45:41 2012 +0200
+
+    indeo3: when freeing buffers, set pointers referencing them to NULL as well
+    
+    Related to CVE-2012-2804
+    (cherry picked from commit bc00da27010ed9e5dbe47e5b6fae3dcddb999d78)
+    
+    Signed-off-by: Reinhard Tartler <siretart@tauware.de>
+
+diff --git a/libavcodec/indeo3.c b/libavcodec/indeo3.c
+index 63517c67d0..48e5810e69 100644
+--- a/libavcodec/indeo3.c
++++ b/libavcodec/indeo3.c
+@@ -207,6 +207,7 @@ static av_cold void free_frame_buffers(Indeo3DecodeContext *ctx)
+     for (p = 0; p < 3; p++) {
+         av_freep(&ctx->planes[p].buffers[0]);
+         av_freep(&ctx->planes[p].buffers[1]);
++        ctx->planes[p].pixels[0] = ctx->planes[p].pixels[1] = 0;
+     }
+ }
+ 

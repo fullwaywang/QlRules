@@ -1,0 +1,134 @@
+commit 54f53ef7ce4102be596130b44c768d1818570344
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Fri Nov 22 16:02:43 2019 +0100
+
+    BUG/MAJOR: h2: reject header values containing invalid chars
+    
+    Tim Düsterhus reported an annoying problem in the H2 decoder related to
+    an ambiguity in the H2 spec. The spec says in section 10.3 that HTTP/2
+    allows header field values that are not valid (since they're binary) and
+    at the same time that an H2 to H1 gateway must be careful to reject headers
+    whose values contain \0, \r or \n.
+    
+    Till now, and for the sake of the ability to maintain end-to-end binary
+    transparency in H2-to-H2, the H2 mux wouldn't reject this since it does
+    not know what version will be used on the other side.
+    
+    In theory we should in fact perform such a check when converting an HTX
+    header to H1. But this causes a problem as it means that all our rule sets,
+    sample fetches, captures, logs or redirects may still find an LF in a header
+    coming from H2. Also in 2.0 and older in legacy mode, the frames are instantly
+    converted to H1 and HTX couldn't help there. So this means that in practice
+    we must refrain from delivering such a header upwards, regardless of any
+    outgoing protocol consideration.
+    
+    Applying such a lookup on all headers leaving the mux comes with a
+    significant performance hit, especially for large ones. A first attempt
+    was made at placing this into the HPACK decoder to refrain from learning
+    invalid literals but error reporting becomes more complicated. Additional
+    tests show that doing this within the HTX transcoding loop benefits from
+    the hot L1 cache, and that by skipping up to 8 bytes per iteration the
+    CPU cost remains within noise margin, around ~0.5%.
+    
+    This patch must be backported as far as 1.8 since this bug could be
+    exploited and serve as the base for an attack. In 2.0 and earlier the
+    fix must also be added to functions h2_make_h1_request() and
+    h2_make_h1_trailers() to handle legacy mode. It relies on previous patch
+    "MINOR: ist: add ist_find_ctl()" to speed up the control bytes lookup.
+    
+    All credits go to Tim for his detailed bug report and his initial patch.
+
+diff --git a/src/h2.c b/src/h2.c
+index f034e3d56..f35abc13a 100644
+--- a/src/h2.c
++++ b/src/h2.c
+@@ -45,6 +45,23 @@ struct h2_frame_definition h2_frame_definition[H2_FT_ENTRIES] =	{
+ 	 [H2_FT_CONTINUATION ] = { .dir = 3, .min_id = 1, .max_id = H2_MAX_STREAM_ID, .min_len = 0, .max_len = H2_MAX_FRAME_LEN, },
+ };
+ 
++/* Looks into <ist> for forbidden characters for header values (0x00, 0x0A,
++ * 0x0D), starting at pointer <start> which must be within <ist>. Returns
++ * non-zero if such a character is found, 0 otherwise. When run on unlikely
++ * header match, it's recommended to first check for the presence of control
++ * chars using ist_find_ctl().
++ */
++static int has_forbidden_char(const struct ist ist, const char *start)
++{
++	do {
++		if ((uint8_t)*start <= 0x0d &&
++		    (1U << (uint8_t)*start) & ((1<<13) | (1<<10) | (1<<0)))
++			return 1;
++		start++;
++	} while (start < ist.ptr + ist.len);
++	return 0;
++}
++
+ /* Parse the Content-Length header field of an HTTP/2 request. The function
+  * checks all possible occurrences of a comma-delimited value, and verifies
+  * if any of them doesn't match a previous value. It returns <0 if a value
+@@ -309,6 +326,7 @@ int h2_make_htx_request(struct http_hdr *list, struct htx *htx, unsigned int *ms
+ 	uint32_t used = htx_used_space(htx);
+ 	struct htx_sl *sl = NULL;
+ 	unsigned int sl_flags = 0;
++	const char *ctl;
+ 
+ 	lck = ck = -1; // no cookie for now
+ 	fields = 0;
+@@ -327,6 +345,13 @@ int h2_make_htx_request(struct http_hdr *list, struct htx *htx, unsigned int *ms
+ 			phdr = h2_str_to_phdr(list[idx].n);
+ 		}
+ 
++		/* RFC7540#10.3: intermediaries forwarding to HTTP/1 must take care of
++		 * rejecting NUL, CR and LF characters.
++		 */
++		ctl = ist_find_ctl(list[idx].v);
++		if (unlikely(ctl) && has_forbidden_char(list[idx].v, ctl))
++			goto fail;
++
+ 		if (phdr > 0 && phdr < H2_PHDR_NUM_ENTRIES) {
+ 			/* insert a pseudo header by its index (in phdr) and value (in value) */
+ 			if (fields & ((1 << phdr) | H2_PHDR_FND_NONE)) {
+@@ -553,6 +578,7 @@ int h2_make_htx_response(struct http_hdr *list, struct htx *htx, unsigned int *m
+ 	uint32_t used = htx_used_space(htx);
+ 	struct htx_sl *sl = NULL;
+ 	unsigned int sl_flags = 0;
++	const char *ctl;
+ 
+ 	fields = 0;
+ 	for (idx = 0; list[idx].n.len != 0; idx++) {
+@@ -570,6 +596,13 @@ int h2_make_htx_response(struct http_hdr *list, struct htx *htx, unsigned int *m
+ 			phdr = h2_str_to_phdr(list[idx].n);
+ 		}
+ 
++		/* RFC7540#10.3: intermediaries forwarding to HTTP/1 must take care of
++		 * rejecting NUL, CR and LF characters.
++		 */
++		ctl = ist_find_ctl(list[idx].v);
++		if (unlikely(ctl) && has_forbidden_char(list[idx].v, ctl))
++			goto fail;
++
+ 		if (phdr > 0 && phdr < H2_PHDR_NUM_ENTRIES) {
+ 			/* insert a pseudo header by its index (in phdr) and value (in value) */
+ 			if (fields & ((1 << phdr) | H2_PHDR_FND_NONE)) {
+@@ -675,6 +708,7 @@ int h2_make_htx_response(struct http_hdr *list, struct htx *htx, unsigned int *m
+  */
+ int h2_make_htx_trailers(struct http_hdr *list, struct htx *htx)
+ {
++	const char *ctl;
+ 	uint32_t idx;
+ 	int i;
+ 
+@@ -705,6 +739,13 @@ int h2_make_htx_trailers(struct http_hdr *list, struct htx *htx)
+ 		    isteq(list[idx].n, ist("transfer-encoding")))
+ 			goto fail;
+ 
++		/* RFC7540#10.3: intermediaries forwarding to HTTP/1 must take care of
++		 * rejecting NUL, CR and LF characters.
++		 */
++		ctl = ist_find_ctl(list[idx].v);
++		if (unlikely(ctl) && has_forbidden_char(list[idx].v, ctl))
++			goto fail;
++
+ 		if (!htx_add_trailer(htx, list[idx].n, list[idx].v))
+ 			goto fail;
+ 	}

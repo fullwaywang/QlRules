@@ -1,0 +1,28 @@
+commit dc1882e4ab48c3b1c11a596e9f577c43a5592dfb
+Author: Tim Kientzle <kientzle@gmail.com>
+Date:   Tue Aug 9 21:35:38 2016 -0400
+
+    Correct the usage of PATH_MAX as reported in Issue #744.
+
+diff --git a/libarchive/archive_write_disk_posix.c b/libarchive/archive_write_disk_posix.c
+index 67aacf15..39ee3b67 100644
+--- a/libarchive/archive_write_disk_posix.c
++++ b/libarchive/archive_write_disk_posix.c
+@@ -1796,7 +1796,7 @@ edit_deep_directories(struct archive_write_disk *a)
+ 	char *tail = a->name;
+ 
+ 	/* If path is short, avoid the open() below. */
+-	if (strlen(tail) <= PATH_MAX)
++	if (strlen(tail) < PATH_MAX)
+ 		return;
+ 
+ 	/* Try to record our starting dir. */
+@@ -1806,7 +1806,7 @@ edit_deep_directories(struct archive_write_disk *a)
+ 		return;
+ 
+ 	/* As long as the path is too long... */
+-	while (strlen(tail) > PATH_MAX) {
++	while (strlen(tail) >= PATH_MAX) {
+ 		/* Locate a dir prefix shorter than PATH_MAX. */
+ 		tail += PATH_MAX - 8;
+ 		while (tail > a->name && *tail != '/')

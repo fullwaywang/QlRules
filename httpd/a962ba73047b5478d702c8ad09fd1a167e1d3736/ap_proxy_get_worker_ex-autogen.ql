@@ -1,7 +1,7 @@
 /**
  * @name httpd-a962ba73047b5478d702c8ad09fd1a167e1d3736-ap_proxy_get_worker_ex
  * @id cpp/httpd/a962ba73047b5478d702c8ad09fd1a167e1d3736/ap-proxy-get-worker-ex
- * @description httpd-a962ba73047b5478d702c8ad09fd1a167e1d3736-ap_proxy_get_worker_ex CVE-2021-44224
+ * @description httpd-a962ba73047b5478d702c8ad09fd1a167e1d3736-modules/proxy/proxy_util.c-ap_proxy_get_worker_ex CVE-2021-44224
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -21,11 +21,13 @@ predicate func_0(Parameter vurl_1727, ExprStmt target_1, ExprStmt target_2, Func
 predicate func_1(Parameter vurl_1727, ExprStmt target_1) {
 		target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vurl_1727
 		and target_1.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("ap_proxy_de_socketfy")
+		and target_1.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("apr_pool_t *")
 		and target_1.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vurl_1727
 }
 
 predicate func_2(Parameter vurl_1727, ExprStmt target_2) {
-		target_2.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("strchr")
+		target_2.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget().getType().hasName("const char *")
+		and target_2.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("strchr")
 		and target_2.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vurl_1727
 		and target_2.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(Literal).getValue()="58"
 }
@@ -36,5 +38,5 @@ not func_0(vurl_1727, target_1, target_2, func)
 and func_1(vurl_1727, target_1)
 and func_2(vurl_1727, target_2)
 and vurl_1727.getType().hasName("const char *")
-and vurl_1727.getParentScope+() = func
+and vurl_1727.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

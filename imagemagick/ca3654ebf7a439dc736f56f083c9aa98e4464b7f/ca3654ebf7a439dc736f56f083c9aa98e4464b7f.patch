@@ -1,0 +1,19 @@
+commit ca3654ebf7a439dc736f56f083c9aa98e4464b7f
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Mar 26 09:26:57 2022 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/4988
+
+diff --git a/coders/cin.c b/coders/cin.c
+index e266e7f3c..23fc17e08 100644
+--- a/coders/cin.c
++++ b/coders/cin.c
+@@ -451,6 +451,8 @@ static Image *ReadCINImage(const ImageInfo *image_info,ExceptionInfo *exception)
+   image->endian=(magick[0] == 0x80) && (magick[1] == 0x2a) &&
+     (magick[2] == 0x5f) && (magick[3] == 0xd7) ? MSBEndian : LSBEndian;
+   cin.file.image_offset=ReadBlobLong(image);
++  if (cin.file.image_offset < 712)
++    ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+   offset+=4;
+   cin.file.generic_length=ReadBlobLong(image);
+   offset+=4;

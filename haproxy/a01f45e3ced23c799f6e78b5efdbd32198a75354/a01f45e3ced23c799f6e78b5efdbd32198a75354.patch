@@ -1,0 +1,32 @@
+commit a01f45e3ced23c799f6e78b5efdbd32198a75354
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Mon Dec 31 07:41:24 2018 +0100
+
+    BUG/CRITICAL: mux-h2: re-check the frame length when PRIORITY is used
+    
+    Tim Düsterhus reported a possible crash in the H2 HEADERS frame decoder
+    when the PRIORITY flag is present. A check is missing to ensure the 5
+    extra bytes needed with this flag are actually part of the frame. As per
+    RFC7540#4.2, let's return a connection error with code FRAME_SIZE_ERROR.
+    
+    Many thanks to Tim for responsibly reporting this issue with a working
+    config and reproducer. This issue was assigned CVE-2018-20615.
+    
+    This fix must be backported to 1.9 and 1.8.
+
+diff --git a/src/mux_h2.c b/src/mux_h2.c
+index dc67bc673..20ff98821 100644
+--- a/src/mux_h2.c
++++ b/src/mux_h2.c
+@@ -3316,6 +3316,11 @@ next_frame:
+ 			goto fail;
+ 		}
+ 
++		if (flen < 5) {
++			h2c_error(h2c, H2_ERR_FRAME_SIZE_ERROR);
++			goto fail;
++		}
++
+ 		hdrs += 5; // stream dep = 4, weight = 1
+ 		flen -= 5;
+ 	}

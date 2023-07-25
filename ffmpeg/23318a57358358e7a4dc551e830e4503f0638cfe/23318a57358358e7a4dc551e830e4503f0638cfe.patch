@@ -1,0 +1,29 @@
+commit 23318a57358358e7a4dc551e830e4503f0638cfe	23318a57358358e7a4dc551e830e4503f0638cfe
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Jan 11 04:44:20 2013 +0100
+
+    error_concealment: Check that the picture is not in a half setup state.
+    
+    Fixes state becoming inconsistent
+    Fixes a null pointer dereference
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/error_resilience.c b/libavcodec/error_resilience.c
+index 01f7424904..2b6bc42ade 100644
+--- a/libavcodec/error_resilience.c
++++ b/libavcodec/error_resilience.c
+@@ -924,6 +924,12 @@ void ff_er_frame_end(MpegEncContext *s)
+         return;
+     };
+ 
++    if (   s->picture_structure == PICT_FRAME
++        && s->current_picture.f.linesize[0] != s->current_picture_ptr->f.linesize[0]) {
++        av_log(s->avctx, AV_LOG_ERROR, "Error concealment not possible, frame not fully initialized\n");
++        return;
++    }
++
+     if (s->current_picture.f.motion_val[0] == NULL) {
+         av_log(s->avctx, AV_LOG_ERROR, "Warning MVs not available\n");
+ 

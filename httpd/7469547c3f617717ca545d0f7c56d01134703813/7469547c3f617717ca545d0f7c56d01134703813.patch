@@ -1,0 +1,55 @@
+commit 7469547c3f617717ca545d0f7c56d01134703813
+Author: Eric Covener <covener@apache.org>
+Date:   Tue Jan 10 13:21:48 2023 +0000
+
+    Merge r1906487 from trunk:
+    
+    * modules/dav/main/util.c (dav_process_if_header): Fix error
+      path for "Not" prefix parsing.
+    
+    
+    Submitted By: jorton
+    Reviewed By: jorton, covener, rpluem
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1906543 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/STATUS b/STATUS
+index ed64d518c6..911dfaa986 100644
+--- a/STATUS
++++ b/STATUS
+@@ -149,14 +149,6 @@ RELEASE SHOWSTOPPERS:
+ PATCHES ACCEPTED TO BACKPORT FROM TRUNK:
+   [ start all new proposals below, under PATCHES PROPOSED. ]
+ 
+-  *) mod_dav: fix error path for "Not" parsing in If header. 
+-     Trunk version of patch:
+-        https://svn.apache.org/r1906487
+-     Backport version for 2.4.x of patch:
+-        Trunk version of patch works
+-        svn merge -c 1906487 ^/httpd/httpd/trunk .
+-     +1: jorton, covener, rpluem
+-
+ PATCHES PROPOSED TO BACKPORT FROM TRUNK:
+   [ New proposals should be added at the end of the list ]
+ 
+diff --git a/modules/dav/main/util.c b/modules/dav/main/util.c
+index 1ae5914027..3f7822fc93 100644
+--- a/modules/dav/main/util.c
++++ b/modules/dav/main/util.c
+@@ -801,8 +801,14 @@ static dav_error * dav_process_if_header(request_rec *r, dav_if_header **p_ih)
+                                                  "for the same state.");
+                         }
+                         condition = DAV_IF_COND_NOT;
++                        list += 2;
++                    }
++                    else {
++                        return dav_new_error(r->pool, HTTP_BAD_REQUEST,
++                                             DAV_ERR_IF_UNK_CHAR, 0,
++                                             "Invalid \"If:\" header: "
++                                             "Unexpected character in List");
+                     }
+-                    list += 2;
+                     break;
+ 
+                 case ' ':

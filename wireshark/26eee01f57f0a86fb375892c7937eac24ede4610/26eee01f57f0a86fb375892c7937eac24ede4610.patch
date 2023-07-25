@@ -1,0 +1,59 @@
+commit 26eee01f57f0a86fb375892c7937eac24ede4610
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Fri Mar 22 09:28:31 2019 -0700
+
+    Rbm: Be more strict about unknown object types.
+    
+    Stop dissection if we encounter an unknown object type.
+    
+    Update .editorconfig while we're here.
+    
+    Bug: 15612
+    Change-Id: I91c0868c376c2b50645af997e0bf84e5c90a512b
+    Reviewed-on: https://code.wireshark.org/review/32523
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+    Petri-Dish: Gerald Combs <gerald@wireshark.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Dario Lombardo <lomato@gmail.com>
+    (cherry picked from commit f273ecd5d94f0c39d1683ed147656daee3ef799b)
+    Reviewed-on: https://code.wireshark.org/review/32525
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+
+diff --git a/epan/dissectors/.editorconfig b/epan/dissectors/.editorconfig
+index fa5478987d..4e05b8dff6 100644
+--- a/epan/dissectors/.editorconfig
++++ b/epan/dissectors/.editorconfig
+@@ -8,6 +8,10 @@
+ indent_style = tab
+ indent_size = tab
+ 
++[file-rbm.[ch]]
++indent_style = tab
++indent_size = tab
++
+ [packet-2dparityfec.[ch]]
+ indent_size = 3
+ 
+diff --git a/epan/dissectors/file-rbm.c b/epan/dissectors/file-rbm.c
+index c369133544..28ee6684b3 100644
+--- a/epan/dissectors/file-rbm.c
++++ b/epan/dissectors/file-rbm.c
+@@ -409,8 +409,8 @@ static void dissect_rbm_object(tvbuff_t* tvb, packet_info* pinfo, proto_tree* pt
+ {
+ 	guint8 subtype = tvb_get_guint8(tvb, *offset);
+ 	proto_tree* tree;
+-	gchar* type_local = NULL;
+-	gchar* value_local = NULL;
++	gchar* type_local = "Unknown";
++	gchar* value_local = "Unknown";
+ 	gint offset_start = *offset;
+ 
+ 	tree = proto_tree_add_subtree(ptree, tvb, *offset, 0, ett_variable, NULL, "");
+@@ -494,6 +494,7 @@ static void dissect_rbm_object(tvbuff_t* tvb, packet_info* pinfo, proto_tree* pt
+ 		default:
+ 			expert_add_info_format(pinfo, tree, &ei_rbm_invalid,
+ 				"Object type 0x%x is invalid", subtype);
++			*offset += tvb_reported_length_remaining(tvb, *offset);
+ 	}
+ 
+ 	proto_item_set_len(tree, *offset - offset_start);

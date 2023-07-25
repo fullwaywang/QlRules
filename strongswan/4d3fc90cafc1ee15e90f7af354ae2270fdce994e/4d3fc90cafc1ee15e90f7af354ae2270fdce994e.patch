@@ -1,0 +1,33 @@
+commit 4d3fc90cafc1ee15e90f7af354ae2270fdce994e
+Author: Tobias Brunner <tobias@strongswan.org>
+Date:   Fri Feb 17 15:07:20 2023 +0100
+
+    libtls: Fix double-free for untrusted peer certificates
+    
+    `public` is returned, but previously only if a trusted key was found.
+    We obviously don't want to return untrusted keys and since the reference
+    was correctly destroyed after determining the key type, this later caused
+    a double-free.
+    
+    Fixes: 63fd718915b5 ("libtls: call create_public_enumerator() with key_type")
+
+diff --git a/src/libtls/tls_server.c b/src/libtls/tls_server.c
+index c9c300917..573893f2e 100644
+--- a/src/libtls/tls_server.c
++++ b/src/libtls/tls_server.c
+@@ -183,11 +183,11 @@ public_key_t *tls_find_public_key(auth_cfg_t *peer_auth, identification_t *id)
+ 	cert = peer_auth->get(peer_auth, AUTH_HELPER_SUBJECT_CERT);
+ 	if (cert)
+ 	{
+-		public = cert->get_public_key(cert);
+-		if (public)
++		current = cert->get_public_key(cert);
++		if (current)
+ 		{
+-			key_type = public->get_type(public);
+-			public->destroy(public);
++			key_type = current->get_type(current);
++			current->destroy(current);
+ 		}
+ 		enumerator = lib->credmgr->create_public_enumerator(lib->credmgr,
+ 											key_type, id, peer_auth, TRUE);

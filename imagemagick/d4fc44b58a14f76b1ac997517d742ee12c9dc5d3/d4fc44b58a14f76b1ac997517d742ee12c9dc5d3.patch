@@ -1,0 +1,32 @@
+commit d4fc44b58a14f76b1ac997517d742ee12c9dc5d3
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Jun 21 20:41:29 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1611
+
+diff --git a/MagickCore/enhance.c b/MagickCore/enhance.c
+index ed3202757..35346890a 100644
+--- a/MagickCore/enhance.c
++++ b/MagickCore/enhance.c
+@@ -1973,7 +1973,7 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
+           pixel.black=((aggregate.black+total_weight/2.0)/total_weight);
+           pixel.alpha=((aggregate.alpha+total_weight/2.0)/total_weight);
+         }
+-      SetPixelViaPixelInfo(image,&pixel,q);
++      SetPixelViaPixelInfo(enhance_image,&pixel,q);
+       p+=GetPixelChannels(image);
+       q+=GetPixelChannels(enhance_image);
+     }
+diff --git a/MagickCore/pixel-accessor.h b/MagickCore/pixel-accessor.h
+index 56fba6c97..8af0e369c 100644
+--- a/MagickCore/pixel-accessor.h
++++ b/MagickCore/pixel-accessor.h
+@@ -111,7 +111,7 @@ static inline PixelTrait GetPixelCbTraits(const Image *magick_restrict image)
+ static inline Quantum GetPixelChannel(const Image *magick_restrict image,
+   const PixelChannel channel,const Quantum *magick_restrict pixel)
+ {
+-  if (image->channel_map[image->channel_map[channel].offset].traits == UndefinedPixelTrait)
++  if (image->channel_map[channel].traits == UndefinedPixelTrait)
+     return((Quantum) 0);
+   return(pixel[image->channel_map[channel].offset]);
+ }

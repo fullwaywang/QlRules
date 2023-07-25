@@ -1,0 +1,67 @@
+commit 25b4a2725d8568212e7cf89ca05ca29d128af7ac
+Author: David Bryant <david@wavpack.com>
+Date:   Tue Jul 5 18:58:19 2022 -0700
+
+    issue #121: NULL pointer dereference in wvunpack.c
+    
+    * check for NULL pointer before dereferencing in wvunpack.c
+    * sanitize custom extensions to be alphanumeric only
+
+diff --git a/ChangeLog b/ChangeLog
+index 79d52ec..1a55378 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,8 @@
++2022-07-05  David Bryant <david@wavpack.com>
++
++  * cli/wvunpack.c, src/open_utils.c:
++    issue #121: fix NULL deference in wvunpack.c and sanitize custom extensions
++
+ 2022-07-03  David Bryant <david@wavpack.com>
+ 
+   * src/pack_utils.c:
+diff --git a/cli/wvunpack.c b/cli/wvunpack.c
+index c8dea62..9a5a49a 100644
+--- a/cli/wvunpack.c
++++ b/cli/wvunpack.c
+@@ -907,8 +907,10 @@ int main(int argc, char **argv)
+ 
+             // clean up in preparation for potentially another file
+ 
+-            if (outpath)
+-                *filespec_name (outfilename) = '\0';
++            if (outpath) {
++                if (filespec_name (outfilename))
++                    *filespec_name (outfilename) = '\0';
++            }
+             else if (*outfilename != '-') {
+                 free (outfilename);
+                 outfilename = NULL;
+diff --git a/src/open_utils.c b/src/open_utils.c
+index 3e14de5..795471e 100644
+--- a/src/open_utils.c
++++ b/src/open_utils.c
+@@ -18,6 +18,7 @@
+ 
+ #include <stdlib.h>
+ #include <string.h>
++#include <ctype.h>
+ 
+ #include "wavpack_local.h"
+ 
+@@ -796,8 +797,13 @@ static int process_metadata (WavpackContext *wpc, WavpackMetadata *wpmd)
+ 
+         case ID_ALT_EXTENSION:
+             if (wpmd->byte_length && wpmd->byte_length < sizeof (wpc->file_extension)) {
+-                memcpy (wpc->file_extension, wpmd->data, wpmd->byte_length);
+-                wpc->file_extension [wpmd->byte_length] = 0;
++                int i, j;
++
++                for (i = j = 0; i < wpmd->byte_length; ++i)
++                    if (isalnum (((char *) wpmd->data) [i]))
++                        wpc->file_extension [j++] = ((char *) wpmd->data) [i];
++
++                wpc->file_extension [j] = 0;
+             }
+ 
+             return TRUE;

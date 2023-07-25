@@ -1,0 +1,79 @@
+commit 2198b3a55de681e1f3c23edb0586afe13f438051
+Author: Andy Polyakov <appro@openssl.org>
+Date:   Thu Jan 19 00:20:49 2017 +0100
+
+    crypto/evp: harden AEAD ciphers.
+    
+    Originally a crash in 32-bit build was reported CHACHA20-POLY1305
+    cipher. The crash is triggered by truncated packet and is result
+    of excessive hashing to the edge of accessible memory. Since hash
+    operation is read-only it is not considered to be exploitable
+    beyond a DoS condition. Other ciphers were hardened.
+    
+    Thanks to Robert Święcki for report.
+    
+    CVE-2017-3731
+    
+    Reviewed-by: Rich Salz <rsalz@openssl.org>
+
+diff --git a/crypto/evp/e_aes.c b/crypto/evp/e_aes.c
+index c0b0a1ebaf..2e5e4edaad 100644
+--- a/crypto/evp/e_aes.c
++++ b/crypto/evp/e_aes.c
+@@ -1388,10 +1388,15 @@ static int aes_gcm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
+                 EVP_CIPHER_CTX_buf_noconst(c)[arg - 2] << 8
+                 | EVP_CIPHER_CTX_buf_noconst(c)[arg - 1];
+             /* Correct length for explicit IV */
++            if (len < EVP_GCM_TLS_EXPLICIT_IV_LEN)
++                return 0;
+             len -= EVP_GCM_TLS_EXPLICIT_IV_LEN;
+             /* If decrypting correct for tag too */
+-            if (!EVP_CIPHER_CTX_encrypting(c))
++            if (!EVP_CIPHER_CTX_encrypting(c)) {
++                if (len < EVP_GCM_TLS_TAG_LEN)
++                    return 0;
+                 len -= EVP_GCM_TLS_TAG_LEN;
++            }
+             EVP_CIPHER_CTX_buf_noconst(c)[arg - 2] = len >> 8;
+             EVP_CIPHER_CTX_buf_noconst(c)[arg - 1] = len & 0xff;
+         }
+@@ -1946,10 +1951,15 @@ static int aes_ccm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
+                 EVP_CIPHER_CTX_buf_noconst(c)[arg - 2] << 8
+                 | EVP_CIPHER_CTX_buf_noconst(c)[arg - 1];
+             /* Correct length for explicit IV */
++            if (len < EVP_CCM_TLS_EXPLICIT_IV_LEN)
++                return 0;
+             len -= EVP_CCM_TLS_EXPLICIT_IV_LEN;
+             /* If decrypting correct for tag too */
+-            if (!EVP_CIPHER_CTX_encrypting(c))
++            if (!EVP_CIPHER_CTX_encrypting(c)) {
++                if (len < cctx->M)
++                    return 0;
+                 len -= cctx->M;
++            }
+             EVP_CIPHER_CTX_buf_noconst(c)[arg - 2] = len >> 8;
+             EVP_CIPHER_CTX_buf_noconst(c)[arg - 1] = len & 0xff;
+         }
+diff --git a/crypto/evp/e_chacha20_poly1305.c b/crypto/evp/e_chacha20_poly1305.c
+index befd805e35..46bc2cb44f 100644
+--- a/crypto/evp/e_chacha20_poly1305.c
++++ b/crypto/evp/e_chacha20_poly1305.c
+@@ -398,6 +398,8 @@ static int chacha20_poly1305_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+             len = aad[EVP_AEAD_TLS1_AAD_LEN - 2] << 8 |
+                   aad[EVP_AEAD_TLS1_AAD_LEN - 1];
+             if (!ctx->encrypt) {
++                if (len < POLY1305_BLOCK_SIZE)
++                    return 0;
+                 len -= POLY1305_BLOCK_SIZE;     /* discount attached tag */
+                 memcpy(temp, aad, EVP_AEAD_TLS1_AAD_LEN - 2);
+                 aad = temp;
+@@ -407,8 +409,7 @@ static int chacha20_poly1305_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+             actx->tls_payload_length = len;
+ 
+             /*
+-             * merge record sequence number as per
+-             * draft-ietf-tls-chacha20-poly1305-03
++             * merge record sequence number as per RFC7905
+              */
+             actx->key.counter[1] = actx->nonce[0];
+             actx->key.counter[2] = actx->nonce[1] ^ CHACHA_U8TOU32(aad);

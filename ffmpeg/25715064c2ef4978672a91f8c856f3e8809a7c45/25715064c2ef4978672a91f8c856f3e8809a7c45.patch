@@ -1,0 +1,37 @@
+commit 25715064c2ef4978672a91f8c856f3e8809a7c45	25715064c2ef4978672a91f8c856f3e8809a7c45
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Mar 24 02:40:24 2012 +0100
+
+    cavsdec: check for changing w/h.
+    
+    Our decoder does not support changing w/h.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/cavsdec.c b/libavcodec/cavsdec.c
+index 6e5539c2d7..daebda26fd 100644
+--- a/libavcodec/cavsdec.c
++++ b/libavcodec/cavsdec.c
+@@ -609,12 +609,19 @@ static int decode_pic(AVSContext *h) {
+ static int decode_seq_header(AVSContext *h) {
+     MpegEncContext *s = &h->s;
+     int frame_rate_code;
++    int width, height;
+ 
+     h->profile =         get_bits(&s->gb,8);
+     h->level =           get_bits(&s->gb,8);
+     skip_bits1(&s->gb); //progressive sequence
+-    s->width =           get_bits(&s->gb,14);
+-    s->height =          get_bits(&s->gb,14);
++       width =           get_bits(&s->gb,14);
++       height =          get_bits(&s->gb,14);
++    if ((s->width || s->height) && (s->width != width || s->height != height)) {
++        av_log_missing_feature(s, "Width/height changing in CAVS is", 0);
++        return -1;
++    }
++    s->width  = width;
++    s->height = height;
+     skip_bits(&s->gb,2); //chroma format
+     skip_bits(&s->gb,3); //sample_precision
+     h->aspect_ratio =    get_bits(&s->gb,4);

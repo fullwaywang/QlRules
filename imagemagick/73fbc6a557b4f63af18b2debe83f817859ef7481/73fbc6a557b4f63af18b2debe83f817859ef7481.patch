@@ -1,0 +1,19 @@
+commit 73fbc6a557b4f63af18b2debe83f817859ef7481
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Thu Feb 8 19:43:26 2018 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/956
+
+diff --git a/coders/sun.c b/coders/sun.c
+index b36a9ea23..fe6277de9 100644
+--- a/coders/sun.c
++++ b/coders/sun.c
+@@ -344,6 +344,8 @@ static Image *ReadSUNImage(const ImageInfo *image_info,ExceptionInfo *exception)
+           image->colors=one << sun_info.depth;
+         if (sun_info.maptype == RMT_EQUAL_RGB)
+           image->colors=sun_info.maplength/3;
++        if (image->colors == 0)
++          ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+         if (AcquireImageColormap(image,image->colors,exception) == MagickFalse)
+           ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+       }

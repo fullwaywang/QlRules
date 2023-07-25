@@ -1,0 +1,37 @@
+commit 06c32f170093a6ecde93e3bc07fed6a706bfbeb3
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Wed Apr 29 15:48:43 2020 +0200
+
+    Fixed int overflow in PresentationContext_new
+    
+    Thanks to hac425 CVE-2020-11038
+
+diff --git a/channels/video/client/video_main.c b/channels/video/client/video_main.c
+index a161a1143..1efadb399 100644
+--- a/channels/video/client/video_main.c
++++ b/channels/video/client/video_main.c
+@@ -220,8 +220,14 @@ error_frames:
+ static PresentationContext* PresentationContext_new(VideoClientContext* video, BYTE PresentationId,
+                                                     UINT32 x, UINT32 y, UINT32 width, UINT32 height)
+ {
++	size_t s;
+ 	VideoClientContextPriv* priv = video->priv;
+-	PresentationContext* ret = calloc(1, sizeof(*ret));
++	PresentationContext* ret;
++	s = width * height * 4ULL;
++	if (s > INT32_MAX)
++		return NULL;
++
++	ret = calloc(1, sizeof(*ret));
+ 	if (!ret)
+ 		return NULL;
+ 
+@@ -243,7 +249,7 @@ static PresentationContext* PresentationContext_new(VideoClientContext* video, B
+ 		goto error_currentSample;
+ 	}
+ 
+-	ret->surfaceData = BufferPool_Take(priv->surfacePool, width * height * 4);
++	ret->surfaceData = BufferPool_Take(priv->surfacePool, s);
+ 	if (!ret->surfaceData)
+ 	{
+ 		WLog_ERR(TAG, "unable to allocate surfaceData");

@@ -1,0 +1,45 @@
+commit 6c4e5bacb9d9791fc6ff074bd7958b3820d70514
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Thu Jul 27 19:22:14 2017 +0200
+
+    opj_pi_next_rpcl / opj_pi_next_pcrl / opj_pi_next_cprl: avoid int overflow (#895)
+    
+    Fixes int overflow on openjeg-crashes-2017-07-27/id:000000,sig:08,src:000879,op:flip2,pos:128.jp2
+
+diff --git a/src/lib/openjp2/pi.c b/src/lib/openjp2/pi.c
+index 66af35f4..4e2e48ad 100644
+--- a/src/lib/openjp2/pi.c
++++ b/src/lib/openjp2/pi.c
+@@ -400,6 +400,10 @@ static OPJ_BOOL opj_pi_next_rpcl(opj_pi_iterator_t * pi)
+                             ((comp->dy << levelno) >> levelno) != comp->dy) {
+                         continue;
+                     }
++                    if ((comp->dx << levelno) > INT_MAX ||
++                            (comp->dy << levelno) > INT_MAX) {
++                        continue;
++                    }
+                     trx0 = opj_int_ceildiv(pi->tx0, (OPJ_INT32)(comp->dx << levelno));
+                     try0 = opj_int_ceildiv(pi->ty0, (OPJ_INT32)(comp->dy << levelno));
+                     trx1 = opj_int_ceildiv(pi->tx1, (OPJ_INT32)(comp->dx << levelno));
+@@ -526,6 +530,10 @@ static OPJ_BOOL opj_pi_next_pcrl(opj_pi_iterator_t * pi)
+                             ((comp->dy << levelno) >> levelno) != comp->dy) {
+                         continue;
+                     }
++                    if ((comp->dx << levelno) > INT_MAX ||
++                            (comp->dy << levelno) > INT_MAX) {
++                        continue;
++                    }
+                     trx0 = opj_int_ceildiv(pi->tx0, (OPJ_INT32)(comp->dx << levelno));
+                     try0 = opj_int_ceildiv(pi->ty0, (OPJ_INT32)(comp->dy << levelno));
+                     trx1 = opj_int_ceildiv(pi->tx1, (OPJ_INT32)(comp->dx << levelno));
+@@ -650,6 +658,10 @@ static OPJ_BOOL opj_pi_next_cprl(opj_pi_iterator_t * pi)
+                             ((comp->dy << levelno) >> levelno) != comp->dy) {
+                         continue;
+                     }
++                    if ((comp->dx << levelno) > INT_MAX ||
++                            (comp->dy << levelno) > INT_MAX) {
++                        continue;
++                    }
+                     trx0 = opj_int_ceildiv(pi->tx0, (OPJ_INT32)(comp->dx << levelno));
+                     try0 = opj_int_ceildiv(pi->ty0, (OPJ_INT32)(comp->dy << levelno));
+                     trx1 = opj_int_ceildiv(pi->tx1, (OPJ_INT32)(comp->dx << levelno));

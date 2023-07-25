@@ -1,0 +1,24 @@
+commit 21265f42ecb265debe9fec1dbfd0cb7de5a8aefb
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Fri Feb 28 22:06:29 2020 +0100
+
+    fftools/ffmpeg_opt: Fix leak of options when parsing options fails
+    
+    Fixes #8094.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+    Reviewed-by: Paul B Mahol <onemda@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/fftools/ffmpeg_opt.c b/fftools/ffmpeg_opt.c
+index 12d44886ee..3bf90bd20c 100644
+--- a/fftools/ffmpeg_opt.c
++++ b/fftools/ffmpeg_opt.c
+@@ -3278,6 +3278,7 @@ static int open_files(OptionGroupList *l, const char *inout,
+         if (ret < 0) {
+             av_log(NULL, AV_LOG_ERROR, "Error parsing options for %s file "
+                    "%s.\n", inout, g->arg);
++            uninit_options(&o);
+             return ret;
+         }
+ 

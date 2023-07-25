@@ -1,0 +1,35 @@
+commit 2c78a76cb0443f8a12a5eadc3b58373aa2f4ab22
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Thu Oct 17 11:54:12 2019 +0200
+
+    avcodec/g729dec: Avoid computing invalid temporary pointers for ff_acelp_weighted_vector_sum()
+    
+    Fixes: Ticket8176
+    
+    Reviewed-by: Paul B Mahol <onemda@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/g729dec.c b/libavcodec/g729dec.c
+index 25951716ef..67054b71df 100644
+--- a/libavcodec/g729dec.c
++++ b/libavcodec/g729dec.c
+@@ -557,12 +557,13 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame_ptr,
+               fc_v[i] = <
+                          \ fc_v[i] + gain_pitch * fc_v[i-pitch_delay], i >= pitch_delay
+             */
+-            ff_acelp_weighted_vector_sum(fc + pitch_delay_int[i],
+-                                         fc + pitch_delay_int[i],
+-                                         fc, 1 << 14,
+-                                         av_clip(ctx->past_gain_pitch[0], SHARP_MIN, SHARP_MAX),
+-                                         0, 14,
+-                                         SUBFRAME_SIZE - pitch_delay_int[i]);
++            if (SUBFRAME_SIZE > pitch_delay_int[i])
++                ff_acelp_weighted_vector_sum(fc + pitch_delay_int[i],
++                                             fc + pitch_delay_int[i],
++                                             fc, 1 << 14,
++                                             av_clip(ctx->past_gain_pitch[0], SHARP_MIN, SHARP_MAX),
++                                             0, 14,
++                                             SUBFRAME_SIZE - pitch_delay_int[i]);
+ 
+             memmove(ctx->past_gain_pitch+1, ctx->past_gain_pitch, 5 * sizeof(int16_t));
+             ctx->past_gain_code[1] = ctx->past_gain_code[0];

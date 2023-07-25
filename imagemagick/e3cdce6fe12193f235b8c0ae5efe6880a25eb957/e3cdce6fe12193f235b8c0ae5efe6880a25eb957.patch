@@ -1,0 +1,19 @@
+commit e3cdce6fe12193f235b8c0ae5efe6880a25eb957
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Sat Feb 9 21:20:50 2019 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/1472
+
+diff --git a/coders/cin.c b/coders/cin.c
+index 6b9b4e50b..72d6138fd 100644
+--- a/coders/cin.c
++++ b/coders/cin.c
+@@ -726,6 +726,8 @@ static Image *ReadCINImage(const ImageInfo *image_info,ExceptionInfo *exception)
+       (void) CloseBlob(image);
+       return(image);
+     }
++  if (((MagickSizeType) image->columns*image->rows) > GetBlobSize(image))
++    ThrowReaderException(CorruptImageError,"InsufficientImageDataInFile");
+   for ( ; offset < (MagickOffsetType) cin.file.image_offset; offset++)
+   {
+     int

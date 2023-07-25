@@ -1,0 +1,22 @@
+commit 052f6c22d3a2b2aae9dfa24aff9ccdf8b72ace91
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Mar 24 12:41:12 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1053
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 1721fb04b..b1508e7bf 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -3513,7 +3513,10 @@ static MagickBooleanType WriteTIFFImage(const ImageInfo *image_info,
+       {
+         status=SetQuantumFormat(image,quantum_info,FloatingPointQuantumFormat);
+         if (status == MagickFalse)
+-          ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
++          {
++            quantum_info=DestroyQuantumInfo(quantum_info);
++            ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
++          }
+       }
+     if ((LocaleCompare(image_info->magick,"PTIF") == 0) &&
+         (GetPreviousImageInList(image) != (Image *) NULL))

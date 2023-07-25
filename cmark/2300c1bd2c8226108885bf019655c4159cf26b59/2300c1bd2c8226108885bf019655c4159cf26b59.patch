@@ -1,0 +1,8 @@
+commit 2300c1bd2c8226108885bf019655c4159cf26b59
+Merge: c32ef78 6e4493d
+Author: Bas Alberts <13686387+anticomputer@users.noreply.github.com>
+Date:   Fri Mar 31 13:27:53 2023 -0400
+
+    Merge pull request from GHSA-66g8-4hjf-77xh
+    
+    Keep a count of the number of open blocks (WIP)

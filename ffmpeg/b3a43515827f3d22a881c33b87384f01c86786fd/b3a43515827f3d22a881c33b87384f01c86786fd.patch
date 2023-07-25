@@ -1,0 +1,22 @@
+commit b3a43515827f3d22a881c33b87384f01c86786fd	b3a43515827f3d22a881c33b87384f01c86786fd
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Apr 14 14:51:24 2012 +0200
+
+    wmalosslessdec: Fix reading too many bits in decode_channel_residues()
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/wmalosslessdec.c b/libavcodec/wmalosslessdec.c
+index a806c38a6f..3b68cca489 100644
+--- a/libavcodec/wmalosslessdec.c
++++ b/libavcodec/wmalosslessdec.c
+@@ -520,7 +520,7 @@ static int decode_channel_residues(WmallDecodeCtx *s, int ch, int tile_size)
+             residue = quo;
+         else {
+             rem_bits = av_ceil_log2(ave_mean);
+-            rem      = rem_bits ? get_bits(&s->gb, rem_bits) : 0;
++            rem      = get_bits_long(&s->gb, rem_bits);
+             residue  = (quo << rem_bits) + rem;
+         }
+ 

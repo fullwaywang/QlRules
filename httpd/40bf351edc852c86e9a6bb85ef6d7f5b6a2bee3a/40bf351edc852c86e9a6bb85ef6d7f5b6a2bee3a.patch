@@ -1,0 +1,101 @@
+commit 40bf351edc852c86e9a6bb85ef6d7f5b6a2bee3a
+Author: Eric Covener <covener@apache.org>
+Date:   Wed Feb 19 12:26:31 2020 +0000
+
+    add AP_REG_NO_DEFAULT to allow opt-out of pcre defaults
+    
+    ... and use it in mod_substitute to avoid DOTALL
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1874191 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/ap_mmn.h b/include/ap_mmn.h
+index 70300f4330..0af9c9874f 100644
+--- a/include/ap_mmn.h
++++ b/include/ap_mmn.h
+@@ -533,6 +533,7 @@
+  *                          AP_VOLATILIZE_T.
+  * 20120211.90 (2.4.42-dev) AP_REG_DEFAULT macro in ap_regex.h
+  * 20120211.91 (2.4.42-dev) Add ap_is_chunked() in httpd.h
++ * 20120211.92 (2.4.42-dev) AP_REG_NO_DEFAULT macro in ap_regex.h
+  */
+ 
+ #define MODULE_MAGIC_COOKIE 0x41503234UL /* "AP24" */
+@@ -540,7 +541,7 @@
+ #ifndef MODULE_MAGIC_NUMBER_MAJOR
+ #define MODULE_MAGIC_NUMBER_MAJOR 20120211
+ #endif
+-#define MODULE_MAGIC_NUMBER_MINOR 91                  /* 0...n */
++#define MODULE_MAGIC_NUMBER_MINOR 92                  /* 0...n */
+ 
+ /**
+  * Determine if the server's current MODULE_MAGIC_NUMBER is at least a
+diff --git a/include/ap_regex.h b/include/ap_regex.h
+index e651eeaf7f..7af2f99595 100644
+--- a/include/ap_regex.h
++++ b/include/ap_regex.h
+@@ -84,7 +84,9 @@ extern "C" {
+ 
+ #define AP_REG_DOLLAR_ENDONLY 0x200 /* '$' matches at end of subject string only */
+ 
+-#define AP_REG_MATCH "MATCH_" /** suggested prefix for ap_regname */
++#define AP_REG_NO_DEFAULT 0x400 /**< Don't implicitely add AP_REG_DEFAULT options */
++
++#define AP_REG_MATCH "MATCH_" /**< suggested prefix for ap_regname */
+ 
+ #define AP_REG_DEFAULT (AP_REG_DOTALL|AP_REG_DOLLAR_ENDONLY)
+ 
+diff --git a/modules/filters/mod_substitute.c b/modules/filters/mod_substitute.c
+index b7d5296afa..e976c51a84 100644
+--- a/modules/filters/mod_substitute.c
++++ b/modules/filters/mod_substitute.c
+@@ -667,8 +667,10 @@ static const char *set_pattern(cmd_parms *cmd, void *cfg, const char *line)
+ 
+     /* first see if we can compile the regex */
+     if (!is_pattern) {
+-        r = ap_pregcomp(cmd->pool, from, AP_REG_EXTENDED |
+-                        (ignore_case ? AP_REG_ICASE : 0));
++        int flags = AP_REG_NO_DEFAULT
++                    | (ap_regcomp_get_default_cflags() & AP_REG_DOLLAR_ENDONLY)
++                    | (ignore_case ? AP_REG_ICASE : 0);
++        r = ap_pregcomp(cmd->pool, from, flags);
+         if (!r)
+             return "Substitute could not compile regex";
+     }
+diff --git a/server/util_pcre.c b/server/util_pcre.c
+index 74722b4443..8819871328 100644
+--- a/server/util_pcre.c
++++ b/server/util_pcre.c
+@@ -168,7 +168,9 @@ AP_DECLARE(int) ap_regcomp(ap_regex_t * preg, const char *pattern, int cflags)
+     int errcode = 0;
+     int options = PCRE_DUPNAMES;
+ 
+-    cflags |= default_cflags;
++    if ((cflags & AP_REG_NO_DEFAULT) == 0)
++        cflags |= default_cflags;
++
+     if ((cflags & AP_REG_ICASE) != 0)
+         options |= PCRE_CASELESS;
+     if ((cflags & AP_REG_NEWLINE) != 0)
+diff --git a/server/util_regex.c b/server/util_regex.c
+index 2a30d68176..5405f8d4d0 100644
+--- a/server/util_regex.c
++++ b/server/util_regex.c
+@@ -94,6 +94,7 @@ AP_DECLARE(ap_rxplus_t*) ap_rxplus_compile(apr_pool_t *pool,
+     }
+ 
+     /* anything after the current delimiter is flags */
++    ret->flags = ap_regcomp_get_default_cflags() & AP_REG_DOLLAR_ENDONLY;
+     while (*++endp) {
+         switch (*endp) {
+         case 'i': ret->flags |= AP_REG_ICASE; break;
+@@ -106,7 +107,7 @@ AP_DECLARE(ap_rxplus_t*) ap_rxplus_compile(apr_pool_t *pool,
+         default: break; /* we should probably be stricter here */
+         }
+     }
+-    if (ap_regcomp(&ret->rx, rxstr, ret->flags) == 0) {
++    if (ap_regcomp(&ret->rx, rxstr, AP_REG_NO_DEFAULT | ret->flags) == 0) {
+         apr_pool_cleanup_register(pool, &ret->rx, rxplus_cleanup,
+                                   apr_pool_cleanup_null);
+     }

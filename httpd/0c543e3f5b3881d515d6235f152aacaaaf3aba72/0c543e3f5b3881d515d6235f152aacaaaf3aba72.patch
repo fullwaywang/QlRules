@@ -1,0 +1,73 @@
+commit 0c543e3f5b3881d515d6235f152aacaaaf3aba72
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Fri Jul 24 09:35:25 2020 +0000
+
+    Merge r1880205, r1880214 from trunk:
+    
+    mod_proxy_uwsgi: Error out on HTTP header larger than 16K
+    
+    The uwsgi protocol does not let us serialize more than 16K of HTTP header,
+    so fail early with 500 if it happens.
+    
+    
+    Follow up to r1880205, APLOGNO().
+    
+    
+    Submitted by: ylavic
+    Reviewed by: ylavic, covener, icing
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1880251 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index bd655168f2..ecf6e2cbb6 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,9 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.4.44
+ 
++  *) mod_proxy_uwsgi: Error out on HTTP header larger than 16K (hard
++     protocol limit).  [Yann Ylavic]
++
+   *) mod_http2: 
+      Fixes <https://github.com/icing/mod_h2/issues/200>: 
+      "LimitRequestFields 0" now disables the limit, as documented.
+diff --git a/modules/proxy/mod_proxy_uwsgi.c b/modules/proxy/mod_proxy_uwsgi.c
+index 2ac2a95d2e..0209ac4062 100644
+--- a/modules/proxy/mod_proxy_uwsgi.c
++++ b/modules/proxy/mod_proxy_uwsgi.c
+@@ -136,7 +136,7 @@ static int uwsgi_send_headers(request_rec *r, proxy_conn_rec * conn)
+     int j;
+ 
+     apr_size_t headerlen = 4;
+-    apr_uint16_t pktsize, keylen, vallen;
++    apr_size_t pktsize, keylen, vallen;
+     const char *script_name;
+     const char *path_info;
+     const char *auth;
+@@ -178,6 +178,15 @@ static int uwsgi_send_headers(request_rec *r, proxy_conn_rec * conn)
+         headerlen += 2 + strlen(env[j].key) + 2 + strlen(env[j].val);
+     }
+ 
++    pktsize = headerlen - 4;
++    if (pktsize > APR_UINT16_MAX) {
++        ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10259)
++                      "can't send headers to %s:%u: packet size too "
++                      "large (%" APR_SIZE_T_FMT ")",
++                      conn->hostname, conn->port, pktsize);
++        return HTTP_INTERNAL_SERVER_ERROR;
++    }
++
+     ptr = buf = apr_palloc(r->pool, headerlen);
+ 
+     ptr += 4;
+@@ -196,8 +205,6 @@ static int uwsgi_send_headers(request_rec *r, proxy_conn_rec * conn)
+         ptr += vallen;
+     }
+ 
+-    pktsize = headerlen - 4;
+-
+     buf[0] = 0;
+     buf[1] = (apr_byte_t) (pktsize & 0xff);
+     buf[2] = (apr_byte_t) ((pktsize >> 8) & 0xff);

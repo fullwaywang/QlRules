@@ -1,0 +1,30 @@
+commit bf3e2dce7b54988d82f16ee3564c14f1b5cd936b
+Author: Anatol Belski <ab@php.net>
+Date:   Thu Apr 27 02:49:01 2017 +0200
+
+    Revert "Follow up patch regarding bug #74216, see bug #74429"
+    
+    This reverts commit cda7dcf4cacef3346f9dc2a4dc947e6a74769259.
+
+diff --git a/main/streams/xp_socket.c b/main/streams/xp_socket.c
+index 92be333260..3ff64787aa 100644
+--- a/main/streams/xp_socket.c
++++ b/main/streams/xp_socket.c
+@@ -581,7 +581,7 @@ static inline char *parse_ip_address_ex(const char *str, size_t str_len, int *po
+ 			return NULL;
+ 		}
+ 		*portno = strtol(p + 2, &e, 10);
+-		if (e && *e && *e != '/') {
++		if (e && *e) {
+ 			if (get_err) {
+ 				*err = strpprintf(0, "Failed to parse address \"%s\"", str);
+ 			}
+@@ -600,7 +600,7 @@ static inline char *parse_ip_address_ex(const char *str, size_t str_len, int *po
+ 	if (colon) {
+ 		char *e = NULL;
+ 		*portno = strtol(colon + 1, &e, 10);
+-		if (!e || !*e || *e == '/') {
++		if (!e || !*e) {
+ 			return estrndup(str, colon - str);
+ 		}
+ 	}

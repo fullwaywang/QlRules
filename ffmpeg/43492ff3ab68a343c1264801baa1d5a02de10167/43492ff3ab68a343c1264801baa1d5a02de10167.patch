@@ -1,0 +1,31 @@
+commit 43492ff3ab68a343c1264801baa1d5a02de10167
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Nov 7 02:16:11 2015 +0100
+
+    avcodec/jpeg2000dec: Clip all tile coordinates
+    
+    Fixes out of array access
+    Fixes: b877a6b788a25c70e8b1d014f8628549/asan_heap-oob_1da2c3f_2324_5a1b329b0b3c4bb6b1d775660ac56717.r3d
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/jpeg2000dec.c b/libavcodec/jpeg2000dec.c
+index c8b0daba88..31f3db8d68 100644
+--- a/libavcodec/jpeg2000dec.c
++++ b/libavcodec/jpeg2000dec.c
+@@ -826,10 +826,10 @@ static int init_tile(Jpeg2000DecoderContext *s, int tileno)
+     if (!tile->comp)
+         return AVERROR(ENOMEM);
+ 
+-    tile->coord[0][0] = FFMAX(tilex       * s->tile_width  + s->tile_offset_x, s->image_offset_x);
+-    tile->coord[0][1] = FFMIN((tilex + 1) * s->tile_width  + s->tile_offset_x, s->width);
+-    tile->coord[1][0] = FFMAX(tiley       * s->tile_height + s->tile_offset_y, s->image_offset_y);
+-    tile->coord[1][1] = FFMIN((tiley + 1) * s->tile_height + s->tile_offset_y, s->height);
++    tile->coord[0][0] = av_clip(tilex       * s->tile_width  + s->tile_offset_x, s->image_offset_x, s->width);
++    tile->coord[0][1] = av_clip((tilex + 1) * s->tile_width  + s->tile_offset_x, s->image_offset_x, s->width);
++    tile->coord[1][0] = av_clip(tiley       * s->tile_height + s->tile_offset_y, s->image_offset_y, s->height);
++    tile->coord[1][1] = av_clip((tiley + 1) * s->tile_height + s->tile_offset_y, s->image_offset_y, s->height);
+ 
+     for (compno = 0; compno < s->ncomponents; compno++) {
+         Jpeg2000Component *comp = tile->comp + compno;

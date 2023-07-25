@@ -1,0 +1,28 @@
+commit 7c0b84d89911b2035161f5ef51aafbfcc84aa9e2
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Jan 12 18:49:20 2016 +0100
+
+    avformat/asfenc: Check pts
+    
+    Fixes integer overflow
+    Fixes: 0063df8be3aaa30dd6d76f59c8f818c8/signal_sigsegv_7b7b59_3634_bf418b6822bbfa68734411d96b667be3.mov
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/asfenc.c b/libavformat/asfenc.c
+index 90d5c26317..87993b64c9 100644
+--- a/libavformat/asfenc.c
++++ b/libavformat/asfenc.c
+@@ -964,6 +964,11 @@ static int asf_write_packet(AVFormatContext *s, AVPacket *pkt)
+ 
+     pts = (pkt->pts != AV_NOPTS_VALUE) ? pkt->pts : pkt->dts;
+     av_assert0(pts != AV_NOPTS_VALUE);
++    if (   pts < - PREROLL_TIME
++        || pts > (INT_MAX-3)/10000LL * ASF_INDEXED_INTERVAL - PREROLL_TIME) {
++        av_log(s, AV_LOG_ERROR, "input pts %"PRId64" is invalid\n", pts);
++        return AVERROR(EINVAL);
++    }
+     pts *= 10000;
+     asf->duration = FFMAX(asf->duration, pts + pkt->duration * 10000);
+ 

@@ -1,0 +1,33 @@
+commit 14e606db148d6ebcaae20f1e1d6d71903ca4a556
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Jan 22 19:39:55 2016 -0500
+
+    https://bugs.launchpad.net/ubuntu/+source/imagemagick/+bug/1537213
+
+diff --git a/coders/hdr.c b/coders/hdr.c
+index b15c415be..bdb343b11 100644
+--- a/coders/hdr.c
++++ b/coders/hdr.c
+@@ -723,7 +723,8 @@ static MagickBooleanType WriteHDRImage(const ImageInfo *image_info,Image *image,
+     }
+   if (image->gamma != 0.0)
+     {
+-      count=FormatLocaleString(header,MagickPathExtent,"GAMMA=%g\n",image->gamma);
++      count=FormatLocaleString(header,MagickPathExtent,"GAMMA=%g\n",
++        image->gamma);
+       (void) WriteBlob(image,(size_t) count,(unsigned char *) header);
+     }
+   count=FormatLocaleString(header,MagickPathExtent,
+@@ -741,10 +742,11 @@ static MagickBooleanType WriteHDRImage(const ImageInfo *image_info,Image *image,
+   /*
+     Write HDR pixels.
+   */
+-  pixels=(unsigned char *) AcquireQuantumMemory(image->columns,4*
++  pixels=(unsigned char *) AcquireQuantumMemory(image->columns+128,4*
+     sizeof(*pixels));
+   if (pixels == (unsigned char *) NULL)
+     ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
++  (void) ResetMagickMemory(pixels,0,4*(image->columns+128)*sizeof(*pixels));
+   for (y=0; y < (ssize_t) image->rows; y++)
+   {
+     p=GetVirtualPixels(image,0,y,image->columns,1,exception);

@@ -1,0 +1,89 @@
+commit 2d032c7fcdfd692c851ea2fa858b4c2d9ea7d52d
+Author: Steffan Karger <steffan.karger@fox-it.com>
+Date:   Mon Jun 19 11:28:38 2017 +0200
+
+    Fix remote-triggerable memory leaks (CVE-2017-7521)
+    
+    Several of our OpenSSL-specific certificate-parsing code paths did not
+    always clear all allocated memory.  Since a client can cause a few bytes
+    of memory to be leaked for each connection attempt, a client can cause a
+    server to run out of memory and thereby kill the server.  That makes this
+    a (quite inefficient) DoS attack.
+    
+    When using the --x509-alt-username option on openssl builds with an
+    extension (argument prefixed with "ext:", e.g. "ext:subjectAltName"), the
+    code would not free all allocated memory.  Fix this by using the proper
+    free function.
+    
+    If ASN1_STRING_to_UTF8() returns 0, it didn't fail and *did* allocate
+    memory.  So also free the returned buffer if it returns 0.
+    
+    These issues were found, analysed and reported to the OpenVPN team by Guido
+    Vranken.
+    
+    CVE: 2017-7521
+    Signed-off-by: Steffan Karger <steffan.karger@fox-it.com>
+    Acked-by: Gert Doering <gert@greenie.muc.de>
+    Acked-by: David Sommerseth <davids@openvpn.net>
+    Acked-by: Guido Vranken <guidovranken@gmail.com>
+    Message-Id: <1497864520-12219-4-git-send-email-steffan.karger@fox-it.com>
+    URL: https://www.mail-archive.com/search?l=mid&q=1497864520-12219-4-git-send-email-steffan.karger@fox-it.com
+    Signed-off-by: Gert Doering <gert@greenie.muc.de>
+
+diff --git a/Changes.rst b/Changes.rst
+index f1aed2d8..89cfae87 100644
+--- a/Changes.rst
++++ b/Changes.rst
+@@ -313,6 +313,11 @@ Security
+   --x509-track option and the client has a correct, signed and unrevoked
+   certificate that contains an embedded NUL in the certificate subject.
+   Discovered and reported to the OpenVPN security team by Guido Vranken.
++- CVE-2017-7521: Fix post-authentication remote-triggerable memory leaks
++  A client could cause a server to leak a few bytes each time it connects to the
++  server.  That can eventuall cause the server to run out of memory, and thereby
++  causing the server process to terminate. Discovered and reported to the
++  OpenVPN security team by Guido Vranken.  (OpenSSL builds only.)
+ 
+ User-visible Changes
+ --------------------
+diff --git a/src/openvpn/ssl_verify_openssl.c b/src/openvpn/ssl_verify_openssl.c
+index 31c16389..7c1a481c 100644
+--- a/src/openvpn/ssl_verify_openssl.c
++++ b/src/openvpn/ssl_verify_openssl.c
+@@ -163,7 +163,7 @@ extract_x509_extension(X509 *cert, char *fieldname, char *out, int size)
+                     break;
+             }
+         }
+-        sk_GENERAL_NAME_free(extensions);
++        GENERAL_NAMES_free(extensions);
+     }
+     return retval;
+ }
+@@ -225,8 +225,7 @@ extract_x509_field_ssl(X509_NAME *x509, const char *field_name, char *out,
+     {
+         return FAILURE;
+     }
+-    tmp = ASN1_STRING_to_UTF8(&buf, asn1);
+-    if (tmp <= 0)
++    if (ASN1_STRING_to_UTF8(&buf, asn1) < 0)
+     {
+         return FAILURE;
+     }
+@@ -466,7 +465,7 @@ x509_setenv_track(const struct x509_track *xt, struct env_set *es, const int dep
+                         {
+                             ASN1_STRING *val = X509_NAME_ENTRY_get_data(ent);
+                             unsigned char *buf = NULL;
+-                            if (ASN1_STRING_to_UTF8(&buf, val) > 0)
++                            if (ASN1_STRING_to_UTF8(&buf, val) >= 0)
+                             {
+                                 do_setenv_x509(es, xt->name, (char *)buf, depth);
+                                 OPENSSL_free(buf);
+@@ -553,7 +552,7 @@ x509_setenv(struct env_set *es, int cert_depth, openvpn_x509_cert_t *peer_cert)
+         {
+             continue;
+         }
+-        if (ASN1_STRING_to_UTF8(&buf, val) <= 0)
++        if (ASN1_STRING_to_UTF8(&buf, val) < 0)
+         {
+             continue;
+         }

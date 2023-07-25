@@ -1,0 +1,25 @@
+commit fe3b639dc19b325846f4f6801f2f4604f56e3de3
+Author: Pauli <pauli@openssl.org>
+Date:   Thu Oct 27 10:21:41 2022 +1100
+
+    Fix CVE-2022-3602 in punycode decoder.
+    
+    An off by one error in the punycode decoder allowed for a single unsigned int
+    overwrite of a buffer which could cause a crash and possible code execution.
+    
+    Reviewed-by: Matt Caswell <matt@openssl.org>
+    Reviewed-by: Tomas Mraz <tomas@openssl.org>
+
+diff --git a/crypto/punycode.c b/crypto/punycode.c
+index 385b4b1df4..5e211af6d9 100644
+--- a/crypto/punycode.c
++++ b/crypto/punycode.c
+@@ -181,7 +181,7 @@ int ossl_punycode_decode(const char *pEncoded, const size_t enc_len,
+         n = n + i / (written_out + 1);
+         i %= (written_out + 1);
+ 
+-        if (written_out > max_out)
++        if (written_out >= max_out)
+             return 0;
+ 
+         memmove(pDecoded + i + 1, pDecoded + i,

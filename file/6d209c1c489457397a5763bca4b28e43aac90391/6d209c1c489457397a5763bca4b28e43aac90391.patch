@@ -1,0 +1,116 @@
+commit 6d209c1c489457397a5763bca4b28e43aac90391
+Author: Christos Zoulas <christos@zoulas.com>
+Date:   Mon May 5 16:11:21 2014 +0000
+
+    Apply patches from file-CVE-2012-1571.patch
+    From Francisco Alonso Espejo:
+        file < 5.18/git version can be made to crash when checking some
+        corrupt CDF files (Using an invalid cdf_read_short_sector size)
+        The problem I found here, is that in most situations (if
+        h_short_sec_size_p2 > 8) because the blocksize is 512 and normal
+        values are 06 which means reading 64 bytes.As long as the check
+        for the block size copy is not checked properly (there's an assert
+        that makes wrong/invalid assumptions)
+
+diff --git a/src/cdf.c b/src/cdf.c
+index 2573a5f7..f7c46aed 100644
+--- a/src/cdf.c
++++ b/src/cdf.c
+@@ -35,7 +35,7 @@
+ #include "file.h"
+ 
+ #ifndef lint
+-FILE_RCSID("@(#)$File: cdf.c,v 1.54 2014/02/25 20:52:02 christos Exp $")
++FILE_RCSID("@(#)$File: cdf.c,v 1.55 2014/02/27 23:26:17 christos Exp $")
+ #endif
+ 
+ #include <assert.h>
+@@ -352,10 +352,10 @@ cdf_read_short_sector(const cdf_stream_t *sst, void *buf, size_t offs,
+ 	size_t ss = CDF_SHORT_SEC_SIZE(h);
+ 	size_t pos = CDF_SHORT_SEC_POS(h, id);
+ 	assert(ss == len);
+-	if (pos > CDF_SEC_SIZE(h) * sst->sst_len) {
++	if (pos + len > CDF_SEC_SIZE(h) * sst->sst_len) {
+ 		DPRINTF(("Out of bounds read %" SIZE_T_FORMAT "u > %"
+ 		    SIZE_T_FORMAT "u\n",
+-		    pos, CDF_SEC_SIZE(h) * sst->sst_len));
++		    pos + len, CDF_SEC_SIZE(h) * sst->sst_len));
+ 		return -1;
+ 	}
+ 	(void)memcpy(((char *)buf) + offs,
+diff --git a/src/readcdf.c b/src/readcdf.c
+index 4afaa0e8..833cd0c7 100644
+--- a/src/readcdf.c
++++ b/src/readcdf.c
+@@ -26,7 +26,7 @@
+ #include "file.h"
+ 
+ #ifndef lint
+-FILE_RCSID("@(#)$File: readcdf.c,v 1.39 2014/02/27 23:26:18 christos Exp $")
++FILE_RCSID("@(#)$File: readcdf.c,v 1.40 2014/03/06 15:23:33 christos Exp $")
+ #endif
+ 
+ #include <assert.h>
+@@ -120,7 +120,7 @@ cdf_app_to_mime(const char *vbuf, const struct nv *nv)
+ 
+ private int
+ cdf_file_property_info(struct magic_set *ms, const cdf_property_info_t *info,
+-    size_t count, const uint64_t clsid[2])
++    size_t count, const cdf_directory_t *root_storage)
+ {
+         size_t i;
+         cdf_timestamp_t tp;
+@@ -130,8 +130,8 @@ cdf_file_property_info(struct magic_set *ms, const cdf_property_info_t *info,
+         const char *s;
+         int len;
+ 
+-        if (!NOTMIME(ms))
+-		str = cdf_clsid_to_mime(clsid, clsid2mime);
++        if (!NOTMIME(ms) && root_storage)
++		str = cdf_clsid_to_mime(root_storage->d_storage_uuid, clsid2mime);
+ 
+         for (i = 0; i < count; i++) {
+                 cdf_print_property_name(buf, sizeof(buf), info[i].pi_id);
+@@ -236,7 +236,7 @@ cdf_file_property_info(struct magic_set *ms, const cdf_property_info_t *info,
+ 
+ private int
+ cdf_file_summary_info(struct magic_set *ms, const cdf_header_t *h,
+-    const cdf_stream_t *sst, const uint64_t clsid[2])
++    const cdf_stream_t *sst, const cdf_directory_t *root_storage)
+ {
+         cdf_summary_info_header_t si;
+         cdf_property_info_t *info;
+@@ -276,13 +276,15 @@ cdf_file_summary_info(struct magic_set *ms, const cdf_header_t *h,
+                                 return -2;
+                         break;
+                 }
+-		str = cdf_clsid_to_mime(clsid, clsid2desc);
+-		if (str)
+-                        if (file_printf(ms, ", %s", str) == -1)
+-				return -2;
+-        }
++		if (root_storage) {
++			str = cdf_clsid_to_mime(root_storage->d_storage_uuid, clsid2desc);
++			if (str)
++				if (file_printf(ms, ", %s", str) == -1)
++					return -2;
++			}
++		}
+ 
+-        m = cdf_file_property_info(ms, info, count, clsid);
++        m = cdf_file_property_info(ms, info, count, root_storage);
+         free(info);
+ 
+         return m == -1 ? -2 : m;
+@@ -381,9 +383,8 @@ file_trycdf(struct magic_set *ms, int fd, const unsigned char *buf,
+ #ifdef CDF_DEBUG
+         cdf_dump_summary_info(&h, &scn);
+ #endif
+-        if ((i = cdf_file_summary_info(ms, &h, &scn,
+-	    root_storage->d_storage_uuid)) < 0)
+-                expn = "Can't expand summary_info";
++        if ((i = cdf_file_summary_info(ms, &h, &scn, root_storage)) < 0)
++            expn = "Can't expand summary_info";
+ 
+ 	if (i == 0) {
+ 		const char *str = NULL;

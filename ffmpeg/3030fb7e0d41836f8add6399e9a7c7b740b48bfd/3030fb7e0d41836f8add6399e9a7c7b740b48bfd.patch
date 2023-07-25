@@ -1,0 +1,26 @@
+commit 3030fb7e0d41836f8add6399e9a7c7b740b48bfd	3030fb7e0d41836f8add6399e9a7c7b740b48bfd
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Dec 16 16:24:55 2014 +0100
+
+    avcodec/vmdvideo: Check len before using it in method 3
+    
+    Fixes out of array access
+    Fixes: asan_heap-oob_4d23ba_91_cov_3853393937_128.vmd
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/vmdvideo.c b/libavcodec/vmdvideo.c
+index fa0fbe32d4..a2ba1c959b 100644
+--- a/libavcodec/vmdvideo.c
++++ b/libavcodec/vmdvideo.c
+@@ -339,6 +339,9 @@ static int vmd_decode(VmdVideoContext *s, AVFrame *frame)
+                         ofs += slen;
+                         bytestream2_skip(&gb, len);
+                     } else {
++                        if (ofs + len > frame_width ||
++                            bytestream2_get_bytes_left(&gb) < len)
++                            return AVERROR_INVALIDDATA;
+                         bytestream2_get_buffer(&gb, &dp[ofs], len);
+                         ofs += len;
+                     }

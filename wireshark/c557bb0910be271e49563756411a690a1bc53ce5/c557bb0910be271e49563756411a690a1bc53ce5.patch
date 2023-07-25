@@ -1,0 +1,33 @@
+commit c557bb0910be271e49563756411a690a1bc53ce5
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Wed Feb 27 15:02:01 2019 +0100
+
+    rpcap: check conversation existence before dereferencing it.
+    
+    Conflicts:
+            epan/dissectors/packet-rpcap.c
+    
+    Bug: 15536
+    Change-Id: I370b7f4b3f647243490cbfadc120f0198c62b09b
+    Reviewed-on: https://code.wireshark.org/review/32232
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 2f048c932d0c063bd53651d0fd8f31a66eede741)
+    Reviewed-on: https://code.wireshark.org/review/32236
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/dissectors/packet-rpcap.c b/epan/dissectors/packet-rpcap.c
+index b334a3768c..546ed916c5 100644
+--- a/epan/dissectors/packet-rpcap.c
++++ b/epan/dissectors/packet-rpcap.c
+@@ -1160,7 +1160,8 @@ dissect_rpcap_heur_tcp (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, voi
+      * as such.
+      */
+     conversation_t *conversation = find_or_create_conversation (pinfo);
+-    conversation_set_dissector_from_frame_number (conversation,
++    if (conversation)
++      conversation_set_dissector_from_frame_number (conversation,
+                                                   pinfo->num,
+                                                   rpcap_tcp_handle);
+     tcp_dissect_pdus (tvb, pinfo, tree, rpcap_desegment, 8,

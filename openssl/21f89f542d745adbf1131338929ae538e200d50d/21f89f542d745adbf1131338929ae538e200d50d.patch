@@ -1,0 +1,46 @@
+commit 21f89f542d745adbf1131338929ae538e200d50d
+Author: Matt Caswell <matt@openssl.org>
+Date:   Wed Apr 13 16:36:54 2022 +0100
+
+    Fix OCSP_basic_verify signer certificate validation
+    
+    The function `OCSP_basic_verify` validates the signer certificate on an OCSP
+    response. The internal function, ocsp_verify_signer, is responsible for this
+    and is expected to return a 0 value in the event of a failure to verify.
+    Unfortunately, due to a bug, it actually returns with a postive success
+    response in this case. In the normal course of events OCSP_basic_verify
+    will then continue and will fail anyway in the ocsp_check_issuer function
+    because the supplied "chain" value will be empty in the case that
+    ocsp_verify_signer failed to verify the chain. This will cause
+    OCSP_basic_verify to return with a negative result (fatal error). Normally
+    in the event of a failure to verify it should return with 0.
+    
+    However, in the case of the OCSP_NOCHECKS flag being used, OCSP_basic_verify
+    will return with a positvie result. This could lead to callers trusting an
+    OCSP Basic response when it should not be.
+    
+    CVE-2022-1343
+    
+    Fixes #18053
+    
+    Reviewed-by: Paul Dale <pauli@openssl.org>
+    Reviewed-by: Tomas Mraz <tomas@openssl.org>
+    Reviewed-by: Matt Caswell <matt@openssl.org>
+
+diff --git a/crypto/ocsp/ocsp_vfy.c b/crypto/ocsp/ocsp_vfy.c
+index ceefafc2a6..e70602184f 100644
+--- a/crypto/ocsp/ocsp_vfy.c
++++ b/crypto/ocsp/ocsp_vfy.c
+@@ -59,9 +59,10 @@ static int ocsp_verify_signer(X509 *signer, int response,
+ 
+     ret = X509_verify_cert(ctx);
+     if (ret <= 0) {
+-        ret = X509_STORE_CTX_get_error(ctx);
++        int err = X509_STORE_CTX_get_error(ctx);
++
+         ERR_raise_data(ERR_LIB_OCSP, OCSP_R_CERTIFICATE_VERIFY_ERROR,
+-                       "Verify error: %s", X509_verify_cert_error_string(ret));
++                       "Verify error: %s", X509_verify_cert_error_string(err));
+         goto end;
+     }
+     if (chain != NULL)

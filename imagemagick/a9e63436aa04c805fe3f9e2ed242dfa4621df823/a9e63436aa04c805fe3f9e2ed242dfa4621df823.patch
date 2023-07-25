@@ -1,0 +1,19 @@
+commit a9e63436aa04c805fe3f9e2ed242dfa4621df823
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Thu Nov 19 18:35:30 2020 +0000
+
+    fix shell injection vulnerability via the -authenticate option
+
+diff --git a/coders/pdf.c b/coders/pdf.c
+index e342a5558..3a14124fc 100644
+--- a/coders/pdf.c
++++ b/coders/pdf.c
+@@ -591,7 +591,7 @@ static Image *ReadPDFImage(const ImageInfo *image_info,ExceptionInfo *exception)
+     (void) ConcatenateMagickString(options,"-dInterpolateControl=-1 ",
+       MagickPathExtent);
+   option=GetImageOption(image_info,"authenticate");
+-  if ((option != (char *) NULL) && (strpbrk(option,"&;<>|") == (char *) NULL))
++  if ((option != (char *) NULL) && (strpbrk(option,"&;<>|\"") == (char *) NULL))
+     {
+       char
+         passphrase[MagickPathExtent];

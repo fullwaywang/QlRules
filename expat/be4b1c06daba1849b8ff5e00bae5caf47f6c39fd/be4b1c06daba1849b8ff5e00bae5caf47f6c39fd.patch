@@ -1,0 +1,9 @@
+commit be4b1c06daba1849b8ff5e00bae5caf47f6c39fd
+Merge: f0bec73b a1bc009d
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Tue May 17 21:08:21 2016 +0200
+
+    Merge branch 'cve-2016-0718-fix-2-2-1'
+    
+    Conflicts:
+      expat/lib/xmltok.c

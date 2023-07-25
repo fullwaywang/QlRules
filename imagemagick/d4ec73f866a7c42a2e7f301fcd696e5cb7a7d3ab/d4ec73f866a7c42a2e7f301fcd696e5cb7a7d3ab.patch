@@ -1,0 +1,50 @@
+commit d4ec73f866a7c42a2e7f301fcd696e5cb7a7d3ab
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Tue Jan 10 09:06:29 2017 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/350
+
+diff --git a/coders/psd.c b/coders/psd.c
+index eb6972dec..1b40c9f86 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -1118,8 +1118,7 @@ static MagickBooleanType ReadPSDChannelRLE(Image *image,const PSDInfo *psd_info,
+   if (length > row_size + 256) // arbitrary number
+     {
+       pixels=(unsigned char *) RelinquishMagickMemory(pixels);
+-      ThrowBinaryException(ResourceLimitError,"InvalidLength",
+-        image->filename);
++      ThrowBinaryException(ResourceLimitError,"InvalidLength",image->filename);
+     }
+ 
+   compact_pixels=(unsigned char *) AcquireQuantumMemory(length,sizeof(*pixels));
+@@ -1660,8 +1659,8 @@ ModuleExport MagickBooleanType ReadPSDLayers(Image *image,
+                 if (DiscardBlobBytes(image,(MagickSizeType) (length-18)) == MagickFalse)
+                   {
+                     layer_info=DestroyLayerInfo(layer_info,number_layers);
+-                    ThrowBinaryException(CorruptImageError,"UnexpectedEndOfFile",
+-                      image->filename);
++                    ThrowBinaryException(CorruptImageError,
++                      "UnexpectedEndOfFile",image->filename);
+                   }
+               }
+             length=ReadBlobLong(image);
+@@ -2602,8 +2601,7 @@ static unsigned char *AcquireCompactPixels(const Image *image,
+   if (compact_pixels == (unsigned char *) NULL)
+     {
+       (void) ThrowMagickException(exception,GetMagickModule(),
+-        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+-        image->filename);
++        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+     }
+   return(compact_pixels);
+ }
+@@ -2634,7 +2632,7 @@ static size_t WritePSDChannels(const PSDInfo *psd_info,
+   compact_pixels=(unsigned char *) NULL;
+   if (next_image->compression == RLECompression)
+     {
+-      compact_pixels=AcquireCompactPixels(image,exception);
++      compact_pixels=AcquireCompactPixels(next_image,exception);
+       if (compact_pixels == (unsigned char *) NULL)
+         return(0);
+     }

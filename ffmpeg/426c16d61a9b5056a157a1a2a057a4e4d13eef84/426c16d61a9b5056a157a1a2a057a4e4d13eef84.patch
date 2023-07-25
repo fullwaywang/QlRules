@@ -1,0 +1,28 @@
+commit 426c16d61a9b5056a157a1a2a057a4e4d13eef84
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Sun Aug 23 03:49:48 2020 +0200
+
+    fftools/ffmpeg: Fix leak of AVFilterInOut in case of error
+    
+    The AVFilterInOuts normally get freed in init_output_filter() when
+    the corresponding streams get created; yet if an error happens before
+    one reaches said point, they leak. Therefore this commit makes
+    ffmpeg_cleanup free them, too.
+    
+    Fixes ticket #8267.
+    
+    Reviewed-by: Nicolas George <george@nsup.org>
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+
+diff --git a/fftools/ffmpeg.c b/fftools/ffmpeg.c
+index 173ac3c9a0..84306818a2 100644
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -528,6 +528,7 @@ static void ffmpeg_cleanup(int ret)
+         for (j = 0; j < fg->nb_outputs; j++) {
+             OutputFilter *ofilter = fg->outputs[j];
+ 
++            avfilter_inout_free(&ofilter->out_tmp);
+             av_freep(&ofilter->name);
+             av_freep(&ofilter->formats);
+             av_freep(&ofilter->channel_layouts);

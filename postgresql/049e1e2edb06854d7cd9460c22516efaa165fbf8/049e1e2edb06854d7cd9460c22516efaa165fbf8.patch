@@ -1,0 +1,1048 @@
+commit 049e1e2edb06854d7cd9460c22516efaa165fbf8
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon May 10 11:02:29 2021 -0400
+
+    Fix mishandling of resjunk columns in ON CONFLICT ... UPDATE tlists.
+    
+    It's unusual to have any resjunk columns in an ON CONFLICT ... UPDATE
+    list, but it can happen when MULTIEXPR_SUBLINK SubPlans are present.
+    If it happens, the ON CONFLICT UPDATE code path would end up storing
+    tuples that include the values of the extra resjunk columns.  That's
+    fairly harmless in the short run, but if new columns are added to
+    the table then the values would become accessible, possibly leading
+    to malfunctions if they don't match the datatypes of the new columns.
+    
+    This had escaped notice through a confluence of missing sanity checks,
+    including
+    
+    * There's no cross-check that a tuple presented to heap_insert or
+    heap_update matches the table rowtype.  While it's difficult to
+    check that fully at reasonable cost, we can easily add assertions
+    that there aren't too many columns.
+    
+    * The output-column-assignment cases in execExprInterp.c lacked
+    any sanity checks on the output column numbers, which seems like
+    an oversight considering there are plenty of assertion checks on
+    input column numbers.  Add assertions there too.
+    
+    * We failed to apply nodeModifyTable's ExecCheckPlanOutput() to
+    the ON CONFLICT UPDATE tlist.  That wouldn't have caught this
+    specific error, since that function is chartered to ignore resjunk
+    columns; but it sure seems like a bad omission now that we've seen
+    this bug.
+    
+    In HEAD, the right way to fix this is to make the processing of
+    ON CONFLICT UPDATE tlists work the same as regular UPDATE tlists
+    now do, that is don't add "SET x = x" entries, and use
+    ExecBuildUpdateProjection to evaluate the tlist and combine it with
+    old values of the not-set columns.  This adds a little complication
+    to ExecBuildUpdateProjection, but allows removal of a comparable
+    amount of now-dead code from the planner.
+    
+    In the back branches, the most expedient solution seems to be to
+    (a) use an output slot for the ON CONFLICT UPDATE projection that
+    actually matches the target table, and then (b) invent a variant of
+    ExecBuildProjectionInfo that can be told to not store values resulting
+    from resjunk columns, so it doesn't try to store into nonexistent
+    columns of the output slot.  (We can't simply ignore the resjunk columns
+    altogether; they have to be evaluated for MULTIEXPR_SUBLINK to work.)
+    This works back to v10.  In 9.6, projections work much differently and
+    we can't cheaply give them such an option.  The 9.6 version of this
+    patch works by inserting a JunkFilter when it's necessary to get rid
+    of resjunk columns.
+    
+    In addition, v11 and up have the reverse problem when trying to
+    perform ON CONFLICT UPDATE on a partitioned table.  Through a
+    further oversight, adjust_partition_tlist() discarded resjunk columns
+    when re-ordering the ON CONFLICT UPDATE tlist to match a partition.
+    This accidentally prevented the storing-bogus-tuples problem, but
+    at the cost that MULTIEXPR_SUBLINK cases didn't work, typically
+    crashing if more than one row has to be updated.  Fix by preserving
+    resjunk columns in that routine.  (I failed to resist the temptation
+    to add more assertions there too, and to do some minor code
+    beautification.)
+    
+    Per report from Andres Freund.  Back-patch to all supported branches.
+    
+    Security: CVE-2021-32028
+
+diff --git a/src/backend/access/heap/heapam.c b/src/backend/access/heap/heapam.c
+index 13396eb7f2..ba36da2b83 100644
+--- a/src/backend/access/heap/heapam.c
++++ b/src/backend/access/heap/heapam.c
+@@ -2070,6 +2070,10 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
+ 	bool		all_frozen_set = false;
+ 	uint8		vmstatus = 0;
+ 
++	/* Cheap, simplistic check that the tuple matches the rel's rowtype. */
++	Assert(HeapTupleHeaderGetNatts(tup->t_data) <=
++		   RelationGetNumberOfAttributes(relation));
++
+ 	/*
+ 	 * Fill in tuple header fields and toast the tuple if necessary.
+ 	 *
+@@ -3255,6 +3259,10 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
+ 
+ 	Assert(ItemPointerIsValid(otid));
+ 
++	/* Cheap, simplistic check that the tuple matches the rel's rowtype. */
++	Assert(HeapTupleHeaderGetNatts(newtup->t_data) <=
++		   RelationGetNumberOfAttributes(relation));
++
+ 	/*
+ 	 * Forbid this during a parallel operation, lest it allocate a combo CID.
+ 	 * Other workers might need that combo CID for visibility checks, and we
+diff --git a/src/backend/executor/execExpr.c b/src/backend/executor/execExpr.c
+index 77c9d785d9..8c9f8a6aeb 100644
+--- a/src/backend/executor/execExpr.c
++++ b/src/backend/executor/execExpr.c
+@@ -485,14 +485,21 @@ ExecBuildProjectionInfo(List *targetList,
+  * be stored into the given tuple slot.  (Caller must have ensured that tuple
+  * slot has a descriptor matching the target rel!)
+  *
+- * subTargetList is the tlist of the subplan node feeding ModifyTable.
+- * We use this mainly to cross-check that the expressions being assigned
+- * are of the correct types.  The values from this tlist are assumed to be
+- * available from the "outer" tuple slot.  They are assigned to target columns
+- * listed in the corresponding targetColnos elements.  (Only non-resjunk tlist
+- * entries are assigned.)  Columns not listed in targetColnos are filled from
+- * the UPDATE's old tuple, which is assumed to be available in the "scan"
+- * tuple slot.
++ * When evalTargetList is false, targetList contains the UPDATE ... SET
++ * expressions that have already been computed by a subplan node; the values
++ * from this tlist are assumed to be available in the "outer" tuple slot.
++ * When evalTargetList is true, targetList contains the UPDATE ... SET
++ * expressions that must be computed (which could contain references to
++ * the outer, inner, or scan tuple slots).
++ *
++ * In either case, targetColnos contains a list of the target column numbers
++ * corresponding to the non-resjunk entries of targetList.  The tlist values
++ * are assigned into these columns of the result tuple slot.  Target columns
++ * not listed in targetColnos are filled from the UPDATE's old tuple, which
++ * is assumed to be available in the "scan" tuple slot.
++ *
++ * targetList can also contain resjunk columns.  These must be evaluated
++ * if evalTargetList is true, but their values are discarded.
+  *
+  * relDesc must describe the relation we intend to update.
+  *
+@@ -503,7 +510,8 @@ ExecBuildProjectionInfo(List *targetList,
+  * ExecCheckPlanOutput, so we must do our safety checks here.
+  */
+ ProjectionInfo *
+-ExecBuildUpdateProjection(List *subTargetList,
++ExecBuildUpdateProjection(List *targetList,
++						  bool evalTargetList,
+ 						  List *targetColnos,
+ 						  TupleDesc relDesc,
+ 						  ExprContext *econtext,
+@@ -525,19 +533,22 @@ ExecBuildUpdateProjection(List *subTargetList,
+ 	/* We embed ExprState into ProjectionInfo instead of doing extra palloc */
+ 	projInfo->pi_state.tag = T_ExprState;
+ 	state = &projInfo->pi_state;
+-	state->expr = NULL;			/* not used */
++	if (evalTargetList)
++		state->expr = (Expr *) targetList;
++	else
++		state->expr = NULL;		/* not used */
+ 	state->parent = parent;
+ 	state->ext_params = NULL;
+ 
+ 	state->resultslot = slot;
+ 
+ 	/*
+-	 * Examine the subplan tlist to see how many non-junk columns there are,
+-	 * and to verify that the non-junk columns come before the junk ones.
++	 * Examine the targetList to see how many non-junk columns there are, and
++	 * to verify that the non-junk columns come before the junk ones.
+ 	 */
+ 	nAssignableCols = 0;
+ 	sawJunk = false;
+-	foreach(lc, subTargetList)
++	foreach(lc, targetList)
+ 	{
+ 		TargetEntry *tle = lfirst_node(TargetEntry, lc);
+ 
+@@ -569,12 +580,10 @@ ExecBuildUpdateProjection(List *subTargetList,
+ 	}
+ 
+ 	/*
+-	 * We want to insert EEOP_*_FETCHSOME steps to ensure the outer and scan
+-	 * tuples are sufficiently deconstructed.  Outer tuple is easy, but for
+-	 * scan tuple we must find out the last old column we need.
++	 * We need to insert EEOP_*_FETCHSOME steps to ensure the input tuples are
++	 * sufficiently deconstructed.  The scan tuple must be deconstructed at
++	 * least as far as the last old column we need.
+ 	 */
+-	deform.last_outer = nAssignableCols;
+-
+ 	for (int attnum = relDesc->natts; attnum > 0; attnum--)
+ 	{
+ 		Form_pg_attribute attr = TupleDescAttr(relDesc, attnum - 1);
+@@ -587,15 +596,26 @@ ExecBuildUpdateProjection(List *subTargetList,
+ 		break;
+ 	}
+ 
++	/*
++	 * If we're actually evaluating the tlist, incorporate its input
++	 * requirements too; otherwise, we'll just need to fetch the appropriate
++	 * number of columns of the "outer" tuple.
++	 */
++	if (evalTargetList)
++		get_last_attnums_walker((Node *) targetList, &deform);
++	else
++		deform.last_outer = nAssignableCols;
++
+ 	ExecPushExprSlots(state, &deform);
+ 
+ 	/*
+-	 * Now generate code to fetch data from the outer tuple, incidentally
+-	 * validating that it'll be of the right type.  The checks above ensure
+-	 * that the forboth() will iterate over exactly the non-junk columns.
++	 * Now generate code to evaluate the tlist's assignable expressions or
++	 * fetch them from the outer tuple, incidentally validating that they'll
++	 * be of the right data type.  The checks above ensure that the forboth()
++	 * will iterate over exactly the non-junk columns.
+ 	 */
+ 	outerattnum = 0;
+-	forboth(lc, subTargetList, lc2, targetColnos)
++	forboth(lc, targetList, lc2, targetColnos)
+ 	{
+ 		TargetEntry *tle = lfirst_node(TargetEntry, lc);
+ 		AttrNumber	targetattnum = lfirst_int(lc2);
+@@ -628,13 +648,47 @@ ExecBuildUpdateProjection(List *subTargetList,
+ 							   targetattnum,
+ 							   format_type_be(exprType((Node *) tle->expr)))));
+ 
+-		/*
+-		 * OK, build an outer-tuple reference.
+-		 */
+-		scratch.opcode = EEOP_ASSIGN_OUTER_VAR;
+-		scratch.d.assign_var.attnum = outerattnum++;
+-		scratch.d.assign_var.resultnum = targetattnum - 1;
+-		ExprEvalPushStep(state, &scratch);
++		/* OK, generate code to perform the assignment. */
++		if (evalTargetList)
++		{
++			/*
++			 * We must evaluate the TLE's expression and assign it.  We do not
++			 * bother jumping through hoops for "safe" Vars like
++			 * ExecBuildProjectionInfo does; this is a relatively less-used
++			 * path and it doesn't seem worth expending code for that.
++			 */
++			ExecInitExprRec(tle->expr, state,
++							&state->resvalue, &state->resnull);
++			/* Needn't worry about read-only-ness here, either. */
++			scratch.opcode = EEOP_ASSIGN_TMP;
++			scratch.d.assign_tmp.resultnum = targetattnum - 1;
++			ExprEvalPushStep(state, &scratch);
++		}
++		else
++		{
++			/* Just assign from the outer tuple. */
++			scratch.opcode = EEOP_ASSIGN_OUTER_VAR;
++			scratch.d.assign_var.attnum = outerattnum;
++			scratch.d.assign_var.resultnum = targetattnum - 1;
++			ExprEvalPushStep(state, &scratch);
++		}
++		outerattnum++;
++	}
++
++	/*
++	 * If we're evaluating the tlist, must evaluate any resjunk columns too.
++	 * (This matters for things like MULTIEXPR_SUBLINK SubPlans.)
++	 */
++	if (evalTargetList)
++	{
++		for_each_cell(lc, targetList, lc)
++		{
++			TargetEntry *tle = lfirst_node(TargetEntry, lc);
++
++			Assert(tle->resjunk);
++			ExecInitExprRec(tle->expr, state,
++							&state->resvalue, &state->resnull);
++		}
+ 	}
+ 
+ 	/*
+diff --git a/src/backend/executor/execExprInterp.c b/src/backend/executor/execExprInterp.c
+index a9ed98ae48..5483dee650 100644
+--- a/src/backend/executor/execExprInterp.c
++++ b/src/backend/executor/execExprInterp.c
+@@ -626,6 +626,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < innerslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = innerslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = innerslot->tts_isnull[attnum];
+ 
+@@ -642,6 +643,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < outerslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = outerslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = outerslot->tts_isnull[attnum];
+ 
+@@ -658,6 +660,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < scanslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = scanslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = scanslot->tts_isnull[attnum];
+ 
+@@ -668,6 +671,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 		{
+ 			int			resultnum = op->d.assign_tmp.resultnum;
+ 
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = state->resvalue;
+ 			resultslot->tts_isnull[resultnum] = state->resnull;
+ 
+@@ -678,6 +682,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 		{
+ 			int			resultnum = op->d.assign_tmp.resultnum;
+ 
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_isnull[resultnum] = state->resnull;
+ 			if (!resultslot->tts_isnull[resultnum])
+ 				resultslot->tts_values[resultnum] =
+@@ -2091,8 +2096,10 @@ ExecJustAssignVarImpl(ExprState *state, TupleTableSlot *inslot, bool *isnull)
+ 	 *
+ 	 * Since we use slot_getattr(), we don't need to implement the FETCHSOME
+ 	 * step explicitly, and we also needn't Assert that the attnum is in range
+-	 * --- slot_getattr() will take care of any problems.
++	 * --- slot_getattr() will take care of any problems.  Nonetheless, check
++	 * that resultnum is in range.
+ 	 */
++	Assert(resultnum >= 0 && resultnum < outslot->tts_tupleDescriptor->natts);
+ 	outslot->tts_values[resultnum] =
+ 		slot_getattr(inslot, attnum, &outslot->tts_isnull[resultnum]);
+ 	return 0;
+@@ -2224,6 +2231,7 @@ ExecJustAssignVarVirtImpl(ExprState *state, TupleTableSlot *inslot, bool *isnull
+ 	Assert(TTS_IS_VIRTUAL(inslot));
+ 	Assert(TTS_FIXED(inslot));
+ 	Assert(attnum >= 0 && attnum < inslot->tts_nvalid);
++	Assert(resultnum >= 0 && resultnum < outslot->tts_tupleDescriptor->natts);
+ 
+ 	outslot->tts_values[resultnum] = inslot->tts_values[attnum];
+ 	outslot->tts_isnull[resultnum] = inslot->tts_isnull[attnum];
+diff --git a/src/backend/executor/execPartition.c b/src/backend/executor/execPartition.c
+index 8afddca73a..8e2feafd28 100644
+--- a/src/backend/executor/execPartition.c
++++ b/src/backend/executor/execPartition.c
+@@ -181,7 +181,7 @@ static char *ExecBuildSlotPartitionKeyDescription(Relation rel,
+ 												  Datum *values,
+ 												  bool *isnull,
+ 												  int maxfieldlen);
+-static List *adjust_partition_tlist(List *tlist, TupleConversionMap *map);
++static List *adjust_partition_colnos(List *colnos, ResultRelInfo *leaf_part_rri);
+ static void ExecInitPruningContext(PartitionPruneContext *context,
+ 								   List *pruning_steps,
+ 								   PartitionDesc partdesc,
+@@ -714,6 +714,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 		 */
+ 		if (node->onConflictAction == ONCONFLICT_UPDATE)
+ 		{
++			OnConflictSetState *onconfl = makeNode(OnConflictSetState);
+ 			TupleConversionMap *map;
+ 
+ 			map = leaf_part_rri->ri_RootToPartitionMap;
+@@ -721,14 +722,14 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 			Assert(node->onConflictSet != NIL);
+ 			Assert(rootResultRelInfo->ri_onConflict != NULL);
+ 
+-			leaf_part_rri->ri_onConflict = makeNode(OnConflictSetState);
++			leaf_part_rri->ri_onConflict = onconfl;
+ 
+ 			/*
+ 			 * Need a separate existing slot for each partition, as the
+ 			 * partition could be of a different AM, even if the tuple
+ 			 * descriptors match.
+ 			 */
+-			leaf_part_rri->ri_onConflict->oc_Existing =
++			onconfl->oc_Existing =
+ 				table_slot_create(leaf_part_rri->ri_RelationDesc,
+ 								  &mtstate->ps.state->es_tupleTable);
+ 
+@@ -748,17 +749,17 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 				 * Projections and where clauses themselves don't store state
+ 				 * / are independent of the underlying storage.
+ 				 */
+-				leaf_part_rri->ri_onConflict->oc_ProjSlot =
++				onconfl->oc_ProjSlot =
+ 					rootResultRelInfo->ri_onConflict->oc_ProjSlot;
+-				leaf_part_rri->ri_onConflict->oc_ProjInfo =
++				onconfl->oc_ProjInfo =
+ 					rootResultRelInfo->ri_onConflict->oc_ProjInfo;
+-				leaf_part_rri->ri_onConflict->oc_WhereClause =
++				onconfl->oc_WhereClause =
+ 					rootResultRelInfo->ri_onConflict->oc_WhereClause;
+ 			}
+ 			else
+ 			{
+ 				List	   *onconflset;
+-				TupleDesc	tupDesc;
++				List	   *onconflcols;
+ 				bool		found_whole_row;
+ 
+ 				/*
+@@ -768,7 +769,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 				 * pseudo-relation (INNER_VAR), and second to handle the main
+ 				 * target relation (firstVarno).
+ 				 */
+-				onconflset = (List *) copyObject((Node *) node->onConflictSet);
++				onconflset = copyObject(node->onConflictSet);
+ 				if (part_attmap == NULL)
+ 					part_attmap =
+ 						build_attrmap_by_name(RelationGetDescr(partrel),
+@@ -788,20 +789,24 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 										&found_whole_row);
+ 				/* We ignore the value of found_whole_row. */
+ 
+-				/* Finally, adjust this tlist to match the partition. */
+-				onconflset = adjust_partition_tlist(onconflset, map);
++				/* Finally, adjust the target colnos to match the partition. */
++				onconflcols = adjust_partition_colnos(node->onConflictCols,
++													  leaf_part_rri);
+ 
+ 				/* create the tuple slot for the UPDATE SET projection */
+-				tupDesc = ExecTypeFromTL(onconflset);
+-				leaf_part_rri->ri_onConflict->oc_ProjSlot =
+-					ExecInitExtraTupleSlot(mtstate->ps.state, tupDesc,
+-										   &TTSOpsVirtual);
++				onconfl->oc_ProjSlot =
++					table_slot_create(partrel,
++									  &mtstate->ps.state->es_tupleTable);
+ 
+ 				/* build UPDATE SET projection state */
+-				leaf_part_rri->ri_onConflict->oc_ProjInfo =
+-					ExecBuildProjectionInfo(onconflset, econtext,
+-											leaf_part_rri->ri_onConflict->oc_ProjSlot,
+-											&mtstate->ps, partrelDesc);
++				onconfl->oc_ProjInfo =
++					ExecBuildUpdateProjection(onconflset,
++											  true,
++											  onconflcols,
++											  partrelDesc,
++											  econtext,
++											  onconfl->oc_ProjSlot,
++											  &mtstate->ps);
+ 
+ 				/*
+ 				 * If there is a WHERE clause, initialize state where it will
+@@ -828,7 +833,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 											RelationGetForm(partrel)->reltype,
+ 											&found_whole_row);
+ 					/* We ignore the value of found_whole_row. */
+-					leaf_part_rri->ri_onConflict->oc_WhereClause =
++					onconfl->oc_WhereClause =
+ 						ExecInitQual((List *) clause, &mtstate->ps);
+ 				}
+ 			}
+@@ -1421,71 +1426,35 @@ ExecBuildSlotPartitionKeyDescription(Relation rel,
+ }
+ 
+ /*
+- * adjust_partition_tlist
+- *		Adjust the targetlist entries for a given partition to account for
+- *		attribute differences between parent and the partition
+- *
+- * The expressions have already been fixed, but here we fix the list to make
+- * target resnos match the partition's attribute numbers.  This results in a
+- * copy of the original target list in which the entries appear in resno
+- * order, including both the existing entries (that may have their resno
+- * changed in-place) and the newly added entries for columns that don't exist
+- * in the parent.
+- *
+- * Scribbles on the input tlist, so callers must make sure to make a copy
+- * before passing it to us.
++ * adjust_partition_colnos
++ *		Adjust the list of UPDATE target column numbers to account for
++ *		attribute differences between the parent and the partition.
+  */
+ static List *
+-adjust_partition_tlist(List *tlist, TupleConversionMap *map)
++adjust_partition_colnos(List *colnos, ResultRelInfo *leaf_part_rri)
+ {
+-	List	   *new_tlist = NIL;
+-	TupleDesc	tupdesc = map->outdesc;
+-	AttrMap    *attrMap = map->attrMap;
+-	AttrNumber	attrno;
+-
+-	Assert(tupdesc->natts == attrMap->maplen);
+-	for (attrno = 1; attrno <= tupdesc->natts; attrno++)
+-	{
+-		Form_pg_attribute att_tup = TupleDescAttr(tupdesc, attrno - 1);
+-		TargetEntry *tle;
+-
+-		if (attrMap->attnums[attrno - 1] != InvalidAttrNumber)
+-		{
+-			Assert(!att_tup->attisdropped);
+-
+-			/*
+-			 * Use the corresponding entry from the parent's tlist, adjusting
+-			 * the resno the match the partition's attno.
+-			 */
+-			tle = (TargetEntry *) list_nth(tlist, attrMap->attnums[attrno - 1] - 1);
+-			tle->resno = attrno;
+-		}
+-		else
+-		{
+-			Const	   *expr;
++	List	   *new_colnos = NIL;
++	TupleConversionMap *map = ExecGetChildToRootMap(leaf_part_rri);
++	AttrMap    *attrMap;
++	ListCell   *lc;
+ 
+-			/*
+-			 * For a dropped attribute in the partition, generate a dummy
+-			 * entry with resno matching the partition's attno.
+-			 */
+-			Assert(att_tup->attisdropped);
+-			expr = makeConst(INT4OID,
+-							 -1,
+-							 InvalidOid,
+-							 sizeof(int32),
+-							 (Datum) 0,
+-							 true,	/* isnull */
+-							 true /* byval */ );
+-			tle = makeTargetEntry((Expr *) expr,
+-								  attrno,
+-								  pstrdup(NameStr(att_tup->attname)),
+-								  false);
+-		}
++	Assert(map != NULL);		/* else we shouldn't be here */
++	attrMap = map->attrMap;
+ 
+-		new_tlist = lappend(new_tlist, tle);
++	foreach(lc, colnos)
++	{
++		AttrNumber	parentattrno = lfirst_int(lc);
++
++		if (parentattrno <= 0 ||
++			parentattrno > attrMap->maplen ||
++			attrMap->attnums[parentattrno - 1] == 0)
++			elog(ERROR, "unexpected attno %d in target column list",
++				 parentattrno);
++		new_colnos = lappend_int(new_colnos,
++								 attrMap->attnums[parentattrno - 1]);
+ 	}
+ 
+-	return new_tlist;
++	return new_colnos;
+ }
+ 
+ /*-------------------------------------------------------------------------
+diff --git a/src/backend/executor/nodeModifyTable.c b/src/backend/executor/nodeModifyTable.c
+index c5a2a9a054..a62928ae7c 100644
+--- a/src/backend/executor/nodeModifyTable.c
++++ b/src/backend/executor/nodeModifyTable.c
+@@ -492,6 +492,7 @@ ExecInitUpdateProjection(ModifyTableState *mtstate,
+ 
+ 	resultRelInfo->ri_projectNew =
+ 		ExecBuildUpdateProjection(subplan->targetlist,
++								  false,	/* subplan did the evaluation */
+ 								  updateColnos,
+ 								  relDesc,
+ 								  mtstate->ps.ps_ExprContext,
+@@ -2972,9 +2973,9 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 	 */
+ 	if (node->onConflictAction == ONCONFLICT_UPDATE)
+ 	{
++		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
+ 		ExprContext *econtext;
+ 		TupleDesc	relationDesc;
+-		TupleDesc	tupDesc;
+ 
+ 		/* already exists if created by RETURNING processing above */
+ 		if (mtstate->ps.ps_ExprContext == NULL)
+@@ -2984,10 +2985,10 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 		relationDesc = resultRelInfo->ri_RelationDesc->rd_att;
+ 
+ 		/* create state for DO UPDATE SET operation */
+-		resultRelInfo->ri_onConflict = makeNode(OnConflictSetState);
++		resultRelInfo->ri_onConflict = onconfl;
+ 
+ 		/* initialize slot for the existing tuple */
+-		resultRelInfo->ri_onConflict->oc_Existing =
++		onconfl->oc_Existing =
+ 			table_slot_create(resultRelInfo->ri_RelationDesc,
+ 							  &mtstate->ps.state->es_tupleTable);
+ 
+@@ -2997,17 +2998,19 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 		 * into the table, and for RETURNING processing - which may access
+ 		 * system attributes.
+ 		 */
+-		tupDesc = ExecTypeFromTL((List *) node->onConflictSet);
+-		resultRelInfo->ri_onConflict->oc_ProjSlot =
+-			ExecInitExtraTupleSlot(mtstate->ps.state, tupDesc,
+-								   table_slot_callbacks(resultRelInfo->ri_RelationDesc));
++		onconfl->oc_ProjSlot =
++			table_slot_create(resultRelInfo->ri_RelationDesc,
++							  &mtstate->ps.state->es_tupleTable);
+ 
+ 		/* build UPDATE SET projection state */
+-		resultRelInfo->ri_onConflict->oc_ProjInfo =
+-			ExecBuildProjectionInfo(node->onConflictSet, econtext,
+-									resultRelInfo->ri_onConflict->oc_ProjSlot,
+-									&mtstate->ps,
+-									relationDesc);
++		onconfl->oc_ProjInfo =
++			ExecBuildUpdateProjection(node->onConflictSet,
++									  true,
++									  node->onConflictCols,
++									  relationDesc,
++									  econtext,
++									  onconfl->oc_ProjSlot,
++									  &mtstate->ps);
+ 
+ 		/* initialize state to evaluate the WHERE clause, if any */
+ 		if (node->onConflictWhere)
+@@ -3016,7 +3019,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 
+ 			qualexpr = ExecInitQual((List *) node->onConflictWhere,
+ 									&mtstate->ps);
+-			resultRelInfo->ri_onConflict->oc_WhereClause = qualexpr;
++			onconfl->oc_WhereClause = qualexpr;
+ 		}
+ 	}
+ 
+diff --git a/src/backend/nodes/copyfuncs.c b/src/backend/nodes/copyfuncs.c
+index f5a7760740..90770a89b0 100644
+--- a/src/backend/nodes/copyfuncs.c
++++ b/src/backend/nodes/copyfuncs.c
+@@ -217,6 +217,7 @@ _copyModifyTable(const ModifyTable *from)
+ 	COPY_SCALAR_FIELD(onConflictAction);
+ 	COPY_NODE_FIELD(arbiterIndexes);
+ 	COPY_NODE_FIELD(onConflictSet);
++	COPY_NODE_FIELD(onConflictCols);
+ 	COPY_NODE_FIELD(onConflictWhere);
+ 	COPY_SCALAR_FIELD(exclRelRTI);
+ 	COPY_NODE_FIELD(exclRelTlist);
+diff --git a/src/backend/nodes/outfuncs.c b/src/backend/nodes/outfuncs.c
+index c723f6d635..8da8b14f0e 100644
+--- a/src/backend/nodes/outfuncs.c
++++ b/src/backend/nodes/outfuncs.c
+@@ -418,6 +418,7 @@ _outModifyTable(StringInfo str, const ModifyTable *node)
+ 	WRITE_ENUM_FIELD(onConflictAction, OnConflictAction);
+ 	WRITE_NODE_FIELD(arbiterIndexes);
+ 	WRITE_NODE_FIELD(onConflictSet);
++	WRITE_NODE_FIELD(onConflictCols);
+ 	WRITE_NODE_FIELD(onConflictWhere);
+ 	WRITE_UINT_FIELD(exclRelRTI);
+ 	WRITE_NODE_FIELD(exclRelTlist);
+diff --git a/src/backend/nodes/readfuncs.c b/src/backend/nodes/readfuncs.c
+index 3746668f52..3772ea07df 100644
+--- a/src/backend/nodes/readfuncs.c
++++ b/src/backend/nodes/readfuncs.c
+@@ -1697,6 +1697,7 @@ _readModifyTable(void)
+ 	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
+ 	READ_NODE_FIELD(arbiterIndexes);
+ 	READ_NODE_FIELD(onConflictSet);
++	READ_NODE_FIELD(onConflictCols);
+ 	READ_NODE_FIELD(onConflictWhere);
+ 	READ_UINT_FIELD(exclRelRTI);
+ 	READ_NODE_FIELD(exclRelTlist);
+diff --git a/src/backend/optimizer/plan/createplan.c b/src/backend/optimizer/plan/createplan.c
+index a9aff24831..7003238d76 100644
+--- a/src/backend/optimizer/plan/createplan.c
++++ b/src/backend/optimizer/plan/createplan.c
+@@ -34,6 +34,7 @@
+ #include "optimizer/placeholder.h"
+ #include "optimizer/plancat.h"
+ #include "optimizer/planmain.h"
++#include "optimizer/prep.h"
+ #include "optimizer/restrictinfo.h"
+ #include "optimizer/subselect.h"
+ #include "optimizer/tlist.h"
+@@ -6909,6 +6910,7 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
+ 	{
+ 		node->onConflictAction = ONCONFLICT_NONE;
+ 		node->onConflictSet = NIL;
++		node->onConflictCols = NIL;
+ 		node->onConflictWhere = NULL;
+ 		node->arbiterIndexes = NIL;
+ 		node->exclRelRTI = 0;
+@@ -6917,7 +6919,16 @@ make_modifytable(PlannerInfo *root, Plan *subplan,
+ 	else
+ 	{
+ 		node->onConflictAction = onconflict->action;
++
++		/*
++		 * Here we convert the ON CONFLICT UPDATE tlist, if any, to the
++		 * executor's convention of having consecutive resno's.  The actual
++		 * target column numbers are saved in node->onConflictCols.  (This
++		 * could be done earlier, but there seems no need to.)
++		 */
+ 		node->onConflictSet = onconflict->onConflictSet;
++		node->onConflictCols =
++			extract_update_targetlist_colnos(node->onConflictSet);
+ 		node->onConflictWhere = onconflict->onConflictWhere;
+ 
+ 		/*
+diff --git a/src/backend/optimizer/prep/preptlist.c b/src/backend/optimizer/prep/preptlist.c
+index 363132185d..aefb6f8d4e 100644
+--- a/src/backend/optimizer/prep/preptlist.c
++++ b/src/backend/optimizer/prep/preptlist.c
+@@ -46,9 +46,7 @@
+ #include "parser/parsetree.h"
+ #include "utils/rel.h"
+ 
+-static List *extract_update_colnos(List *tlist);
+-static List *expand_targetlist(List *tlist, int command_type,
+-							   Index result_relation, Relation rel);
++static List *expand_insert_targetlist(List *tlist, Relation rel);
+ 
+ 
+ /*
+@@ -59,9 +57,6 @@ static List *expand_targetlist(List *tlist, int command_type,
+  * Also, if this is an UPDATE, we return a list of target column numbers
+  * in root->update_colnos.  (Resnos in processed_tlist will be consecutive,
+  * so do not look at that to find out which columns are targets!)
+- *
+- * As a side effect, if there's an ON CONFLICT UPDATE clause, its targetlist
+- * is also preprocessed (and updated in-place).
+  */
+ void
+ preprocess_targetlist(PlannerInfo *root)
+@@ -107,10 +102,9 @@ preprocess_targetlist(PlannerInfo *root)
+ 	 */
+ 	tlist = parse->targetList;
+ 	if (command_type == CMD_INSERT)
+-		tlist = expand_targetlist(tlist, command_type,
+-								  result_relation, target_relation);
++		tlist = expand_insert_targetlist(tlist, target_relation);
+ 	else if (command_type == CMD_UPDATE)
+-		root->update_colnos = extract_update_colnos(tlist);
++		root->update_colnos = extract_update_targetlist_colnos(tlist);
+ 
+ 	/*
+ 	 * For non-inherited UPDATE/DELETE, register any junk column(s) needed to
+@@ -245,23 +239,12 @@ preprocess_targetlist(PlannerInfo *root)
+ 
+ 	root->processed_tlist = tlist;
+ 
+-	/*
+-	 * If there's an ON CONFLICT UPDATE clause, preprocess its targetlist too
+-	 * while we have the relation open.
+-	 */
+-	if (parse->onConflict)
+-		parse->onConflict->onConflictSet =
+-			expand_targetlist(parse->onConflict->onConflictSet,
+-							  CMD_UPDATE,
+-							  result_relation,
+-							  target_relation);
+-
+ 	if (target_relation)
+ 		table_close(target_relation, NoLock);
+ }
+ 
+ /*
+- * extract_update_colnos
++ * extract_update_targetlist_colnos
+  * 		Extract a list of the target-table column numbers that
+  * 		an UPDATE's targetlist wants to assign to, then renumber.
+  *
+@@ -270,9 +253,12 @@ preprocess_targetlist(PlannerInfo *root)
+  * to assign to.  Here, we extract that info into a separate list, and
+  * then convert the tlist to the sequential-numbering convention that's
+  * used by all other query types.
++ *
++ * This is also applied to the tlist associated with INSERT ... ON CONFLICT
++ * ... UPDATE, although not till much later in planning.
+  */
+-static List *
+-extract_update_colnos(List *tlist)
++List *
++extract_update_targetlist_colnos(List *tlist)
+ {
+ 	List	   *update_colnos = NIL;
+ 	AttrNumber	nextresno = 1;
+@@ -297,18 +283,16 @@ extract_update_colnos(List *tlist)
+  *****************************************************************************/
+ 
+ /*
+- * expand_targetlist
++ * expand_insert_targetlist
+  *	  Given a target list as generated by the parser and a result relation,
+  *	  add targetlist entries for any missing attributes, and ensure the
+  *	  non-junk attributes appear in proper field order.
+  *
+- * command_type is a bit of an archaism now: it's CMD_INSERT when we're
+- * processing an INSERT, all right, but the only other use of this function
+- * is for ON CONFLICT UPDATE tlists, for which command_type is CMD_UPDATE.
++ * Once upon a time we also did more or less this with UPDATE targetlists,
++ * but now this code is only applied to INSERT targetlists.
+  */
+ static List *
+-expand_targetlist(List *tlist, int command_type,
+-				  Index result_relation, Relation rel)
++expand_insert_targetlist(List *tlist, Relation rel)
+ {
+ 	List	   *new_tlist = NIL;
+ 	ListCell   *tlist_item;
+@@ -347,15 +331,11 @@ expand_targetlist(List *tlist, int command_type,
+ 			/*
+ 			 * Didn't find a matching tlist entry, so make one.
+ 			 *
+-			 * For INSERT, generate a NULL constant.  (We assume the rewriter
+-			 * would have inserted any available default value.) Also, if the
+-			 * column isn't dropped, apply any domain constraints that might
+-			 * exist --- this is to catch domain NOT NULL.
+-			 *
+-			 * For UPDATE, generate a Var reference to the existing value of
+-			 * the attribute, so that it gets copied to the new tuple. But
+-			 * generate a NULL for dropped columns (we want to drop any old
+-			 * values).
++			 * INSERTs should insert NULL in this case.  (We assume the
++			 * rewriter would have inserted any available non-NULL default
++			 * value.)  Also, if the column isn't dropped, apply any domain
++			 * constraints that might exist --- this is to catch domain NOT
++			 * NULL.
+ 			 *
+ 			 * When generating a NULL constant for a dropped column, we label
+ 			 * it INT4 (any other guaranteed-to-exist datatype would do as
+@@ -367,13 +347,9 @@ expand_targetlist(List *tlist, int command_type,
+ 			 * relation, however.
+ 			 */
+ 			Oid			atttype = att_tup->atttypid;
+-			int32		atttypmod = att_tup->atttypmod;
+ 			Oid			attcollation = att_tup->attcollation;
+ 			Node	   *new_expr;
+ 
+-			switch (command_type)
+-			{
+-				case CMD_INSERT:
+ 					if (!att_tup->attisdropped)
+ 					{
+ 						new_expr = (Node *) makeConst(atttype,
+@@ -402,35 +378,6 @@ expand_targetlist(List *tlist, int command_type,
+ 													  true, /* isnull */
+ 													  true /* byval */ );
+ 					}
+-					break;
+-				case CMD_UPDATE:
+-					if (!att_tup->attisdropped)
+-					{
+-						new_expr = (Node *) makeVar(result_relation,
+-													attrno,
+-													atttype,
+-													atttypmod,
+-													attcollation,
+-													0);
+-					}
+-					else
+-					{
+-						/* Insert NULL for dropped column */
+-						new_expr = (Node *) makeConst(INT4OID,
+-													  -1,
+-													  InvalidOid,
+-													  sizeof(int32),
+-													  (Datum) 0,
+-													  true, /* isnull */
+-													  true /* byval */ );
+-					}
+-					break;
+-				default:
+-					elog(ERROR, "unrecognized command_type: %d",
+-						 (int) command_type);
+-					new_expr = NULL;	/* keep compiler quiet */
+-					break;
+-			}
+ 
+ 			new_tle = makeTargetEntry((Expr *) new_expr,
+ 									  attrno,
+@@ -445,9 +392,8 @@ expand_targetlist(List *tlist, int command_type,
+ 	 * The remaining tlist entries should be resjunk; append them all to the
+ 	 * end of the new tlist, making sure they have resnos higher than the last
+ 	 * real attribute.  (Note: although the rewriter already did such
+-	 * renumbering, we have to do it again here in case we are doing an UPDATE
+-	 * in a table with dropped columns, or an inheritance child table with
+-	 * extra columns.)
++	 * renumbering, we have to do it again here in case we added NULL entries
++	 * above.)
+ 	 */
+ 	while (tlist_item)
+ 	{
+diff --git a/src/include/executor/executor.h b/src/include/executor/executor.h
+index 6eae134c08..3dc03c913e 100644
+--- a/src/include/executor/executor.h
++++ b/src/include/executor/executor.h
+@@ -287,7 +287,8 @@ extern ProjectionInfo *ExecBuildProjectionInfo(List *targetList,
+ 											   TupleTableSlot *slot,
+ 											   PlanState *parent,
+ 											   TupleDesc inputDesc);
+-extern ProjectionInfo *ExecBuildUpdateProjection(List *subTargetList,
++extern ProjectionInfo *ExecBuildUpdateProjection(List *targetList,
++												 bool evalTargetList,
+ 												 List *targetColnos,
+ 												 TupleDesc relDesc,
+ 												 ExprContext *econtext,
+diff --git a/src/include/nodes/plannodes.h b/src/include/nodes/plannodes.h
+index d671328dfd..841401be20 100644
+--- a/src/include/nodes/plannodes.h
++++ b/src/include/nodes/plannodes.h
+@@ -232,7 +232,8 @@ typedef struct ModifyTable
+ 	int			epqParam;		/* ID of Param for EvalPlanQual re-eval */
+ 	OnConflictAction onConflictAction;	/* ON CONFLICT action */
+ 	List	   *arbiterIndexes; /* List of ON CONFLICT arbiter index OIDs  */
+-	List	   *onConflictSet;	/* SET for INSERT ON CONFLICT DO UPDATE */
++	List	   *onConflictSet;	/* INSERT ON CONFLICT DO UPDATE targetlist */
++	List	   *onConflictCols; /* target column numbers for onConflictSet */
+ 	Node	   *onConflictWhere;	/* WHERE for ON CONFLICT UPDATE */
+ 	Index		exclRelRTI;		/* RTI of the EXCLUDED pseudo relation */
+ 	List	   *exclRelTlist;	/* tlist of the EXCLUDED pseudo relation */
+diff --git a/src/include/optimizer/prep.h b/src/include/optimizer/prep.h
+index b1c4065689..bcd2a86166 100644
+--- a/src/include/optimizer/prep.h
++++ b/src/include/optimizer/prep.h
+@@ -36,6 +36,8 @@ extern Relids get_relids_for_join(Query *query, int joinrelid);
+  */
+ extern void preprocess_targetlist(PlannerInfo *root);
+ 
++extern List *extract_update_targetlist_colnos(List *tlist);
++
+ extern PlanRowMark *get_plan_rowmark(List *rowmarks, Index rtindex);
+ 
+ /*
+diff --git a/src/test/regress/expected/update.out b/src/test/regress/expected/update.out
+index bbf6705b65..c809f88f54 100644
+--- a/src/test/regress/expected/update.out
++++ b/src/test/regress/expected/update.out
+@@ -199,7 +199,7 @@ SELECT a, b, char_length(c) FROM update_test;
+ (4 rows)
+ 
+ -- Test ON CONFLICT DO UPDATE
+-INSERT INTO upsert_test VALUES(1, 'Boo');
++INSERT INTO upsert_test VALUES(1, 'Boo'), (3, 'Zoo');
+ -- uncorrelated  sub-select:
+ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+   VALUES (1, 'Bar') ON CONFLICT(a)
+@@ -210,22 +210,24 @@ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+ (1 row)
+ 
+ -- correlated sub-select:
+-INSERT INTO upsert_test VALUES (1, 'Baz') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Baz'), (3, 'Zaz') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a)
+   RETURNING *;
+  a |        b        
+ ---+-----------------
+  1 | Foo, Correlated
+-(1 row)
++ 3 | Zoo, Correlated
++(2 rows)
+ 
+ -- correlated sub-select (EXCLUDED.* alias):
+-INSERT INTO upsert_test VALUES (1, 'Bat') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Bat'), (3, 'Zot') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
+   RETURNING *;
+  a |             b             
+ ---+---------------------------
+  1 | Foo, Correlated, Excluded
+-(1 row)
++ 3 | Zoo, Correlated, Excluded
++(2 rows)
+ 
+ -- ON CONFLICT using system attributes in RETURNING, testing both the
+ -- inserting and updating paths. See bug report at:
+@@ -249,6 +251,35 @@ INSERT INTO upsert_test VALUES (2, 'Brox') ON CONFLICT(a)
+ (1 row)
+ 
+ DROP TABLE update_test;
++DROP TABLE upsert_test;
++-- Test ON CONFLICT DO UPDATE with partitioned table and non-identical children
++CREATE TABLE upsert_test (
++    a   INT PRIMARY KEY,
++    b   TEXT
++) PARTITION BY LIST (a);
++CREATE TABLE upsert_test_1 PARTITION OF upsert_test FOR VALUES IN (1);
++CREATE TABLE upsert_test_2 (b TEXT, a INT PRIMARY KEY);
++ALTER TABLE upsert_test ATTACH PARTITION upsert_test_2 FOR VALUES IN (2);
++INSERT INTO upsert_test VALUES(1, 'Boo'), (2, 'Zoo');
++-- uncorrelated sub-select:
++WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
++  VALUES (1, 'Bar') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
++ a |  b  
++---+-----
++ 1 | Foo
++(1 row)
++
++-- correlated sub-select:
++WITH aaa AS (SELECT 1 AS ctea, ' Foo' AS cteb) INSERT INTO upsert_test
++  VALUES (1, 'Bar'), (2, 'Baz') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa) RETURNING *;
++ a |    b    
++---+---------
++ 1 | Foo Foo
++ 2 | Zoo Foo
++(2 rows)
++
+ DROP TABLE upsert_test;
+ ---------------------------
+ -- UPDATE with row movement
+diff --git a/src/test/regress/sql/update.sql b/src/test/regress/sql/update.sql
+index d0bc8e9228..7a7bee77b9 100644
+--- a/src/test/regress/sql/update.sql
++++ b/src/test/regress/sql/update.sql
+@@ -100,17 +100,18 @@ UPDATE update_test t
+ SELECT a, b, char_length(c) FROM update_test;
+ 
+ -- Test ON CONFLICT DO UPDATE
+-INSERT INTO upsert_test VALUES(1, 'Boo');
++
++INSERT INTO upsert_test VALUES(1, 'Boo'), (3, 'Zoo');
+ -- uncorrelated  sub-select:
+ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+   VALUES (1, 'Bar') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
+ -- correlated sub-select:
+-INSERT INTO upsert_test VALUES (1, 'Baz') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Baz'), (3, 'Zaz') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a)
+   RETURNING *;
+ -- correlated sub-select (EXCLUDED.* alias):
+-INSERT INTO upsert_test VALUES (1, 'Bat') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Bat'), (3, 'Zot') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
+   RETURNING *;
+ 
+@@ -126,10 +127,32 @@ INSERT INTO upsert_test VALUES (2, 'Brox') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
+   RETURNING tableoid::regclass, xmin = pg_current_xact_id()::xid AS xmin_correct, xmax = pg_current_xact_id()::xid AS xmax_correct;
+ 
+-
+ DROP TABLE update_test;
+ DROP TABLE upsert_test;
+ 
++-- Test ON CONFLICT DO UPDATE with partitioned table and non-identical children
++
++CREATE TABLE upsert_test (
++    a   INT PRIMARY KEY,
++    b   TEXT
++) PARTITION BY LIST (a);
++
++CREATE TABLE upsert_test_1 PARTITION OF upsert_test FOR VALUES IN (1);
++CREATE TABLE upsert_test_2 (b TEXT, a INT PRIMARY KEY);
++ALTER TABLE upsert_test ATTACH PARTITION upsert_test_2 FOR VALUES IN (2);
++
++INSERT INTO upsert_test VALUES(1, 'Boo'), (2, 'Zoo');
++-- uncorrelated sub-select:
++WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
++  VALUES (1, 'Bar') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
++-- correlated sub-select:
++WITH aaa AS (SELECT 1 AS ctea, ' Foo' AS cteb) INSERT INTO upsert_test
++  VALUES (1, 'Bar'), (2, 'Baz') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa) RETURNING *;
++
++DROP TABLE upsert_test;
++
+ 
+ ---------------------------
+ -- UPDATE with row movement

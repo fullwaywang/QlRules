@@ -1,0 +1,28 @@
+commit 373c1c9b691fd4c6831b3a114a006b639304c2af
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Tue Jan 7 14:55:48 2020 +0100
+
+    avformat/wtvdec: Fix memleak when reading header fails
+    
+    Fixes #8314.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+    Reviewed-by: Peter Ross <pross@xvid.org>
+    Signed-off-by: James Almer <jamrial@gmail.com>
+
+diff --git a/libavformat/wtvdec.c b/libavformat/wtvdec.c
+index 706e8ca38d..92629bb31b 100644
+--- a/libavformat/wtvdec.c
++++ b/libavformat/wtvdec.c
+@@ -993,8 +993,10 @@ static int read_header(AVFormatContext *s)
+     }
+ 
+     ret = parse_chunks(s, SEEK_TO_DATA, 0, 0);
+-    if (ret < 0)
++    if (ret < 0) {
++        wtvfile_close(wtv->pb);
+         return ret;
++    }
+     avio_seek(wtv->pb, -32, SEEK_CUR);
+ 
+     timeline_pos = avio_tell(s->pb); // save before opening another file

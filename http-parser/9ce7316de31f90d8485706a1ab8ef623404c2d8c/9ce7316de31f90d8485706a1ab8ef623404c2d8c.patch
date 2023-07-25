@@ -1,0 +1,62 @@
+commit 9ce7316de31f90d8485706a1ab8ef623404c2d8c
+Author: Fedor Indutny <fedor@indutny.com>
+Date:   Tue Feb 6 17:33:16 2018 -0500
+
+    src: fix out-of-bounds read through `strtoul`
+
+    `strtoul` will attempt to lookup the next digit up until it will stumble
+    upon an invalid one. However, for an unterminated string as an input
+    value, this results in out-of-bounds read.
+
+    Remove `strtoul` call, and replace it with simple loop.
+
+    Fix: #408
+    PR-URL: https://github.com/nodejs/http-parser/pull/409
+    Reviewed-By: Ben Noordhuis <info@bnoordhuis.nl>
+
+diff --git a/http_parser.c b/http_parser.c
+index 8d85124..3d1e125 100644
+--- a/http_parser.c
++++ b/http_parser.c
+@@ -22,7 +22,6 @@
+ #include <assert.h>
+ #include <stddef.h>
+ #include <ctype.h>
+-#include <stdlib.h>
+ #include <string.h>
+ #include <limits.h>
+
+@@ -2367,12 +2366,27 @@ http_parser_parse_url(const char *buf, size_t buflen, int is_connect,
+   }
+
+   if (u->field_set & (1 << UF_PORT)) {
+-    /* Don't bother with endp; we've already validated the string */
+-    unsigned long v = strtoul(buf + u->field_data[UF_PORT].off, NULL, 10);
+-
+-    /* Ports have a max value of 2^16 */
+-    if (v > 0xffff) {
+-      return 1;
++    uint16_t off;
++    uint16_t len;
++    const char* p;
++    const char* end;
++    unsigned long v;
++
++    off = u->field_data[UF_PORT].off;
++    len = u->field_data[UF_PORT].len;
++    end = buf + off + len;
++
++    /* NOTE: The characters are already validated and are in the [0-9] range */
++    assert(off + len <= buflen && "Port number overflow");
++    v = 0;
++    for (p = buf + off; p < end; p++) {
++      v *= 10;
++      v += *p - '0';
++
++      /* Ports have a max value of 2^16 */
++      if (v > 0xffff) {
++        return 1;
++      }
+     }
+
+     u->port = (uint16_t) v;

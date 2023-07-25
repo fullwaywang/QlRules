@@ -1,0 +1,244 @@
+commit 3119b232c9c453c98d8fa8b6ae4e37ba18117cd4
+Author: Hilko Bengen <hillu@users.noreply.github.com>
+Date:   Tue Jan 17 17:07:02 2017 +0100
+
+    re_lexer: Make reading escape sequences more robust (#586)
+    
+    * Add test for issue #503
+    
+    * re_lexer: Make reading escape sequences more robust
+    
+    This commit fixes parsing incomplete escape sequences at the end of a
+    regular expression and parsing things like \xxy (invalid hex digits)
+    which before were silently turned into (char)255.
+    
+    Close #503
+    
+    * Update re_lexer.c
+
+diff --git a/libyara/re_lexer.c b/libyara/re_lexer.c
+index 82d48719..f0940a8b 100644
+--- a/libyara/re_lexer.c
++++ b/libyara/re_lexer.c
+@@ -190,7 +190,7 @@ typedef size_t yy_size_t;
+ 
+     /* Note: We specifically omit the test for yy_rule_can_match_eol because it requires
+      *       access to the local variable yy_act. Since yyless() is a macro, it would break
+-     *       existing scanners that call yyless() from OUTSIDE re_yylex. 
++     *       existing scanners that call yyless() from OUTSIDE re_yylex.
+      *       One obvious solution it to make yy_act a global. I tried that, and saw
+      *       a 5% performance hit in a non-yylineno scanner, because yy_act is
+      *       normally declared as a register variable-- so it is not worth it.
+@@ -266,7 +266,7 @@ struct yy_buffer_state
+ 
+     int yy_bs_lineno; /**< The line count. */
+     int yy_bs_column; /**< The column count. */
+-    
++
+ 	/* Whether to try to fill the input buffer when we reach the
+ 	 * end of it.
+ 	 */
+@@ -906,7 +906,7 @@ yy_find_action:
+ 			yy_size_t yyl;
+ 			for ( yyl = 0; yyl < yyleng; ++yyl )
+ 				if ( yytext[yyl] == '\n' )
+-					   
++					
+     do{ yylineno++;
+         yycolumn=0;
+     }while(0)
+@@ -1125,7 +1125,7 @@ YY_RULE_SETUP
+   }
+   else
+   {
+-    yyerror(yyscanner, lex_env, "unexpected end of buffer");
++    yyerror(yyscanner, lex_env, "illegal escape sequence");
+     yyterminate();
+   }
+ }
+@@ -1180,7 +1180,7 @@ YY_RULE_SETUP
+   {
+     if (!read_escaped_char(yyscanner, &end))
+     {
+-      yyerror(yyscanner, lex_env, "unexpected end of buffer");
++      yyerror(yyscanner, lex_env, "illegal escape sequence");
+       yyterminate();
+     }
+   }
+@@ -1292,7 +1292,7 @@ YY_RULE_SETUP
+   }
+   else
+   {
+-    yyerror(yyscanner, lex_env, "unexpected end of buffer");
++    yyerror(yyscanner, lex_env, "illegal escape sequence");
+     yyterminate();
+   }
+ }
+@@ -1763,7 +1763,7 @@ static int yy_get_next_buffer (yyscan_t yyscanner)
+ 	yyg->yy_hold_char = *++yyg->yy_c_buf_p;
+ 
+ 	if ( c == '\n' )
+-		   
++		
+     do{ yylineno++;
+         yycolumn=0;
+     }while(0)
+@@ -2018,9 +2018,9 @@ static void re_yyensure_buffer_stack (yyscan_t yyscanner)
+ 								, yyscanner);
+ 		if ( ! yyg->yy_buffer_stack )
+ 			YY_FATAL_ERROR( "out of dynamic memory in re_yyensure_buffer_stack()" );
+-								  
++
+ 		memset(yyg->yy_buffer_stack, 0, num_to_alloc * sizeof(struct yy_buffer_state*));
+-				
++
+ 		yyg->yy_buffer_stack_max = num_to_alloc;
+ 		yyg->yy_buffer_stack_top = 0;
+ 		return;
+@@ -2049,7 +2049,7 @@ static void re_yyensure_buffer_stack (yyscan_t yyscanner)
+  * @param base the character buffer
+  * @param size the size in bytes of the character buffer
+  * @param yyscanner The scanner object.
+- * @return the newly allocated buffer state object. 
++ * @return the newly allocated buffer state object.
+  */
+ YY_BUFFER_STATE re_yy_scan_buffer  (char * base, yy_size_t  size , yyscan_t yyscanner)
+ {
+@@ -2177,7 +2177,7 @@ YY_EXTRA_TYPE re_yyget_extra  (yyscan_t yyscanner)
+ int re_yyget_lineno  (yyscan_t yyscanner)
+ {
+     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+-    
++
+         if (! YY_CURRENT_BUFFER)
+             return 0;
+     
+@@ -2190,7 +2190,7 @@ int re_yyget_lineno  (yyscan_t yyscanner)
+ int re_yyget_column  (yyscan_t yyscanner)
+ {
+     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
+-    
++
+         if (! YY_CURRENT_BUFFER)
+             return 0;
+     
+@@ -2365,20 +2365,20 @@ int re_yylex_init_extra(YY_EXTRA_TYPE yy_user_defined,yyscan_t* ptr_yy_globals )
+         errno = EINVAL;
+         return 1;
+     }
+-	
++
+     *ptr_yy_globals = (yyscan_t) re_yyalloc ( sizeof( struct yyguts_t ), &dummy_yyguts );
+-	
++
+     if (*ptr_yy_globals == NULL){
+         errno = ENOMEM;
+         return 1;
+     }
+-    
++
+     /* By setting to 0xAA, we expose bugs in
+     yy_init_globals. Leave at 0x00 for releases. */
+     memset(*ptr_yy_globals,0x00,sizeof(struct yyguts_t));
+-    
++
+     re_yyset_extra (yy_user_defined, *ptr_yy_globals);
+-    
++
+     return yy_init_globals ( *ptr_yy_globals );
+ }
+ 
+@@ -2568,19 +2568,19 @@ int read_escaped_char(
+   text[0] = '\\';
+   text[1] = RE_YY_INPUT(yyscanner);
+ 
+-  if (text[1] == EOF)
++  if (text[1] == EOF || text[1] == 0)
+     return 0;
+ 
+   if (text[1] == 'x')
+   {
+     text[2] = RE_YY_INPUT(yyscanner);
+ 
+-    if (text[2] == EOF)
++    if (!isxdigit(text[2]))
+       return 0;
+ 
+     text[3] = RE_YY_INPUT(yyscanner);
+ 
+-    if (text[3] == EOF)
++    if (!isxdigit(text[3]))
+       return 0;
+   }
+ 
+diff --git a/libyara/re_lexer.l b/libyara/re_lexer.l
+index 1b3f5aa8..9e0b0054 100644
+--- a/libyara/re_lexer.l
++++ b/libyara/re_lexer.l
+@@ -261,7 +261,7 @@ hex_digit     [0-9a-fA-F]
+   }
+   else
+   {
+-    yyerror(yyscanner, lex_env, "unexpected end of buffer");
++    yyerror(yyscanner, lex_env, "illegal escape sequence");
+     yyterminate();
+   }
+ }
+@@ -312,7 +312,7 @@ hex_digit     [0-9a-fA-F]
+   {
+     if (!read_escaped_char(yyscanner, &end))
+     {
+-      yyerror(yyscanner, lex_env, "unexpected end of buffer");
++      yyerror(yyscanner, lex_env, "illegal escape sequence");
+       yyterminate();
+     }
+   }
+@@ -410,7 +410,7 @@ hex_digit     [0-9a-fA-F]
+   }
+   else
+   {
+-    yyerror(yyscanner, lex_env, "unexpected end of buffer");
++    yyerror(yyscanner, lex_env, "illegal escape sequence");
+     yyterminate();
+   }
+ }
+@@ -524,19 +524,19 @@ int read_escaped_char(
+   text[0] = '\\';
+   text[1] = RE_YY_INPUT(yyscanner);
+ 
+-  if (text[1] == EOF)
++  if (text[1] == EOF || text[1] == 0)
+     return 0;
+ 
+   if (text[1] == 'x')
+   {
+     text[2] = RE_YY_INPUT(yyscanner);
+ 
+-    if (text[2] == EOF)
++    if (!isxdigit(text[2]))
+       return 0;
+ 
+     text[3] = RE_YY_INPUT(yyscanner);
+ 
+-    if (text[3] == EOF)
++    if (!isxdigit(text[3]))
+       return 0;
+   }
+ 
+diff --git a/tests/test-rules.c b/tests/test-rules.c
+index 5570dbc4..556e3452 100644
+--- a/tests/test-rules.c
++++ b/tests/test-rules.c
+@@ -1019,6 +1019,12 @@ void test_re()
+ 
+   // Test case for issue #324
+   assert_true_regexp("whatever|   x.   x", "   xy   x", "   xy   x");
++
++  // test case for issue #503, \x without two following hex-digits
++  assert_regexp_syntax_error("\\x0");
++  assert_regexp_syntax_error("\\x");
++
++  assert_regexp_syntax_error("\\xxy");
+ }
+ 
+ 

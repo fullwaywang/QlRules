@@ -1,0 +1,23 @@
+commit 1d6cfb8e625a944010956714c1802bc1e1fc6c4f
+Author: Szymon Janc <szymon.janc@codecoup.pl>
+Date:   Fri Jun 24 10:25:41 2022 +0200
+
+    monitor: Fix crash when using RTT backend
+    
+    This fix regression introduced by "monitor: Fix memory leaks".
+    J-Link shared library is in use if jlink_init() returns 0 and thus
+    handle shall not be closed.
+
+diff --git a/monitor/jlink.c b/monitor/jlink.c
+index f1d8ce660..f9d4037f4 100644
+--- a/monitor/jlink.c
++++ b/monitor/jlink.c
+@@ -112,7 +112,7 @@ int jlink_init(void)
+ 		return -EIO;
+ 	}
+ 
+-	dlclose(so);
++	/* don't dlclose(so) here cause symbols from it are in use now */
+ 	return 0;
+ }
+ 

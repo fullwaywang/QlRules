@@ -1,0 +1,62 @@
+commit ec412aa4583ad71ecabb967d3c77162760169d1f
+Author: Dan Fandrich <dan@coneharvesters.com>
+Date:   Sat May 16 19:29:21 2020 +0200
+
+    Ensure the MakerNote data pointers are initialized with NULL.
+    
+    This ensures that an uninitialized pointer isn't dereferenced later in
+    the case where the number of components (and therefore size) is 0.
+    
+    This fixes the second issue reported at
+    https://sourceforge.net/p/libexif/bugs/125/
+    
+    CVE-2020-13113
+
+diff --git a/libexif/canon/exif-mnote-data-canon.c b/libexif/canon/exif-mnote-data-canon.c
+index 4e99325..b8a21e1 100644
+--- a/libexif/canon/exif-mnote-data-canon.c
++++ b/libexif/canon/exif-mnote-data-canon.c
+@@ -236,6 +236,7 @@ exif_mnote_data_canon_load (ExifMnoteData *ne,
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+ 
++		memset(&n->entries[tcount], 0, sizeof(MnoteCanonEntry));
+ 		if (CHECKOVERFLOW(o,buf_size,12)) {
+ 			exif_log (ne->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				"ExifMnoteCanon", "Short MakerNote");
+diff --git a/libexif/fuji/exif-mnote-data-fuji.c b/libexif/fuji/exif-mnote-data-fuji.c
+index 6671e4c..c191490 100644
+--- a/libexif/fuji/exif-mnote-data-fuji.c
++++ b/libexif/fuji/exif-mnote-data-fuji.c
+@@ -198,6 +198,7 @@ exif_mnote_data_fuji_load (ExifMnoteData *en,
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+ 
++		memset(&n->entries[tcount], 0, sizeof(MnoteFujiEntry));
+ 		if (CHECKOVERFLOW(o, buf_size, 12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteDataFuji", "Short MakerNote");
+diff --git a/libexif/olympus/exif-mnote-data-olympus.c b/libexif/olympus/exif-mnote-data-olympus.c
+index bd83411..1d1de2c 100644
+--- a/libexif/olympus/exif-mnote-data-olympus.c
++++ b/libexif/olympus/exif-mnote-data-olympus.c
+@@ -425,6 +425,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 	tcount = 0;
+ 	for (i = c, o = o2; i; --i, o += 12) {
+ 		size_t s;
++		memset(&n->entries[tcount], 0, sizeof(MnoteOlympusEntry));
+ 		if (CHECKOVERFLOW(o, buf_size, 12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteOlympus", "Short MakerNote");
+diff --git a/libexif/pentax/exif-mnote-data-pentax.c b/libexif/pentax/exif-mnote-data-pentax.c
+index 5f75d8f..5299e63 100644
+--- a/libexif/pentax/exif-mnote-data-pentax.c
++++ b/libexif/pentax/exif-mnote-data-pentax.c
+@@ -280,6 +280,7 @@ exif_mnote_data_pentax_load (ExifMnoteData *en,
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+ 
++		memset(&n->entries[tcount], 0, sizeof(MnotePentaxEntry));
+ 		if (CHECKOVERFLOW(o,buf_size,12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteDataPentax", "Short MakerNote");

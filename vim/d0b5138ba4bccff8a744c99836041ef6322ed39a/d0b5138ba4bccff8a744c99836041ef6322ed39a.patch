@@ -1,0 +1,141 @@
+commit d0b5138ba4bccff8a744c99836041ef6322ed39a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri Nov 4 15:23:45 2016 +0100
+
+    patch 8.0.0056
+    Problem:    When setting 'filetype' there is no check for a valid name.
+    Solution:   Only allow valid characters in 'filetype', 'syntax' and 'keymap'.
+
+diff --git a/src/option.c b/src/option.c
+index ebf443b84..8eea1f876 100644
+--- a/src/option.c
++++ b/src/option.c
+@@ -5822,6 +5822,21 @@ set_string_option(
+     return r;
+ }
+ 
++/*
++ * Return TRUE if "val" is a valid 'filetype' name.
++ * Also used for 'syntax' and 'keymap'.
++ */
++    static int
++valid_filetype(char_u *val)
++{
++    char_u *s;
++
++    for (s = val; *s != NUL; ++s)
++	if (!ASCII_ISALNUM(*s) && vim_strchr((char_u *)".-_", *s) == NULL)
++	    return FALSE;
++    return TRUE;
++}
++
+ /*
+  * Handle string options that need some action to perform when changed.
+  * Returns NULL for success, or an error message for an error.
+@@ -6235,8 +6250,11 @@ did_set_string_option(
+ #ifdef FEAT_KEYMAP
+     else if (varp == &curbuf->b_p_keymap)
+     {
+-	/* load or unload key mapping tables */
+-	errmsg = keymap_init();
++	if (!valid_filetype(*varp))
++	    errmsg = e_invarg;
++	else
++	    /* load or unload key mapping tables */
++	    errmsg = keymap_init();
+ 
+ 	if (errmsg == NULL)
+ 	{
+@@ -7222,6 +7240,22 @@ did_set_string_option(
+     }
+ #endif
+ 
++#ifdef FEAT_AUTOCMD
++    else if (gvarp == &p_ft)
++    {
++	if (!valid_filetype(*varp))
++	    errmsg = e_invarg;
++    }
++#endif
++
++#ifdef FEAT_SYN_HL
++    else if (gvarp == &p_syn)
++    {
++	if (!valid_filetype(*varp))
++	    errmsg = e_invarg;
++    }
++#endif
++
+     /* Options that are a list of flags. */
+     else
+     {
+diff --git a/src/testdir/test_options.vim b/src/testdir/test_options.vim
+index 21dd7fe4f..dee435c38 100644
+--- a/src/testdir/test_options.vim
++++ b/src/testdir/test_options.vim
+@@ -48,3 +48,52 @@ func Test_signcolumn()
+   endif
+ endfunc
+ 
++func Test_filetype_valid()
++  set ft=valid_name
++  call assert_equal("valid_name", &filetype)
++  set ft=valid-name
++  call assert_equal("valid-name", &filetype)
++
++  call assert_fails(":set ft=wrong;name", "E474:")
++  call assert_fails(":set ft=wrong\\\\name", "E474:")
++  call assert_fails(":set ft=wrong\\|name", "E474:")
++  call assert_fails(":set ft=wrong/name", "E474:")
++  call assert_fails(":set ft=wrong\\\nname", "E474:")
++  call assert_equal("valid-name", &filetype)
++
++  exe "set ft=trunc\x00name"
++  call assert_equal("trunc", &filetype)
++endfunc
++
++func Test_syntax_valid()
++  set syn=valid_name
++  call assert_equal("valid_name", &syntax)
++  set syn=valid-name
++  call assert_equal("valid-name", &syntax)
++
++  call assert_fails(":set syn=wrong;name", "E474:")
++  call assert_fails(":set syn=wrong\\\\name", "E474:")
++  call assert_fails(":set syn=wrong\\|name", "E474:")
++  call assert_fails(":set syn=wrong/name", "E474:")
++  call assert_fails(":set syn=wrong\\\nname", "E474:")
++  call assert_equal("valid-name", &syntax)
++
++  exe "set syn=trunc\x00name"
++  call assert_equal("trunc", &syntax)
++endfunc
++
++func Test_keymap_valid()
++  call assert_fails(":set kmp=valid_name", "E544:")
++  call assert_fails(":set kmp=valid_name", "valid_name")
++  call assert_fails(":set kmp=valid-name", "E544:")
++  call assert_fails(":set kmp=valid-name", "valid-name")
++
++  call assert_fails(":set kmp=wrong;name", "E474:")
++  call assert_fails(":set kmp=wrong\\\\name", "E474:")
++  call assert_fails(":set kmp=wrong\\|name", "E474:")
++  call assert_fails(":set kmp=wrong/name", "E474:")
++  call assert_fails(":set kmp=wrong\\\nname", "E474:")
++
++  call assert_fails(":set kmp=trunc\x00name", "E544:")
++  call assert_fails(":set kmp=trunc\x00name", "trunc")
++endfunc
+diff --git a/src/version.c b/src/version.c
+index 0b62f9cae..f63041ec4 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -764,6 +764,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    56,
+ /**/
+     55,
+ /**/

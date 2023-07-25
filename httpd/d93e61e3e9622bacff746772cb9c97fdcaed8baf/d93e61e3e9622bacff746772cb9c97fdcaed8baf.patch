@@ -1,0 +1,27 @@
+commit d93e61e3e9622bacff746772cb9c97fdcaed8baf
+Author: Eric Covener <covener@apache.org>
+Date:   Tue Jan 10 13:20:55 2023 +0000
+
+    Merge r1906540 from trunk:
+    
+    cleanup on error
+    
+    
+    Reviewed By: rpluem, gbechis, covener
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1906542 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/proxy/mod_proxy_ajp.c b/modules/proxy/mod_proxy_ajp.c
+index 226ad9b3de..1449acad73 100644
+--- a/modules/proxy/mod_proxy_ajp.c
++++ b/modules/proxy/mod_proxy_ajp.c
+@@ -257,6 +257,8 @@ static int ap_proxy_ajp_request(apr_pool_t *p, request_rec *r,
+             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10396)
+                           "%s Transfer-Encoding is not supported",
+                           tenc);
++            /* We had a failure: Close connection to backend */
++            conn->close = 1;
+             return HTTP_INTERNAL_SERVER_ERROR;
+         }
+     } else {

@@ -1,0 +1,24 @@
+commit 6ce6152284c47ba9b1d4fe8ff9d2e6a3f5ee02c7
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Wed Oct 23 09:22:44 2019 +0200
+
+    pkcs15-prkey: Simplify cleaning memory after failure
+    
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=18478
+
+diff --git a/src/libopensc/pkcs15-prkey.c b/src/libopensc/pkcs15-prkey.c
+index 228a7b3d..a4f4a410 100644
+--- a/src/libopensc/pkcs15-prkey.c
++++ b/src/libopensc/pkcs15-prkey.c
+@@ -260,10 +260,7 @@ int sc_pkcs15_decode_prkdf_entry(struct sc_pkcs15_card *p15card,
+ 	r = sc_asn1_decode_choice(ctx, asn1_prkey, *buf, *buflen, buf, buflen);
+ 	if (r < 0) {
+ 		/* This might have allocated something. If so, clear it now */
+-		if (asn1_com_prkey_attr->flags & SC_ASN1_PRESENT &&
+-			asn1_com_prkey_attr[0].flags & SC_ASN1_PRESENT) {
+-			free(asn1_com_prkey_attr[0].parm);
+-		}
++		free(info.subject.value);
+ 	}
+ 	if (r == SC_ERROR_ASN1_END_OF_CONTENTS)
+ 		return r;

@@ -1,0 +1,27 @@
+commit e787f8fd7ee99ba0c3e0f086ce2ce59eea7ed86c
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Fri Oct 11 11:18:10 2019 +0200
+
+    avfilter/vf_neighbor: check if width is 1
+    
+    Fixes #8242
+
+diff --git a/libavfilter/vf_neighbor.c b/libavfilter/vf_neighbor.c
+index e50d4b4ed0..47c6175a12 100644
+--- a/libavfilter/vf_neighbor.c
++++ b/libavfilter/vf_neighbor.c
+@@ -296,9 +296,11 @@ static int filter_slice(AVFilterContext *ctx, void *arg, int jobnr, int nb_jobs)
+                                                src + (width - 2) * bpc,                                                      src + (width - 2) * bpc,
+                                                src + (width - 2) * bpc + ph * stride, src + (width - 1) * bpc + ph * stride, src + (width - 2) * bpc + ph * stride};
+ 
+-            s->filter(dst,                     src,                     1,         threshold, coordinateslb, s->coordinates, s->max);
+-            s->filter(dst          + 1  * bpc, src          + 1  * bpc, width - 2, threshold, coordinates,   s->coordinates, s->max);
+-            s->filter(dst + (width - 1) * bpc, src + (width - 1) * bpc, 1,         threshold, coordinatesrb, s->coordinates, s->max);
++            s->filter(dst,                         src,                     1,         threshold, coordinateslb, s->coordinates, s->max);
++            if (width > 1) {
++                s->filter(dst          + 1  * bpc, src          + 1  * bpc, width - 2, threshold, coordinates,   s->coordinates, s->max);
++                s->filter(dst + (width - 1) * bpc, src + (width - 1) * bpc, 1,         threshold, coordinatesrb, s->coordinates, s->max);
++            }
+ 
+             src += stride;
+             dst += dstride;

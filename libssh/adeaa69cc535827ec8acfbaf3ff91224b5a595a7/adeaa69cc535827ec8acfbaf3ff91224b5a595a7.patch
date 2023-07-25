@@ -1,0 +1,34 @@
+commit adeaa69cc535827ec8acfbaf3ff91224b5a595a7
+Author: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+Date:   Fri Sep 7 17:00:40 2018 +0200
+
+    CVE-2018-10933: Check channel state when OPEN_CONFIRMATION arrives
+    
+    When a SSH2_MSG_OPEN_CONFIRMATION arrives, the channel state is checked
+    to be in SSH_CHANNEL_STATE_OPENING.
+    
+    Fixes T101
+    
+    Signed-off-by: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+    Reviewed-by: Andreas Schneider <asn@cryptomilk.org>
+
+diff --git a/src/channels.c b/src/channels.c
+index 103009a8..b26f6bd4 100644
+--- a/src/channels.c
++++ b/src/channels.c
+@@ -171,6 +171,15 @@ SSH_PACKET_CALLBACK(ssh_packet_channel_open_conf){
+       "Received a CHANNEL_OPEN_CONFIRMATION for channel %d:%d",
+       channel->local_channel,
+       channel->remote_channel);
++
++  if (channel->state != SSH_CHANNEL_STATE_OPENING) {
++      SSH_LOG(SSH_LOG_RARE,
++              "SSH2_MSG_CHANNEL_OPEN_CONFIRMATION received in incorrect "
++              "channel state %d",
++              channel->state);
++      goto error;
++  }
++
+   SSH_LOG(SSH_LOG_PROTOCOL,
+       "Remote window : %lu, maxpacket : %lu",
+       (long unsigned int) channel->remote_window,

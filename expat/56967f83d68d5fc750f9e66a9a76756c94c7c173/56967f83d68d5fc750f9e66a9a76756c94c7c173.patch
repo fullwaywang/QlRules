@@ -1,0 +1,8 @@
+commit 56967f83d68d5fc750f9e66a9a76756c94c7c173
+Merge: 5ac71407 eedc5f6d
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Mon Oct 24 16:34:19 2022 +0200
+
+    Merge pull request #650 from libexpat/issue-649-fix-overeager-dtd-destruction
+    
+    [CVE-2022-43680] Fix overeager DTD destruction (fixes #649)

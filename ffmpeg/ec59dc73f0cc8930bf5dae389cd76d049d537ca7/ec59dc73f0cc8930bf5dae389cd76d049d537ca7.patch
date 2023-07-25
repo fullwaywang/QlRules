@@ -1,0 +1,26 @@
+commit ec59dc73f0cc8930bf5dae389cd76d049d537ca7
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Thu Jul 9 12:07:28 2020 +0200
+
+    avformat/mm: Check for existence of audio stream
+    
+    No audio stream is created unconditionally and if none has been created,
+    no packet with stream_index 1 may be returned. This fixes an assert in
+    ff_read_packet() in libavformat/utils reported in ticket #8782.
+    
+    Reviewed-by: Michael Niedermayer <michael@niedermayer.cc>
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+
+diff --git a/libavformat/mm.c b/libavformat/mm.c
+index d40fd12acc..02ffbcd824 100644
+--- a/libavformat/mm.c
++++ b/libavformat/mm.c
+@@ -175,6 +175,8 @@ static int read_packet(AVFormatContext *s,
+             return 0;
+ 
+         case MM_TYPE_AUDIO :
++            if (s->nb_streams < 2)
++                return AVERROR_INVALIDDATA;
+             if ((ret = av_get_packet(s->pb, pkt, length)) < 0)
+                 return ret;
+             pkt->stream_index = 1;

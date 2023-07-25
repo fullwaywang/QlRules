@@ -1,0 +1,29 @@
+commit 35893e7cad78ce461fcaffa56076c11700ba5e4e
+Author: Dirk Lemstra <dirk@lemstra.org>
+Date:   Sat Sep 11 12:30:42 2021 +0200
+
+    Added missing policy checks in RegisterStaticModules.
+
+diff --git a/MagickCore/static.c b/MagickCore/static.c
+index 766ddf682..120c39e3c 100644
+--- a/MagickCore/static.c
++++ b/MagickCore/static.c
+@@ -240,7 +240,7 @@ MagickExport MagickBooleanType RegisterStaticModule(const char *module,
+   p=GetCoderInfo(module,exception);
+   if (p != (CoderInfo *) NULL)
+     (void) CopyMagickString(module_name,p->name,MagickPathExtent);
+-  rights=ReadPolicyRights;
++  rights=AllPolicyRights;
+   if (IsRightsAuthorized(ModulePolicyDomain,rights,module_name) == MagickFalse)
+     {
+       errno=EPERM;
+@@ -294,6 +294,9 @@ MagickExport void RegisterStaticModules(void)
+   {
+     if (MagickModules[i].registered == MagickFalse)
+       {
++        if (IsRightsAuthorized(ModulePolicyDomain,AllPolicyRights,
++              MagickModules[i].module) == MagickFalse)
++          continue;
+         (void) (MagickModules[i].register_module)();
+         MagickModules[i].registered=MagickTrue;
+       }

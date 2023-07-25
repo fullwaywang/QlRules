@@ -1,0 +1,305 @@
+commit 435e21f05001fb03f9f186fa7cbc69454afd00d1
+Author: Dan Fandrich <dan@coneharvesters.com>
+Date:   Sat May 16 17:32:28 2020 +0200
+
+    Fix MakerNote tag size overflow issues at read time.
+    
+    Check for a size overflow while reading tags, which ensures that the
+    size is always consistent for the given components and type of the
+    entry, making checking further down superfluous.
+    
+    This provides an alternate fix for
+    https://sourceforge.net/p/libexif/bugs/125/ CVE-2016-6328 and for all
+    the MakerNote types. Likely, this makes both commits 41bd0423 and
+    89e5b1c1 redundant as it ensures that MakerNote entries are well-formed
+    when they're populated.
+    
+    Some improvements on top by Marcus Meissner <marcus@jet.franken.de>
+    
+    CVE-2020-13112
+
+diff --git a/libexif/canon/exif-mnote-data-canon.c b/libexif/canon/exif-mnote-data-canon.c
+index ccaeb6a..4e99325 100644
+--- a/libexif/canon/exif-mnote-data-canon.c
++++ b/libexif/canon/exif-mnote-data-canon.c
+@@ -30,6 +30,8 @@
+ #include <libexif/exif-utils.h>
+ #include <libexif/exif-data.h>
+ 
++#define CHECKOVERFLOW(offset,datasize,structsize) (( offset >= datasize) || (structsize > datasize) || (offset > datasize - structsize ))
++
+ static void
+ exif_mnote_data_canon_clear (ExifMnoteDataCanon *n)
+ {
+@@ -209,7 +211,7 @@ exif_mnote_data_canon_load (ExifMnoteData *ne,
+ 		return;
+ 	}
+ 	datao = 6 + n->offset;
+-	if ((datao + 2 < datao) || (datao + 2 < 2) || (datao + 2 > buf_size)) {
++	if (CHECKOVERFLOW(datao, buf_size, 2)) {
+ 		exif_log (ne->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteCanon", "Short MakerNote");
+ 		return;
+@@ -233,11 +235,12 @@ exif_mnote_data_canon_load (ExifMnoteData *ne,
+ 	tcount = 0;
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+-		if ((o + 12 < o) || (o + 12 < 12) || (o + 12 > buf_size)) {
++
++		if (CHECKOVERFLOW(o,buf_size,12)) {
+ 			exif_log (ne->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				"ExifMnoteCanon", "Short MakerNote");
+ 			break;
+-	        }
++		}
+ 
+ 		n->entries[tcount].tag        = exif_get_short (buf + o, n->order);
+ 		n->entries[tcount].format     = exif_get_short (buf + o + 2, n->order);
+@@ -248,6 +251,16 @@ exif_mnote_data_canon_load (ExifMnoteData *ne,
+ 			"Loading entry 0x%x ('%s')...", n->entries[tcount].tag,
+ 			 mnote_canon_tag_get_name (n->entries[tcount].tag));
+ 
++		/* Check if we overflow the multiplication. Use buf_size as the max size for integer overflow detection,
++		 * we will check the buffer sizes closer later. */
++		if (	exif_format_get_size (n->entries[tcount].format) &&
++			buf_size / exif_format_get_size (n->entries[tcount].format) < n->entries[tcount].components
++		) {
++			exif_log (ne->log, EXIF_LOG_CODE_CORRUPT_DATA,
++				  "ExifMnoteCanon", "Tag size overflow detected (%u * %lu)", exif_format_get_size (n->entries[tcount].format), n->entries[tcount].components);
++			continue;
++		}
++
+ 		/*
+ 		 * Size? If bigger than 4 bytes, the actual data is not
+ 		 * in the entry but somewhere else (offset).
+@@ -264,7 +277,8 @@ exif_mnote_data_canon_load (ExifMnoteData *ne,
+ 		} else {
+ 			size_t dataofs = o + 8;
+ 			if (s > 4) dataofs = exif_get_long (buf + dataofs, n->order) + 6;
+-			if ((dataofs + s < s) || (dataofs + s < dataofs) || (dataofs + s > buf_size)) {
++
++			if (CHECKOVERFLOW(dataofs, buf_size, s)) {
+ 				exif_log (ne->log, EXIF_LOG_CODE_DEBUG,
+ 					"ExifMnoteCanon",
+ 					"Tag data past end of buffer (%u > %u)",
+diff --git a/libexif/fuji/exif-mnote-data-fuji.c b/libexif/fuji/exif-mnote-data-fuji.c
+index 726a1d3..6671e4c 100644
+--- a/libexif/fuji/exif-mnote-data-fuji.c
++++ b/libexif/fuji/exif-mnote-data-fuji.c
+@@ -28,6 +28,8 @@
+ 
+ #include "exif-mnote-data-fuji.h"
+ 
++#define CHECKOVERFLOW(offset,datasize,structsize) (( offset >= datasize) || (structsize > datasize) || (offset > datasize - structsize ))
++
+ struct _MNoteFujiDataPrivate {
+ 	ExifByteOrder order;
+ };
+@@ -162,16 +164,16 @@ exif_mnote_data_fuji_load (ExifMnoteData *en,
+ 		return;
+ 	}
+ 	datao = 6 + n->offset;
+-	if ((datao + 12 < datao) || (datao + 12 < 12) || (datao + 12 > buf_size)) {
++	if (CHECKOVERFLOW(datao, buf_size, 12)) {
+ 		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteDataFuji", "Short MakerNote");
+ 		return;
+ 	}
+ 
+ 	n->order = EXIF_BYTE_ORDER_INTEL;
++
+ 	datao += exif_get_long (buf + datao + 8, EXIF_BYTE_ORDER_INTEL);
+-	if ((datao + 2 < datao) || (datao + 2 < 2) ||
+-	    (datao + 2 > buf_size)) {
++	if (CHECKOVERFLOW(datao, buf_size, 2)) {
+ 		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteDataFuji", "Short MakerNote");
+ 		return;
+@@ -195,7 +197,8 @@ exif_mnote_data_fuji_load (ExifMnoteData *en,
+ 	tcount = 0;
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+-		if ((o + 12 < o) || (o + 12 < 12) || (o + 12 > buf_size)) {
++
++		if (CHECKOVERFLOW(o, buf_size, 12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteDataFuji", "Short MakerNote");
+ 			break;
+@@ -210,6 +213,15 @@ exif_mnote_data_fuji_load (ExifMnoteData *en,
+ 			  "Loading entry 0x%x ('%s')...", n->entries[tcount].tag,
+ 			  mnote_fuji_tag_get_name (n->entries[tcount].tag));
+ 
++		/* Check if we overflow the multiplication. Use buf_size as the max size for integer overflow detection,
++		 * we will check the buffer sizes closer later. */
++		if (	exif_format_get_size (n->entries[tcount].format) &&
++			buf_size / exif_format_get_size (n->entries[tcount].format) < n->entries[tcount].components
++		) {
++			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
++					  "ExifMnoteDataFuji", "Tag size overflow detected (%u * %lu)", exif_format_get_size (n->entries[tcount].format), n->entries[tcount].components);
++			continue;
++		}
+ 		/*
+ 		 * Size? If bigger than 4 bytes, the actual data is not
+ 		 * in the entry but somewhere else (offset).
+@@ -221,8 +233,8 @@ exif_mnote_data_fuji_load (ExifMnoteData *en,
+ 			if (s > 4)
+ 				/* The data in this case is merely a pointer */
+ 				dataofs = exif_get_long (buf + dataofs, n->order) + 6 + n->offset;
+-			if ((dataofs + s < dataofs) || (dataofs + s < s) ||
+-				(dataofs + s >= buf_size)) {
++
++			if (CHECKOVERFLOW(dataofs, buf_size, s)) {
+ 				exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 						  "ExifMnoteDataFuji", "Tag data past end of "
+ 					  "buffer (%u >= %u)", (unsigned)(dataofs + s), buf_size);
+diff --git a/libexif/olympus/exif-mnote-data-olympus.c b/libexif/olympus/exif-mnote-data-olympus.c
+index 5a02a94..bd83411 100644
+--- a/libexif/olympus/exif-mnote-data-olympus.c
++++ b/libexif/olympus/exif-mnote-data-olympus.c
+@@ -35,6 +35,8 @@
+  */
+ /*#define EXIF_OVERCOME_SANYO_OFFSET_BUG */
+ 
++#define CHECKOVERFLOW(offset,datasize,structsize) (( offset >= datasize) || (structsize > datasize) || (offset > datasize - structsize ))
++
+ static enum OlympusVersion
+ exif_mnote_data_olympus_identify_variant (const unsigned char *buf,
+ 		unsigned int buf_size);
+@@ -245,7 +247,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 		return;
+ 	}
+ 	o2 = 6 + n->offset; /* Start of interesting data */
+-	if ((o2 + 10 < o2) || (o2 + 10 < 10) || (o2 + 10 > buf_size)) {
++	if (CHECKOVERFLOW(o2,buf_size,10)) {
+ 		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteDataOlympus", "Short MakerNote");
+ 		return;
+@@ -300,7 +302,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 		/* Olympus S760, S770 */
+ 		datao = o2;
+ 		o2 += 8;
+-		if ((o2 + 4 < o2) || (o2 + 4 < 4) || (o2 + 4 > buf_size)) return;
++		if (CHECKOVERFLOW(o2,buf_size,4)) return;
+ 		exif_log (en->log, EXIF_LOG_CODE_DEBUG, "ExifMnoteDataOlympus",
+ 			"Parsing Olympus maker note v2 (0x%02x, %02x, %02x, %02x)...",
+ 			buf[o2 + 0], buf[o2 + 1], buf[o2 + 2], buf[o2 + 3]);
+@@ -341,7 +343,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 
+ 	case nikonV2:
+ 		o2 += 6;
+-		if ((o2 + 12 < o2) || (o2 + 12 < 12) || (o2 + 12 > buf_size)) return;
++		if (CHECKOVERFLOW(o2,buf_size,12)) return;
+ 		exif_log (en->log, EXIF_LOG_CODE_DEBUG, "ExifMnoteDataOlympus",
+ 			"Parsing Nikon maker note v2 (0x%02x, %02x, %02x, "
+ 			"%02x, %02x, %02x, %02x, %02x)...",
+@@ -399,7 +401,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 	}
+ 
+ 	/* Sanity check the offset */
+-	if ((o2 + 2 < o2) || (o2 + 2 < 2) || (o2 + 2 > buf_size)) {
++	if (CHECKOVERFLOW(o2,buf_size,2)) {
+ 		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteOlympus", "Short MakerNote");
+ 		return;
+@@ -423,7 +425,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 	tcount = 0;
+ 	for (i = c, o = o2; i; --i, o += 12) {
+ 		size_t s;
+-		if ((o + 12 < o) || (o + 12 < 12) || (o + 12 > buf_size)) {
++		if (CHECKOVERFLOW(o, buf_size, 12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteOlympus", "Short MakerNote");
+ 			break;
+@@ -444,6 +446,14 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 		    n->entries[tcount].components,
+ 		    (int)exif_format_get_size(n->entries[tcount].format)); */
+ 
++	    /* Check if we overflow the multiplication. Use buf_size as the max size for integer overflow detection,
++	     * we will check the buffer sizes closer later. */
++	    if (exif_format_get_size (n->entries[tcount].format) &&
++		buf_size / exif_format_get_size (n->entries[tcount].format) < n->entries[tcount].components
++	    ) {
++		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA, "ExifMnoteOlympus", "Tag size overflow detected (%u * %lu)", exif_format_get_size (n->entries[tcount].format), n->entries[tcount].components);
++		continue;
++	    }
+ 	    /*
+ 	     * Size? If bigger than 4 bytes, the actual data is not
+ 	     * in the entry but somewhere else (offset).
+@@ -462,7 +472,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 				 * tag in its MakerNote. The offset is actually the absolute
+ 				 * position in the file instead of the position within the IFD.
+ 				 */
+-			    if (dataofs + s > buf_size && n->version == sanyoV1) {
++			    if (dataofs > (buf_size - s) && n->version == sanyoV1) {
+ 					/* fix pointer */
+ 					dataofs -= datao + 6;
+ 					exif_log (en->log, EXIF_LOG_CODE_DEBUG,
+@@ -471,8 +481,7 @@ exif_mnote_data_olympus_load (ExifMnoteData *en,
+ 			    }
+ #endif
+ 			}
+-			if ((dataofs + s < dataofs) || (dataofs + s < s) || 
+-			    (dataofs + s > buf_size)) {
++			if (CHECKOVERFLOW(dataofs, buf_size, s)) {
+ 				exif_log (en->log, EXIF_LOG_CODE_DEBUG,
+ 					  "ExifMnoteOlympus",
+ 					  "Tag data past end of buffer (%u > %u)",
+diff --git a/libexif/pentax/exif-mnote-data-pentax.c b/libexif/pentax/exif-mnote-data-pentax.c
+index c7305c7..5f75d8f 100644
+--- a/libexif/pentax/exif-mnote-data-pentax.c
++++ b/libexif/pentax/exif-mnote-data-pentax.c
+@@ -28,6 +28,8 @@
+ #include <libexif/exif-byte-order.h>
+ #include <libexif/exif-utils.h>
+ 
++#define CHECKOVERFLOW(offset,datasize,structsize) (( offset >= datasize) || (structsize > datasize) || (offset > datasize - structsize ))
++
+ static void
+ exif_mnote_data_pentax_clear (ExifMnoteDataPentax *n)
+ {
+@@ -224,7 +226,7 @@ exif_mnote_data_pentax_load (ExifMnoteData *en,
+ 		return;
+ 	}
+ 	datao = 6 + n->offset;
+-	if ((datao + 8 < datao) || (datao + 8 < 8) || (datao + 8 > buf_size)) {
++	if (CHECKOVERFLOW(datao, buf_size, 8)) {
+ 		exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 			  "ExifMnoteDataPentax", "Short MakerNote");
+ 		return;
+@@ -277,7 +279,8 @@ exif_mnote_data_pentax_load (ExifMnoteData *en,
+ 	tcount = 0;
+ 	for (i = c, o = datao; i; --i, o += 12) {
+ 		size_t s;
+-		if ((o + 12 < o) || (o + 12 < 12) || (o + 12 > buf_size)) {
++
++		if (CHECKOVERFLOW(o,buf_size,12)) {
+ 			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
+ 				  "ExifMnoteDataPentax", "Short MakerNote");
+ 			break;
+@@ -292,6 +295,15 @@ exif_mnote_data_pentax_load (ExifMnoteData *en,
+ 			  "Loading entry 0x%x ('%s')...", n->entries[tcount].tag,
+ 			  mnote_pentax_tag_get_name (n->entries[tcount].tag));
+ 
++		/* Check if we overflow the multiplication. Use buf_size as the max size for integer overflow detection,
++		 * we will check the buffer sizes closer later. */
++		if (	exif_format_get_size (n->entries[tcount].format) &&
++			buf_size / exif_format_get_size (n->entries[tcount].format) < n->entries[tcount].components
++		) {
++			exif_log (en->log, EXIF_LOG_CODE_CORRUPT_DATA,
++				  "ExifMnoteDataPentax", "Tag size overflow detected (%u * %lu)", exif_format_get_size (n->entries[tcount].format), n->entries[tcount].components);
++			break;
++		}
+ 		/*
+ 		 * Size? If bigger than 4 bytes, the actual data is not
+ 		 * in the entry but somewhere else (offset).
+@@ -304,8 +316,8 @@ exif_mnote_data_pentax_load (ExifMnoteData *en,
+ 			if (s > 4)
+ 				/* The data in this case is merely a pointer */
+ 			   	dataofs = exif_get_long (buf + dataofs, n->order) + 6;
+-			if ((dataofs + s < dataofs) || (dataofs + s < s) ||
+-				(dataofs + s > buf_size)) {
++
++			if (CHECKOVERFLOW(dataofs, buf_size, s)) {
+ 				exif_log (en->log, EXIF_LOG_CODE_DEBUG,
+ 						  "ExifMnoteDataPentax", "Tag data past end "
+ 					  "of buffer (%u > %u)", (unsigned)(dataofs + s), buf_size);

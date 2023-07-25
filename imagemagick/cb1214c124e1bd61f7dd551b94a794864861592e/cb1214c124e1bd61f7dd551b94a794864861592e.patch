@@ -1,0 +1,19 @@
+commit cb1214c124e1bd61f7dd551b94a794864861592e
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Mar 24 15:33:39 2018 -0400
+
+    ...
+
+diff --git a/coders/meta.c b/coders/meta.c
+index ec4d5d49f..eaebd1fc0 100644
+--- a/coders/meta.c
++++ b/coders/meta.c
+@@ -2204,7 +2204,7 @@ static int format8BIM(Image *ifile, Image *ofile)
+         return -1;
+       }
+     /* make a buffer to hold the data and snag it from the input stream */
+-    str=(unsigned char *) AcquireQuantumMemory((size_t) count,sizeof(*str));
++    str=(unsigned char *) AcquireQuantumMemory((size_t) count+1,sizeof(*str));
+     if (str == (unsigned char *) NULL)
+       {
+         PString=(unsigned char *) RelinquishMagickMemory(PString);

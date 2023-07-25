@@ -1,0 +1,27 @@
+commit a5d849b149ca67ced2d271dc84db0bc95a548abb
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue May 30 21:29:20 2017 +0200
+
+    avformat/avidec: Limit formats in gab2 to srt and ass/ssa
+    
+    This prevents part of one exploit leading to an information leak
+    
+    Found-by: Emil Lerner and Pavel Cheremushkin
+    Reported-by: Thierry Foucu <tfoucu@google.com>
+    
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/avidec.c b/libavformat/avidec.c
+index b6ef0ac62d..df52092067 100644
+--- a/libavformat/avidec.c
++++ b/libavformat/avidec.c
+@@ -1099,6 +1099,9 @@ static int read_gab2_sub(AVFormatContext *s, AVStream *st, AVPacket *pkt)
+         if (!sub_demuxer)
+             goto error;
+ 
++        if (strcmp(sub_demuxer->name, "srt") && strcmp(sub_demuxer->name, "ass"))
++            goto error;
++
+         if (!(ast->sub_ctx = avformat_alloc_context()))
+             goto error;
+ 

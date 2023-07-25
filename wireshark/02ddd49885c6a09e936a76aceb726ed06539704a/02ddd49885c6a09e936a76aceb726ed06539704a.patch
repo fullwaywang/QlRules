@@ -1,0 +1,33 @@
+commit 02ddd49885c6a09e936a76aceb726ed06539704a
+Author: Michael Mann <mmann78@netscape.net>
+Date:   Wed Aug 28 22:27:58 2019 -0400
+
+    Gryphon: Prevent endless loop
+    
+    Bug: 16020
+    Change-Id: I59c24d3bdb3f3a85f6e498683594ee12db9642a8
+    Reviewed-on: https://code.wireshark.org/review/34392
+    Reviewed-by: Michael Mann <mmann78@netscape.net>
+    Petri-Dish: Michael Mann <mmann78@netscape.net>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 627917faff4889f763bf8e6570f62d66656047bd)
+    Reviewed-on: https://code.wireshark.org/review/34396
+
+diff --git a/plugins/epan/gryphon/packet-gryphon.c b/plugins/epan/gryphon/packet-gryphon.c
+index 29437dc663..6030906844 100644
+--- a/plugins/epan/gryphon/packet-gryphon.c
++++ b/plugins/epan/gryphon/packet-gryphon.c
+@@ -1193,7 +1193,11 @@ dissect_gryphon_message_with_offset(tvbuff_t *tvb, int offset, packet_info *pinf
+          * Unknown message type.
+          */
+         proto_tree_add_item(gryphon_tree, hf_gryphon_data, tvb, offset, msglen, ENC_NA);
+-        offset += msglen;
++        if (msglen != 0) {
++            offset += msglen;
++        } else {
++            offset = tvb_reported_length_remaining(tvb, offset);
++        }
+         return offset;
+     }
+ 

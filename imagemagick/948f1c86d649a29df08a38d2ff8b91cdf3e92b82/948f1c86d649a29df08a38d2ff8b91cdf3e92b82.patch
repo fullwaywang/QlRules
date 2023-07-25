@@ -1,0 +1,20 @@
+commit 948f1c86d649a29df08a38d2ff8b91cdf3e92b82
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Oct 6 08:55:55 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1337
+
+diff --git a/coders/bmp.c b/coders/bmp.c
+index e20085fef..ab5818379 100644
+--- a/coders/bmp.c
++++ b/coders/bmp.c
+@@ -595,8 +595,7 @@ static Image *ReadBMPImage(const ImageInfo *image_info,ExceptionInfo *exception)
+     /*
+       Verify BMP identifier.
+     */
+-    if (bmp_info.ba_offset == 0)
+-      start_position=TellBlob(image)-2;
++    start_position=TellBlob(image)-2;
+     bmp_info.ba_offset=0;
+     while (LocaleNCompare((char *) magick,"BA",2) == 0)
+     {

@@ -1,0 +1,75 @@
+commit ccfde4d028e891a41e3548323c3d47b06fb0b83e
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Sep 5 19:51:13 2022 +0100
+
+    patch 9.0.0389: crash when 'tagfunc' closes the window
+    
+    Problem:    Crash when 'tagfunc' closes the window.
+    Solution:   Bail out when the window was closed.
+
+diff --git a/src/errors.h b/src/errors.h
+index ee75d07e5..44eb9db9f 100644
+--- a/src/errors.h
++++ b/src/errors.h
+@@ -3324,3 +3324,5 @@ EXTERN char e_non_null_dict_required_for_argument_nr[]
+ EXTERN char e_non_null_list_required_for_argument_nr[]
+ 	INIT(= N_("E1298: Non-NULL List required for argument %d"));
+ #endif
++EXTERN char e_window_unexpectedly_close_while_searching_for_tags[]
++	INIT(= N_("E1299: Window unexpectedly closed while searching for tags"));
+diff --git a/src/tag.c b/src/tag.c
+index c3e23f624..d07fbbe99 100644
+--- a/src/tag.c
++++ b/src/tag.c
+@@ -690,6 +690,16 @@ do_tag(
+ 		max_num_matches = MAXCOL; // If less than max_num_matches
+ 					  // found: all matches found.
+ 
++	    // A tag function may do anything, which may cause various
++	    // information to become invalid.  At least check for the tagstack
++	    // to still be the same.
++	    if (tagstack != curwin->w_tagstack)
++	    {
++		emsg(_(e_window_unexpectedly_close_while_searching_for_tags));
++		FreeWild(new_num_matches, new_matches);
++		break;
++	    }
++
+ 	    // If there already were some matches for the same name, move them
+ 	    // to the start.  Avoids that the order changes when using
+ 	    // ":tnext" and jumping to another file.
+diff --git a/src/testdir/test_tagfunc.vim b/src/testdir/test_tagfunc.vim
+index 95826121c..5b1897690 100644
+--- a/src/testdir/test_tagfunc.vim
++++ b/src/testdir/test_tagfunc.vim
+@@ -401,4 +401,17 @@ func Test_tagfunc_wipes_buffer()
+   set tagfunc=
+ endfunc
+ 
++func Test_tagfunc_closes_window()
++  split any
++  func MytagfuncClose(pat, flags, info)
++    close
++    return [{'name' : 'mytag', 'filename' : 'Xtest', 'cmd' : '1'}]
++  endfunc
++  set tagfunc=MytagfuncClose
++  call assert_fails('tag xyz', 'E1299:')
++
++  set tagfunc=
++endfunc
++
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index d4fc4d585..b114c2760 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -703,6 +703,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    389,
+ /**/
+     388,
+ /**/

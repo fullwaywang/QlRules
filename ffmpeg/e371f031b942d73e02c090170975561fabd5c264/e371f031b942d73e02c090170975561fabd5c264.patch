@@ -1,0 +1,33 @@
+commit e371f031b942d73e02c090170975561fabd5c264
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Mon Jan 23 01:25:27 2017 +0100
+
+    avcodec/pngdec: Fix off by 1 size in decode_zbuf()
+    
+    Fixes out of array access
+    Fixes: 444/fuzz-2-ffmpeg_VIDEO_AV_CODEC_ID_PNG_fuzzer
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/pngdec.c b/libavcodec/pngdec.c
+index 2f8d266c27..50a0a296b3 100644
+--- a/libavcodec/pngdec.c
++++ b/libavcodec/pngdec.c
+@@ -437,13 +437,13 @@ static int decode_zbuf(AVBPrint *bp, const uint8_t *data,
+     av_bprint_init(bp, 0, -1);
+ 
+     while (zstream.avail_in > 0) {
+-        av_bprint_get_buffer(bp, 1, &buf, &buf_size);
+-        if (!buf_size) {
++        av_bprint_get_buffer(bp, 2, &buf, &buf_size);
++        if (buf_size < 2) {
+             ret = AVERROR(ENOMEM);
+             goto fail;
+         }
+         zstream.next_out  = buf;
+-        zstream.avail_out = buf_size;
++        zstream.avail_out = buf_size - 1;
+         ret = inflate(&zstream, Z_PARTIAL_FLUSH);
+         if (ret != Z_OK && ret != Z_STREAM_END) {
+             ret = AVERROR_EXTERNAL;

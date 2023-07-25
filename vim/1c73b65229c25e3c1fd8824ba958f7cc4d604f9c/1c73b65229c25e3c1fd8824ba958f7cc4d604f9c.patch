@@ -1,0 +1,72 @@
+commit 1c73b65229c25e3c1fd8824ba958f7cc4d604f9c
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri Mar 3 21:11:52 2023 +0000
+
+    patch 9.0.1376: accessing invalid memory with put in Visual block mode
+    
+    Problem:    Accessing invalid memory with put in Visual block mode.
+    Solution:   Adjust the cursor column if needed.
+
+diff --git a/src/register.c b/src/register.c
+index 4dc0a68fd..461363be3 100644
+--- a/src/register.c
++++ b/src/register.c
+@@ -1928,7 +1928,7 @@ do_put(
+ 		ptr += yanklen;
+ 
+ 		// insert block's trailing spaces only if there's text behind
+-		if ((j < count - 1 || !shortline) && spaces)
++		if ((j < count - 1 || !shortline) && spaces > 0)
+ 		{
+ 		    vim_memset(ptr, ' ', (size_t)spaces);
+ 		    ptr += spaces;
+@@ -2284,6 +2284,15 @@ error:
+     msgmore(nr_lines);
+     curwin->w_set_curswant = TRUE;
+ 
++    // Make sure the cursor is not after the NUL.
++    int len = (int)STRLEN(ml_get_curline());
++    if (curwin->w_cursor.col > len)
++    {
++	if (cur_ve_flags == VE_ALL)
++	    curwin->w_cursor.coladd = curwin->w_cursor.col - len;
++	curwin->w_cursor.col = len;
++    }
++
+ end:
+     if (cmdmod.cmod_flags & CMOD_LOCKMARKS)
+     {
+diff --git a/src/testdir/test_put.vim b/src/testdir/test_put.vim
+index 66438bd3f..a6cea74ef 100644
+--- a/src/testdir/test_put.vim
++++ b/src/testdir/test_put.vim
+@@ -231,5 +231,16 @@ func Test_put_visual_mode()
+   set selection&
+ endfunc
+ 
++func Test_put_visual_block_mode()
++  enew
++  exe "norm 0R\<CR>\<C-C>V"
++  sil exe "norm \<C-V>c	\<MiddleDrag>"
++  set ve=all
++  sil norm vz=p
++
++  bwipe!
++  set ve=
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 8f26bdf47..022b9ffe8 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1376,
+ /**/
+     1375,
+ /**/

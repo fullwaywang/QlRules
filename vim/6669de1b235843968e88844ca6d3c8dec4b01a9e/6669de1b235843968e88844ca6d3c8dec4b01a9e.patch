@@ -1,0 +1,61 @@
+commit 6669de1b235843968e88844ca6d3c8dec4b01a9e
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Aug 21 20:33:47 2022 +0100
+
+    patch 9.0.0240: crash when using ":mkspell" with an empty .dic file
+    
+    Problem:    Crash when using ":mkspell" with an empty .dic file.
+    Solution:   Check for an empty word tree.
+
+diff --git a/src/spellfile.c b/src/spellfile.c
+index 5962a1048..7620affee 100644
+--- a/src/spellfile.c
++++ b/src/spellfile.c
+@@ -5585,10 +5585,12 @@ sug_filltree(spellinfo_T *spin, slang_T *slang)
+ 
+     /*
+      * Go through the whole case-folded tree, soundfold each word and put it
+-     * in the trie.
++     * in the trie.  Bail out if the tree is empty.
+      */
+     byts = slang->sl_fbyts;
+     idxs = slang->sl_fidxs;
++    if (byts == NULL || idxs == NULL)
++	return FAIL;
+ 
+     arridx[0] = 0;
+     curi[0] = 1;
+diff --git a/src/testdir/test_spellfile.vim b/src/testdir/test_spellfile.vim
+index 43dfad462..28e69bdc5 100644
+--- a/src/testdir/test_spellfile.vim
++++ b/src/testdir/test_spellfile.vim
+@@ -1168,4 +1168,16 @@ def Test_spellfile_allow_at_character()
+   delete('Xtest', 'rf')
+ enddef
+ 
++" this was using a NULL pointer
++func Test_mkspell_empty_dic()
++  call writefile(['1'], 'XtestEmpty.dic')
++  call writefile(['SOFOFROM abcd', 'SOFOTO ABCD', 'SAL CIA X'], 'XtestEmpty.aff')
++  mkspell! XtestEmpty.spl XtestEmpty
++
++  call delete('XtestEmpty.dic')
++  call delete('XtestEmpty.aff')
++  call delete('XtestEmpty.spl')
++endfunc
++
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index fe100c810..9e77abcee 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -731,6 +731,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    240,
+ /**/
+     239,
+ /**/

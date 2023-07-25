@@ -1,0 +1,35 @@
+commit a3545867fcdec50307c776ce0af28d07046a52dd
+Author: W.C.A. Wijngaards <wouter@nlnetlabs.nl>
+Date:   Tue Nov 19 16:42:17 2019 +0100
+
+    - Fix Integer Overflow to Buffer Overflow in
+      sldns_str2wire_dname_buf_origin(), reported by X41 D-Sec.
+
+diff --git a/doc/Changelog b/doc/Changelog
+index 7398075e..509b74b8 100644
+--- a/doc/Changelog
++++ b/doc/Changelog
+@@ -11,6 +11,8 @@
+ 	  reported by X41 D-Sec.
+ 	- Fix Integer Overflows in Size Calculations,
+ 	  reported by X41 D-Sec.
++	- Fix Integer Overflow to Buffer Overflow in
++	  sldns_str2wire_dname_buf_origin(), reported by X41 D-Sec.
+ 
+ 18 November 2019: Wouter
+ 	- In unbound-host use separate variable for get_option to please
+diff --git a/sldns/str2wire.c b/sldns/str2wire.c
+index 097f6210..f08f107c 100644
+--- a/sldns/str2wire.c
++++ b/sldns/str2wire.c
+@@ -150,6 +150,10 @@ int sldns_str2wire_dname_buf_origin(const char* str, uint8_t* buf, size_t* len,
+ 	if(s) return s;
+ 
+ 	if(rel && origin && dlen > 0) {
++		if((unsigned)dlen >= 0x00ffffffU ||
++			(unsigned)origin_len >= 0x00ffffffU)
++			/* guard against integer overflow in addition */
++			return RET_ERR(LDNS_WIREPARSE_ERR_GENERAL, *len);
+ 		if(dlen + origin_len - 1 > LDNS_MAX_DOMAINLEN)
+ 			return RET_ERR(LDNS_WIREPARSE_ERR_DOMAINNAME_OVERFLOW,
+ 				LDNS_MAX_DOMAINLEN);

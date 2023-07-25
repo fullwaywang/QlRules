@@ -1,0 +1,45 @@
+commit f8fbe9f934d65b2694fa74622e5eb2e1dc8cd20b
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Sat Jan 26 17:10:53 2019 +0100
+
+    BER: don't use invalid time offsets.
+    
+    4 digits values could overflow the destination buffer. Skip them
+    since they're invalid and can only from tainted data.
+    
+    Bug: 15447
+    Change-Id: Ice6d4f144597499483160ecaa63702025ab86f61
+    Reviewed-on: https://code.wireshark.org/review/31751
+    Petri-Dish: Peter Wu <peter@lekensteyn.nl>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Peter Wu <peter@lekensteyn.nl>
+    (cherry picked from commit cb47fe6b05a70776fdd6df4a84be26f8361587ea)
+    Reviewed-on: https://code.wireshark.org/review/31778
+
+diff --git a/epan/dissectors/packet-ber.c b/epan/dissectors/packet-ber.c
+index 9b0fe58033..bfa8d70b09 100644
+--- a/epan/dissectors/packet-ber.c
++++ b/epan/dissectors/packet-ber.c
+@@ -3675,7 +3675,7 @@ dissect_ber_GeneralizedTime(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree
+ 
+     first_delim[0]  = 0;
+     second_delim[0] = 0;
+-    ret = sscanf( tmpstr, "%14d%1[.,+-Z]%4d%1[+-Z]%4d", &tmp_int, first_delim, &first_digits, second_delim, &second_digits);
++    ret = sscanf(tmpstr, "%14d%1[.,+-Z]%4d%1[+-Z]%4d", &tmp_int, first_delim, &first_digits, second_delim, &second_digits);
+     /* tmp_int does not contain valid value because of overflow but we use it just for format checking */
+     if (ret < 1) {
+         /* Nothing matched */
+@@ -3701,9 +3701,11 @@ dissect_ber_GeneralizedTime(gboolean implicit_tag, asn1_ctx_t *actx, proto_tree
+             /*
+              * Fraction of a minute or an hour.
+              */
+-            if (ret == 2) {
++            if (ret == 2 || first_digits < 0 || first_digits > 999) {
+                 /*
+-                 * We saw the decimal sign, but didn't see the fraction.
++                 * We saw the decimal sign, but didn't see the fraction
++                 * or
++                 * we got a number outside the valid range.
+                  */
+                 goto invalid;
+             }

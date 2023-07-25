@@ -1,0 +1,8 @@
+commit 306b72134f157bbfd1637b20a22cabf4acfa136a
+Merge: 2cc97e87 c16300f0
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Fri Feb 18 20:12:32 2022 +0100
+
+    Merge pull request #562 from libexpat/utf8-security
+    
+    [CVE-2022-25235] lib: Protect against malformed encoding (e.g. malformed UTF-8)

@@ -1,0 +1,20 @@
+commit 7fd419441bc7103398e313558171d342c6315f44
+Author: Dirk Lemstra <dirk@git.imagemagick.org>
+Date:   Mon May 15 21:43:29 2017 +0200
+
+    Added check for incorrect number of meta channels report in #492.
+
+diff --git a/coders/mpc.c b/coders/mpc.c
+index 8088da492..86359572d 100644
+--- a/coders/mpc.c
++++ b/coders/mpc.c
+@@ -568,6 +568,9 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
+                 if (LocaleCompare(keyword,"number-meta-channels") == 0)
+                   {
+                     image->number_meta_channels=StringToUnsignedLong(options);
++                    if (image->number_meta_channels > MaxPixelChannels)
++                      ThrowReaderException(CorruptImageError,
++                        "ImproperImageHeader");
+                     break;
+                   }
+                 break;

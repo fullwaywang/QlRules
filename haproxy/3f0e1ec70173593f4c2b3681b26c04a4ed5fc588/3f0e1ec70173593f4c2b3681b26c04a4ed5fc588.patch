@@ -1,0 +1,45 @@
+commit 3f0e1ec70173593f4c2b3681b26c04a4ed5fc588
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Tue Apr 17 10:28:27 2018 +0200
+
+    BUG/CRITICAL: h2: fix incorrect frame length check
+    
+    The incoming H2 frame length was checked against the max_frame_size
+    setting instead of being checked against the bufsize. The max_frame_size
+    only applies to outgoing traffic and not to incoming one, so if a large
+    enough frame size is advertised in the SETTINGS frame, a wrapped frame
+    will be defragmented into a temporary allocated buffer where the second
+    fragment my overflow the heap by up to 16 kB.
+    
+    It is very unlikely that this can be exploited for code execution given
+    that buffers are very short lived and their address not realistically
+    predictable in production, but the likeliness of an immediate crash is
+    absolutely certain.
+    
+    This fix must be backported to 1.8.
+    
+    Many thanks to Jordan Zebor from F5 Networks for reporting this issue
+    in a responsible way.
+
+diff --git a/src/mux_h2.c b/src/mux_h2.c
+index a22ea2a32..f27131f7e 100644
+--- a/src/mux_h2.c
++++ b/src/mux_h2.c
+@@ -1735,7 +1735,7 @@ static void h2_process_demux(struct h2c *h2c)
+ 				goto fail;
+ 			}
+ 
+-			if ((int)hdr.len < 0 || (int)hdr.len > h2c->mfs) {
++			if ((int)hdr.len < 0 || (int)hdr.len > global.tune.bufsize) {
+ 				/* RFC7540#3.5: a GOAWAY frame MAY be omitted */
+ 				h2c_error(h2c, H2_ERR_FRAME_SIZE_ERROR);
+ 				h2c->st0 = H2_CS_ERROR2;
+@@ -1765,7 +1765,7 @@ static void h2_process_demux(struct h2c *h2c)
+ 			if (!h2_peek_frame_hdr(h2c->dbuf, &hdr))
+ 				break;
+ 
+-			if ((int)hdr.len < 0 || (int)hdr.len > h2c->mfs) {
++			if ((int)hdr.len < 0 || (int)hdr.len > global.tune.bufsize) {
+ 				h2c_error(h2c, H2_ERR_FRAME_SIZE_ERROR);
+ 				h2c->st0 = H2_CS_ERROR;
+ 				break;

@@ -1,0 +1,261 @@
+commit 6b485b146a1b9d6ce72dfd7b5f36456c166e7a16
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Wed Apr 15 17:21:46 2020 +0200
+
+    Fixed oob read in irp_write and similar
+
+diff --git a/channels/drive/client/drive_main.c b/channels/drive/client/drive_main.c
+index 861fad507..1b5422522 100644
+--- a/channels/drive/client/drive_main.c
++++ b/channels/drive/client/drive_main.c
+@@ -331,6 +331,7 @@ static UINT drive_process_irp_write(DRIVE_DEVICE* drive, IRP* irp)
+ 	DRIVE_FILE* file;
+ 	UINT32 Length;
+ 	UINT64 Offset;
++	void* ptr;
+ 
+ 	if (!drive || !irp || !irp->input || !irp->output || !irp->Complete)
+ 		return ERROR_INVALID_PARAMETER;
+@@ -341,6 +342,9 @@ static UINT drive_process_irp_write(DRIVE_DEVICE* drive, IRP* irp)
+ 	Stream_Read_UINT32(irp->input, Length);
+ 	Stream_Read_UINT64(irp->input, Offset);
+ 	Stream_Seek(irp->input, 20); /* Padding */
++	ptr = Stream_Pointer(irp->input);
++	if (!Stream_SafeSeek(irp->input, Length))
++		return ERROR_INVALID_DATA;
+ 	file = drive_get_file_by_id(drive, irp->FileId);
+ 
+ 	if (!file)
+@@ -353,7 +357,7 @@ static UINT drive_process_irp_write(DRIVE_DEVICE* drive, IRP* irp)
+ 		irp->IoStatus = drive_map_windows_err(GetLastError());
+ 		Length = 0;
+ 	}
+-	else if (!drive_file_write(file, Stream_Pointer(irp->input), Length))
++	else if (!drive_file_write(file, ptr, Length))
+ 	{
+ 		irp->IoStatus = drive_map_windows_err(GetLastError());
+ 		Length = 0;
+diff --git a/channels/printer/client/printer_main.c b/channels/printer/client/printer_main.c
+index 42bcd3fbf..39a474999 100644
+--- a/channels/printer/client/printer_main.c
++++ b/channels/printer/client/printer_main.c
+@@ -478,10 +478,16 @@ static UINT printer_process_irp_write(PRINTER_DEVICE* printer_dev, IRP* irp)
+ 	UINT64 Offset;
+ 	rdpPrintJob* printjob = NULL;
+ 	UINT error = CHANNEL_RC_OK;
++	void* ptr;
++
++	if (Stream_GetRemainingLength(irp->input) < 32)
++		return ERROR_INVALID_DATA;
+ 	Stream_Read_UINT32(irp->input, Length);
+ 	Stream_Read_UINT64(irp->input, Offset);
+ 	Stream_Seek(irp->input, 20); /* Padding */
+-
++	ptr = Stream_Pointer(irp->input);
++	if (!Stream_SafeSeek(irp->input, Length))
++		return ERROR_INVALID_DATA;
+ 	if (printer_dev->printer)
+ 		printjob = printer_dev->printer->FindPrintJob(printer_dev->printer, irp->FileId);
+ 
+@@ -492,7 +498,7 @@ static UINT printer_process_irp_write(PRINTER_DEVICE* printer_dev, IRP* irp)
+ 	}
+ 	else
+ 	{
+-		error = printjob->Write(printjob, Stream_Pointer(irp->input), Length);
++		error = printjob->Write(printjob, ptr, Length);
+ 	}
+ 
+ 	if (error)
+diff --git a/channels/rdpei/client/rdpei_main.c b/channels/rdpei/client/rdpei_main.c
+index 2e72bd449..7dd65211d 100644
+--- a/channels/rdpei/client/rdpei_main.c
++++ b/channels/rdpei/client/rdpei_main.c
+@@ -445,6 +445,9 @@ static UINT rdpei_recv_pdu(RDPEI_CHANNEL_CALLBACK* callback, wStream* s)
+ 	UINT16 eventId;
+ 	UINT32 pduLength;
+ 	UINT error;
++	if (Stream_GetRemainingLength(s) < 6)
++		return ERROR_INVALID_DATA;
++
+ 	Stream_Read_UINT16(s, eventId);   /* eventId (2 bytes) */
+ 	Stream_Read_UINT32(s, pduLength); /* pduLength (4 bytes) */
+ #ifdef WITH_DEBUG_RDPEI
+diff --git a/channels/serial/client/serial_main.c b/channels/serial/client/serial_main.c
+index cac534c8d..afe67b4d3 100644
+--- a/channels/serial/client/serial_main.c
++++ b/channels/serial/client/serial_main.c
+@@ -142,10 +142,9 @@ static UINT serial_process_irp_create(SERIAL_DEVICE* serial, IRP* irp)
+ 	Stream_Seek_UINT32(irp->input);                    /* CreateOptions (4 bytes) */
+ 	Stream_Read_UINT32(irp->input, PathLength);        /* PathLength (4 bytes) */
+ 
+-	if (Stream_GetRemainingLength(irp->input) < PathLength)
++	if (!Stream_SafeSeek(irp->input, PathLength)) /* Path (variable) */
+ 		return ERROR_INVALID_DATA;
+ 
+-	Stream_Seek(irp->input, PathLength); /* Path (variable) */
+ 	assert(PathLength == 0);             /* MS-RDPESP 2.2.2.2 */
+ #ifndef _WIN32
+ 	/* Windows 2012 server sends on a first call :
+@@ -300,6 +299,7 @@ static UINT serial_process_irp_write(SERIAL_DEVICE* serial, IRP* irp)
+ {
+ 	UINT32 Length;
+ 	UINT64 Offset;
++	void* ptr;
+ 	DWORD nbWritten = 0;
+ 
+ 	if (Stream_GetRemainingLength(irp->input) < 32)
+@@ -307,7 +307,9 @@ static UINT serial_process_irp_write(SERIAL_DEVICE* serial, IRP* irp)
+ 
+ 	Stream_Read_UINT32(irp->input, Length); /* Length (4 bytes) */
+ 	Stream_Read_UINT64(irp->input, Offset); /* Offset (8 bytes) */
+-	Stream_Seek(irp->input, 20);            /* Padding (20 bytes) */
++	if (!Stream_SafeSeek(irp->input, 20))   /* Padding (20 bytes) */
++		return ERROR_INVALID_DATA;
++
+ 	/* MS-RDPESP 3.2.5.1.5: The Offset field is ignored
+ 	 * assert(Offset == 0);
+ 	 *
+@@ -317,8 +319,11 @@ static UINT serial_process_irp_write(SERIAL_DEVICE* serial, IRP* irp)
+ 	WLog_Print(serial->log, WLOG_DEBUG, "writing %" PRIu32 " bytes to %s", Length,
+ 	           serial->device.name);
+ 
++	ptr = Stream_Pointer(irp->input);
++	if (!Stream_SafeSeek(irp->input, Length))
++		return ERROR_INVALID_DATA;
+ 	/* FIXME: CommWriteFile to be replaced by WriteFile */
+-	if (CommWriteFile(serial->hComm, Stream_Pointer(irp->input), Length, &nbWritten, NULL))
++	if (CommWriteFile(serial->hComm, ptr, Length, &nbWritten, NULL))
+ 	{
+ 		irp->IoStatus = STATUS_SUCCESS;
+ 	}
+diff --git a/libfreerdp/core/gateway/rdg.c b/libfreerdp/core/gateway/rdg.c
+index d8f17c20b..6ea9e4f06 100644
+--- a/libfreerdp/core/gateway/rdg.c
++++ b/libfreerdp/core/gateway/rdg.c
+@@ -304,7 +304,8 @@ static wStream* rdg_receive_packet(rdpRdg* rdg)
+ 	Stream_Seek(s, 4);
+ 	Stream_Read_UINT32(s, packetLength);
+ 
+-	if ((packetLength > INT_MAX) || !Stream_EnsureCapacity(s, packetLength))
++	if ((packetLength > INT_MAX) || !Stream_EnsureCapacity(s, packetLength) ||
++	    (packetLength < header))
+ 	{
+ 		Stream_Free(s, TRUE);
+ 		return NULL;
+diff --git a/libfreerdp/core/nego.c b/libfreerdp/core/nego.c
+index 543c2e54f..7cb509464 100644
+--- a/libfreerdp/core/nego.c
++++ b/libfreerdp/core/nego.c
+@@ -91,9 +91,9 @@ static BOOL nego_security_connect(rdpNego* nego);
+ static BOOL nego_send_preconnection_pdu(rdpNego* nego);
+ static BOOL nego_recv_response(rdpNego* nego);
+ static void nego_send(rdpNego* nego);
+-static void nego_process_negotiation_request(rdpNego* nego, wStream* s);
+-static void nego_process_negotiation_response(rdpNego* nego, wStream* s);
+-static void nego_process_negotiation_failure(rdpNego* nego, wStream* s);
++static BOOL nego_process_negotiation_request(rdpNego* nego, wStream* s);
++static BOOL nego_process_negotiation_response(rdpNego* nego, wStream* s);
++static BOOL nego_process_negotiation_failure(rdpNego* nego, wStream* s);
+ 
+ /**
+  * Negotiate protocol security and connect.
+@@ -618,7 +618,8 @@ int nego_recv(rdpTransport* transport, wStream* s, void* extra)
+ 		switch (type)
+ 		{
+ 			case TYPE_RDP_NEG_RSP:
+-				nego_process_negotiation_response(nego, s);
++				if (!nego_process_negotiation_response(nego, s))
++					return -1;
+ 				WLog_DBG(TAG, "selected_protocol: %" PRIu32 "", nego->SelectedProtocol);
+ 
+ 				/* enhanced security selected ? */
+@@ -645,7 +646,8 @@ int nego_recv(rdpTransport* transport, wStream* s, void* extra)
+ 				break;
+ 
+ 			case TYPE_RDP_NEG_FAILURE:
+-				nego_process_negotiation_failure(nego, s);
++				if (!nego_process_negotiation_failure(nego, s))
++					return -1;
+ 				break;
+ 		}
+ 	}
+@@ -795,7 +797,8 @@ BOOL nego_read_request(rdpNego* nego, wStream* s)
+ 			return FALSE;
+ 		}
+ 
+-		nego_process_negotiation_request(nego, s);
++		if (!nego_process_negotiation_request(nego, s))
++			return FALSE;
+ 	}
+ 
+ 	return tpkt_ensure_stream_consumed(s, length);
+@@ -918,15 +921,19 @@ fail:
+  * @param s
+  */
+ 
+-void nego_process_negotiation_request(rdpNego* nego, wStream* s)
++BOOL nego_process_negotiation_request(rdpNego* nego, wStream* s)
+ {
+ 	BYTE flags;
+ 	UINT16 length;
++
++	if (Stream_GetRemainingLength(s) < 7)
++		return FALSE;
+ 	Stream_Read_UINT8(s, flags);
+ 	Stream_Read_UINT16(s, length);
+ 	Stream_Read_UINT32(s, nego->RequestedProtocols);
+ 	WLog_DBG(TAG, "RDP_NEG_REQ: RequestedProtocol: 0x%08" PRIX32 "", nego->RequestedProtocols);
+ 	nego->state = NEGO_STATE_FINAL;
++	return TRUE;
+ }
+ 
+ /**
+@@ -935,7 +942,7 @@ void nego_process_negotiation_request(rdpNego* nego, wStream* s)
+  * @param s
+  */
+ 
+-void nego_process_negotiation_response(rdpNego* nego, wStream* s)
++BOOL nego_process_negotiation_response(rdpNego* nego, wStream* s)
+ {
+ 	UINT16 length;
+ 	WLog_DBG(TAG, "RDP_NEG_RSP");
+@@ -944,13 +951,14 @@ void nego_process_negotiation_response(rdpNego* nego, wStream* s)
+ 	{
+ 		WLog_ERR(TAG, "Invalid RDP_NEG_RSP");
+ 		nego->state = NEGO_STATE_FAIL;
+-		return;
++		return FALSE;
+ 	}
+ 
+ 	Stream_Read_UINT8(s, nego->flags);
+ 	Stream_Read_UINT16(s, length);
+ 	Stream_Read_UINT32(s, nego->SelectedProtocol);
+ 	nego->state = NEGO_STATE_FINAL;
++	return TRUE;
+ }
+ 
+ /**
+@@ -959,12 +967,14 @@ void nego_process_negotiation_response(rdpNego* nego, wStream* s)
+  * @param s
+  */
+ 
+-void nego_process_negotiation_failure(rdpNego* nego, wStream* s)
++BOOL nego_process_negotiation_failure(rdpNego* nego, wStream* s)
+ {
+ 	BYTE flags;
+ 	UINT16 length;
+ 	UINT32 failureCode;
+ 	WLog_DBG(TAG, "RDP_NEG_FAILURE");
++	if (Stream_GetRemainingLength(s) < 7)
++		return FALSE;
+ 	Stream_Read_UINT8(s, flags);
+ 	Stream_Read_UINT16(s, length);
+ 	Stream_Read_UINT32(s, failureCode);
+@@ -999,6 +1009,7 @@ void nego_process_negotiation_failure(rdpNego* nego, wStream* s)
+ 	}
+ 
+ 	nego->state = NEGO_STATE_FAIL;
++	return TRUE;
+ }
+ 
+ /**

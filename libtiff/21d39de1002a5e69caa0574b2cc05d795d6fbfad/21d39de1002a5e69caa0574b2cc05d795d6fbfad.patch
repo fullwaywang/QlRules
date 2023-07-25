@@ -1,0 +1,105 @@
+commit 21d39de1002a5e69caa0574b2cc05d795d6fbfad	21d39de1002a5e69caa0574b2cc05d795d6fbfad
+Author: erouault <erouault>
+Date:   Fri Nov 11 19:33:06 2016 +0000
+
+    * tools/tiffcrop.c: fix multiple uint32 overflows in
+    writeBufferToSeparateStrips(), writeBufferToContigTiles() and
+    writeBufferToSeparateTiles() that could cause heap buffer overflows.
+    Reported by Henri Salo from Nixu Corporation.
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2592
+
+diff --git a/ChangeLog b/ChangeLog
+index 4ff52810..b642c7ce 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,11 @@
++2016-11-11 Even Rouault <even.rouault at spatialys.com>
++
++	* tools/tiffcrop.c: fix multiple uint32 overflows in
++	writeBufferToSeparateStrips(), writeBufferToContigTiles() and
++	writeBufferToSeparateTiles() that could cause heap buffer overflows.
++	Reported by Henri Salo from Nixu Corporation.
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2592
++
+ 2016-11-10 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* libtiff/tif_strip.c: make TIFFNumberOfStrips() return the td->td_nstrips
+diff --git a/tools/tiffcrop.c b/tools/tiffcrop.c
+index 47177373..b6357c2d 100644
+--- a/tools/tiffcrop.c
++++ b/tools/tiffcrop.c
+@@ -148,6 +148,8 @@ extern int getopt(int argc, char * const argv[], const char *optstring);
+ #define PATH_MAX 1024
+ #endif
+ 
++#define TIFF_UINT32_MAX     0xFFFFFFFFU
++
+ #ifndef streq
+ #define	streq(a,b)	(strcmp((a),(b)) == 0)
+ #endif
+@@ -1164,7 +1166,24 @@ writeBufferToSeparateStrips (TIFF* out, uint8* buf,
+   (void) TIFFGetFieldDefaulted(out, TIFFTAG_ROWSPERSTRIP, &rowsperstrip);
+   (void) TIFFGetField(out, TIFFTAG_BITSPERSAMPLE, &bps);
+   bytes_per_sample = (bps + 7) / 8;
+-  rowsize = ((bps * spp * width) + 7) / 8; /* source has interleaved samples */
++  if( width == 0 ||
++      (uint32)bps * (uint32)spp > TIFF_UINT32_MAX / width ||
++      bps * spp * width > TIFF_UINT32_MAX - 7U )
++  {
++      TIFFError(TIFFFileName(out),
++            "Error, uint32 overflow when computing (bps * spp * width) + 7");
++      return 1;
++  }
++  rowsize = ((bps * spp * width) + 7U) / 8; /* source has interleaved samples */
++  if( bytes_per_sample == 0 ||
++      rowsperstrip > TIFF_UINT32_MAX / bytes_per_sample ||
++      rowsperstrip * bytes_per_sample > TIFF_UINT32_MAX / (width + 1) )
++  {
++      TIFFError(TIFFFileName(out),
++                "Error, uint32 overflow when computing rowsperstrip * "
++                "bytes_per_sample * (width + 1)");
++      return 1;
++  }
+   rowstripsize = rowsperstrip * bytes_per_sample * (width + 1); 
+ 
+   obuf = _TIFFmalloc (rowstripsize);
+@@ -1251,11 +1270,19 @@ static int writeBufferToContigTiles (TIFF* out, uint8* buf, uint32 imagelength,
+     }
+     }
+ 
++  if( imagewidth == 0 ||
++      (uint32)bps * (uint32)spp > TIFF_UINT32_MAX / imagewidth ||
++      bps * spp * imagewidth > TIFF_UINT32_MAX - 7U )
++  {
++      TIFFError(TIFFFileName(out),
++            "Error, uint32 overflow when computing (imagewidth * bps * spp) + 7");
++      return 1;
++  }
++  src_rowsize = ((imagewidth * spp * bps) + 7U) / 8;
++
+   tilebuf = _TIFFmalloc(tile_buffsize);
+   if (tilebuf == 0)
+     return 1;
+-
+-  src_rowsize = ((imagewidth * spp * bps) + 7) / 8;
+   for (row = 0; row < imagelength; row += tl)
+     {
+     nrow = (row + tl > imagelength) ? imagelength - row : tl;
+@@ -1315,7 +1342,16 @@ static int writeBufferToSeparateTiles (TIFF* out, uint8* buf, uint32 imagelength
+   TIFFGetField(out, TIFFTAG_TILELENGTH, &tl);
+   TIFFGetField(out, TIFFTAG_TILEWIDTH, &tw);
+   TIFFGetField(out, TIFFTAG_BITSPERSAMPLE, &bps);
+-  src_rowsize = ((imagewidth * spp * bps) + 7) / 8;
++
++  if( imagewidth == 0 ||
++      (uint32)bps * (uint32)spp > TIFF_UINT32_MAX / imagewidth ||
++      bps * spp * imagewidth > TIFF_UINT32_MAX - 7 )
++  {
++      TIFFError(TIFFFileName(out),
++            "Error, uint32 overflow when computing (imagewidth * bps * spp) + 7");
++      return 1;
++  }
++  src_rowsize = ((imagewidth * spp * bps) + 7U) / 8;
+          
+   for (row = 0; row < imagelength; row += tl)
+     {

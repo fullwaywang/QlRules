@@ -1,0 +1,31 @@
+commit 784d4d47e97b5d0fccccbd931349997a0e2074cc
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Sat Jul 29 17:51:10 2017 +0200
+
+    Fix breakage of 2fa0fc61f2d546c8b67e7c5a9cbc61d98e1f7af0 (#970)
+
+diff --git a/src/bin/jp2/convert.c b/src/bin/jp2/convert.c
+index 730ab909..b3eb8581 100644
+--- a/src/bin/jp2/convert.c
++++ b/src/bin/jp2/convert.c
+@@ -1896,8 +1896,9 @@ static int are_comps_similar(opj_image_t * image)
+     for (i = 1; i < image->numcomps; i++) {
+         if (image->comps[0].dx != image->comps[i].dx ||
+                 image->comps[0].dy != image->comps[i].dy ||
+-                image->comps[0].prec != image->comps[i].prec ||
+-                image->comps[0].sgnd != image->comps[i].sgnd) {
++                (i <= 2 &&
++                 (image->comps[0].prec != image->comps[i].prec ||
++                  image->comps[0].sgnd != image->comps[i].sgnd))) {
+             return OPJ_FALSE;
+         }
+     }
+@@ -1940,7 +1941,7 @@ int imagetopnm(opj_image_t * image, const char *outfile, int force_split)
+         ncomp = 1;
+     }
+ 
+-    if ((force_split == 0) &&
++    if ((force_split == 0) && ncomp >= 2 &&
+             are_comps_similar(image)) {
+         fdest = fopen(outfile, "wb");
+ 

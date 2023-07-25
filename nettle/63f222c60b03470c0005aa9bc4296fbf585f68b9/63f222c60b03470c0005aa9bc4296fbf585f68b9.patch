@@ -1,0 +1,37 @@
+commit 63f222c60b03470c0005aa9bc4296fbf585f68b9
+Author: Niels Möller <nisse@lysator.liu.se>
+Date:   Sat Mar 13 16:45:34 2021 +0100
+
+    Fix canonical reduction in gostdsa_vko.
+    
+    * gostdsa-vko.c (gostdsa_vko): Use ecc_mod_mul_canonical to
+    compute the scalar used for ecc multiplication.
+    
+    (cherry picked from commit b30e0ca6d2b41579a5b6a010fc54065d790e8d55)
+
+diff --git a/ChangeLog b/ChangeLog
+index ce330831..8a27a9a6 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,5 +1,8 @@
+ 2021-03-13  Niels Möller  <nisse@lysator.liu.se>
+ 
++	* gostdsa-vko.c (gostdsa_vko): Use ecc_mod_mul_canonical to
++	compute the scalar used for ecc multiplication.
++
+ 	* eddsa-hash.c (_eddsa_hash): Ensure result is canonically
+ 	reduced. Two of the three call sites need that.
+ 
+diff --git a/gostdsa-vko.c b/gostdsa-vko.c
+index a02d59a9..3dc42a1e 100644
+--- a/gostdsa-vko.c
++++ b/gostdsa-vko.c
+@@ -87,7 +87,7 @@ gostdsa_vko (const struct ecc_scalar *priv,
+   if (mpn_zero_p (UKM, size))
+     UKM[0] = 1;
+ 
+-  ecc_mod_mul (&ecc->q, TEMP, priv->p, UKM, TEMP); /* TEMP = UKM * priv */
++  ecc_mod_mul_canonical (&ecc->q, TEMP, priv->p, UKM, TEMP); /* TEMP = UKM * priv */
+   ecc->mul (ecc, XYZ, TEMP, pub->p, scratch + 4*size); /* XYZ = UKM * priv * pub */
+   ecc->h_to_a (ecc, 0, TEMP, XYZ, scratch + 5*size); /* TEMP = XYZ */
+   mpn_get_base256_le (out, bsize, TEMP, size);

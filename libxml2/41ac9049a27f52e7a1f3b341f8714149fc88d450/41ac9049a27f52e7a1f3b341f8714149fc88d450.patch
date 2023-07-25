@@ -1,0 +1,23 @@
+commit 41ac9049a27f52e7a1f3b341f8714149fc88d450	41ac9049a27f52e7a1f3b341f8714149fc88d450
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Tue Oct 27 10:53:44 2015 +0800
+
+    Fix an error in previous Conditional section patch
+    
+    an off by one mistake in the change, led to error on correct
+    document where the end of the included entity was exactly
+    the end of the conditional section, leading to regtest failure
+
+diff --git a/parser.c b/parser.c
+index b9217ff1..d67b3003 100644
+--- a/parser.c
++++ b/parser.c
+@@ -6916,7 +6916,7 @@ xmlParseConditionalSections(xmlParserCtxtPtr ctxt) {
+ 				 NULL, NULL);
+ 	}
+ 	if ((ctxt-> instate != XML_PARSER_EOF) &&
+-	    ((ctxt->input->cur + 3) < ctxt->input->end))
++	    ((ctxt->input->cur + 3) <= ctxt->input->end))
+ 	    SKIP(3);
+     }
+ }

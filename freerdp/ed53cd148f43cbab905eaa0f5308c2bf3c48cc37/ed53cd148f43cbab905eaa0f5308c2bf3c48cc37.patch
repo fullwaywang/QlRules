@@ -1,0 +1,41 @@
+commit ed53cd148f43cbab905eaa0f5308c2bf3c48cc37
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Tue Mar 31 09:21:43 2020 +0200
+
+    Fixed #6006: bounds checks in update_read_synchronize
+
+diff --git a/libfreerdp/core/update.c b/libfreerdp/core/update.c
+index 8c0658d12..086469682 100644
+--- a/libfreerdp/core/update.c
++++ b/libfreerdp/core/update.c
+@@ -287,14 +287,14 @@ fail:
+ 	return NULL;
+ }
+ 
+-static void update_read_synchronize(rdpUpdate* update, wStream* s)
++static BOOL update_read_synchronize(rdpUpdate* update, wStream* s)
+ {
+ 	WINPR_UNUSED(update);
+-	Stream_Seek_UINT16(s); /* pad2Octets (2 bytes) */
+-	                       /**
+-	                        * The Synchronize Update is an artifact from the
+-	                        * T.128 protocol and should be ignored.
+-	                        */
++	return Stream_SafeSeek(s, 2); /* pad2Octets (2 bytes) */
++	                              /**
++	                               * The Synchronize Update is an artifact from the
++	                               * T.128 protocol and should be ignored.
++	                               */
+ }
+ 
+ static BOOL update_read_play_sound(wStream* s, PLAY_SOUND_UPDATE* play_sound)
+@@ -807,7 +807,8 @@ BOOL update_recv(rdpUpdate* update, wStream* s)
+ 		break;
+ 
+ 		case UPDATE_TYPE_SYNCHRONIZE:
+-			update_read_synchronize(update, s);
++			if (!update_read_synchronize(update, s))
++				goto fail;
+ 			rc = IFCALLRESULT(TRUE, update->Synchronize, context);
+ 			break;
+ 

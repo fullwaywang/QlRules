@@ -1,114 +1,62 @@
+/**
+ * @name openssl-52e623c4cb06fffa9d5e75c60b34b4bc130b12e9-ssl3_get_client_certificate
+ * @id cpp/openssl/52e623c4cb06fffa9d5e75c60b34b4bc130b12e9/ssl3-get-client-certificate
+ * @description openssl-52e623c4cb06fffa9d5e75c60b34b4bc130b12e9-ssl/s3_srvr.c-ssl3_get_client_certificate CVE-2016-6306
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Function func) {
-	exists(Literal target_0 |
-		target_0.getValue()="3241"
-		and not target_0.getValue()="3247"
-		and target_0.getEnclosingFunction() = func)
+predicate func_0(Variable val_3182, Variable vnc_3184, Variable vllen_3184, ExprStmt target_1, RelationalOperation target_2, RelationalOperation target_3) {
+	exists(IfStmt target_0 |
+		target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vnc_3184
+		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(Literal).getValue()="3"
+		and target_0.getCondition().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vllen_3184
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=val_3182
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(Literal).getValue()="50"
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ERR_put_error")
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(3) instanceof StringLiteral
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(4) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(2).(GotoStmt).toString() = "goto ..."
+		and target_0.getThen().(BlockStmt).getStmt(2).(GotoStmt).getName() ="f_err"
+		and target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation())
+		and target_2.getLesserOperand().(VariableAccess).getLocation().isBefore(target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation())
+		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation().isBefore(target_3.getGreaterOperand().(AddExpr).getAnOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation()))
 }
 
-predicate func_1(Function func) {
-	exists(Literal target_1 |
-		target_1.getValue()="3248"
-		and not target_1.getValue()="3254"
-		and target_1.getEnclosingFunction() = func)
+predicate func_1(Variable val_3182, ExprStmt target_1) {
+		target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=val_3182
+		and target_1.getExpr().(AssignExpr).getRValue().(Literal).getValue()="50"
 }
 
-predicate func_2(Function func) {
-	exists(Literal target_2 |
-		target_2.getValue()="3254"
-		and not target_2.getValue()="3260"
-		and target_2.getEnclosingFunction() = func)
+predicate func_2(Variable vnc_3184, Variable vllen_3184, RelationalOperation target_2) {
+		 (target_2 instanceof GTExpr or target_2 instanceof LTExpr)
+		and target_2.getLesserOperand().(VariableAccess).getTarget()=vnc_3184
+		and target_2.getGreaterOperand().(VariableAccess).getTarget()=vllen_3184
 }
 
-predicate func_3(Function func) {
-	exists(Literal target_3 |
-		target_3.getValue()="3258"
-		and not target_3.getValue()="3264"
-		and target_3.getEnclosingFunction() = func)
+predicate func_3(Variable vnc_3184, Variable vllen_3184, RelationalOperation target_3) {
+		 (target_3 instanceof GTExpr or target_3 instanceof LTExpr)
+		and target_3.getGreaterOperand().(AddExpr).getAnOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vnc_3184
+		and target_3.getGreaterOperand().(AddExpr).getAnOperand().(Literal).getValue()="3"
+		and target_3.getLesserOperand().(VariableAccess).getTarget()=vllen_3184
 }
 
-predicate func_4(Function func) {
-	exists(Literal target_4 |
-		target_4.getValue()="3270"
-		and not target_4.getValue()="3276"
-		and target_4.getEnclosingFunction() = func)
-}
-
-predicate func_5(Function func) {
-	exists(Literal target_5 |
-		target_5.getValue()="3277"
-		and not target_5.getValue()="3283"
-		and target_5.getEnclosingFunction() = func)
-}
-
-predicate func_6(Function func) {
-	exists(Literal target_6 |
-		target_6.getValue()="3291"
-		and not target_6.getValue()="3297"
-		and target_6.getEnclosingFunction() = func)
-}
-
-predicate func_7(Function func) {
-	exists(Literal target_7 |
-		target_7.getValue()="3308"
-		and not target_7.getValue()="3314"
-		and target_7.getEnclosingFunction() = func)
-}
-
-predicate func_8(Variable val, Variable vnc, Variable vllen) {
-	exists(IfStmt target_8 |
-		target_8.getCondition().(GTExpr).getType().hasName("int")
-		and target_8.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getType().hasName("unsigned long")
-		and target_8.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(VariableAccess).getTarget()=vnc
-		and target_8.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getRightOperand().(Literal).getValue()="3"
-		and target_8.getCondition().(GTExpr).getLesserOperand().(VariableAccess).getTarget()=vllen
-		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getType().hasName("int")
-		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=val
-		and target_8.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(Literal).getValue()="50"
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ERR_put_error")
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getType().hasName("void")
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(Literal).getValue()="20"
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="137"
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="135"
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(3).(StringLiteral).getValue()="s3_srvr.c"
-		and target_8.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(4).(Literal).getValue()="3240")
-}
-
-predicate func_10(Variable val, Variable vl, Variable vnc, Variable vllen) {
-	exists(ExprStmt target_10 |
-		target_10.getExpr().(AssignExpr).getType().hasName("int")
-		and target_10.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=val
-		and target_10.getExpr().(AssignExpr).getRValue().(Literal).getValue()="50"
-		and target_10.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getType().hasName("int")
-		and target_10.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(AddExpr).getLeftOperand().(VariableAccess).getTarget()=vl
-		and target_10.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(AddExpr).getRightOperand().(VariableAccess).getTarget()=vnc
-		and target_10.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getRightOperand().(Literal).getValue()="3"
-		and target_10.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getLesserOperand().(VariableAccess).getTarget()=vllen)
-}
-
-from Function func, Variable val, Variable vl, Variable vnc, Variable vllen, Variable vp, Variable vq
+from Function func, Variable val_3182, Variable vnc_3184, Variable vllen_3184, ExprStmt target_1, RelationalOperation target_2, RelationalOperation target_3
 where
-func_0(func)
-and func_1(func)
-and func_2(func)
-and func_3(func)
-and func_4(func)
-and func_5(func)
-and func_6(func)
-and func_7(func)
-and not func_8(val, vnc, vllen)
-and func_10(val, vl, vnc, vllen)
-and val.getType().hasName("int")
-and vl.getType().hasName("unsigned long")
-and vnc.getType().hasName("unsigned long")
-and vllen.getType().hasName("unsigned long")
-and vp.getType().hasName("const unsigned char *")
-and vq.getType().hasName("const unsigned char *")
-and val.getParentScope+() = func
-and vl.getParentScope+() = func
-and vnc.getParentScope+() = func
-and vllen.getParentScope+() = func
-and vp.getParentScope+() = func
-and vq.getParentScope+() = func
-select func, val, vl, vnc, vllen, vp, vq
+not func_0(val_3182, vnc_3184, vllen_3184, target_1, target_2, target_3)
+and func_1(val_3182, target_1)
+and func_2(vnc_3184, vllen_3184, target_2)
+and func_3(vnc_3184, vllen_3184, target_3)
+and val_3182.getType().hasName("int")
+and vnc_3184.getType().hasName("unsigned long")
+and vllen_3184.getType().hasName("unsigned long")
+and val_3182.getParentScope+() = func
+and vnc_3184.getParentScope+() = func
+and vllen_3184.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

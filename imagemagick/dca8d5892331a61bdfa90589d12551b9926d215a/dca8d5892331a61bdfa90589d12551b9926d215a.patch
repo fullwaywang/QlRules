@@ -1,0 +1,17 @@
+commit dca8d5892331a61bdfa90589d12551b9926d215a
+Author: cristy <urban-warrior@git.imagemagick.org>
+Date:   Wed Oct 29 15:53:19 2014 +0000
+
+diff --git a/MagickCore/property.c b/MagickCore/property.c
+index e2b0262f2..8faf32f88 100644
+--- a/MagickCore/property.c
++++ b/MagickCore/property.c
+@@ -1352,6 +1352,8 @@ static MagickBooleanType GetEXIFProperty(const Image *image,
+             The directory entry contains an offset.
+           */
+           offset=(ssize_t) ((int) ReadPropertyLong(endian,q+8));
++          if ((offset < 0) || (size_t) offset >= length)
++            continue;
+           if ((ssize_t) (offset+number_bytes) < offset)
+             continue;  /* prevent overflow */
+           if ((size_t) (offset+number_bytes) > length)

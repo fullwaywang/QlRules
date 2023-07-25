@@ -1,3 +1,12 @@
+/**
+ * @name curl-058f98dc3fe595f21dc26-hashkey
+ * @id cpp/curl/058f98dc3fe595f21dc26/hashkey
+ * @description curl-058f98dc3fe595f21dc26-hashkey CVE-2022-27775
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
 predicate func_0(Function func) {
@@ -7,17 +16,23 @@ predicate func_0(Function func) {
 		and target_0.getEnclosingFunction() = func)
 }
 
-predicate func_1(Parameter vconn) {
+predicate func_1(Parameter vconn_135) {
 	exists(PointerFieldAccess target_1 |
 		target_1.getTarget().getName()="scope_id"
-		and target_1.getType().hasName("unsigned int")
-		and target_1.getQualifier().(VariableAccess).getTarget()=vconn)
+		and target_1.getQualifier().(VariableAccess).getTarget()=vconn_135)
 }
 
-from Function func, Parameter vconn
+predicate func_2(Parameter vconn_135) {
+	exists(PointerFieldAccess target_2 |
+		target_2.getTarget().getName()="host"
+		and target_2.getQualifier().(VariableAccess).getTarget()=vconn_135)
+}
+
+from Function func, Parameter vconn_135
 where
 func_0(func)
-and not func_1(vconn)
-and vconn.getType().hasName("connectdata *")
-and vconn.getParentScope+() = func
-select func, vconn
+and not func_1(vconn_135)
+and vconn_135.getType().hasName("connectdata *")
+and func_2(vconn_135)
+and vconn_135.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

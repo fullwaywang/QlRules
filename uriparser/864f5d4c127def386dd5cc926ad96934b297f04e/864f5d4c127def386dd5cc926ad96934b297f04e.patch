@@ -1,0 +1,70 @@
+commit 864f5d4c127def386dd5cc926ad96934b297f04e
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Sun Sep 23 20:07:25 2018 +0200
+
+    UriQuery.c: Fix out-of-bounds-write in ComposeQuery and ...Ex
+    
+    Reported by Google Autofuzz team
+
+diff --git a/src/UriQuery.c b/src/UriQuery.c
+index 5fd6b68..eb22157 100644
+--- a/src/UriQuery.c
++++ b/src/UriQuery.c
+@@ -223,6 +223,7 @@ int URI_FUNC(ComposeQueryEngine)(URI_CHAR * dest,
+ 
+ 			/* Copy key */
+ 			if (firstItem == URI_TRUE) {
++				ampersandLen = 1;
+ 				firstItem = URI_FALSE;
+ 			} else {
+ 				write[0] = _UT('&');
+diff --git a/test/test.cpp b/test/test.cpp
+index 41e3912..dbb8adb 100644
+--- a/test/test.cpp
++++ b/test/test.cpp
+@@ -104,6 +104,7 @@ public:
+ 		TEST_ADD(UriSuite::testQueryList)
+ 		TEST_ADD(UriSuite::testQueryListPair)
+ 		TEST_ADD(UriSuite::testQueryDissection_Bug3590761)
++		TEST_ADD(UriSuite::testQueryCompositionMathWrite_GoogleAutofuzz113244572)
+ 		TEST_ADD(UriSuite::testFreeCrash_Bug20080827)
+ 		TEST_ADD(UriSuite::testParseInvalid_Bug16)
+ 		TEST_ADD(UriSuite::testRangeComparison)
+@@ -1749,6 +1750,37 @@ Rule                                | Example | hostSet | absPath | emptySeg
+ 		uriFreeQueryListA(queryList);
+ 	}
+ 
++	void testQueryCompositionMathWrite_GoogleAutofuzz113244572() {
++		UriQueryListA second = { .key = "\x11", .value = NULL, .next = NULL };
++		UriQueryListA first = { .key = "\x01", .value = "\x02", .next = &second };
++
++		const UriBool spaceToPlus = URI_TRUE;
++		const UriBool normalizeBreaks = URI_FALSE;  /* for factor 3 but 6 */
++
++		const int charsRequired = (3 + 1 + 3) + 1 + (3);
++
++		{
++			// Minimum space to hold everything fine
++			const char * const expected = "%01=%02" "&" "%11";
++			char dest[charsRequired + 1];
++			int charsWritten;
++			TEST_ASSERT(uriComposeQueryExA(dest, &first, sizeof(dest),
++					&charsWritten, spaceToPlus, normalizeBreaks)
++				== URI_SUCCESS);
++			TEST_ASSERT(! strcmp(dest, expected));
++			TEST_ASSERT(charsWritten == strlen(expected) + 1);
++		}
++
++		{
++			// Previous math failed to take ampersand into account
++			char dest[charsRequired + 1 - 1];
++			int charsWritten;
++			TEST_ASSERT(uriComposeQueryExA(dest, &first, sizeof(dest),
++					&charsWritten, spaceToPlus, normalizeBreaks)
++				== URI_ERROR_OUTPUT_TOO_LARGE);
++		}
++	}
++
+ 	void testFreeCrash_Bug20080827() {
+ 		char const * const sourceUri = "abc";
+ 		char const * const baseUri = "http://www.example.org/";

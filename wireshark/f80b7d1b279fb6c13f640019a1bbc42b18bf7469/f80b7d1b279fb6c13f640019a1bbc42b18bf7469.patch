@@ -1,0 +1,62 @@
+commit f80b7d1b279fb6c13f640019a1bbc42b18bf7469
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Tue Mar 12 14:47:00 2019 +0100
+
+    gsm_gsup: check the current len against the caller length.
+    
+    When the former is greater than the latter, we have a malformed
+    packet. Add an expert info and stop the dissection.
+    
+    Bug: 15585
+    Change-Id: I37e35ed7bfe96fe6896fa5bf3c32bae50a427c60
+    Reviewed-on: https://code.wireshark.org/review/32382
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Oliver Smith <osmith@sysmocom.de>
+    Reviewed-by: Dario Lombardo <lomato@gmail.com>
+    (cherry picked from commit 5d9d7893d6723b4545d4c2c765002e4830493dc6)
+    Reviewed-on: https://code.wireshark.org/review/32396
+
+diff --git a/epan/dissectors/packet-gsm_gsup.c b/epan/dissectors/packet-gsm_gsup.c
+index 365c824cae..a3fad1269d 100644
+--- a/epan/dissectors/packet-gsm_gsup.c
++++ b/epan/dissectors/packet-gsm_gsup.c
+@@ -237,6 +237,7 @@ static gint ett_gsup_ie = -1;
+ 
+ static expert_field ei_sm_rp_da_invalid = EI_INIT;
+ static expert_field ei_sm_rp_oa_invalid = EI_INIT;
++static expert_field ei_gsup_ie_len_invalid = EI_INIT;
+ 
+ static dissector_handle_t gsm_map_handle;
+ static dissector_handle_t gsm_sms_handle;
+@@ -522,7 +523,7 @@ dissect_gsup_tlvs(tvbuff_t *tvb, int base_offs, int length, packet_info *pinfo,
+ 
+ 	while (offset - base_offs < length) {
+ 		guint8 tag;
+-		unsigned int len;
++		guint8 len;
+ 		proto_item *ti;
+ 		proto_tree *att_tree;
+ 		const guchar *apn;
+@@ -535,6 +536,11 @@ dissect_gsup_tlvs(tvbuff_t *tvb, int base_offs, int length, packet_info *pinfo,
+ 		len = tvb_get_guint8(tvb, offset);
+ 		offset++;
+ 
++		if (offset - base_offs + len > length) {
++			expert_add_info(pinfo, gsup_ti, &ei_gsup_ie_len_invalid);
++			return offset - 2;
++		}
++
+ 		att_tree = proto_tree_add_subtree_format(tree, tvb, offset-2, len+2, ett_gsup_ie, &ti,
+ 						"IE: %s",
+ 						val_to_str(tag, gsup_iei_types, "Unknown 0x%02x"));
+@@ -778,6 +784,9 @@ proto_register_gsup(void)
+ 		{ &ei_sm_rp_oa_invalid,
+ 		  { "gsup.sm_rp_oa.invalid", PI_PROTOCOL, PI_ERROR,
+ 		    "Malformed SM-RP-OA IE", EXPFILL } },
++		{ &ei_gsup_ie_len_invalid,
++		  { "gsup.ie.len.invalid", PI_PROTOCOL, PI_MALFORMED,
++		    "Invalid Information Element Length", EXPFILL } },
+ 	};
+ 
+ 	proto_gsup = proto_register_protocol("Osmocom General Subscriber Update Protocol", "gsup", "gsup");

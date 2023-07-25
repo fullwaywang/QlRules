@@ -1,0 +1,23 @@
+commit f1a38264f20382731cf2cc75fdd98f4c9a84a626
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Thu Jul 16 11:52:33 2015 +0200
+
+    avcodec/pthread_frame: clear priv_data, avoid stale pointer in error case
+    
+    Fixes: b4b47bc2b3fb7ca710bfffe5aa969e37_signal_sigabrt_7ffff70eccc9_744_nc_sample2.avi with memlimit of 4194304
+    
+    Found-by: Samuel Groß, Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/pthread_frame.c b/libavcodec/pthread_frame.c
+index df372e0c99..8987c12fe7 100644
+--- a/libavcodec/pthread_frame.c
++++ b/libavcodec/pthread_frame.c
+@@ -690,6 +690,7 @@ int ff_frame_thread_init(AVCodecContext *avctx)
+ 
+         copy->internal = av_malloc(sizeof(AVCodecInternal));
+         if (!copy->internal) {
++            copy->priv_data = NULL;
+             err = AVERROR(ENOMEM);
+             goto error;
+         }

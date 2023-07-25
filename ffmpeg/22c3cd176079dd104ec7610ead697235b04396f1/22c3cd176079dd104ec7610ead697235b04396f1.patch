@@ -1,0 +1,35 @@
+commit 22c3cd176079dd104ec7610ead697235b04396f1
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Tue Sep 29 10:21:34 2020 +0200
+
+    avformat/movenc: Fix segfault when remuxing rtp hint stream
+    
+    When remuxing an rtp hint stream (or any stream with the tag "rtp "),
+    the mov muxer treats this as one of the rtp hint tracks it creates
+    internally when ordered to do so; yet this track lacks the
+    AVFormatContext for the hinting rtp muxer, leading to segfaults in
+    mov_write_udta_sdp() if a "trak" atom is written for this stream; if not,
+    the stream's codecpar is freed by mov_free() as if the mov muxer owned
+    it (it does for the internally created "rtp " tracks), but without
+    resetting st->codecpar, leading to double-frees lateron. This commit
+    therefore ignores said tag which makes rtp hint streams unremuxable.
+    
+    This fixes tickets #8181 and #8186.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index 6c641d549d..ae32b39dbb 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -1653,6 +1653,10 @@ static unsigned int mov_get_codec_tag(AVFormatContext *s, MOVTrack *track)
+ {
+     unsigned int tag = track->par->codec_tag;
+ 
++    // "rtp " is used to distinguish internally created RTP-hint tracks
++    // (with rtp_ctx) from other tracks.
++    if (tag == MKTAG('r','t','p',' '))
++        tag = 0;
+     if (!tag || (s->strict_std_compliance >= FF_COMPLIANCE_NORMAL &&
+                  (track->par->codec_id == AV_CODEC_ID_DVVIDEO ||
+                   track->par->codec_id == AV_CODEC_ID_RAWVIDEO ||

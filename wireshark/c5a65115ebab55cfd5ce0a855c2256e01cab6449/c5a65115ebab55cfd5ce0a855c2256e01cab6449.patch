@@ -1,0 +1,36 @@
+commit c5a65115ebab55cfd5ce0a855c2256e01cab6449
+Author: Peter Wu <peter@lekensteyn.nl>
+Date:   Thu Oct 11 13:04:03 2018 +0200
+
+    DCOM: always NUL-terminate dissect_dcom_BSTR results
+    
+    All of the six users in plugins/epan/profinet/packet-dcom-cba.c expect
+    the string to be NUL-terminated, so ensure this to avoid reading
+    uninitialized memory for the Info column.
+    
+    Bug: 15130
+    Change-Id: Ibc922068d14b87ce324af3cec22a5f8343088b40
+    Reviewed-on: https://code.wireshark.org/review/30128
+    Petri-Dish: Peter Wu <peter@lekensteyn.nl>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit ec6ace066ae4c889d4c18a0a38a8c6053483877b)
+    Reviewed-on: https://code.wireshark.org/review/30159
+    Reviewed-by: Peter Wu <peter@lekensteyn.nl>
+
+diff --git a/epan/dissectors/packet-dcom.c b/epan/dissectors/packet-dcom.c
+index c6b6892cb6..0cba816915 100644
+--- a/epan/dissectors/packet-dcom.c
++++ b/epan/dissectors/packet-dcom.c
+@@ -1738,8 +1738,10 @@ dissect_dcom_BSTR(tvbuff_t *tvb, gint offset, packet_info *pinfo,
+ 	offset = dissect_dcom_dcerpc_array_size(tvb, offset, pinfo, sub_tree, di, drep,
+ 			&u32ArraySize);
+ 
+-	if ((guint32)offset + u32ArraySize*2 > G_MAXINT)
++	if ((guint32)offset + u32ArraySize*2 > G_MAXINT) {
++		pszStr[0] = 0;
+ 		return offset;
++	}
+ 
+ 	realOffset = offset + u32ArraySize*2;
+ 

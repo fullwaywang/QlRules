@@ -1,0 +1,19 @@
+commit c8718305f120293d8bf13724f12eed885d830b09
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Tue Mar 22 20:11:47 2022 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/4974
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 31839f67e..32ae00ab8 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -1987,7 +1987,7 @@ static Image *ReadTIFFImage(const ImageInfo *image_info,
+         number_pixels=(MagickSizeType) columns*rows;
+         if (HeapOverflowSanityCheck(rows,sizeof(*tile_pixels)) != MagickFalse)
+           ThrowTIFFException(ResourceLimitError,"MemoryAllocationFailed");
+-        extent=MagickMax(rows*TIFFTileRowSize(tiff),TIFFTileSize(tiff));
++        extent=4*MagickMax(rows*TIFFTileRowSize(tiff),TIFFTileSize(tiff));
+ #if defined(TIFF_VERSION_BIG)
+         extent+=image->columns*sizeof(uint64);
+ #else

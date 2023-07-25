@@ -1,0 +1,57 @@
+commit d25f003342aca9889067f2e839963dfeccf1fe05
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Jun 30 12:30:19 2022 +0100
+
+    patch 9.0.0011: reading beyond the end of the line with put command
+    
+    Problem:    Reading beyond the end of the line with put command.
+    Solution:   Adjust the end mark position.
+
+diff --git a/src/register.c b/src/register.c
+index 93860bae6..30e2001da 100644
+--- a/src/register.c
++++ b/src/register.c
+@@ -1918,6 +1918,8 @@ do_put(
+ 		    vim_memset(ptr, ' ', (size_t)spaces);
+ 		    ptr += spaces;
+ 		}
++		else
++		    totlen -= spaces;  // didn't use these spaces
+ 	    }
+ 
+ 	    // may insert some spaces after the new text
+diff --git a/src/testdir/test_put.vim b/src/testdir/test_put.vim
+index aa5aa2b99..66438bd3f 100644
+--- a/src/testdir/test_put.vim
++++ b/src/testdir/test_put.vim
+@@ -219,5 +219,17 @@ func Test_put_empty_register()
+   bwipe!
+ endfunc
+ 
++" this was putting the end mark after the end of the line
++func Test_put_visual_mode()
++  edit! SomeNewBuffer
++  set selection=exclusive
++  exe "norm o\t"
++  m0
++  sil! norm pp
++
++  bwipe!
++  set selection&
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index c2726aa77..11fd817ed 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    11,
+ /**/
+     10,
+ /**/

@@ -1,0 +1,213 @@
+commit 3d1b8004ed3a07422ca5d4e4ee8097150b934fd2
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Thu Jan 31 15:40:24 2019 +0100
+
+    tcap: check p_tcap_private before dereferencing.
+    
+    This caused a NULL pointer dereference on ASAN builds with
+    malformed packets.
+    
+    AddressSanitizer:DEADLYSIGNAL
+    =================================================================
+    ==15485==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000008 (pc 0x7ff49a4281fa bp 0x7ffe5257a4d0 sp 0x7ffe5257a2c0 T0)
+    ==15485==The signal is caused by a WRITE memory access.
+    ==15485==Hint: address points to the zero page.
+        #0 0x7ff49a4281f9 in dissect_tcap_AARQ_application_context_name wireshark/epan/dissectors/./asn1/tcap/tcap.cnf
+        #1 0x7ff498e7bab1 in dissect_ber_sequence wireshark/epan/dissectors/packet-ber.c:2425:17
+    
+    Bug: 15464
+    Change-Id: I8fd4f09a1356211acb180e4598a33fce96d98e94
+    Reviewed-on: https://code.wireshark.org/review/31840
+    Reviewed-by: Pascal Quantin <pascal.quantin@gmail.com>
+    Petri-Dish: Pascal Quantin <pascal.quantin@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 34873a20eb489562098c5a58085ae783f869525c)
+    Reviewed-on: https://code.wireshark.org/review/31842
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+    Reviewed-by: Dario Lombardo <lomato@gmail.com>
+
+diff --git a/epan/dissectors/asn1/tcap/tcap.cnf b/epan/dissectors/asn1/tcap/tcap.cnf
+index 8898561d4a..0a6e54bcc3 100644
+--- a/epan/dissectors/asn1/tcap/tcap.cnf
++++ b/epan/dissectors/asn1/tcap/tcap.cnf
+@@ -115,20 +115,26 @@ ABRT-apdu/_untag/user-information abrt_user_information
+ #.FN_BODY AUDT-apdu/_untag/application-context-name  FN_VARIANT = _str  VAL_PTR = &cur_oid
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+ %(DEFAULT_BODY)s
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ #----------------------------------------------------------------------------------------
+ #.FN_BODY AARQ-apdu/_untag/application-context-name  FN_VARIANT = _str  VAL_PTR = &cur_oid
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+ %(DEFAULT_BODY)s
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ #----------------------------------------------------------------------------------------
+ #.FN_BODY AARE-apdu/_untag/application-context-name  FN_VARIANT = _str  VAL_PTR = &cur_oid
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+ %(DEFAULT_BODY)s
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ #----------------------------------------------------------------------------------------
+ #.FN_BODY OrigTransactionID
+   tvbuff_t *parameter_tvb;
+@@ -166,7 +172,8 @@ ABRT-apdu/_untag/user-information abrt_user_information
+       gp_tcapsrt_info->src_tid=0;
+       break;
+     }
+-    p_tcap_private->src_tid = gp_tcapsrt_info->src_tid;
++    if (p_tcap_private)
++      p_tcap_private->src_tid = gp_tcapsrt_info->src_tid;
+ 
+     if (len) {
+       col_append_str(actx->pinfo->cinfo, COL_INFO, "otid(");
+@@ -214,7 +221,8 @@ ABRT-apdu/_untag/user-information abrt_user_information
+       gp_tcapsrt_info->dst_tid=0;
+       break;
+     }
+-    p_tcap_private->dst_tid = gp_tcapsrt_info->dst_tid;
++    if (p_tcap_private)
++      p_tcap_private->dst_tid = gp_tcapsrt_info->dst_tid;
+ 
+     if (len) {
+       col_append_str(actx->pinfo->cinfo, COL_INFO, "dtid(");
+diff --git a/epan/dissectors/packet-tcap.c b/epan/dissectors/packet-tcap.c
+index 51611ee1a8..a325f5c31b 100644
+--- a/epan/dissectors/packet-tcap.c
++++ b/epan/dissectors/packet-tcap.c
+@@ -755,7 +755,7 @@ dissect_tcap_OCTET_STRING_SIZE_1_4(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
+ 
+ static int
+ dissect_tcap_OrigTransactionID(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 134 "./asn1/tcap/tcap.cnf"
++#line 140 "./asn1/tcap/tcap.cnf"
+   tvbuff_t *parameter_tvb;
+   guint8 len, i;
+   proto_tree *subtree;
+@@ -793,7 +793,8 @@ dissect_tcap_OrigTransactionID(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int
+       gp_tcapsrt_info->src_tid=0;
+       break;
+     }
+-    p_tcap_private->src_tid = gp_tcapsrt_info->src_tid;
++    if (p_tcap_private)
++      p_tcap_private->src_tid = gp_tcapsrt_info->src_tid;
+ 
+     if (len) {
+       col_append_str(actx->pinfo->cinfo, COL_INFO, "otid(");
+@@ -819,7 +820,7 @@ static const ber_sequence_t Begin_sequence[] = {
+ 
+ static int
+ dissect_tcap_Begin(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 228 "./asn1/tcap/tcap.cnf"
++#line 236 "./asn1/tcap/tcap.cnf"
+ gp_tcapsrt_info->ope=TC_BEGIN;
+ 
+ /*  Do not change col_add_str() to col_append_str() here: we _want_ this call
+@@ -841,7 +842,7 @@ gp_tcapsrt_info->ope=TC_BEGIN;
+ 
+ static int
+ dissect_tcap_DestTransactionID(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 182 "./asn1/tcap/tcap.cnf"
++#line 189 "./asn1/tcap/tcap.cnf"
+   tvbuff_t *parameter_tvb;
+   guint8 len , i;
+   proto_tree *subtree;
+@@ -879,7 +880,8 @@ dissect_tcap_DestTransactionID(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int
+       gp_tcapsrt_info->dst_tid=0;
+       break;
+     }
+-    p_tcap_private->dst_tid = gp_tcapsrt_info->dst_tid;
++    if (p_tcap_private)
++      p_tcap_private->dst_tid = gp_tcapsrt_info->dst_tid;
+ 
+     if (len) {
+       col_append_str(actx->pinfo->cinfo, COL_INFO, "dtid(");
+@@ -904,7 +906,7 @@ static const ber_sequence_t End_sequence[] = {
+ 
+ static int
+ dissect_tcap_End(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 242 "./asn1/tcap/tcap.cnf"
++#line 250 "./asn1/tcap/tcap.cnf"
+ gp_tcapsrt_info->ope=TC_END;
+ 
+   col_set_str(actx->pinfo->cinfo, COL_INFO, "End ");
+@@ -926,7 +928,7 @@ static const ber_sequence_t Continue_sequence[] = {
+ 
+ static int
+ dissect_tcap_Continue(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 249 "./asn1/tcap/tcap.cnf"
++#line 257 "./asn1/tcap/tcap.cnf"
+ gp_tcapsrt_info->ope=TC_CONT;
+ 
+   col_set_str(actx->pinfo->cinfo, COL_INFO, "Continue ");
+@@ -997,7 +999,7 @@ static const ber_sequence_t Abort_sequence[] = {
+ 
+ static int
+ dissect_tcap_Abort(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 256 "./asn1/tcap/tcap.cnf"
++#line 264 "./asn1/tcap/tcap.cnf"
+ gp_tcapsrt_info->ope=TC_ABORT;
+ 
+   col_set_str(actx->pinfo->cinfo, COL_INFO, "Abort ");
+@@ -1050,8 +1052,10 @@ dissect_tcap_AUDT_application_context_name(gboolean implicit_tag _U_, tvbuff_t *
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+   offset = dissect_ber_object_identifier_str(implicit_tag, actx, tree, tvb, offset, hf_index, &cur_oid);
+ 
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ 
+ 
+   return offset;
+@@ -1144,12 +1148,14 @@ dissect_tcap_AARQ_protocol_version(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
+ 
+ static int
+ dissect_tcap_AARQ_application_context_name(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 122 "./asn1/tcap/tcap.cnf"
++#line 124 "./asn1/tcap/tcap.cnf"
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+   offset = dissect_ber_object_identifier_str(implicit_tag, actx, tree, tvb, offset, hf_index, &cur_oid);
+ 
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ 
+ 
+   return offset;
+@@ -1213,12 +1219,14 @@ dissect_tcap_AARE_protocol_version(gboolean implicit_tag _U_, tvbuff_t *tvb _U_,
+ 
+ static int
+ dissect_tcap_AARE_application_context_name(gboolean implicit_tag _U_, tvbuff_t *tvb _U_, int offset _U_, asn1_ctx_t *actx _U_, proto_tree *tree _U_, int hf_index _U_) {
+-#line 128 "./asn1/tcap/tcap.cnf"
++#line 132 "./asn1/tcap/tcap.cnf"
+   struct tcap_private_t *p_tcap_private = (struct tcap_private_t*)actx->value_ptr;
+   offset = dissect_ber_object_identifier_str(implicit_tag, actx, tree, tvb, offset, hf_index, &cur_oid);
+ 
+-  p_tcap_private->oid= (const void*) cur_oid;
+-  p_tcap_private->acv=TRUE;
++  if (p_tcap_private) {
++    p_tcap_private->oid= (const void*) cur_oid;
++    p_tcap_private->acv=TRUE;
++  }
+ 
+ 
+   return offset;

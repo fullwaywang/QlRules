@@ -1,0 +1,24 @@
+commit 695af8eed642ff0104834495652d1ee784a4c14d	695af8eed642ff0104834495652d1ee784a4c14d
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Feb 2 21:11:54 2013 +0100
+
+    h264: skip error concealment when SPS and slices are mismatching
+    
+    Fixes out of array accesses
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/h264.c b/libavcodec/h264.c
+index 50839bd83c..34cd8c0658 100644
+--- a/libavcodec/h264.c
++++ b/libavcodec/h264.c
+@@ -2367,7 +2367,7 @@ static int field_end(H264Context *h, int in_setup)
+      * past end by one (callers fault) and resync_mb_y != 0
+      * causes problems for the first MB line, too.
+      */
+-    if (!FIELD_PICTURE && h->current_slice)
++    if (!FIELD_PICTURE && h->current_slice && !h->sps.new)
+         ff_er_frame_end(s);
+ 
+     ff_MPV_frame_end(s);

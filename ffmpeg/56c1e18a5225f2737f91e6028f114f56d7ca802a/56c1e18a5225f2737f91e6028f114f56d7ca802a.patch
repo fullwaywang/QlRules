@@ -1,0 +1,42 @@
+commit 56c1e18a5225f2737f91e6028f114f56d7ca802a	56c1e18a5225f2737f91e6028f114f56d7ca802a
+Author: Anton Khirnov <anton@khirnov.net>
+Date:   Thu Dec 13 17:53:31 2012 +0100
+
+    mpeg12: do not decode extradata more than once.
+    
+    Fixes CVE-2012-2803.
+    
+    CC: libav-stable@libav.org
+    (cherry picked from commit 582368626188c070d4300913c6da5efa4c24cfb2)
+    
+    Conflicts:
+    
+            libavcodec/mpeg12.c
+
+diff --git a/libavcodec/mpeg12.c b/libavcodec/mpeg12.c
+index 65dfe472e9..436b4cf376 100644
+--- a/libavcodec/mpeg12.c
++++ b/libavcodec/mpeg12.c
+@@ -2223,8 +2223,9 @@ static int mpeg_decode_frame(AVCodecContext *avctx,
+ 
+     s->slice_count = 0;
+ 
+-    if (avctx->extradata && !avctx->frame_number) {
++    if (avctx->extradata && !s->extradata_decoded) {
+         int ret = decode_chunks(avctx, picture, data_size, avctx->extradata, avctx->extradata_size);
++        s->extradata_decoded = 1;
+         if (ret < 0 && (avctx->err_recognition & AV_EF_EXPLODE))
+             return ret;
+     }
+diff --git a/libavcodec/mpeg12.h b/libavcodec/mpeg12.h
+index ab0352ff10..0f9faaf19c 100644
+--- a/libavcodec/mpeg12.h
++++ b/libavcodec/mpeg12.h
+@@ -42,6 +42,7 @@ typedef struct Mpeg1Context {
+     AVRational frame_rate_ext;       ///< MPEG-2 specific framerate modificator
+     int sync;                        ///< Did we reach a sync point like a GOP/SEQ/KEYFrame?
+     int closed_gop;                  ///< GOP is closed
++    int extradata_decoded;
+ } Mpeg1Context;
+ 
+ extern uint8_t ff_mpeg12_static_rl_table_store[2][2][2*MAX_RUN + MAX_LEVEL + 3];

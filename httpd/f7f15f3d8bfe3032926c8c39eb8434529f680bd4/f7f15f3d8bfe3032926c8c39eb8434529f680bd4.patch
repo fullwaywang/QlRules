@@ -1,0 +1,38 @@
+commit f7f15f3d8bfe3032926c8c39eb8434529f680bd4
+Author: Yann Ylavic <ylavic@apache.org>
+Date:   Wed Jun 1 13:48:21 2022 +0000
+
+    mod_proxy_ajp: T-E has precedence over C-L.
+    
+    Merge r1901521 from trunk.
+    Submitted by: rpluem
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1901522 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/proxy/mod_proxy_ajp.c b/modules/proxy/mod_proxy_ajp.c
+index c15d046340..226ad9b3de 100644
+--- a/modules/proxy/mod_proxy_ajp.c
++++ b/modules/proxy/mod_proxy_ajp.c
+@@ -247,9 +247,18 @@ static int ap_proxy_ajp_request(apr_pool_t *p, request_rec *r,
+     /* read the first block of data */
+     input_brigade = apr_brigade_create(p, r->connection->bucket_alloc);
+     tenc = apr_table_get(r->headers_in, "Transfer-Encoding");
+-    if (tenc && (ap_cstr_casecmp(tenc, "chunked") == 0)) {
+-        /* The AJP protocol does not want body data yet */
+-        ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(00870) "request is chunked");
++    if (tenc) {
++        if (ap_cstr_casecmp(tenc, "chunked") == 0) {
++            /* The AJP protocol does not want body data yet */
++            ap_log_rerror(APLOG_MARK, APLOG_DEBUG, 0, r, APLOGNO(00870)
++                          "request is chunked");
++        }
++        else {
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10396)
++                          "%s Transfer-Encoding is not supported",
++                          tenc);
++            return HTTP_INTERNAL_SERVER_ERROR;
++        }
+     } else {
+         /* Get client provided Content-Length header */
+         content_length = get_content_length(r);

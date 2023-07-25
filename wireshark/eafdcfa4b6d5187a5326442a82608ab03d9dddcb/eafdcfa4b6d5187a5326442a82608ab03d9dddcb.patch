@@ -1,0 +1,54 @@
+commit eafdcfa4b6d5187a5326442a82608ab03d9dddcb
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Sun Mar 17 00:47:02 2019 +0100
+
+    dcerpc: ensure the length in the packet doesn't overcome the boundaries.
+    
+    The spoolss dissector creates a new source using the length from the packet
+    data. If it overcomes the ends of the packet we hit a crash. In this case
+    add an expert info and stop the dissection
+    
+    Bug: 15568
+    Change-Id: Idfb0b54c1f41842170d3d03c80897a3b7edc9400
+    Reviewed-on: https://code.wireshark.org/review/32449
+    Petri-Dish: Anders Broman <a.broman58@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 5aba3ed0cdebc1ec960261e3e9eda87c8408259f)
+    Reviewed-on: https://code.wireshark.org/review/32750
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/dissectors/packet-dcerpc-spoolss.c b/epan/dissectors/packet-dcerpc-spoolss.c
+index 710bab5cc5..f01ce32c03 100644
+--- a/epan/dissectors/packet-dcerpc-spoolss.c
++++ b/epan/dissectors/packet-dcerpc-spoolss.c
+@@ -327,6 +327,7 @@ static expert_field ei_driver_info_level = EI_INIT;
+ static expert_field ei_level = EI_INIT;
+ static expert_field ei_notify_info_data_type = EI_INIT;
+ static expert_field ei_enumprinterdataex_value = EI_INIT;
++static expert_field ei_buffer_size_too_long = EI_INIT;
+ 
+ /* Registry data types */
+ 
+@@ -453,6 +454,13 @@ dissect_spoolss_buffer_data(tvbuff_t *tvb, int offset, packet_info *pinfo,
+ 	offset = dissect_ndr_uint32(tvb, offset, pinfo, tree, di, drep,
+ 				    hf_buffer_size, &size);
+ 
++	/* Before going any further, we must ensure the bytes
++	   actually esist in the tvb */
++	if ((guint32)tvb_reported_length_remaining(tvb, offset) < size) {
++		expert_add_info(pinfo, tree, &ei_buffer_size_too_long);
++		return offset;
++	}
++
+ 	offset = dissect_ndr_uint8s(tvb, offset, pinfo, NULL, di, drep,
+ 				    hf_buffer_data, size, &data);
+ 
+@@ -8329,6 +8337,7 @@ proto_register_dcerpc_spoolss(void)
+ 		{ &ei_level, { "spoolss.level.unknown", PI_PROTOCOL, PI_WARN, "Info level unknown", EXPFILL }},
+ 		{ &ei_notify_info_data_type, { "spoolss.notify_info_data.type.unknown", PI_PROTOCOL, PI_WARN, "Unknown notify type", EXPFILL }},
+ 		{ &ei_enumprinterdataex_value, { "spoolss.enumprinterdataex.val_unknown", PI_PROTOCOL, PI_WARN, "Unknown value type", EXPFILL }},
++		{ &ei_buffer_size_too_long, { "spoolss.buffer.size.invalid", PI_PROTOCOL, PI_ERROR, "Buffer size too long", EXPFILL }},
+ 	};
+ 
+ 	expert_module_t* expert_dcerpc_spoolss;

@@ -1,0 +1,22 @@
+commit f18c873ab5ee3c78d00fdcc2582b39c133faecb4	f18c873ab5ee3c78d00fdcc2582b39c133faecb4
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Dec 12 17:14:32 2012 +0100
+
+    adpcm: fix off by 1 error and out of array access in DK4
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/adpcm.c b/libavcodec/adpcm.c
+index bf26186d33..cd68257256 100644
+--- a/libavcodec/adpcm.c
++++ b/libavcodec/adpcm.c
+@@ -801,7 +801,7 @@ static int adpcm_decode_frame(AVCodecContext *avctx, void *data,
+                 return AVERROR_INVALIDDATA;
+             }
+         }
+-        for (n = nb_samples >> (1 - st); n > 0; n--) {
++        for (n = (nb_samples - 1) >> (1 - st); n > 0; n--) {
+             int v = bytestream2_get_byteu(&gb);
+             *samples++ = adpcm_ima_expand_nibble(&c->status[0 ], v >> 4  , 3);
+             *samples++ = adpcm_ima_expand_nibble(&c->status[st], v & 0x0F, 3);

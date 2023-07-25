@@ -1,0 +1,65 @@
+commit 8eba2bd291b347e3008aa9e565652d51ad638cfa
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Jun 22 19:59:28 2022 +0100
+
+    patch 8.2.5151: reading beyond the end of the line with lisp indenting
+    
+    Problem:    Reading beyond the end of the line with lisp indenting.
+    Solution:   Avoid going over the NUL at the end of the line.
+
+diff --git a/src/indent.c b/src/indent.c
+index fa177bcf2..f6cfe4b2f 100644
+--- a/src/indent.c
++++ b/src/indent.c
+@@ -2076,8 +2076,11 @@ get_lisp_indent(void)
+ 		    amount += 2;
+ 		else
+ 		{
+-		    that++;
+-		    amount++;
++		    if (*that != NUL)
++		    {
++			that++;
++			amount++;
++		    }
+ 		    firsttry = amount;
+ 
+ 		    while (VIM_ISWHITE(*that))
+diff --git a/src/testdir/test_lispwords.vim b/src/testdir/test_lispwords.vim
+index ff710b271..4144fb052 100644
+--- a/src/testdir/test_lispwords.vim
++++ b/src/testdir/test_lispwords.vim
+@@ -1,4 +1,5 @@
+-" Tests for 'lispwords' settings being global-local
++" Tests for 'lispwords' settings being global-local.
++" And  other lisp indent stuff.
+ 
+ set nocompatible viminfo+=nviminfo
+ 
+@@ -85,4 +86,13 @@ func Test_lisp_indent()
+   set nolisp
+ endfunc
+ 
++func Test_lisp_indent_works()
++  " This was reading beyond the end of the line
++  new
++  exe "norm a\tü(\<CR>="
++  set lisp
++  norm ==
++  bwipe!
++endfunc
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index b947061b3..bb3f1665f 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5151,
+ /**/
+     5150,
+ /**/

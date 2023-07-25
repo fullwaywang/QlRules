@@ -1,0 +1,25 @@
+commit 668494acd8b20f974c7722895d4a6a14c1005f1e	668494acd8b20f974c7722895d4a6a14c1005f1e
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Jan 25 06:32:05 2012 +0100
+
+    ffmpeg: add image size check to codec_get_buffer()
+    
+    Fixes CVE-2011-3935
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/ffmpeg.c b/ffmpeg.c
+index 0fe418647a..dfdce6a32d 100644
+--- a/ffmpeg.c
++++ b/ffmpeg.c
+@@ -546,6 +546,9 @@ static int codec_get_buffer(AVCodecContext *s, AVFrame *frame)
+     FrameBuffer *buf;
+     int ret, i;
+ 
++    if(av_image_check_size(s->width, s->height, 0, s))
++        return -1;
++
+     if (!ist->buffer_pool && (ret = alloc_buffer(s, ist, &ist->buffer_pool)) < 0)
+         return ret;
+ 

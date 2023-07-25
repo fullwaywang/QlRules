@@ -1,0 +1,23 @@
+commit 740b218386083dc708ce98ccc94a63a95cd5629e
+Author: Krzysztof Stachowiak <krzysiek.stachowiak@gmail.com>
+Date:   Tue Mar 13 11:31:14 2018 +0100
+
+    Add bounds check before length read
+
+diff --git a/library/ssl_cli.c b/library/ssl_cli.c
+index 2534346a4..585750ef2 100644
+--- a/library/ssl_cli.c
++++ b/library/ssl_cli.c
+@@ -2057,6 +2057,12 @@ static int ssl_parse_server_psk_hint( mbedtls_ssl_context *ssl,
+      *
+      * opaque psk_identity_hint<0..2^16-1>;
+      */
++    if( (*p) > end - 2 )
++    {
++        MBEDTLS_SSL_DEBUG_MSG( 1, ( "bad server key exchange message "
++                                    "(psk_identity_hint length)" ) );
++        return( MBEDTLS_ERR_SSL_BAD_HS_SERVER_KEY_EXCHANGE );
++    }
+     len = (*p)[0] << 8 | (*p)[1];
+     *p += 2;
+ 

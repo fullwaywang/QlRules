@@ -1,0 +1,47 @@
+commit 7cf7148a8f8f4f55fb04de2a517d740bb6253eac
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Mon May 27 16:32:42 2019 -0700
+
+    Fix bug #78069 - Out-of-bounds read in iconv.c:_php_iconv_mime_decode() due to integer overflow
+
+diff --git a/ext/iconv/iconv.c b/ext/iconv/iconv.c
+index f86d0ae031..b4a2abe08d 100644
+--- a/ext/iconv/iconv.c
++++ b/ext/iconv/iconv.c
+@@ -1673,7 +1673,9 @@ static php_iconv_err_t _php_iconv_mime_decode(smart_str *pretval, const char *st
+ 							 * we can do at this point. */
+ 							if (*(p1 + 1) == '=') {
+ 								++p1;
+-								--str_left;
++								if (str_left > 1) {
++									--str_left;
++								}
+ 							}
+ 
+ 							err = _php_iconv_appendl(pretval, encoded_word, (size_t)((p1 + 1) - encoded_word), cd_pl);
+diff --git a/ext/iconv/tests/bug78069.data b/ext/iconv/tests/bug78069.data
+new file mode 100644
+index 0000000000..ebd5d0bdcf
+Binary files /dev/null and b/ext/iconv/tests/bug78069.data differ
+diff --git a/ext/iconv/tests/bug78069.phpt b/ext/iconv/tests/bug78069.phpt
+new file mode 100644
+index 0000000000..1341a5ef4f
+--- /dev/null
++++ b/ext/iconv/tests/bug78069.phpt
+@@ -0,0 +1,15 @@
++--TEST--
++Bug #78069 (Out-of-bounds read in iconv.c:_php_iconv_mime_decode() due to integer overflow)
++--SKIPIF--
++<?php
++if (!extension_loaded('iconv')) die('skip ext/iconv required');
++?>
++--FILE--
++<?php
++$hdr = iconv_mime_decode_headers(file_get_contents(__DIR__ . "/bug78069.data"),2);
++var_dump(count($hdr));
++?>
++DONE
++--EXPECT--
++int(1)
++DONE
+\ No newline at end of file

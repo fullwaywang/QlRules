@@ -1,0 +1,24 @@
+commit 608708009f69ba4cecebf05120c696167494c897	608708009f69ba4cecebf05120c696167494c897
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Mon Dec 19 04:09:23 2011 +0100
+
+    adpcm: Fix crash
+    Fixes half of Ticket794
+    Bug found by: Oana Stratulat
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/adpcm.c b/libavcodec/adpcm.c
+index bbc7d1cd27..e7657945dd 100644
+--- a/libavcodec/adpcm.c
++++ b/libavcodec/adpcm.c
+@@ -818,6 +818,9 @@ static int adpcm_decode_frame(AVCodecContext *avctx, void *data,
+         /* Each EA ADPCM frame has a 12-byte header followed by 30-byte pieces,
+            each coding 28 stereo samples. */
+ 
++        if(avctx->channels != 2)
++            return AVERROR_INVALIDDATA;
++
+         src += 4; // skip sample count (already read)
+ 
+         current_left_sample   = (int16_t)bytestream_get_le16(&src);

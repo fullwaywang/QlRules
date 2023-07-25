@@ -1,0 +1,32 @@
+commit 57d299a499155d4b327e341c6024e293b0418243
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Mon Aug 13 10:35:52 2018 +0200
+
+    Curl_ntlm_core_mk_nt_hash: return error on too long password
+    
+    ... since it would cause an integer overflow if longer than (max size_t
+    / 2).
+    
+    This is CVE-2018-14618
+    
+    Bug: https://curl.haxx.se/docs/CVE-2018-14618.html
+    Closes #2756
+    Reported-by: Zhaoyang Wu
+
+diff --git a/lib/curl_ntlm_core.c b/lib/curl_ntlm_core.c
+index e27cab353..922e85a92 100644
+--- a/lib/curl_ntlm_core.c
++++ b/lib/curl_ntlm_core.c
+@@ -557,8 +557,11 @@ CURLcode Curl_ntlm_core_mk_nt_hash(struct Curl_easy *data,
+                                    unsigned char *ntbuffer /* 21 bytes */)
+ {
+   size_t len = strlen(password);
+-  unsigned char *pw = len ? malloc(len * 2) : strdup("");
++  unsigned char *pw;
+   CURLcode result;
++  if(len > SIZE_T_MAX/2) /* avoid integer overflow */
++    return CURLE_OUT_OF_MEMORY;
++  pw = len ? malloc(len * 2) : strdup("");
+   if(!pw)
+     return CURLE_OUT_OF_MEMORY;
+ 

@@ -1,0 +1,28 @@
+commit 6b67d7f05918f7a1ee8fc6ff21355d7e8736aa10
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Jul 28 15:03:50 2018 +0200
+
+    avformat/flvenc: Check audio packet size
+    
+    Fixes: Assertion failure
+    Fixes: assert_flvenc.c:941_1.swf
+    
+    Found-by: #CHEN HONGXU# <HCHEN017@e.ntu.edu.sg>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/flvenc.c b/libavformat/flvenc.c
+index 1c552a3e6b..e4863f1fc7 100644
+--- a/libavformat/flvenc.c
++++ b/libavformat/flvenc.c
+@@ -883,6 +883,11 @@ static int flv_write_packet(AVFormatContext *s, AVPacket *pkt)
+     int flags = -1, flags_size, ret;
+     int64_t cur_offset = avio_tell(pb);
+ 
++    if (par->codec_type == AVMEDIA_TYPE_AUDIO && !pkt->size) {
++        av_log(s, AV_LOG_WARNING, "Empty audio Packet\n");
++        return AVERROR(EINVAL);
++    }
++
+     if (par->codec_id == AV_CODEC_ID_VP6F || par->codec_id == AV_CODEC_ID_VP6A ||
+         par->codec_id == AV_CODEC_ID_VP6  || par->codec_id == AV_CODEC_ID_AAC)
+         flags_size = 2;

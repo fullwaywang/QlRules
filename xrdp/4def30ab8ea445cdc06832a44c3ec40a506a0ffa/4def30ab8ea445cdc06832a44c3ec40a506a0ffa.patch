@@ -1,0 +1,8 @@
+commit 4def30ab8ea445cdc06832a44c3ec40a506a0ffa
+Merge: 934a91fc eb4a8e34
+Author: metalefty <meta@vmeta.jp>
+Date:   Mon Feb 7 15:18:15 2022 +0900
+
+    Merge pull request from GHSA-8h98-h426-xf32
+    
+    Add lower bound to sesman data input size check

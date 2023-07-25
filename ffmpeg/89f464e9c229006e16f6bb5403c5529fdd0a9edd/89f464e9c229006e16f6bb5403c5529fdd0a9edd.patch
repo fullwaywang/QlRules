@@ -1,0 +1,40 @@
+commit 89f464e9c229006e16f6bb5403c5529fdd0a9edd
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Mon Jan 18 03:31:25 2016 +0100
+
+    avcodec/tiff: Check subsample & rps values more completely
+    
+    Fixes out of array access
+    Fixes: 83aedfb29af669c4d6e10f1bfad974d2/asan_heap-oob_1ab42fe_4984_9f6ec14462f8d8a00ea24b320572a963.tif
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/tiff.c b/libavcodec/tiff.c
+index d5c6398a17..4be587d569 100644
+--- a/libavcodec/tiff.c
++++ b/libavcodec/tiff.c
+@@ -1004,8 +1004,13 @@ static int tiff_decode_tag(TiffContext *s, AVFrame *frame)
+             av_log(s->avctx, AV_LOG_ERROR, "subsample count invalid\n");
+             return AVERROR_INVALIDDATA;
+         }
+-        for (i = 0; i < count; i++)
++        for (i = 0; i < count; i++) {
+             s->subsampling[i] = ff_tget(&s->gb, type, s->le);
++            if (s->subsampling[i] <= 0) {
++                av_log(s->avctx, AV_LOG_ERROR, "subsampling %d is invalid\n", s->subsampling[i]);
++                return AVERROR_INVALIDDATA;
++            }
++        }
+         break;
+     case TIFF_T4OPTIONS:
+         if (s->compr == TIFF_G3)
+@@ -1253,7 +1258,7 @@ static int decode_frame(AVCodecContext *avctx,
+                          avpkt->size - s->strippos);
+     }
+ 
+-    if (s->rps <= 0) {
++    if (s->rps <= 0 || s->rps % s->subsampling[1]) {
+         av_log(avctx, AV_LOG_ERROR, "rps %d invalid\n", s->rps);
+         return AVERROR_INVALIDDATA;
+     }

@@ -1,0 +1,98 @@
+commit 0e097f2c96ce31b16fa371981045f224e5a37160
+Author: Nikita Popov <nikita.ppv@gmail.com>
+Date:   Fri Nov 17 23:11:15 2017 +0100
+
+    Fixed bug #75535
+    
+    The sizeof()s for Content-Length and Transfer-Encoding were missing
+    the trailing ":". Apart from being generally wrong, this no longer
+    verified that the header actually contains a colon, leading to the
+    null http_header_value being used.
+    
+    Additionally, in the interest of being defensive, also make sure
+    that http_header_value is non-null by setting it to the end of
+    the header line (effectively an empty string) if there is no colon.
+    If the following conditions are correct, this value is not going
+    to be used though.
+
+diff --git a/NEWS b/NEWS
+index fa35c56c1b..57d0fdb973 100644
+--- a/NEWS
++++ b/NEWS
+@@ -10,6 +10,10 @@ PHP                                                                        NEWS
+   . Fixed bug #75384 (PHP seems incompatible with OneDrive files on demand).
+     (Anatol)
+ 
++- Standard:
++  . Fixed bug #75535 (Inappropriately parsing HTTP response leads to PHP
++    segment fault). (Nikita)
++
+ 23 Nov 2017 PHP 7.0.26
+ 
+ - Core:
+diff --git a/ext/standard/http_fopen_wrapper.c b/ext/standard/http_fopen_wrapper.c
+index 1822566a21..e60ac225c9 100644
+--- a/ext/standard/http_fopen_wrapper.c
++++ b/ext/standard/http_fopen_wrapper.c
+@@ -796,6 +796,10 @@ finish:
+ 						&& (*http_header_value == ' ' || *http_header_value == '\t')) {
+ 					http_header_value++;
+ 				}
++			} else {
++				/* There is no colon. Set the value to the end of the header line, which is
++				 * effectively an empty string. */
++				http_header_value = e;
+ 			}
+ 
+ 			if (!strncasecmp(http_header_line, "Location:", sizeof("Location:")-1)) {
+@@ -812,11 +816,11 @@ finish:
+ 				strlcpy(location, http_header_value, sizeof(location));
+ 			} else if (!strncasecmp(http_header_line, "Content-Type:", sizeof("Content-Type:")-1)) {
+ 				php_stream_notify_info(context, PHP_STREAM_NOTIFY_MIME_TYPE_IS, http_header_value, 0);
+-			} else if (!strncasecmp(http_header_line, "Content-Length:", sizeof("Content-Length")-1)) {
++			} else if (!strncasecmp(http_header_line, "Content-Length:", sizeof("Content-Length:")-1)) {
+ 				file_size = atoi(http_header_value);
+ 				php_stream_notify_file_size(context, file_size, http_header_line, 0);
+ 			} else if (
+-				!strncasecmp(http_header_line, "Transfer-Encoding:", sizeof("Transfer-Encoding")-1)
++				!strncasecmp(http_header_line, "Transfer-Encoding:", sizeof("Transfer-Encoding:")-1)
+ 				&& !strncasecmp(http_header_value, "Chunked", sizeof("Chunked")-1)
+ 			) {
+ 
+diff --git a/ext/standard/tests/http/bug75535.phpt b/ext/standard/tests/http/bug75535.phpt
+new file mode 100644
+index 0000000000..9bf298cc06
+--- /dev/null
++++ b/ext/standard/tests/http/bug75535.phpt
+@@ -0,0 +1,31 @@
++--TEST--
++Bug #75535: Inappropriately parsing HTTP response leads to PHP segment fault
++--SKIPIF--
++<?php require 'server.inc'; http_server_skipif('tcp://127.0.0.1:22351'); ?>
++--INI--
++allow_url_fopen=1
++--FILE--
++<?php
++require 'server.inc';
++
++$responses = array(
++	"data://text/plain,HTTP/1.0 200 Ok\r\nContent-Length\r\n",
++);
++
++$pid = http_server("tcp://127.0.0.1:22351", $responses, $output);
++
++var_dump(file_get_contents('http://127.0.0.1:22351/'));
++var_dump($http_response_header);
++
++http_server_kill($pid);
++?>
++==DONE==
++--EXPECT--
++string(0) ""
++array(2) {
++  [0]=>
++  string(15) "HTTP/1.0 200 Ok"
++  [1]=>
++  string(14) "Content-Length"
++}
++==DONE==

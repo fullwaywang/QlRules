@@ -1,0 +1,26 @@
+commit 2c22701c371c2f3dea21fcdbb97c981939fb77af	2c22701c371c2f3dea21fcdbb97c981939fb77af
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 20 17:52:33 2012 +0200
+
+    ac3dec: Check number of output channels.
+    
+    Fixes out of array write.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/ac3dec.c b/libavcodec/ac3dec.c
+index 6c1fdbebd7..4ac3ea5cf1 100644
+--- a/libavcodec/ac3dec.c
++++ b/libavcodec/ac3dec.c
+@@ -1395,6 +1395,10 @@ static int ac3_decode_frame(AVCodecContext * avctx, void *data,
+         if (s->out_channels < s->channels)
+             s->output_mode  = s->out_channels == 1 ? AC3_CHMODE_MONO : AC3_CHMODE_STEREO;
+     }
++    if (avctx->channels != s->out_channels) {
++        av_log(avctx, AV_LOG_ERROR, "channel number mismatching on damaged frame\n");
++        return AVERROR_INVALIDDATA;
++    }
+     /* set audio service type based on bitstream mode for AC-3 */
+     avctx->audio_service_type = s->bitstream_mode;
+     if (s->bitstream_mode == 0x7 && s->channels > 1)

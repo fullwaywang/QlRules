@@ -1,0 +1,121 @@
+commit 926f796e8feec15f3836aa0a060ed906f8ae04d3	926f796e8feec15f3836aa0a060ed906f8ae04d3
+Author: drh <drh@noemail.net>
+Date:   Mon Dec 9 17:14:48 2019 +0000
+
+    Ensure that the SrcList_item.colUsed field is set correctly (set to have a
+    1 for all columns of the table) when a generated column appears in the USING
+    clause of a join.
+    
+    FossilOrigin-Name: 1923efb283e8840fa7436eb20b9d2174ef7cace1690d3b97b572a0db2048b8e3
+
+diff --git a/manifest b/manifest
+index a5efb5260..0282d726c 100644
+--- a/manifest
++++ b/manifest
+@@ -1,5 +1,5 @@
+-C Fix\sthe\sNOT\sNULL\sverification\slogic\sin\sPRAGMA\sintegrity_check\sso\sthat\sit\nworks\sfor\sgenerated\scolumns\swhose\svalue\sis\sthe\sresult\sof\sa\scomparison\soperator.\nTicket\s[bd8c280671ba44a7]
+-D 2019-12-09T15:52:07.194
++C Ensure\sthat\sthe\sSrcList_item.colUsed\sfield\sis\sset\scorrectly\s(set\sto\shave\sa\n1\sfor\sall\scolumns\sof\sthe\stable)\swhen\sa\sgenerated\scolumn\sappears\sin\sthe\sUSING\nclause\sof\sa\sjoin.
++D 2019-12-09T17:14:48.320
+ F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
+ F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
+ F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
+@@ -525,7 +525,7 @@ F src/pragma.h ec3b31eac9b1df040f1cc8cb3d89bc06605c3b4cb3d76f833de8d6d6c3f77f04
+ F src/prepare.c 6049beb71385f017af6fc320d2c75a4e50b75e280c54232442b785fbb83df057
+ F src/printf.c 9be6945837c839ba57837b4bc3af349eba630920fa5532aa518816defe42a7d4
+ F src/random.c 80f5d666f23feb3e6665a6ce04c7197212a88384
+-F src/resolve.c 618bf4f57fa0617cd5295117fea5f25955b76d278303405a8551c4204593011e
++F src/resolve.c 32b5adb26c21be0dcf7d639053f10f1a34a0a4ae10f59dd9c5b71f8d1579e76b
+ F src/rowset.c d977b011993aaea002cab3e0bb2ce50cf346000dff94e944d547b989f4b1fe93
+ F src/select.c 0fe10579de20eb8dc04ec9ed29659fa782bee2bcc85a35734637f3e2cabc2762
+ F src/shell.c.in 4a3a9e1c11847b1904f2b01d087af1c052f660902755abab457cab1756817ded
+@@ -1022,7 +1022,7 @@ F test/fuzzer1.test 3d4c4b7e547aba5e5511a2991e3e3d07166cfbb8
+ F test/fuzzer2.test a85ef814ce071293bce1ad8dffa217cbbaad4c14
+ F test/fuzzerfault.test 8792cd77fd5bce765b05d0c8e01b9edcf8af8536
+ F test/gcfault.test dd28c228a38976d6336a3fc42d7e5f1ad060cb8c
+-F test/gencol1.test 96d669ccb82d4140df6b38bfc110b98f94ac4cf8d32af42bae6349941b3eb92c
++F test/gencol1.test 891f9ac3a3acf27902767020b8667ba6168306f3f226e5c036c442caffd06dd7
+ F test/genesis.tcl 1e2e2e8e5cc4058549a154ff1892fe5c9de19f98
+ F test/having.test e4098a4b8962f9596035c3b87a8928a10648acc509f1bb8d6f96413bbf79a1b3
+ F test/hexlit.test 4a6a5f46e3c65c4bf1fa06f5dd5a9507a5627751
+@@ -1852,7 +1852,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
+ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
+ F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
+ F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
+-P e3398c5ffb060b2b26334b8598e2c63953741e2d6f5124dbd6bdfc8e94742539
+-R 214fd6f511022e08e69f40b8ca4a69e8
++P f3b39c71b88cb6721f443de56cdce4c08252453a5e340b00a2bd88dc10c42400
++R 4c75b826224c9334b1247cab793c4dea
+ U drh
+-Z 7b3cdd64628ae3e72f321ced6b81d514
++Z 46d53a02a606d9b97d8ca0a567728aa1
+diff --git a/manifest.uuid b/manifest.uuid
+index fdfe085d8..0dec8cbdc 100644
+--- a/manifest.uuid
++++ b/manifest.uuid
+@@ -1 +1 @@
+-f3b39c71b88cb6721f443de56cdce4c08252453a5e340b00a2bd88dc10c42400
+\ No newline at end of file
++1923efb283e8840fa7436eb20b9d2174ef7cace1690d3b97b572a0db2048b8e3
+\ No newline at end of file
+diff --git a/src/resolve.c b/src/resolve.c
+index fdf4bf0f0..5c01df4f8 100644
+--- a/src/resolve.c
++++ b/src/resolve.c
+@@ -624,15 +624,28 @@ Expr *sqlite3CreateColumnExpr(sqlite3 *db, SrcList *pSrc, int iSrc, int iCol){
+   Expr *p = sqlite3ExprAlloc(db, TK_COLUMN, 0, 0);
+   if( p ){
+     struct SrcList_item *pItem = &pSrc->a[iSrc];
+-    p->y.pTab = pItem->pTab;
++    Table *pTab = p->y.pTab = pItem->pTab;
+     p->iTable = pItem->iCursor;
+     if( p->y.pTab->iPKey==iCol ){
+       p->iColumn = -1;
+     }else{
+       p->iColumn = (ynVar)iCol;
+-      testcase( iCol==BMS );
+-      testcase( iCol==BMS-1 );
+-      pItem->colUsed |= ((Bitmask)1)<<(iCol>=BMS ? BMS-1 : iCol);
++      if( pTab->tabFlags & TF_HasGenerated ){
++        Column *pColumn = pTab->aCol + iCol;
++        if( pColumn->colFlags & COLFLAG_GENERATED ){
++          testcase( pTab->nCol==63 );
++          testcase( pTab->nCol==64 );
++          if( pTab->nCol>=64 ){
++            pItem->colUsed = ALLBITS;
++          }else{
++            pItem->colUsed = MASKBIT(pTab->nCol)-1;
++          }
++        }
++      }else{
++        testcase( iCol==BMS );
++        testcase( iCol==BMS-1 );
++        pItem->colUsed |= ((Bitmask)1)<<(iCol>=BMS ? BMS-1 : iCol);
++      }
+     }
+   }
+   return p;
+diff --git a/test/gencol1.test b/test/gencol1.test
+index 80769222a..1a4576760 100644
+--- a/test/gencol1.test
++++ b/test/gencol1.test
+@@ -342,4 +342,19 @@ do_execsql_test gencol1-12.10 {
+   PRAGMA integrity_check;
+ } {ok}
+ 
++# 2019-12-09 but report from Yongheng Chen
++# Ensure that the SrcList_item.colUsed field is set correctly when a
++# generated column appears in the USING clause of a join.
++#
++do_execsql_test gencol1-13.10 {
++  CREATE TABLE t1(x, y AS(x+1));
++  INSERT INTO t1 VALUES(10);
++  SELECT y FROM t1 JOIN t1 USING (y,y);
++} {11}
++do_execsql_test gencol1-13.11 {
++  CREATE INDEX t1y ON t1(y);
++  SELECT y FROM t1 JOIN t1 USING (y,y);
++} {11}
++
++
+ finish_test

@@ -1,0 +1,21 @@
+commit e27b65b3bf8defa34db58919496056caf3850cd4
+Author: JerikoOne <jeriko.one@gmx.us>
+Date:   Sat Jul 7 15:35:56 2018 -0500
+
+    imap_quote_string make room for quotes
+
+diff --git a/imap/util.c b/imap/util.c
+index 57802b254..fccfdbf45 100644
+--- a/imap/util.c
++++ b/imap/util.c
+@@ -814,8 +814,8 @@ void imap_quote_string(char *dest, size_t dlen, const char *src, bool quote_back
+   const char *s = src;
+ 
+   *pt++ = '"';
+-  /* save room for trailing quote-char */
+-  dlen -= 2;
++  /* save room for quote-chars */
++  dlen -= 3;
+ 
+   for (; *s && dlen; s++)
+   {

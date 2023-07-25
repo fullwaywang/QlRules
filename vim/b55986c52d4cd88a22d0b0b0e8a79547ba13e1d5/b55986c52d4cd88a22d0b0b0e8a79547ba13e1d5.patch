@@ -1,0 +1,66 @@
+commit b55986c52d4cd88a22d0b0b0e8a79547ba13e1d5
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Mar 29 13:24:58 2022 +0100
+
+    patch 8.2.4646: using buffer line after it has been freed
+    
+    Problem:    Using buffer line after it has been freed in old regexp engine.
+    Solution:   After getting mark get the line again.
+
+diff --git a/src/regexp_bt.c b/src/regexp_bt.c
+index 4082f59d3..793faaf6b 100644
+--- a/src/regexp_bt.c
++++ b/src/regexp_bt.c
+@@ -3360,8 +3360,17 @@ regmatch(
+ 		int	mark = OPERAND(scan)[0];
+ 		int	cmp = OPERAND(scan)[1];
+ 		pos_T	*pos;
++		size_t	col = REG_MULTI ? rex.input - rex.line : 0;
+ 
+ 		pos = getmark_buf(rex.reg_buf, mark, FALSE);
++
++		// Line may have been freed, get it again.
++		if (REG_MULTI)
++		{
++		    rex.line = reg_getline(rex.lnum);
++		    rex.input = rex.line + col;
++		}
++
+ 		if (pos == NULL		     // mark doesn't exist
+ 			|| pos->lnum <= 0)   // mark isn't set in reg_buf
+ 		{
+diff --git a/src/testdir/test_regexp_latin.vim b/src/testdir/test_regexp_latin.vim
+index 71915be9e..fc9c81bfe 100644
+--- a/src/testdir/test_regexp_latin.vim
++++ b/src/testdir/test_regexp_latin.vim
+@@ -1042,10 +1042,17 @@ endfunc
+ 
+ func Test_using_mark_position()
+   " this was using freed memory
++  " new engine
+   new
+   norm O0
+   call assert_fails("s/\\%')", 'E486:')
+   bwipe!
++
++  " old engine
++  new
++  norm O0
++  call assert_fails("s/\\%#=1\\%')", 'E486:')
++  bwipe!
+ endfunc
+ 
+ func Test_using_visual_position()
+diff --git a/src/version.c b/src/version.c
+index 03778bd5c..14fd1c369 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4646,
+ /**/
+     4645,
+ /**/

@@ -1,0 +1,19 @@
+commit 930ff0d1a9bc42925a7856e9ea53f5fc9f318bf3
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Thu May 27 10:30:17 2021 -0400
+
+    eliminate heap buffer overflow vulnerability, thanks to ZhangJiaxing (@r0fm1a) from Codesafe Team of Legendsec at Qi'anxin Group
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 277b9788b..b88ce368b 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -1894,7 +1894,7 @@ static Image *ReadTIFFImage(const ImageInfo *image_info,
+         /*
+           Convert stripped TIFF image.
+         */
+-        extent=2*TIFFStripSize(tiff);
++        extent=4*TIFFStripSize(tiff);
+ #if defined(TIFF_VERSION_BIG)
+         extent+=image->columns*sizeof(uint64);
+ #else

@@ -1,6 +1,4 @@
-commit ad88b54f1a28a8565964a370b5d387927b633c0d
-Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
-Reflog message: reset: moving to ad88b54f1a28a8565964a370b5d387927b633c0d
+commit ad88b54f1a28a8565964a370b5d387927b633c0d	ad88b54f1a28a8565964a370b5d387927b633c0d
 Author: Daniel Veillard <veillard@redhat.com>
 Date:   Fri Dec 8 09:42:31 2017 +0100
 

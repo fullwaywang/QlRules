@@ -1,0 +1,40 @@
+commit fa23ee8f31ba9a018c720ea822faaee639dc7a9c
+Author: W.C.A. Wijngaards <wouter@nlnetlabs.nl>
+Date:   Tue Nov 19 16:54:44 2019 +0100
+
+    - Fix Out of Bounds Write in sldns_bget_token_par(),
+      reported by X41 D-Sec.
+
+diff --git a/doc/Changelog b/doc/Changelog
+index e604158a..54c69a8f 100644
+--- a/doc/Changelog
++++ b/doc/Changelog
+@@ -15,6 +15,8 @@
+ 	  sldns_str2wire_dname_buf_origin(), reported by X41 D-Sec.
+ 	- Fix Out of Bounds Read in sldns_str2wire_dname(),
+ 	  reported by X41 D-Sec.
++	- Fix Out of Bounds Write in sldns_bget_token_par(),
++	  reported by X41 D-Sec.
+ 
+ 18 November 2019: Wouter
+ 	- In unbound-host use separate variable for get_option to please
+diff --git a/sldns/parse.c b/sldns/parse.c
+index b62c4059..b30264e8 100644
+--- a/sldns/parse.c
++++ b/sldns/parse.c
+@@ -325,8 +325,14 @@ sldns_bget_token_par(sldns_buffer *b, char *token, const char *delim,
+ 		if (c == '\n' && p != 0) {
+ 			/* in parentheses */
+ 			/* do not write ' ' if we want to skip spaces */
+-			if(!(skipw && (strchr(skipw, c)||strchr(skipw, ' '))))
++			if(!(skipw && (strchr(skipw, c)||strchr(skipw, ' ')))) {
++				/* check for space for the space character */
++				if (limit > 0 && (i >= limit || (size_t)(t-token) >= limit)) {
++					*t = '\0';
++					return -1;
++				}
+ 				*t++ = ' ';
++			}
+ 			lc = c;
+ 			continue;
+ 		}

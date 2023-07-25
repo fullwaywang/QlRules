@@ -1,0 +1,26 @@
+commit 3920d1387834e2bc334aff9f518f4beb24e470bd	3920d1387834e2bc334aff9f518f4beb24e470bd
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Nov 10 17:41:56 2012 +0100
+
+    alac: fix integer overflow leading to subsequent out of array accesses.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/alac.c b/libavcodec/alac.c
+index f032ceb9cc..46c3a5b37b 100644
+--- a/libavcodec/alac.c
++++ b/libavcodec/alac.c
+@@ -542,7 +542,11 @@ static av_cold int alac_decode_close(AVCodecContext *avctx)
+ static int allocate_buffers(ALACContext *alac)
+ {
+     int ch;
+-    int buf_size = alac->max_samples_per_frame * sizeof(int32_t);
++    int buf_size;
++
++    if (alac->max_samples_per_frame > INT_MAX / sizeof(int32_t))
++        goto buf_alloc_fail;
++    buf_size = alac->max_samples_per_frame * sizeof(int32_t);
+ 
+     for (ch = 0; ch < FFMIN(alac->channels, 2); ch++) {
+         FF_ALLOC_OR_GOTO(alac->avctx, alac->predict_error_buffer[ch],

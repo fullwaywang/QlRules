@@ -1,0 +1,27 @@
+commit 780669ef7c23c00836a24921fcc6b03be2b8ca4a	780669ef7c23c00836a24921fcc6b03be2b8ca4a
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Oct 26 02:19:13 2013 +0200
+
+    avcodec/jpeg2000dec: non zero image offsets are not supported
+    
+    Fixes out of array accesses
+    Fixes Ticket3080
+    Found-by: ami_stuff
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/jpeg2000dec.c b/libavcodec/jpeg2000dec.c
+index 80bc335507..b150bc1595 100644
+--- a/libavcodec/jpeg2000dec.c
++++ b/libavcodec/jpeg2000dec.c
+@@ -243,6 +243,11 @@ static int get_siz(Jpeg2000DecoderContext *s)
+     s->tile_offset_y  = bytestream2_get_be32u(&s->g); // YT0Siz
+     ncomponents       = bytestream2_get_be16u(&s->g); // CSiz
+ 
++    if (s->image_offset_x || s->image_offset_y) {
++        avpriv_request_sample(s->avctx, "Support for image offsets");
++        return AVERROR_PATCHWELCOME;
++    }
++
+     if (ncomponents <= 0) {
+         av_log(s->avctx, AV_LOG_ERROR, "Invalid number of components: %d\n",
+                s->ncomponents);

@@ -1,33 +1,90 @@
+/**
+ * @name curl-b780b30d1377adb10bbe774835f49e9b237fb9bb-ntlm_decode_type2_target
+ * @id cpp/curl/b780b30d1377adb10bbe774835f49e9b237fb9bb/ntlm-decode-type2-target
+ * @description curl-b780b30d1377adb10bbe774835f49e9b237fb9bb-ntlm_decode_type2_target CVE-2018-16890
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Parameter vsize, Variable vtarget_info_len, Variable vtarget_info_offset, Parameter vdata) {
+predicate func_0(Parameter vsize_171, Variable vtarget_info_offset_175, Parameter vdata_169) {
 	exists(LogicalOrExpr target_0 |
-		target_0.getType().hasName("int")
-		and target_0.getLeftOperand().(GEExpr).getType().hasName("int")
-		and target_0.getLeftOperand().(GEExpr).getGreaterOperand().(VariableAccess).getTarget()=vtarget_info_offset
-		and target_0.getLeftOperand().(GEExpr).getLesserOperand().(VariableAccess).getTarget()=vsize
-		and target_0.getRightOperand().(GTExpr).getType().hasName("int")
-		and target_0.getRightOperand().(GTExpr).getGreaterOperand().(AddExpr).getType().hasName("unsigned int")
-		and target_0.getRightOperand().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(VariableAccess).getTarget()=vtarget_info_offset
-		and target_0.getRightOperand().(GTExpr).getGreaterOperand().(AddExpr).getRightOperand().(VariableAccess).getTarget()=vtarget_info_len
-		and target_0.getRightOperand().(GTExpr).getLesserOperand().(VariableAccess).getTarget()=vsize
-		and target_0.getParent().(LogicalOrExpr).getRightOperand().(LTExpr).getType().hasName("int")
-		and target_0.getParent().(LogicalOrExpr).getRightOperand().(LTExpr).getLesserOperand().(VariableAccess).getTarget()=vtarget_info_offset
-		and target_0.getParent().(LogicalOrExpr).getRightOperand().(LTExpr).getGreaterOperand().(Literal).getValue()="48"
+		target_0.getAnOperand().(RelationalOperation).getGreaterOperand().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_0.getAnOperand().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vsize_171
+		and target_0.getAnOperand() instanceof RelationalOperation
+		and target_0.getParent().(LogicalOrExpr).getAnOperand().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_0.getParent().(LogicalOrExpr).getAnOperand().(RelationalOperation).getGreaterOperand().(Literal).getValue()="48"
 		and target_0.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
-		and target_0.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata
+		and target_0.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_169
 		and target_0.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer\n")
 }
 
-from Function func, Parameter vsize, Variable vtarget_info_len, Variable vtarget_info_offset, Parameter vdata
+predicate func_1(Parameter vsize_171, Variable vtarget_info_len_174, Variable vtarget_info_offset_175, Parameter vdata_169) {
+	exists(RelationalOperation target_1 |
+		 (target_1 instanceof GTExpr or target_1 instanceof LTExpr)
+		and target_1.getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_1.getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vtarget_info_len_174
+		and target_1.getLesserOperand().(VariableAccess).getTarget()=vsize_171
+		and target_1.getParent().(LogicalOrExpr).getAnOperand().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_1.getParent().(LogicalOrExpr).getAnOperand().(RelationalOperation).getGreaterOperand().(Literal).getValue()="48"
+		and target_1.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
+		and target_1.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_169
+		and target_1.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer\n")
+}
+
+predicate func_2(Variable vCurl_cmalloc, Parameter vbuffer_170, Parameter vsize_171, Parameter vntlm_172, Variable vtarget_info_len_174, Variable vtarget_info_offset_175, Parameter vdata_169) {
+	exists(RelationalOperation target_2 |
+		 (target_2 instanceof GEExpr or target_2 instanceof LEExpr)
+		and target_2.getGreaterOperand().(VariableAccess).getTarget()=vsize_171
+		and target_2.getLesserOperand().(Literal).getValue()="48"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vtarget_info_len_174
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_read16_le")
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(VariableAccess).getTarget()=vbuffer_170
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="40"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_read32_le")
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(VariableAccess).getTarget()=vbuffer_170
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="44"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getCondition().(RelationalOperation).getGreaterOperand().(VariableAccess).getTarget()=vtarget_info_len_174
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getCondition().(RelationalOperation).getLesserOperand().(Literal).getValue()="0"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand() instanceof RelationalOperation
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(RelationalOperation).getGreaterOperand().(Literal).getValue()="48"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_169
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer\n"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="target_info"
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vntlm_172
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cmalloc
+		and target_2.getParent().(IfStmt).getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(VariableAccess).getTarget()=vtarget_info_len_174)
+}
+
+predicate func_3(Parameter vbuffer_170, Variable vtarget_info_offset_175) {
+	exists(AssignExpr target_3 |
+		target_3.getLValue().(VariableAccess).getTarget()=vtarget_info_offset_175
+		and target_3.getRValue().(FunctionCall).getTarget().hasName("Curl_read32_le")
+		and target_3.getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(VariableAccess).getTarget()=vbuffer_170
+		and target_3.getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="44")
+}
+
+from Function func, Variable vCurl_cmalloc, Parameter vbuffer_170, Parameter vsize_171, Parameter vntlm_172, Variable vtarget_info_len_174, Variable vtarget_info_offset_175, Parameter vdata_169
 where
-not func_0(vsize, vtarget_info_len, vtarget_info_offset, vdata)
-and vsize.getType().hasName("size_t")
-and vtarget_info_len.getType().hasName("unsigned short")
-and vtarget_info_offset.getType().hasName("unsigned int")
-and vdata.getType().hasName("Curl_easy *")
-and vsize.getParentScope+() = func
-and vtarget_info_len.getParentScope+() = func
-and vtarget_info_offset.getParentScope+() = func
-and vdata.getParentScope+() = func
-select func, vsize, vtarget_info_len, vtarget_info_offset, vdata
+not func_0(vsize_171, vtarget_info_offset_175, vdata_169)
+and func_1(vsize_171, vtarget_info_len_174, vtarget_info_offset_175, vdata_169)
+and vsize_171.getType().hasName("size_t")
+and func_2(vCurl_cmalloc, vbuffer_170, vsize_171, vntlm_172, vtarget_info_len_174, vtarget_info_offset_175, vdata_169)
+and vntlm_172.getType().hasName("ntlmdata *")
+and vtarget_info_len_174.getType().hasName("unsigned short")
+and vtarget_info_offset_175.getType().hasName("unsigned int")
+and func_3(vbuffer_170, vtarget_info_offset_175)
+and vdata_169.getType().hasName("Curl_easy *")
+and not vCurl_cmalloc.getParentScope+() = func
+and vbuffer_170.getParentScope+() = func
+and vsize_171.getParentScope+() = func
+and vntlm_172.getParentScope+() = func
+and vtarget_info_len_174.getParentScope+() = func
+and vtarget_info_offset_175.getParentScope+() = func
+and vdata_169.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

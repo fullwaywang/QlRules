@@ -1,0 +1,56 @@
+commit 0ba5d8814a17a64bdb8d9035f4c533f3f3f4b496	0ba5d8814a17a64bdb8d9035f4c533f3f3f4b496
+Author: erouault <erouault>
+Date:   Sun Jul 10 18:00:20 2016 +0000
+
+    * libtiff/tif_read.c: Fix out-of-bounds read on
+    memory-mapped files in TIFFReadRawStrip1() and TIFFReadRawTile1()
+    when stripoffset is beyond tmsize_t max value (reported by
+    Mathias Svensson)
+
+diff --git a/ChangeLog b/ChangeLog
+index 6f6e7c63..e98d54d5 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,10 @@
++2016-07-10 Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_read.c: Fix out-of-bounds read on
++	memory-mapped files in TIFFReadRawStrip1() and TIFFReadRawTile1()
++	when stripoffset is beyond tmsize_t max value (reported by
++	Mathias Svensson)
++
+ 2016-07-10 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* tools/tiffdump.c: fix a few misaligned 64-bit reads warned
+diff --git a/libtiff/tif_read.c b/libtiff/tif_read.c
+index 5e39b9f5..c26c55f4 100644
+--- a/libtiff/tif_read.c
++++ b/libtiff/tif_read.c
+@@ -31,6 +31,9 @@
+ #include "tiffiop.h"
+ #include <stdio.h>
+ 
++#define TIFF_SIZE_T_MAX ((size_t) ~ ((size_t)0))
++#define TIFF_TMSIZE_T_MAX (tmsize_t)(TIFF_SIZE_T_MAX >> 1)
++
+ int TIFFFillStrip(TIFF* tif, uint32 strip);
+ int TIFFFillTile(TIFF* tif, uint32 tile);
+ static int TIFFStartStrip(TIFF* tif, uint32 strip);
+@@ -421,7 +424,7 @@ TIFFReadRawStrip1(TIFF* tif, uint32 strip, void* buf, tmsize_t size,
+ 		tmsize_t n;
+ 		ma=(tmsize_t)td->td_stripoffset[strip];
+ 		mb=ma+size;
+-		if (((uint64)ma!=td->td_stripoffset[strip])||(ma>tif->tif_size))
++		if ((td->td_stripoffset[strip] > (uint64)TIFF_TMSIZE_T_MAX)||(ma>tif->tif_size))
+ 			n=0;
+ 		else if ((mb<ma)||(mb<size)||(mb>tif->tif_size))
+ 			n=tif->tif_size-ma;
+@@ -755,7 +758,7 @@ TIFFReadRawTile1(TIFF* tif, uint32 tile, void* buf, tmsize_t size, const char* m
+ 		tmsize_t n;
+ 		ma=(tmsize_t)td->td_stripoffset[tile];
+ 		mb=ma+size;
+-		if (((uint64)ma!=td->td_stripoffset[tile])||(ma>tif->tif_size))
++		if ((td->td_stripoffset[tile] > (uint64)TIFF_TMSIZE_T_MAX)||(ma>tif->tif_size))
+ 			n=0;
+ 		else if ((mb<ma)||(mb<size)||(mb>tif->tif_size))
+ 			n=tif->tif_size-ma;

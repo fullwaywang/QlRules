@@ -1,0 +1,25 @@
+commit 95556e27e2c1d56d9e18f5db34d6f756f3011148
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Wed Jun 27 17:27:50 2018 +0200
+
+    avformat/movenc: Do not pass AVCodecParameters in avpriv_request_sample
+    
+    Fixes: out of array read
+    Fixes: ffmpeg_crash_8.avi
+    
+    Found-by: Thuan Pham, Marcel Böhme, Andrew Santosa and Alexandru Razvan Caciulescu with AFLSmart
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index 6eabf32fce..4ce5c23ab8 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -429,7 +429,7 @@ static int handle_eac3(MOVMuxContext *mov, AVPacket *pkt, MOVTrack *track)
+ 
+             if (hdr->substreamid == info->num_ind_sub + 1) {
+                 //info->num_ind_sub++;
+-                avpriv_request_sample(track->par, "Multiple independent substreams");
++                avpriv_request_sample(mov->fc, "Multiple independent substreams");
+                 ret = AVERROR_PATCHWELCOME;
+                 goto end;
+             } else if (hdr->substreamid < info->num_ind_sub ||

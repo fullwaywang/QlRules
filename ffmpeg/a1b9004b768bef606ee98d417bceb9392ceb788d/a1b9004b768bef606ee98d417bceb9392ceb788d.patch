@@ -1,0 +1,38 @@
+commit a1b9004b768bef606ee98d417bceb9392ceb788d	a1b9004b768bef606ee98d417bceb9392ceb788d
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Oct 15 13:15:47 2013 +0200
+
+    avcodec/jpeg2000dec: fix context consistency with too large lowres
+    
+    Fixes out of array accesses
+    Fixes Ticket2898
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/jpeg2000dec.c b/libavcodec/jpeg2000dec.c
+index ef63d37f0c..80bc335507 100644
+--- a/libavcodec/jpeg2000dec.c
++++ b/libavcodec/jpeg2000dec.c
+@@ -370,11 +370,18 @@ static int get_cox(Jpeg2000DecoderContext *s, Jpeg2000CodingStyle *c)
+         return AVERROR_INVALIDDATA;
+     }
+ 
++    if (c->nreslevels <= s->reduction_factor) {
++        /* we are forced to update reduction_factor as its requested value is
++           not compatible with this bitstream, and as we might have used it
++           already in setup earlier we have to fail this frame until
++           reinitialization is implemented */
++        av_log(s->avctx, AV_LOG_ERROR, "reduction_factor too large for this bitstream, max is %d\n", c->nreslevels - 1);
++        s->reduction_factor = c->nreslevels - 1;
++        return AVERROR(EINVAL);
++    }
++
+     /* compute number of resolution levels to decode */
+-    if (c->nreslevels < s->reduction_factor)
+-        c->nreslevels2decode = 1;
+-    else
+-        c->nreslevels2decode = c->nreslevels - s->reduction_factor;
++    c->nreslevels2decode = c->nreslevels - s->reduction_factor;
+ 
+     c->log2_cblk_width  = (bytestream2_get_byteu(&s->g) & 15) + 2; // cblk width
+     c->log2_cblk_height = (bytestream2_get_byteu(&s->g) & 15) + 2; // cblk height

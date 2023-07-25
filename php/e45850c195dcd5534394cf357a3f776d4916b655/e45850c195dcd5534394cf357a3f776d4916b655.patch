@@ -1,0 +1,22 @@
+commit e45850c195dcd5534394cf357a3f776d4916b655
+Author: Jakub Zelenka <bukka@php.net>
+Date:   Thu Jan 19 14:11:18 2023 +0000
+
+    Fix repeated warning for file uploads limit exceeding
+
+diff --git a/main/rfc1867.c b/main/rfc1867.c
+index c2f606c64a..b43cfae5a1 100644
+--- a/main/rfc1867.c
++++ b/main/rfc1867.c
+@@ -911,7 +911,10 @@ SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler) /* {{{ */
+ 				skip_upload = 1;
+ 			} else if (upload_cnt <= 0) {
+ 				skip_upload = 1;
+-				sapi_module.sapi_error(E_WARNING, "Maximum number of allowable file uploads has been exceeded");
++				if (upload_cnt == 0) {
++					--upload_cnt;
++					sapi_module.sapi_error(E_WARNING, "Maximum number of allowable file uploads has been exceeded");
++				}
+ 			}
+ 
+ 			/* Return with an error if the posted data is garbled */

@@ -1,0 +1,43 @@
+commit 35d8d895cd0b724e58129374beb0bb4a2edf9519
+Author: Luiz Augusto von Dentz <luiz.von.dentz@intel.com>
+Date:   Tue Mar 10 09:59:07 2020 -0700
+
+    input: hog: Attempt to set security level if not bonded
+    
+    This attempts to set the security if the device is not bonded, the
+    kernel will block any communication on the ATT socket while bumping
+    the security and if that fails the device will be disconnected which
+    is better than having the device dangling around without being able to
+    communicate with it until it is properly bonded.
+
+diff --git a/profiles/input/hog.c b/profiles/input/hog.c
+index dfac68921..f0226ebbd 100644
+--- a/profiles/input/hog.c
++++ b/profiles/input/hog.c
+@@ -49,6 +49,8 @@
+ #include "src/shared/util.h"
+ #include "src/shared/uhid.h"
+ #include "src/shared/queue.h"
++#include "src/shared/att.h"
++#include "src/shared/gatt-client.h"
+ #include "src/plugin.h"
+ 
+ #include "suspend.h"
+@@ -187,8 +189,15 @@ static int hog_accept(struct btd_service *service)
+ 	}
+ 
+ 	/* HOGP 1.0 Section 6.1 requires bonding */
+-	if (!device_is_bonded(device, btd_device_get_bdaddr_type(device)))
+-		return -ECONNREFUSED;
++	if (!device_is_bonded(device, btd_device_get_bdaddr_type(device))) {
++		struct bt_gatt_client *client;
++
++		client = btd_device_get_gatt_client(device);
++		if (!bt_gatt_client_set_security(client,
++						BT_ATT_SECURITY_MEDIUM)) {
++			return -ECONNREFUSED;
++		}
++	}
+ 
+ 	/* TODO: Replace GAttrib with bt_gatt_client */
+ 	bt_hog_attach(dev->hog, attrib);

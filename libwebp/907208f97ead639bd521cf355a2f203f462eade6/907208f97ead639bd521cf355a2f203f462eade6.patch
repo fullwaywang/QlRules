@@ -1,0 +1,29 @@
+commit 907208f97ead639bd521cf355a2f203f462eade6
+Author: Vincent Rabaud <vrabaud@google.com>
+Date:   Fri Jul 20 16:27:30 2018 -0700
+
+    Wait for all threads to be done in DecodeRemaining.
+    
+    This could lead to a race condition.
+    
+    BUG=oss-fuzz:9417
+    
+    Change-Id: Ifef4001115888541cb76095e1c0226487d497b78
+
+diff --git a/src/dec/idec_dec.c b/src/dec/idec_dec.c
+index 738e14c9..9bc91668 100644
+--- a/src/dec/idec_dec.c
++++ b/src/dec/idec_dec.c
+@@ -473,6 +473,12 @@ static VP8StatusCode DecodeRemaining(WebPIDecoder* const idec) {
+             MemDataSize(&idec->mem_) > MAX_MB_SIZE) {
+           return IDecError(idec, VP8_STATUS_BITSTREAM_ERROR);
+         }
++        // Synchronize the threads.
++        if (dec->mt_method_ > 0) {
++          if (!WebPGetWorkerInterface()->Sync(&dec->worker_)) {
++            return IDecError(idec, VP8_STATUS_BITSTREAM_ERROR);
++          }
++        }
+         RestoreContext(&context, dec, token_br);
+         return VP8_STATUS_SUSPENDED;
+       }

@@ -1,0 +1,53 @@
+commit 0d13325b660b5ae64267dffcc9a153c7634fdfe2
+Merge: 75d7666968 9e00ad2b09
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Wed Aug 17 00:23:51 2016 -0700
+
+    Merge branch 'PHP-5.6' into PHP-7.0
+    
+    * PHP-5.6: (24 commits)
+      Update NEWS
+      BLock test with memory leak
+      fix tests
+      Fix TSRM build
+      Fix bug #72850 - integer overflow in uuencode
+      Fixed bug #72849 - integer overflow in urlencode
+      Fix bug #72848 - integer overflow in quoted_printable_encode caused heap corruption
+      Fix bug #72838 -      Integer overflow lead to heap corruption in sql_regcase
+      Fix bug #72837 - integer overflow in bzdecompress caused heap corruption
+      Fix bug #72836 - integer overflow in base64_decode caused heap corruption
+      Fix for bug #72807 - do not produce strings with negative length
+      Fix for bug #72790 and bug #72799
+      Fix bug #72730 - imagegammacorrect allows arbitrary write access
+      Fix bug#72697 - select_colors write out-of-bounds
+      Fixed bug #72627: Memory Leakage In exif_process_IFD_in_TIFF
+      Fix bug #72750: wddx_deserialize null dereference
+      Fix bug #72771: ftps:// opendir wrapper is vulnerable to protocol downgrade attack
+      Improve fix for #72663
+      Fix bug #70436: Use After Free Vulnerability in unserialize()
+      Fix bug #72749: wddx_deserialize allows illegal memory access
+      ...
+    
+    Conflicts:
+            Zend/zend_API.h
+            ext/bz2/bz2.c
+            ext/curl/interface.c
+            ext/ereg/ereg.c
+            ext/exif/exif.c
+            ext/gd/gd.c
+            ext/gd/tests/imagetruecolortopalette_error3.phpt
+            ext/gd/tests/imagetruecolortopalette_error4.phpt
+            ext/session/session.c
+            ext/snmp/snmp.c
+            ext/standard/base64.c
+            ext/standard/ftp_fopen_wrapper.c
+            ext/standard/quot_print.c
+            ext/standard/url.c
+            ext/standard/uuencode.c
+            ext/standard/var.c
+            ext/standard/var_unserializer.c
+            ext/standard/var_unserializer.re
+            ext/wddx/tests/bug72790.phpt
+            ext/wddx/tests/bug72799.phpt
+            ext/wddx/wddx.c
+            sapi/cli/generate_mime_type_map.php

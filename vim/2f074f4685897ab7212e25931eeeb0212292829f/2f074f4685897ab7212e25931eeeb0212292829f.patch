@@ -1,0 +1,44 @@
+commit 2f074f4685897ab7212e25931eeeb0212292829f
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jun 18 11:22:40 2022 +0100
+
+    patch 8.2.5120: searching for quotes may go over the end of the line
+    
+    Problem:    Searching for quotes may go over the end of the line.
+    Solution:   Check for running into the NUL.
+
+diff --git a/src/textobject.c b/src/textobject.c
+index 9a8a91626..153c14ddd 100644
+--- a/src/textobject.c
++++ b/src/textobject.c
+@@ -1798,11 +1798,17 @@ current_quote(
+ 
+ 	// Find out if we have a quote in the selection.
+ 	while (i <= col_end)
++	{
++	    // check for going over the end of the line, which can happen if
++	    // the line was changed after the Visual area was selected.
++	    if (line[i] == NUL)
++		break;
+ 	    if (line[i++] == quotechar)
+ 	    {
+ 		selected_quote = TRUE;
+ 		break;
+ 	    }
++	}
+     }
+ 
+     if (!vis_empty && line[col_start] == quotechar)
+diff --git a/src/version.c b/src/version.c
+index b9b334785..df9d576ad 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5120,
+ /**/
+     5119,
+ /**/

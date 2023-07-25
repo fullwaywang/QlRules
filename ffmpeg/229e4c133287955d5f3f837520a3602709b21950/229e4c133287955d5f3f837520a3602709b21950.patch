@@ -1,0 +1,44 @@
+commit 229e4c133287955d5f3f837520a3602709b21950	229e4c133287955d5f3f837520a3602709b21950
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Mar 24 17:43:55 2012 +0100
+
+    indeo5dec: Make sure we have had a valid gop header.
+    
+    This prevents decoding happening on a half initialized context.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/indeo5.c b/libavcodec/indeo5.c
+index 9b9805ff51..2bacfa2885 100644
+--- a/libavcodec/indeo5.c
++++ b/libavcodec/indeo5.c
+@@ -76,6 +76,8 @@ typedef struct {
+     int             is_scalable;
+     uint32_t        lock_word;
+     IVIPicConfig    pic_conf;
++
++    int gop_invalid;
+ } IVI5DecContext;
+ 
+ 
+@@ -336,8 +338,10 @@ static int decode_pic_hdr(IVI5DecContext *ctx, AVCodecContext *avctx)
+     ctx->frame_num = get_bits(&ctx->gb, 8);
+ 
+     if (ctx->frame_type == FRAMETYPE_INTRA) {
++        ctx->gop_invalid = 1;
+         if (decode_gop_header(ctx, avctx))
+             return -1;
++        ctx->gop_invalid = 0;
+     }
+ 
+     if (ctx->frame_type != FRAMETYPE_NULL) {
+@@ -751,7 +755,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
+     ctx->frame_size = buf_size;
+ 
+     result = decode_pic_hdr(ctx, avctx);
+-    if (result) {
++    if (result || ctx->gop_invalid) {
+         av_log(avctx, AV_LOG_ERROR,
+                "Error while decoding picture header: %d\n", result);
+         return -1;

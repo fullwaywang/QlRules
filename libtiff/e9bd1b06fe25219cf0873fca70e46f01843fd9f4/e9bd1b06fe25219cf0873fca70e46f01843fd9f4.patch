@@ -1,0 +1,60 @@
+commit e9bd1b06fe25219cf0873fca70e46f01843fd9f4	e9bd1b06fe25219cf0873fca70e46f01843fd9f4
+Author: erouault <erouault>
+Date:   Thu Apr 27 17:29:26 2017 +0000
+
+    * libtiff/tif_ojpeg.c: fix potential memory leak in
+    OJPEGReadHeaderInfoSecTablesQTable, OJPEGReadHeaderInfoSecTablesDcTable
+    and OJPEGReadHeaderInfoSecTablesAcTable
+    Patch by Nicolás Peña.
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2670
+
+diff --git a/ChangeLog b/ChangeLog
+index 11639b98..cb25b006 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,4 +1,13 @@
+-2017-04-27
++2017-04-27 Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_ojpeg.c: fix potential memory leak in
++	OJPEGReadHeaderInfoSecTablesQTable, OJPEGReadHeaderInfoSecTablesDcTable
++	and OJPEGReadHeaderInfoSecTablesAcTable
++	Patch by Nicolás Peña.
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2670
++
++2017-04-27 Even Rouault <even.rouault at spatialys.com>
++
+ 	* libtiff/tif_dirread.c: fix memory leak in non DEFER_STRILE_LOAD
+ 	mode (ie default) when there is both a StripOffsets and
+ 	TileOffsets tag, or a StripByteCounts and TileByteCounts
+diff --git a/libtiff/tif_ojpeg.c b/libtiff/tif_ojpeg.c
+index 5f6c684c..e79b5429 100644
+--- a/libtiff/tif_ojpeg.c
++++ b/libtiff/tif_ojpeg.c
+@@ -1794,6 +1794,8 @@ OJPEGReadHeaderInfoSecTablesQTable(TIFF* tif)
+                                 _TIFFfree(ob);
+ 				return(0);
+                         }
++			if (sp->qtable[m]!=0)
++				_TIFFfree(sp->qtable[m]);
+ 			sp->qtable[m]=ob;
+ 			sp->sof_tq[m]=m;
+ 		}
+@@ -1861,6 +1863,8 @@ OJPEGReadHeaderInfoSecTablesDcTable(TIFF* tif)
+                                 _TIFFfree(rb);
+ 				return(0);
+                         }
++			if (sp->dctable[m]!=0)
++				_TIFFfree(sp->dctable[m]);
+ 			sp->dctable[m]=rb;
+ 			sp->sos_tda[m]=(m<<4);
+ 		}
+@@ -1928,6 +1932,8 @@ OJPEGReadHeaderInfoSecTablesAcTable(TIFF* tif)
+                                 _TIFFfree(rb);
+ 				return(0);
+                         }
++			if (sp->actable[m]!=0)
++				_TIFFfree(sp->actable[m]);
+ 			sp->actable[m]=rb;
+ 			sp->sos_tda[m]=(sp->sos_tda[m]|m);
+ 		}

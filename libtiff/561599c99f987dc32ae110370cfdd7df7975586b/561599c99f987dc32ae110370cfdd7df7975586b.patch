@@ -1,0 +1,20 @@
+commit 561599c99f987dc32ae110370cfdd7df7975586b	561599c99f987dc32ae110370cfdd7df7975586b
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Sat Feb 5 20:36:41 2022 +0100
+
+    TIFFReadDirectory(): avoid calling memcpy() with a null source pointer and size of zero (fixes #362)
+
+diff --git a/libtiff/tif_dirread.c b/libtiff/tif_dirread.c
+index 2bbc4585..23194ced 100644
+--- a/libtiff/tif_dirread.c
++++ b/libtiff/tif_dirread.c
+@@ -4177,7 +4177,8 @@ TIFFReadDirectory(TIFF* tif)
+                     goto bad;
+                 }
+ 
+-                memcpy(new_sampleinfo, tif->tif_dir.td_sampleinfo, old_extrasamples * sizeof(uint16_t));
++                if (old_extrasamples > 0)
++                    memcpy(new_sampleinfo, tif->tif_dir.td_sampleinfo, old_extrasamples * sizeof(uint16_t));
+                 _TIFFsetShortArray(&tif->tif_dir.td_sampleinfo, new_sampleinfo, tif->tif_dir.td_extrasamples);
+                 _TIFFfree(new_sampleinfo);
+         }

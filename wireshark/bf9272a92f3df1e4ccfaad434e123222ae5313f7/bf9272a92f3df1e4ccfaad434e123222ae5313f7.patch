@@ -1,0 +1,63 @@
+commit bf9272a92f3df1e4ccfaad434e123222ae5313f7
+Author: Stig Bjørlykke <stig@bjorlykke.org>
+Date:   Sun Dec 9 21:54:18 2018 +0100
+
+    p_mul: Detect Data PDU sequence number 0
+    
+    Data PDU sequence number 0 is illegal, add an expert info for this.
+    Don't include this packet in SEQ/ACK analysis.
+    
+    Bug: 15337
+    Change-Id: I476088531e8a3605393ee1dedf1e8b159dac342b
+    Reviewed-on: https://code.wireshark.org/review/30980
+    Petri-Dish: Stig Bjørlykke <stig@bjorlykke.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 3cccd4ec5b922e79afd134db4f0c9acb10bf7202)
+    Reviewed-on: https://code.wireshark.org/review/30987
+    Reviewed-by: Stig Bjørlykke <stig@bjorlykke.org>
+
+diff --git a/epan/dissectors/packet-p_mul.c b/epan/dissectors/packet-p_mul.c
+index 35edde78ac..2dd6f159cd 100644
+--- a/epan/dissectors/packet-p_mul.c
++++ b/epan/dissectors/packet-p_mul.c
+@@ -163,6 +163,7 @@ static gint ett_msg_fragments = -1;
+ 
+ static expert_field ei_more_data = EI_INIT;
+ static expert_field ei_checksum_bad = EI_INIT;
++static expert_field ei_illegal_seq_no = EI_INIT;
+ static expert_field ei_tot_miss_seq_no = EI_INIT;
+ static expert_field ei_miss_seq_no = EI_INIT;
+ static expert_field ei_analysis_ack_missing = EI_INIT;
+@@ -368,6 +369,11 @@ static p_mul_seq_val *register_p_mul_id (packet_info *pinfo, address *addr, guin
+     return NULL;
+   }
+ 
++  if (pdu_type == Data_PDU && seq_no == 0) {
++    /* Illegal sequence number for Data PDU */
++    return NULL;
++  }
++
+   nstime_set_zero(&addr_time);
+   nstime_set_zero(&prev_time);
+ 
+@@ -877,7 +883,10 @@ static int dissect_p_mul (tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
+   case Data_PDU:
+     /* Sequence Number of PDUs */
+     seq_no = tvb_get_ntohs (tvb, offset);
+-    proto_tree_add_item (p_mul_tree, hf_seq_no, tvb, offset, 2, ENC_BIG_ENDIAN);
++    en = proto_tree_add_item (p_mul_tree, hf_seq_no, tvb, offset, 2, ENC_BIG_ENDIAN);
++    if (seq_no == 0) {
++      expert_add_info(pinfo, en, &ei_illegal_seq_no);
++    }
+     proto_item_append_text (ti, ", Seq no: %u", seq_no);
+     break;
+ 
+@@ -1548,6 +1557,7 @@ void proto_register_p_mul (void)
+       { &ei_miss_seq_range, { "p_mul.missing_seq_range.invalid", PI_UNDECODED, PI_WARN, "Invalid missing sequence range", EXPFILL }},
+       { &ei_miss_seq_no, { "p_mul.missing_seq_no.invalid", PI_UNDECODED, PI_WARN, "Invalid missing seq number", EXPFILL }},
+       { &ei_tot_miss_seq_no, { "p_mul.no_missing_seq_no.expert", PI_RESPONSE_CODE, PI_NOTE, "Missing seq numbers", EXPFILL }},
++      { &ei_illegal_seq_no, { "p_mul.seq_no.illegal", PI_PROTOCOL, PI_WARN, "Illegal seq number", EXPFILL }},
+       { &ei_length, { "p_mul.length.invalid", PI_MALFORMED, PI_WARN, "Incorrect length field", EXPFILL }},
+       { &ei_more_data, { "p_mul.more_data", PI_MALFORMED, PI_WARN, "More data in packet", EXPFILL }},
+   };

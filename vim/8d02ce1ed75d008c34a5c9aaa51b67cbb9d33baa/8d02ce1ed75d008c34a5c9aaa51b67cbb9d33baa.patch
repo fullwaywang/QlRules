@@ -1,0 +1,60 @@
+commit 8d02ce1ed75d008c34a5c9aaa51b67cbb9d33baa
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Jan 25 18:24:00 2022 +0000
+
+    patch 8.2.4217: illegal memory access when undo makes Visual area invalid
+    
+    Problem:    Illegal memory access when undo makes Visual area invalid.
+    Solution:   Correct the Visual area after undo.
+
+diff --git a/src/testdir/test_visual.vim b/src/testdir/test_visual.vim
+index 9b322fd21..b2beda08d 100644
+--- a/src/testdir/test_visual.vim
++++ b/src/testdir/test_visual.vim
+@@ -1339,5 +1339,20 @@ func Test_visual_ex_copy_line()
+   bwipe!
+ endfunc
+ 
++" This was leaving the end of the Visual area beyond the end of a line.
++" Set 'undolevels' to start a new undo block.
++func Test_visual_undo_deletes_last_line()
++  new
++  call setline(1, ["aaa", "ccc", "dyd"])
++  set undolevels=100
++  exe "normal obbbbbbbbbxbb\<Esc>"
++  set undolevels=100
++  /y
++  exe "normal ggvjfxO"
++  undo
++  normal gNU
++  bwipe!
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/undo.c b/src/undo.c
+index 4d186d453..636144aef 100644
+--- a/src/undo.c
++++ b/src/undo.c
+@@ -3029,6 +3029,8 @@ u_undo_end(
+ 	}
+     }
+ #endif
++    if (VIsual_active)
++	check_pos(curbuf, &VIsual);
+ 
+     smsg_attr_keep(0, _("%ld %s; %s #%ld  %s"),
+ 	    u_oldcount < 0 ? -u_oldcount : u_oldcount,
+diff --git a/src/version.c b/src/version.c
+index f5f9a2ef9..6685b554f 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4217,
+ /**/
+     4216,
+ /**/

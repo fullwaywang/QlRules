@@ -1,0 +1,41 @@
+commit babe75030c7f64a37826bb3342317134568bef61
+Reflog: HEAD@{0} (yongzhiliu <yongzhiliu@tencent.com>)
+Reflog message: reset: moving to babe75030c7f64a37826bb3342317134568bef61
+Author: Nick Wellnhofer <wellnhofer@aevum.de>
+Date:   Sat May 1 16:53:33 2021 +0200
+
+    Propagate error in xmlParseElementChildrenContentDeclPriv
+    
+    Check return value of recursive calls to
+    xmlParseElementChildrenContentDeclPriv and return immediately in case
+    of errors. Otherwise, struct xmlElementContent could contain unexpected
+    null pointers, leading to a null deref when post-validating documents
+    which aren't well-formed and parsed in recovery mode.
+    
+    Fixes #243.
+
+diff --git a/parser.c b/parser.c
+index b42e6043..73c27edd 100644
+--- a/parser.c
++++ b/parser.c
+@@ -6208,6 +6208,8 @@ xmlParseElementChildrenContentDeclPriv(xmlParserCtxtPtr ctxt, int inputchk,
+ 	SKIP_BLANKS;
+         cur = ret = xmlParseElementChildrenContentDeclPriv(ctxt, inputid,
+                                                            depth + 1);
++        if (cur == NULL)
++            return(NULL);
+ 	SKIP_BLANKS;
+ 	GROW;
+     } else {
+@@ -6341,6 +6343,11 @@ xmlParseElementChildrenContentDeclPriv(xmlParserCtxtPtr ctxt, int inputchk,
+ 	    SKIP_BLANKS;
+ 	    last = xmlParseElementChildrenContentDeclPriv(ctxt, inputid,
+                                                           depth + 1);
++            if (last == NULL) {
++		if (ret != NULL)
++		    xmlFreeDocElementContent(ctxt->myDoc, ret);
++		return(NULL);
++            }
+ 	    SKIP_BLANKS;
+ 	} else {
+ 	    elem = xmlParseName(ctxt);

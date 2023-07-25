@@ -1,0 +1,19 @@
+commit aea6c6507f55632829e6432f8177a084a57c9fcc
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Oct 7 17:01:22 2016 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/271
+
+diff --git a/coders/rle.c b/coders/rle.c
+index 8edd8133c..05a65ec22 100644
+--- a/coders/rle.c
++++ b/coders/rle.c
+@@ -224,7 +224,7 @@ static Image *ReadRLEImage(const ImageInfo *image_info,ExceptionInfo *exception)
+     bits_per_pixel=(size_t) ReadBlobByte(image);
+     number_colormaps=(size_t) ReadBlobByte(image);
+     map_length=(unsigned char) ReadBlobByte(image);
+-    if (map_length >= 64)
++    if (map_length >= 32)
+       ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+     one=1;
+     map_length=one << map_length;

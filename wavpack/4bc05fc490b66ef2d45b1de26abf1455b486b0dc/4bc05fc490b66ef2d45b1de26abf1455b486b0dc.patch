@@ -1,0 +1,45 @@
+commit 4bc05fc490b66ef2d45b1de26abf1455b486b0dc
+Author: David Bryant <david@wavpack.com>
+Date:   Wed Dec 21 22:18:36 2016 -0800
+
+    fixes for 4 fuzz failures posted to SourceForge mailing list
+
+diff --git a/src/open_utils.c b/src/open_utils.c
+index 7519f99..a844046 100644
+--- a/src/open_utils.c
++++ b/src/open_utils.c
+@@ -560,7 +560,7 @@ static int read_new_config_info (WavpackContext *wpc, WavpackMetadata *wpmd)
+ 
+     // if there's any data, the first two bytes are file_format and qmode flags
+ 
+-    if (bytecnt) {
++    if (bytecnt >= 2) {
+         wpc->file_format = *byteptr++;
+         wpc->config.qmode = (wpc->config.qmode & ~0xff) | *byteptr++;
+         bytecnt -= 2;
+@@ -593,6 +593,10 @@ static int read_new_config_info (WavpackContext *wpc, WavpackMetadata *wpmd)
+                         for (i = 0; i < nchans; ++i)
+                             if (bytecnt) {
+                                 wpc->channel_reordering [i] = *byteptr++;
++
++                                if (wpc->channel_reordering [i] >= nchans)  // make sure index is in range
++                                    wpc->channel_reordering [i] = 0;
++
+                                 bytecnt--;
+                             }
+                             else
+diff --git a/src/read_words.c b/src/read_words.c
+index 62acac3..a537bfa 100644
+--- a/src/read_words.c
++++ b/src/read_words.c
+@@ -288,6 +288,10 @@ int32_t FASTCALL get_word (WavpackStream *wps, int chan, int32_t *correction)
+ 
+     low &= 0x7fffffff;
+     high &= 0x7fffffff;
++
++    if (low > high)         // make sure high and low make sense
++        high = low;
++
+     mid = (high + low + 1) >> 1;
+ 
+     if (!c->error_limit)

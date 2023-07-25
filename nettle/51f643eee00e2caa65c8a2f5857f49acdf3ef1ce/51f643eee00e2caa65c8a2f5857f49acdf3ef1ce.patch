@@ -1,0 +1,39 @@
+commit 51f643eee00e2caa65c8a2f5857f49acdf3ef1ce
+Author: Niels Möller <nisse@lysator.liu.se>
+Date:   Sat Mar 13 16:27:50 2021 +0100
+
+    Ensure ecdsa_sign output is canonically reduced.
+    
+    * ecc-ecdsa-sign.c (ecc_ecdsa_sign): Ensure s output is reduced to
+    canonical range.
+    
+    (cherry picked from commit c24b36160dc5303f7541dd9da1429c4046f27398)
+
+diff --git a/ChangeLog b/ChangeLog
+index 63848f53..fb2d7f66 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,5 +1,8 @@
+ 2021-03-13  Niels Möller  <nisse@lysator.liu.se>
+ 
++	* ecc-ecdsa-sign.c (ecc_ecdsa_sign): Ensure s output is reduced to
++	canonical range.
++
+ 	* ecc-ecdsa-verify.c (ecc_ecdsa_verify): Use ecc_mod_mul_canonical
+ 	to compute the scalars used for ecc multiplication.
+ 	* testsuite/ecdsa-verify-test.c (test_main): Add test case that
+diff --git a/ecc-ecdsa-sign.c b/ecc-ecdsa-sign.c
+index f323196e..4adee1d1 100644
+--- a/ecc-ecdsa-sign.c
++++ b/ecc-ecdsa-sign.c
+@@ -91,9 +91,8 @@ ecc_ecdsa_sign (const struct ecc_curve *ecc,
+ 
+   ecc_mod_mul (&ecc->q, tp, zp, rp, tp);
+   ecc_mod_add (&ecc->q, hp, hp, tp);
+-  ecc_mod_mul (&ecc->q, tp, hp, kinv, tp);
++  ecc_mod_mul_canonical (&ecc->q, sp, hp, kinv, tp);
+ 
+-  mpn_copyi (sp, tp, ecc->p.size);
+ #undef P
+ #undef hp
+ #undef kinv

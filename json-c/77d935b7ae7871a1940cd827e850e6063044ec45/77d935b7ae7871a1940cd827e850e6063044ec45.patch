@@ -1,0 +1,32 @@
+commit 77d935b7ae7871a1940cd827e850e6063044ec45
+Author: Tobias Stoeckmann <tobias@stoeckmann.org>
+Date:   Mon May 4 19:46:45 2020 +0200
+
+    Prevent division by zero in linkhash.
+    
+    If a linkhash with a size of zero is created, then modulo operations
+    are prone to division by zero operations.
+    
+    Purely protective measure against bad usage.
+
+diff --git a/linkhash.c b/linkhash.c
+index 7ea58c0..f05cc38 100644
+--- a/linkhash.c
++++ b/linkhash.c
+@@ -12,6 +12,7 @@
+ 
+ #include "config.h"
+ 
++#include <assert.h>
+ #include <limits.h>
+ #include <stdarg.h>
+ #include <stddef.h>
+@@ -499,6 +500,8 @@ struct lh_table *lh_table_new(int size, lh_entry_free_fn *free_fn, lh_hash_fn *h
+ 	int i;
+ 	struct lh_table *t;
+ 
++	/* Allocate space for elements to avoid divisions by zero. */
++	assert(size > 0);
+ 	t = (struct lh_table *)calloc(1, sizeof(struct lh_table));
+ 	if (!t)
+ 		return NULL;

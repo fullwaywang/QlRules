@@ -1,0 +1,137 @@
+commit 7ce5b2b590256ce53d6af28c1d203fb3bc1d2d97
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon May 16 19:40:59 2022 +0100
+
+    patch 8.2.4969: changing text in Visual mode may cause invalid memory access
+    
+    Problem:    Changing text in Visual mode may cause invalid memory access.
+    Solution:   Check the Visual position after making a change.
+
+diff --git a/src/change.c b/src/change.c
+index a9c3e19f4..47411ca59 100644
+--- a/src/change.c
++++ b/src/change.c
+@@ -548,6 +548,9 @@ changed_common(
+ 	curwin->w_changelistidx = curbuf->b_changelistlen;
+     }
+ 
++    if (VIsual_active)
++	check_visual_pos();
++
+     FOR_ALL_TAB_WINDOWS(tp, wp)
+     {
+ 	if (wp->w_buffer == curbuf)
+diff --git a/src/edit.c b/src/edit.c
+index 5b06131f9..6e76971c3 100644
+--- a/src/edit.c
++++ b/src/edit.c
+@@ -2541,16 +2541,8 @@ stop_insert(
+ 
+ 	    // <C-S-Right> may have started Visual mode, adjust the position for
+ 	    // deleted characters.
+-	    if (VIsual_active && VIsual.lnum == curwin->w_cursor.lnum)
+-	    {
+-		int len = (int)STRLEN(ml_get_curline());
+-
+-		if (VIsual.col > len)
+-		{
+-		    VIsual.col = len;
+-		    VIsual.coladd = 0;
+-		}
+-	    }
++	    if (VIsual_active)
++		check_visual_pos();
+ 	}
+     }
+     did_ai = FALSE;
+diff --git a/src/misc2.c b/src/misc2.c
+index 7840ea98f..e03ca4936 100644
+--- a/src/misc2.c
++++ b/src/misc2.c
+@@ -622,6 +622,31 @@ check_cursor(void)
+     check_cursor_col();
+ }
+ 
++/*
++ * Check if VIsual position is valid, correct it if not.
++ * Can be called when in Visual mode and a change has been made.
++ */
++    void
++check_visual_pos(void)
++{
++    if (VIsual.lnum > curbuf->b_ml.ml_line_count)
++    {
++	VIsual.lnum = curbuf->b_ml.ml_line_count;
++	VIsual.col = 0;
++	VIsual.coladd = 0;
++    }
++    else
++    {
++	int len = (int)STRLEN(ml_get(VIsual.lnum));
++
++	if (VIsual.col > len)
++	{
++	    VIsual.col = len;
++	    VIsual.coladd = 0;
++	}
++    }
++}
++
+ #if defined(FEAT_TEXTOBJ) || defined(PROTO)
+ /*
+  * Make sure curwin->w_cursor is not on the NUL at the end of the line.
+@@ -2416,7 +2441,7 @@ get_user_name(char_u *buf, int len)
+     return OK;
+ }
+ 
+-#if defined(EXITFREE) || defined(PROTOS)
++#if defined(EXITFREE) || defined(PROTO)
+ /*
+  * Free the memory allocated by get_user_name()
+  */
+diff --git a/src/proto/misc2.pro b/src/proto/misc2.pro
+index fe0a4fbb5..2728ffe64 100644
+--- a/src/proto/misc2.pro
++++ b/src/proto/misc2.pro
+@@ -17,6 +17,7 @@ void check_cursor_lnum(void);
+ void check_cursor_col(void);
+ void check_cursor_col_win(win_T *win);
+ void check_cursor(void);
++void check_visual_pos(void);
+ void adjust_cursor_col(void);
+ int leftcol_changed(void);
+ int copy_option_part(char_u **option, char_u *buf, int maxlen, char *sep_chars);
+diff --git a/src/testdir/test_visual.vim b/src/testdir/test_visual.vim
+index abc8265bd..c3230623b 100644
+--- a/src/testdir/test_visual.vim
++++ b/src/testdir/test_visual.vim
+@@ -1296,6 +1296,16 @@ func Test_visual_block_append_invalid_char()
+   set isprint&
+ endfunc
+ 
++func Test_visual_block_with_substitute()
++  " this was reading beyond the end of the line
++  new
++  norm a0)
++  sil! norm  O
++  s/)
++  sil! norm 
++  bwipe!
++endfunc
++
+ func Test_visual_reselect_with_count()
+   " this was causing an illegal memory access
+   let lines =<< trim END
+diff --git a/src/version.c b/src/version.c
+index 7397e6fb7..485e25780 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4969,
+ /**/
+     4968,
+ /**/

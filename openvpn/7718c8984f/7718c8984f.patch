@@ -1,0 +1,54 @@
+commit 7718c8984f04b507c1885f363970e2124e3c6c77
+Author: Guido Vranken <guidovranken@gmail.com>
+Date:   Fri May 19 14:04:25 2017 +0200
+
+    Prevent two kinds of stack buffer OOB reads and a crash for invalid input data
+    
+    Pre-authentication remote crash/information disclosure for clients
+    
+    If clients use a HTTP proxy with NTLM authentication (i.e.
+    "--http-proxy <server> <port> [<authfile>|'auto'|'auto-nct'] ntlm2"),
+    a man-in-the-middle attacker between the client and the proxy can
+    cause the client to crash or disclose at most 96 bytes of stack
+    memory. The disclosed stack memory is likely to contain the proxy
+    password.
+    
+    If the proxy password is not reused, this is unlikely to compromise
+    the security of the OpenVPN tunnel itself.  Clients who do not use
+    the --http-proxy option with ntlm2 authentication are not affected.
+    
+    CVE: 2017-7520
+    Signed-off-by: Guido Vranken <guidovranken@gmail.com>
+    Acked-by: Gert Doering <gert@greenie.muc.de>
+    Message-Id: <CAO5O-EJvHKid-zTj+hmFG_3Gv78ixqCayE9=C62DZaxN32WNtQ@mail.gmail.com>
+    URL: https://www.mail-archive.com/search?l=mid&q=CAO5O-EJvHKid-zTj+hmFG_3Gv78ixqCayE9=C62DZaxN32WNtQ@mail.gmail.com
+    Signed-off-by: Gert Doering <gert@greenie.muc.de>
+
+diff --git a/src/openvpn/ntlm.c b/src/openvpn/ntlm.c
+index 16d60d2c..0b1163ee 100644
+--- a/src/openvpn/ntlm.c
++++ b/src/openvpn/ntlm.c
+@@ -195,7 +195,7 @@ ntlm_phase_3(const struct http_proxy_info *p, const char *phase_2, struct gc_are
+      */
+ 
+     char pwbuf[sizeof(p->up.password) * 2]; /* for unicode password */
+-    char buf2[128]; /* decoded reply from proxy */
++    unsigned char buf2[128]; /* decoded reply from proxy */
+     unsigned char phase3[464];
+ 
+     char md4_hash[MD4_DIGEST_LENGTH+5];
+@@ -301,7 +301,13 @@ ntlm_phase_3(const struct http_proxy_info *p, const char *phase_2, struct gc_are
+                 tib_len = 96;
+             }
+             {
+-                char *tib_ptr = buf2 + buf2[0x2c];           /* Get Target Information block pointer */
++                char *tib_ptr;
++                int tib_pos = buf2[0x2c];
++                if (tib_pos + tib_len > sizeof(buf2))
++                {
++                    return NULL;
++                }
++                tib_ptr = buf2 + tib_pos;                               /* Get Target Information block pointer */
+                 memcpy(&ntlmv2_blob[0x1c], tib_ptr, tib_len);           /* Copy Target Information block into the blob */
+             }
+         }

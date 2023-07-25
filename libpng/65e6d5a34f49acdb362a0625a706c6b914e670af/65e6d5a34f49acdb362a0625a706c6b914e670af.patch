@@ -1,0 +1,74 @@
+commit 65e6d5a34f49acdb362a0625a706c6b914e670af
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Tue Jun 7 14:58:07 2011 -0500
+
+    [master] Fixed 1-byte uninitialized memory reference in png_format_buffer()
+    
+    (Bug report by Frank Busse, related to CVE-2004-0421).
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index 7df9b95f0..c4b65091c 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,5 +1,5 @@
+ 
+-Libpng 1.4.8beta04 - June 6, 2011
++Libpng 1.4.8beta04 - June 7, 2011
+ 
+ This is not intended to be a public release.  It will be replaced
+ within a few weeks by a public version or by another test version.
+@@ -44,7 +44,9 @@ version 1.4.8beta02 [June 5, 2011]
+ version 1.4.8beta03 [June 6, 2011]
+   Check for integer overflow in png_set_rgb_to_gray().
+ 
+-version 1.4.8beta04 [June 6, 2011]
++version 1.4.8beta04 [June 7, 2011]
++  Fixed 1-byte uninitialized memory reference in png_format_buffer() (Bug
++    report by Frank Busse, related to CVE-2004-0421).
+ 
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index 244437f8b..2797b0814 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2812,7 +2812,9 @@ version 1.4.8beta02 [June 5, 2011]
+ version 1.4.8beta03 [June 6, 2011]
+   Check for integer overflow in png_set_rgb_to_gray().
+ 
+-version 1.4.8beta04 [June 6, 2011]
++version 1.4.8beta04 [June 7, 2011]
++  Fixed 1-byte uninitialized memory reference in png_format_buffer() (Bug
++    report by Frank Busse, related to CVE-2004-0421).
+ 
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+diff --git a/pngerror.c b/pngerror.c
+index edfe0d010..6ca29c8bf 100644
+--- a/pngerror.c
++++ b/pngerror.c
+@@ -1,7 +1,7 @@
+ 
+ /* pngerror.c - stub functions for i/o and memory allocation
+  *
+- * Last changed in libpng 1.4.8 [June 6, 2011]
++ * Last changed in libpng 1.4.8 [June 7, 2011]
+  * Copyright (c) 1998-2011 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
+@@ -186,8 +186,13 @@ png_format_buffer(png_structp png_ptr, png_charp buffer, png_const_charp
+    {
+       buffer[iout++] = ':';
+       buffer[iout++] = ' ';
+-      png_memcpy(buffer + iout, error_message, PNG_MAX_ERROR_TEXT);
+-      buffer[iout + PNG_MAX_ERROR_TEXT - 1] = '\0';
++
++      iin = 0;
++      while (iin < PNG_MAX_ERROR_TEXT-1 && error_message[iin] != '\0')
++         buffer[iout++] = error_message[iin++];
++
++      /* iin < PNG_MAX_ERROR_TEXT, so the following is safe: */
++      buffer[iout] = '\0';
+    }
+ }
+ 

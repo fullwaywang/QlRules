@@ -1,0 +1,72 @@
+commit d3a117814d6acbf0dca3eff1a7626843b9b3734a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Jan 5 16:50:40 2022 +0000
+
+    patch 8.2.4009: reading one byte beyond the end of the line
+    
+    Problem:    Reading one byte beyond the end of the line.
+    Solution:   Check for NUL byte first.
+
+diff --git a/src/ex_docmd.c b/src/ex_docmd.c
+index 41cbd3090..1f15bc854 100644
+--- a/src/ex_docmd.c
++++ b/src/ex_docmd.c
+@@ -3632,7 +3632,8 @@ find_ex_command(
+ 	}
+ 
+ 	// Check for "++nr" and "--nr".
+-	if (p == eap->cmd && p[0] == p[1] && (*p == '+' || *p == '-'))
++	if (p == eap->cmd && p[0] != NUL && p[0] == p[1]
++						   && (*p == '+' || *p == '-'))
+ 	{
+ 	    eap->cmdidx = *p == '+' ? CMD_increment : CMD_decrement;
+ 	    return eap->cmd + 2;
+diff --git a/src/testdir/test_vim9_func.vim b/src/testdir/test_vim9_func.vim
+index 0ec1700dc..025edd5da 100644
+--- a/src/testdir/test_vim9_func.vim
++++ b/src/testdir/test_vim9_func.vim
+@@ -3537,6 +3537,17 @@ def Test_numbered_function_reference()
+   unlet g:mydict
+ enddef
+ 
++def Test_go_beyond_end_of_cmd()
++  # this was reading the byte after the end of the line
++  var lines =<< trim END
++    def F()
++      cal
++    enddef
++    defcompile
++  END
++  CheckScriptFailure(lines, 'E476:')
++enddef
++
+ if has('python3')
+   def Test_python3_heredoc()
+     py3 << trim EOF
+diff --git a/src/version.c b/src/version.c
+index 48a1c9820..6b7a915c4 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4009,
+ /**/
+     4008,
+ /**/
+diff --git a/src/vim9compile.c b/src/vim9compile.c
+index cccf02c2c..f1a6a0311 100644
+--- a/src/vim9compile.c
++++ b/src/vim9compile.c
+@@ -2781,7 +2781,8 @@ compile_def_function(
+ 	cmd = ea.cmd;
+ 	if ((*cmd != '$' || starts_with_colon)
+ 		&& (starts_with_colon || !(*cmd == '\''
+-		       || (cmd[0] == cmd[1] && (*cmd == '+' || *cmd == '-')))))
++		       || (cmd[0] != NUL && cmd[0] == cmd[1]
++					    && (*cmd == '+' || *cmd == '-')))))
+ 	{
+ 	    ea.cmd = skip_range(ea.cmd, TRUE, NULL);
+ 	    if (ea.cmd > cmd)

@@ -1,0 +1,23 @@
+commit c41ac870470c614185e1752c11f892809022248a	c41ac870470c614185e1752c11f892809022248a
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 13 23:56:26 2012 +0200
+
+    avidec: update size when packet is shrunk
+    
+    Fixes out of array read
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavformat/avidec.c b/libavformat/avidec.c
+index 0067ff98f2..b78a3d2a2b 100644
+--- a/libavformat/avidec.c
++++ b/libavformat/avidec.c
+@@ -1125,6 +1125,7 @@ resync:
+         err= av_get_packet(pb, pkt, size);
+         if(err<0)
+             return err;
++        size = err;
+ 
+         if(ast->has_pal && pkt->data && pkt->size<(unsigned)INT_MAX/2){
+             uint8_t *pal;

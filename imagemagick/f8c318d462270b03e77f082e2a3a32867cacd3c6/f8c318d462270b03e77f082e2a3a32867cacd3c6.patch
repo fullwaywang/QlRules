@@ -1,0 +1,28 @@
+commit f8c318d462270b03e77f082e2a3a32867cacd3c6
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sun Jan 24 19:10:07 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/96
+
+diff --git a/coders/meta.c b/coders/meta.c
+index 53fde4c0d..96ad6c8f1 100644
+--- a/coders/meta.c
++++ b/coders/meta.c
+@@ -461,7 +461,7 @@ static ssize_t parse8BIM(Image *ifile, Image *ofile)
+ 
+                     next=0;
+                     outputlen += len;
+-                    while (len--)
++                    while (len-- > 0)
+                       (void) WriteBlobByte(ofile,(unsigned char) token[next++]);
+ 
+                     if (outputlen & 1)
+@@ -492,7 +492,7 @@ static ssize_t parse8BIM(Image *ifile, Image *ofile)
+                     outputlen += 5;
+                     next=0;
+                     outputlen += len;
+-                    while (len--)
++                    while (len-- > 0)
+                       (void) WriteBlobByte(ofile,(unsigned char) token[next++]);
+                   }
+               }

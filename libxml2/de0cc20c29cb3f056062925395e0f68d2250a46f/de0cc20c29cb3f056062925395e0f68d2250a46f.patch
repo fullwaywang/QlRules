@@ -1,0 +1,78 @@
+commit de0cc20c29cb3f056062925395e0f68d2250a46f	de0cc20c29cb3f056062925395e0f68d2250a46f
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Tue Feb 12 16:55:34 2013 +0800
+
+    Fix some buffer conversion issues
+    
+    https://bugzilla.gnome.org/show_bug.cgi?id=690202
+    
+    Buffer overflow errors originating from xmlBufGetInputBase in 2.9.0
+    The pointers from the context input were not properly reset after
+    that call which can do reallocations.
+
+diff --git a/HTMLparser.c b/HTMLparser.c
+index a533f375..6b83654d 100644
+--- a/HTMLparser.c
++++ b/HTMLparser.c
+@@ -6054,6 +6054,8 @@ htmlParseChunk(htmlParserCtxtPtr ctxt, const char *chunk, int size,
+ 	    if ((in->encoder != NULL) && (in->buffer != NULL) &&
+ 		    (in->raw != NULL)) {
+ 		int nbchars;
++		size_t base = xmlBufGetInputBase(in->buffer, ctxt->input);
++		size_t current = ctxt->input->cur - ctxt->input->base;
+ 
+ 		nbchars = xmlCharEncInput(in);
+ 		if (nbchars < 0) {
+@@ -6061,6 +6063,7 @@ htmlParseChunk(htmlParserCtxtPtr ctxt, const char *chunk, int size,
+ 			         "encoder error\n", NULL, NULL);
+ 		    return(XML_ERR_INVALID_ENCODING);
+ 		}
++		xmlBufSetInputBaseCur(in->buffer, ctxt->input, base, current);
+ 	    }
+ 	}
+     }
+diff --git a/parser.c b/parser.c
+index 31f90d60..1c99051f 100644
+--- a/parser.c
++++ b/parser.c
+@@ -12126,7 +12126,7 @@ xmldecl_done:
+                 remain = 0;
+             }
+         }
+-	res =xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
++	res = xmlParserInputBufferPush(ctxt->input->buf, size, chunk);
+ 	if (res < 0) {
+ 	    ctxt->errNo = XML_PARSER_EOF;
+ 	    ctxt->disableSAX = 1;
+@@ -12143,6 +12143,8 @@ xmldecl_done:
+ 	    if ((in->encoder != NULL) && (in->buffer != NULL) &&
+ 		    (in->raw != NULL)) {
+ 		int nbchars;
++		size_t base = xmlBufGetInputBase(in->buffer, ctxt->input);
++		size_t current = ctxt->input->cur - ctxt->input->base;
+ 
+ 		nbchars = xmlCharEncInput(in);
+ 		if (nbchars < 0) {
+@@ -12151,6 +12153,7 @@ xmldecl_done:
+ 				    "xmlParseChunk: encoder error\n");
+ 		    return(XML_ERR_INVALID_ENCODING);
+ 		}
++		xmlBufSetInputBaseCur(in->buffer, ctxt->input, base, current);
+ 	    }
+ 	}
+     }
+@@ -12190,7 +12193,14 @@ xmldecl_done:
+     }
+     if ((end_in_lf == 1) && (ctxt->input != NULL) &&
+         (ctxt->input->buf != NULL)) {
++	size_t base = xmlBufGetInputBase(ctxt->input->buf->buffer,
++					 ctxt->input);
++	size_t current = ctxt->input->cur - ctxt->input->base;
++
+ 	xmlParserInputBufferPush(ctxt->input->buf, 1, "\r");
++
++	xmlBufSetInputBaseCur(ctxt->input->buf->buffer, ctxt->input,
++			      base, current);
+     }
+     if (terminate) {
+ 	/*

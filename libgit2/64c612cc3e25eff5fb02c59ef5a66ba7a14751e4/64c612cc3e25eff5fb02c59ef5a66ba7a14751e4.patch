@@ -1,0 +1,54 @@
+commit 64c612cc3e25eff5fb02c59ef5a66ba7a14751e4
+Author: Johannes Schindelin <johannes.schindelin@gmx.de>
+Date:   Wed Sep 18 15:25:02 2019 +0200
+
+    Protect against 8.3 "short name" attacks also on Linux/macOS
+    
+    The Windows Subsystem for Linux (WSL) is getting increasingly popular,
+    in particular because it makes it _so_ easy to run Linux software on
+    Windows' files, via the auto-mounted Windows drives (`C:\` is mapped to
+    `/mnt/c/`, no need to set that up manually).
+    
+    Unfortunately, files/directories on the Windows drives can be accessed
+    via their _short names_, if that feature is enabled (which it is on the
+    `C:` drive by default).
+    
+    Which means that we have to safeguard even our Linux users against the
+    short name attacks.
+    
+    Further, while the default options of CIFS/SMB-mounts seem to disallow
+    accessing files on network shares via their short names on Linux/macOS,
+    it _is_ possible to do so with the right options.
+    
+    So let's just safe-guard against short name attacks _everywhere_.
+    
+    Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+
+diff --git a/src/checkout.c b/src/checkout.c
+index 5cfa7280b..5b20ede46 100644
+--- a/src/checkout.c
++++ b/src/checkout.c
+@@ -1271,7 +1271,7 @@ static int checkout_verify_paths(
+ 	int action,
+ 	git_diff_delta *delta)
+ {
+-	unsigned int flags = GIT_PATH_REJECT_WORKDIR_DEFAULTS;
++	unsigned int flags = GIT_PATH_REJECT_WORKDIR_DEFAULTS | GIT_PATH_REJECT_DOT_GIT_NTFS;
+ 
+ 	if (action & CHECKOUT_ACTION__REMOVE) {
+ 		if (!git_path_isvalid(repo, delta->old_file.path, delta->old_file.mode, flags)) {
+diff --git a/tests/checkout/nasty.c b/tests/checkout/nasty.c
+index 3897878ce..a0ac738a8 100644
+--- a/tests/checkout/nasty.c
++++ b/tests/checkout/nasty.c
+@@ -206,9 +206,8 @@ void test_checkout_nasty__dot_git_dot(void)
+  */
+ void test_checkout_nasty__git_tilde1(void)
+ {
+-#ifdef GIT_WIN32
+ 	test_checkout_fails("refs/heads/git_tilde1", ".git/foobar");
+-#endif
++	test_checkout_fails("refs/heads/git_tilde1", "git~1/foobar");
+ }
+ 
+ /* A tree that contains an entry "git~2", when we have forced the short

@@ -1,0 +1,22 @@
+commit d85b3c4fff4c4b255232fcc01edbd57f19d60998	d85b3c4fff4c4b255232fcc01edbd57f19d60998
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Mar 24 05:21:39 2012 +0100
+
+    vp56dec: avoid freeing the returned frame before returning it.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/vp56.c b/libavcodec/vp56.c
+index 63b844e700..c6e32af867 100644
+--- a/libavcodec/vp56.c
++++ b/libavcodec/vp56.c
+@@ -621,7 +621,7 @@ int ff_vp56_decode_frame(AVCodecContext *avctx, void *data, int *data_size,
+ 
+     next:
+         if (p->key_frame || golden_frame) {
+-            if (s->framep[VP56_FRAME_GOLDEN]->data[0] &&
++            if (s->framep[VP56_FRAME_GOLDEN]->data[0] && s->framep[VP56_FRAME_GOLDEN] != p &&
+                 s->framep[VP56_FRAME_GOLDEN] != s->framep[VP56_FRAME_GOLDEN2])
+                 avctx->release_buffer(avctx, s->framep[VP56_FRAME_GOLDEN]);
+             s->framep[VP56_FRAME_GOLDEN] = p;

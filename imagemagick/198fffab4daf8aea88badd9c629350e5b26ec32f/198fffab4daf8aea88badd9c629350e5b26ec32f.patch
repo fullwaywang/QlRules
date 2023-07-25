@@ -1,0 +1,19 @@
+commit 198fffab4daf8aea88badd9c629350e5b26ec32f
+Author: dirk <dirk@git.imagemagick.org>
+Date:   Fri Jan 15 11:17:30 2016 +0100
+
+    Added check for bit depth 1.
+
+diff --git a/coders/psd.c b/coders/psd.c
+index 5a5c63380..976d9076f 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -1908,6 +1908,8 @@ static Image *ReadPSDImage(const ImageInfo *image_info,ExceptionInfo *exception)
+           image->alpha_trait=UndefinedPixelTrait;
+         }
+     }
++  if ((image->depth == 1) && (image->storage_class != PseudoClass))
++    ThrowReaderException(CorruptImageError, "ImproperImageHeader");
+   has_merged_image=MagickTrue;
+   length=ReadBlobMSBLong(image);
+   if (length != 0)

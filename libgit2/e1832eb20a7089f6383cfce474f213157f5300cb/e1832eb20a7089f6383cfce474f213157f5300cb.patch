@@ -1,0 +1,40 @@
+commit e1832eb20a7089f6383cfce474f213157f5300cb
+Author: Johannes Schindelin <johannes.schindelin@gmx.de>
+Date:   Wed Sep 18 16:33:18 2019 +0200
+
+    path: also guard `.gitmodules` against NTFS Alternate Data Streams
+    
+    We just safe-guarded `.git` against NTFS Alternate Data Stream-related
+    attack vectors, and now it is time to do the same for `.gitmodules`.
+    
+    Note: In the added regression test, we refrain from verifying all kinds
+    of variations between short names and NTFS Alternate Data Streams: as
+    the new code disallows _all_ Alternate Data Streams of `.gitmodules`, it
+    is enough to test one in order to know that all of them are guarded
+    against.
+    
+    Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+
+diff --git a/src/path.c b/src/path.c
+index 7844da672..b3a8fc32f 100644
+--- a/src/path.c
++++ b/src/path.c
+@@ -1646,7 +1646,7 @@ GIT_INLINE(bool) only_spaces_and_dots(const char *path)
+ 	const char *c = path;
+ 
+ 	for (;; c++) {
+-		if (*c == '\0')
++		if (*c == '\0' || *c == ':')
+ 			return true;
+ 		if (*c != ' ' && *c != '.')
+ 			return false;
+diff --git a/tests/path/dotgit.c b/tests/path/dotgit.c
+index 309966945..ceb7330d2 100644
+--- a/tests/path/dotgit.c
++++ b/tests/path/dotgit.c
+@@ -116,4 +116,5 @@ void test_path_dotgit__dotgit_modules_symlink(void)
+ 	cl_assert_equal_b(true, git_path_isvalid(NULL, ".gitmodules", 0, GIT_PATH_REJECT_DOT_GIT_HFS|GIT_PATH_REJECT_DOT_GIT_NTFS));
+ 	cl_assert_equal_b(false, git_path_isvalid(NULL, ".gitmodules", S_IFLNK, GIT_PATH_REJECT_DOT_GIT_HFS));
+ 	cl_assert_equal_b(false, git_path_isvalid(NULL, ".gitmodules", S_IFLNK, GIT_PATH_REJECT_DOT_GIT_NTFS));
++	cl_assert_equal_b(false, git_path_isvalid(NULL, ".gitmodules . .::$DATA", S_IFLNK, GIT_PATH_REJECT_DOT_GIT_NTFS));
+ }

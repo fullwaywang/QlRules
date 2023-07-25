@@ -1,0 +1,35 @@
+commit 36aad4f1cc707feb15f071260a99f239b6623a59	36aad4f1cc707feb15f071260a99f239b6623a59
+Author: Kostya Shishkov <kostya.shishkov@gmail.com>
+Date:   Sun Mar 17 20:22:19 2013 +0100
+
+    iff: validate CMAP palette size
+    
+    Fixes CVE-2013-2495
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Luca Barbato <lu_zero@gentoo.org>
+    
+    CC: libav-stable@libav.org
+    (cherry picked from commit 50c449ac24fbb4c03c15d2e2026cef2204b80385)
+    
+    Signed-off-by: Reinhard Tartler <siretart@tauware.de>
+    (cherry picked from commit 31a77177ff323ef83944c60a8654891213ab6691)
+    
+    Signed-off-by: Reinhard Tartler <siretart@tauware.de>
+
+diff --git a/libavformat/iff.c b/libavformat/iff.c
+index b895cf2e67..4552985d77 100644
+--- a/libavformat/iff.c
++++ b/libavformat/iff.c
+@@ -159,6 +159,11 @@ static int iff_read_header(AVFormatContext *s,
+             break;
+ 
+         case ID_CMAP:
++            if (data_size < 3 || data_size > 768 || data_size % 3) {
++                 av_log(s, AV_LOG_ERROR, "Invalid CMAP chunk size %d\n",
++                        data_size);
++                 return AVERROR_INVALIDDATA;
++            }
+             st->codec->extradata_size = data_size;
+             st->codec->extradata      = av_malloc(data_size);
+             if (!st->codec->extradata)

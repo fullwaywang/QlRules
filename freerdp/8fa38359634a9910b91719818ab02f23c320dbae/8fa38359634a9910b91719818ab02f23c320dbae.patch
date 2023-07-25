@@ -1,0 +1,22 @@
+commit 8fa38359634a9910b91719818ab02f23c320dbae
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Wed Apr 15 16:48:50 2020 +0200
+
+    Fixed oob read in ntlm_read_NegotiateMessage
+
+diff --git a/winpr/libwinpr/sspi/NTLM/ntlm_message.c b/winpr/libwinpr/sspi/NTLM/ntlm_message.c
+index e5586c9f5..c4ba1d974 100644
+--- a/winpr/libwinpr/sspi/NTLM/ntlm_message.c
++++ b/winpr/libwinpr/sspi/NTLM/ntlm_message.c
+@@ -219,6 +219,11 @@ SECURITY_STATUS ntlm_read_NegotiateMessage(NTLM_CONTEXT* context, PSecBuffer buf
+ 		return SEC_E_INVALID_TOKEN;
+ 	}
+ 
++	if (Stream_GetRemainingLength(s) < 4)
++	{
++		Stream_Free(s, FALSE);
++		return SEC_E_INVALID_TOKEN;
++	}
+ 	Stream_Read_UINT32(s, message->NegotiateFlags); /* NegotiateFlags (4 bytes) */
+ 
+ 	if (!((message->NegotiateFlags & NTLMSSP_REQUEST_TARGET) &&

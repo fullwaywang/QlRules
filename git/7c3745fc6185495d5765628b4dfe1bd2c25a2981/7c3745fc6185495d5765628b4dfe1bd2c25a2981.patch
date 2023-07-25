@@ -1,0 +1,87 @@
+commit 7c3745fc6185495d5765628b4dfe1bd2c25a2981
+Author: Johannes Schindelin <Johannes.Schindelin@gmx.de>
+Date:   Wed Aug 28 12:22:17 2019 +0200
+
+    path: safeguard `.git` against NTFS Alternate Streams Accesses
+    
+    Probably inspired by HFS' resource streams, NTFS supports "Alternate
+    Data Streams": by appending `:<stream-name>` to the file name,
+    information in addition to the file contents can be written and read,
+    information that is copied together with the file (unless copied to a
+    non-NTFS location).
+    
+    These Alternate Data Streams are typically used for things like marking
+    an executable as having just been downloaded from the internet (and
+    hence not necessarily being trustworthy).
+    
+    In addition to a stream name, a stream type can be appended, like so:
+    `:<stream-name>:<stream-type>`. Unless specified, the default stream
+    type is `$DATA` for files and `$INDEX_ALLOCATION` for directories. In
+    other words, `.git::$INDEX_ALLOCATION` is a valid way to reference the
+    `.git` directory!
+    
+    In our work in Git v2.2.1 to protect Git on NTFS drives under
+    `core.protectNTFS`, we focused exclusively on NTFS short names, unaware
+    of the fact that NTFS Alternate Data Streams offer a similar attack
+    vector.
+    
+    Let's fix this.
+    
+    Seeing as it is better to be safe than sorry, we simply disallow paths
+    referring to *any* NTFS Alternate Data Stream of `.git`, not just
+    `::$INDEX_ALLOCATION`. This also simplifies the implementation.
+    
+    This closes CVE-2019-1352.
+    
+    Further reading about NTFS Alternate Data Streams:
+    https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c54dec26-1551-4d3a-a0ea-4fa40f848eb3
+    
+    Reported-by: Nicolas Joly <Nicolas.Joly@microsoft.com>
+    Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+
+diff --git a/path.c b/path.c
+index f62a37d5f5..e39ecf4689 100644
+--- a/path.c
++++ b/path.c
+@@ -1321,10 +1321,19 @@ static int only_spaces_and_periods(const char *path, size_t len, size_t skip)
+  *   `.git` is the first item in a directory, therefore it will be associated
+  *   with the short name `git~1` (unless short names are disabled).
+  *
++ * - For yet other historical reasons, NTFS supports so-called "Alternate Data
++ *   Streams", i.e. metadata associated with a given file, referred to via
++ *   `<filename>:<stream-name>:<stream-type>`. There exists a default stream
++ *   type for directories, allowing `.git/` to be accessed via
++ *   `.git::$INDEX_ALLOCATION/`.
++ *
+  * When this function returns 1, it indicates that the specified file/directory
+  * name refers to a `.git` file or directory, or to any of these synonyms, and
+  * Git should therefore not track it.
+  *
++ * For performance reasons, _all_ Alternate Data Streams of `.git/` are
++ * forbidden, not just `::$INDEX_ALLOCATION`.
++ *
+  * This function is intended to be used by `git fsck` even on platforms where
+  * the backslash is a regular filename character, therefore it needs to handle
+  * backlash characters in the provided `name` specially: they are interpreted
+@@ -1335,7 +1344,8 @@ int is_ntfs_dotgit(const char *name)
+ 	size_t len;
+ 
+ 	for (len = 0; ; len++)
+-		if (!name[len] || name[len] == '\\' || is_dir_sep(name[len])) {
++		if (!name[len] || name[len] == '\\' || is_dir_sep(name[len]) ||
++		    name[len] == ':') {
+ 			if (only_spaces_and_periods(name, len, 4) &&
+ 					!strncasecmp(name, ".git", 4))
+ 				return 1;
+diff --git a/t/t1014-read-tree-confusing.sh b/t/t1014-read-tree-confusing.sh
+index 2f5a25d503..da3376b3bb 100755
+--- a/t/t1014-read-tree-confusing.sh
++++ b/t/t1014-read-tree-confusing.sh
+@@ -49,6 +49,7 @@ git~1
+ .git.SPACE .git.{space}
+ .\\\\.GIT\\\\foobar backslashes
+ .git\\\\foobar backslashes2
++.git...:alternate-stream
+ EOF
+ 
+ test_expect_success 'utf-8 paths allowed with core.protectHFS off' '

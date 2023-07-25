@@ -1,0 +1,51 @@
+commit 197e0ea817ad64820789d86711d55ff50d71f631
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Mon Jan 6 14:35:04 2014 +0000
+
+    Fix for TLS record tampering bug CVE-2013-4353
+
+diff --git a/CHANGES b/CHANGES
+index 173be2465e..6494184bad 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -4,6 +4,11 @@
+ 
+  Changes between 1.0.1e and 1.0.1f [xx XXX xxxx]
+ 
++  *) Fix for TLS record tampering bug. A carefully crafted invalid 
++     handshake could crash OpenSSL with a NULL pointer exception.
++     Thanks to Anton Johansson for reporting this issues.
++     (CVE-2013-4353)
++
+   *) Keep original DTLS digest and encryption contexts in retransmission
+      structures so we can use the previous session parameters if they need
+      to be resent. (CVE-2013-6450)
+diff --git a/NEWS b/NEWS
+index cdf84d927d..81b6ed2c7b 100644
+--- a/NEWS
++++ b/NEWS
+@@ -7,6 +7,7 @@
+ 
+   Major changes between OpenSSL 1.0.1e and OpenSSL 1.0.1f [under development]
+ 
++      o Fix for TLS record tampering bug CVE-2013-4353
+       o Fix for TLS version checking bug CVE-2013-6449
+       o Fix for DTLS retransmission bug CVE-2013-6450
+ 
+diff --git a/ssl/s3_both.c b/ssl/s3_both.c
+index 1e5dcab7d3..53b9390fdd 100644
+--- a/ssl/s3_both.c
++++ b/ssl/s3_both.c
+@@ -210,7 +210,11 @@ static void ssl3_take_mac(SSL *s)
+ 	{
+ 	const char *sender;
+ 	int slen;
+-
++	/* If no new cipher setup return immediately: other functions will
++	 * set the appropriate error.
++	 */
++	if (s->s3->tmp.new_cipher == NULL)
++		return;
+ 	if (s->state & SSL_ST_CONNECT)
+ 		{
+ 		sender=s->method->ssl3_enc->server_finished_label;

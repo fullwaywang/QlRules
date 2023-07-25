@@ -1,0 +1,19 @@
+commit 13a2d9e34ffc4170720ce417c73e396d0ac1471a
+Author: Nick Terrell <terrelln@fb.com>
+Date:   Wed Jul 17 11:50:47 2019 -0700
+
+    [LZ4_compress_destSize] Fix overflow condition
+
+diff --git a/lib/lz4.c b/lib/lz4.c
+index 461644d..74a9247 100644
+--- a/lib/lz4.c
++++ b/lib/lz4.c
+@@ -1027,7 +1027,7 @@ _next_match:
+             }
+ 
+             if ((outputDirective) &&    /* Check output buffer overflow */
+-                (unlikely(op + (1 + LASTLITERALS) + (matchCode>>8) > olimit)) ) {
++                (unlikely(op + (1 + LASTLITERALS) + (matchCode+240)/255 > olimit)) ) {
+                 if (outputDirective == fillOutput) {
+                     /* Match description too long : reduce it */
+                     U32 newMatchCode = 15 /* in token */ - 1 /* to avoid needing a zero byte */ + ((U32)(olimit - op) - 1 - LASTLITERALS) * 255;

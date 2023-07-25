@@ -1,0 +1,80 @@
+commit 1a7fd1fb2998002da6e9ff2ee46e1bdd25ee8404
+Author: Jeff King <peff@peff.net>
+Date:   Mon Sep 24 04:42:19 2018 -0400
+
+    fsck: detect submodule paths starting with dash
+    
+    As with urls, submodule paths with dashes are ignored by
+    git, but may end up confusing older versions. Detecting them
+    via fsck lets us prevent modern versions of git from being a
+    vector to spread broken .gitmodules to older versions.
+    
+    Compared to blocking leading-dash urls, though, this
+    detection may be less of a good idea:
+    
+      1. While such paths provide confusing and broken results,
+         they don't seem to actually work as option injections
+         against anything except "cd". In particular, the
+         submodule code seems to canonicalize to an absolute
+         path before running "git clone" (so it passes
+         /your/clone/-sub).
+    
+      2. It's more likely that we may one day make such names
+         actually work correctly. Even after we revert this fsck
+         check, it will continue to be a hassle until hosting
+         servers are all updated.
+    
+    On the other hand, it's not entirely clear that the behavior
+    in older versions is safe. And if we do want to eventually
+    allow this, we may end up doing so with a special syntax
+    anyway (e.g., writing "./-sub" in the .gitmodules file, and
+    teaching the submodule code to canonicalize it when
+    comparing).
+    
+    So on balance, this is probably a good protection.
+    
+    Signed-off-by: Jeff King <peff@peff.net>
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+diff --git a/fsck.c b/fsck.c
+index c472856527..5d9b25fac0 100644
+--- a/fsck.c
++++ b/fsck.c
+@@ -65,6 +65,7 @@ static struct oidset gitmodules_done = OIDSET_INIT;
+ 	FUNC(GITMODULES_NAME, ERROR) \
+ 	FUNC(GITMODULES_SYMLINK, ERROR) \
+ 	FUNC(GITMODULES_URL, ERROR) \
++	FUNC(GITMODULES_PATH, ERROR) \
+ 	/* warnings */ \
+ 	FUNC(BAD_FILEMODE, WARN) \
+ 	FUNC(EMPTY_NAME, WARN) \
+@@ -952,6 +953,12 @@ static int fsck_gitmodules_fn(const char *var, const char *value, void *vdata)
+ 				    FSCK_MSG_GITMODULES_URL,
+ 				    "disallowed submodule url: %s",
+ 				    value);
++	if (!strcmp(key, "path") && value &&
++	    looks_like_command_line_option(value))
++		data->ret |= report(data->options, data->obj,
++				    FSCK_MSG_GITMODULES_PATH,
++				    "disallowed submodule path: %s",
++				    value);
+ 	free(name);
+ 
+ 	return 0;
+diff --git a/t/t7417-submodule-path-url.sh b/t/t7417-submodule-path-url.sh
+index 638293f0da..756af8c4d6 100755
+--- a/t/t7417-submodule-path-url.sh
++++ b/t/t7417-submodule-path-url.sh
+@@ -17,4 +17,12 @@ test_expect_success 'clone rejects unprotected dash' '
+ 	test_i18ngrep ignoring err
+ '
+ 
++test_expect_success 'fsck rejects unprotected dash' '
++	test_when_finished "rm -rf dst" &&
++	git init --bare dst &&
++	git -C dst config transfer.fsckObjects true &&
++	test_must_fail git push dst HEAD 2>err &&
++	grep gitmodulesPath err
++'
++
+ test_done

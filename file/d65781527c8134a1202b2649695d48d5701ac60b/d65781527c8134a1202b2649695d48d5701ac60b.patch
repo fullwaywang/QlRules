@@ -1,0 +1,143 @@
+commit d65781527c8134a1202b2649695d48d5701ac60b
+Author: Christos Zoulas <christos@zoulas.com>
+Date:   Mon Feb 18 17:46:56 2019 +0000
+
+    PR/62: spinpx: limit size of file_printable.
+
+diff --git a/src/file.h b/src/file.h
+index d26b25cc..f8e08354 100644
+--- a/src/file.h
++++ b/src/file.h
+@@ -27,7 +27,7 @@
+  */
+ /*
+  * file.h - definitions for file(1) program
+- * @(#)$File: file.h,v 1.201 2018/10/19 00:33:04 christos Exp $
++ * @(#)$File: file.h,v 1.202 2019/02/18 17:46:56 christos Exp $
+  */
+ 
+ #ifndef __file_h__
+@@ -506,7 +506,7 @@ protected int file_looks_utf8(const unsigned char *, size_t, unichar *,
+     size_t *);
+ protected size_t file_pstring_length_size(const struct magic *);
+ protected size_t file_pstring_get_length(const struct magic *, const char *);
+-protected char * file_printable(char *, size_t, const char *);
++protected char * file_printable(char *, size_t, const char *, size_t);
+ #ifdef __EMX__
+ protected int file_os2_apptype(struct magic_set *, const char *, const void *,
+     size_t);
+diff --git a/src/funcs.c b/src/funcs.c
+index 48c85538..ba40c3dc 100644
+--- a/src/funcs.c
++++ b/src/funcs.c
+@@ -27,7 +27,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: funcs.c,v 1.100 2018/10/01 18:45:39 christos Exp $")
++FILE_RCSID("@(#)$File: funcs.c,v 1.101 2019/02/18 17:46:56 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -623,12 +623,13 @@ file_pop_buffer(struct magic_set *ms, file_pushbuf_t *pb)
+  * convert string to ascii printable format.
+  */
+ protected char *
+-file_printable(char *buf, size_t bufsiz, const char *str)
++file_printable(char *buf, size_t bufsiz, const char *str, size_t slen)
+ {
+-	char *ptr, *eptr;
++	char *ptr, *eptr = buf + bufsiz - 1;
+ 	const unsigned char *s = (const unsigned char *)str;
++	const unsigned char *es = s + slen;
+ 
+-	for (ptr = buf, eptr = ptr + bufsiz - 1; ptr < eptr && *s; s++) {
++	for (ptr = buf;  ptr < eptr && s < es && *s; s++) {
+ 		if (isprint(*s)) {
+ 			*ptr++ = *s;
+ 			continue;
+diff --git a/src/readelf.c b/src/readelf.c
+index 519811d1..deb881cc 100644
+--- a/src/readelf.c
++++ b/src/readelf.c
+@@ -27,7 +27,7 @@
+ #include "file.h"
+ 
+ #ifndef lint
+-FILE_RCSID("@(#)$File: readelf.c,v 1.160 2019/02/18 17:30:41 christos Exp $")
++FILE_RCSID("@(#)$File: readelf.c,v 1.161 2019/02/18 17:46:56 christos Exp $")
+ #endif
+ 
+ #ifdef BUILTIN_ELF
+@@ -760,7 +760,7 @@ do_core_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
+ 			if (file_printf(ms, ", from '%.31s', pid=%u, uid=%u, "
+ 			    "gid=%u, nlwps=%u, lwp=%u (signal %u/code %u)",
+ 			    file_printable(sbuf, sizeof(sbuf),
+-			    RCAST(char *, pi.cpi_name)),
++			    RCAST(char *, pi.cpi_name), sizeof(pi.cpi_name)),
+ 			    elf_getu32(swap, (uint32_t)pi.cpi_pid),
+ 			    elf_getu32(swap, pi.cpi_euid),
+ 			    elf_getu32(swap, pi.cpi_egid),
+@@ -1702,7 +1702,8 @@ dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
+ 		return -1;
+ 	if (interp[0])
+ 		if (file_printf(ms, ", interpreter %s",
+-		    file_printable(ibuf, sizeof(ibuf), interp)) == -1)
++		    file_printable(ibuf, sizeof(ibuf), interp, sizeof(interp)))
++			== -1)
+ 			return -1;
+ 	return 0;
+ }
+diff --git a/src/softmagic.c b/src/softmagic.c
+index 7ecad2ab..a2123199 100644
+--- a/src/softmagic.c
++++ b/src/softmagic.c
+@@ -32,7 +32,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: softmagic.c,v 1.276 2019/02/14 00:25:59 christos Exp $")
++FILE_RCSID("@(#)$File: softmagic.c,v 1.277 2019/02/18 17:46:56 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -634,8 +634,8 @@ mprint(struct magic_set *ms, struct magic *m)
+   	case FILE_LESTRING16:
+ 		if (m->reln == '=' || m->reln == '!') {
+ 			if (file_printf(ms, F(ms, desc, "%s"),
+-			    file_printable(sbuf, sizeof(sbuf), m->value.s))
+-			    == -1)
++			    file_printable(sbuf, sizeof(sbuf), m->value.s,
++			    sizeof(m->value.s))) == -1)
+ 				return -1;
+ 			t = ms->offset + m->vallen;
+ 		}
+@@ -662,7 +662,8 @@ mprint(struct magic_set *ms, struct magic *m)
+ 			}
+ 
+ 			if (file_printf(ms, F(ms, desc, "%s"),
+-			    file_printable(sbuf, sizeof(sbuf), str)) == -1)
++			    file_printable(sbuf, sizeof(sbuf), str,
++				sizeof(p->s) - (str - p->s))) == -1)
+ 				return -1;
+ 
+ 			if (m->type == FILE_PSTRING)
+@@ -768,7 +769,7 @@ mprint(struct magic_set *ms, struct magic *m)
+ 			return -1;
+ 		}
+ 		rval = file_printf(ms, F(ms, desc, "%s"),
+-		    file_printable(sbuf, sizeof(sbuf), cp));
++		    file_printable(sbuf, sizeof(sbuf), cp, ms->search.rm_len));
+ 		free(cp);
+ 
+ 		if (rval == -1)
+@@ -795,7 +796,8 @@ mprint(struct magic_set *ms, struct magic *m)
+ 		break;
+ 	case FILE_DER:
+ 		if (file_printf(ms, F(ms, desc, "%s"),
+-		    file_printable(sbuf, sizeof(sbuf), ms->ms_value.s)) == -1)
++		    file_printable(sbuf, sizeof(sbuf), ms->ms_value.s,
++			sizeof(ms->ms_value.s))) == -1)
+ 			return -1;
+ 		t = ms->offset;
+ 		break;

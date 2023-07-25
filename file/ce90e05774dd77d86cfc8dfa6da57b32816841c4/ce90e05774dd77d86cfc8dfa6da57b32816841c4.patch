@@ -1,0 +1,900 @@
+commit ce90e05774dd77d86cfc8dfa6da57b32816841c4
+Author: Christos Zoulas <christos@zoulas.com>
+Date:   Tue Dec 16 23:18:40 2014 +0000
+
+    - Add a limit to the number of ELF notes processed (Suggested by Alexander
+      Cherepanov)
+    - Restructure ELF note printing so that we don't print the same message
+      multiple times on repeated notes of the same kind.
+
+diff --git a/ChangeLog b/ChangeLog
+index d8b5fb34..7e501baa 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,8 @@
++2014-12-16  18:10  Christos Zoulas <christos@zoulas.com>
++	
++	* restructure elf note printing to avoid repeated messages
++	* add note limit, suggested by Alexander Cherepanov
++
+ 2014-12-16  16:53  Christos Zoulas <christos@zoulas.com>
+ 	
+ 	* Bail out on partial pread()'s (Alexander Cherepanov)
+diff --git a/doc/file.man b/doc/file.man
+index 52eb035f..07b32db5 100644
+--- a/doc/file.man
++++ b/doc/file.man
+@@ -1,5 +1,5 @@
+-.\" $File: file.man,v 1.109 2014/11/28 02:35:05 christos Exp $
+-.Dd November 27, 2014
++.\" $File: file.man,v 1.110 2014/11/28 02:46:39 christos Exp $
++.Dd December 16, 2014
+ .Dt FILE __CSECTION__
+ .Os
+ .Sh NAME
+@@ -310,6 +310,7 @@ Set various parameter limits.
+ .It Sy "Name" Ta Sy "Default" Ta Sy "Explanation"
+ .It Li indir Ta 15 Ta recursion limit for indirect magic
+ .It Li name Ta 30 Ta use count limit for name/use magic
++.It Li elf_notes Ta 256 Ta max ELF notes processed
+ .It Li elf_phnum Ta 128 Ta max ELF program sections processed
+ .It Li elf_shnum Ta 32768 Ta max ELF sections processed
+ .El
+diff --git a/doc/libmagic.man b/doc/libmagic.man
+index 9fdd2080..6f3792e0 100644
+--- a/doc/libmagic.man
++++ b/doc/libmagic.man
+@@ -1,4 +1,4 @@
+-.\" $File: libmagic.man,v 1.32 2014/11/28 02:35:05 christos Exp $
++.\" $File: libmagic.man,v 1.33 2014/11/28 02:46:39 christos Exp $
+ .\"
+ .\" Copyright (c) Christos Zoulas 2003.
+ .\" All Rights Reserved.
+@@ -25,7 +25,7 @@
+ .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ .\" SUCH DAMAGE.
+ .\"
+-.Dd November 27, 2014
++.Dd December 16, 2014
+ .Dt LIBMAGIC 3
+ .Os
+ .Sh NAME
+@@ -284,6 +284,7 @@ library.
+ .It Sy "Parameter" Ta Sy "Type" Ta Sy "Default"
+ .It Li MAGIC_PARAM_INDIR_MAX Ta size_t Ta 15
+ .It Li MAGIC_PARAM_NAME_MAX Ta size_t Ta 30
++.It Li MAGIC_PARAM_ELF_NOTES_MAX Ta size_t Ta 256
+ .It Li MAGIC_PARAM_ELF_PHNUM_MAX Ta size_t Ta 128
+ .It Li MAGIC_PARAM_ELF_SHNUM_MAX Ta size_t Ta 32768
+ .El
+@@ -303,12 +304,16 @@ The
+ parameter controls the maximum number of calls for name/use.
+ .Pp
+ The
++.Dv MAGIC_PARAM_NOTES_MAX
++parameter controls how many ELF notes will be processed.
++.Pp
++The
+ .Dv MAGIC_PARAM_PHNUM_MAX
+-parameter controls how many elf program sections will be processed.
++parameter controls how many ELF program sections will be processed.
+ .Pp
+ The
+ .Dv MAGIC_PARAM_SHNUM_MAX
+-parameter controls how many elf sections will be processed.
++parameter controls how many ELF sections will be processed.
+ .Pp
+ The
+ .Fn magic_version
+diff --git a/src/apprentice.c b/src/apprentice.c
+index 58a27ec1..ac098263 100644
+--- a/src/apprentice.c
++++ b/src/apprentice.c
+@@ -32,7 +32,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: apprentice.c,v 1.226 2014/11/28 02:35:05 christos Exp $")
++FILE_RCSID("@(#)$File: apprentice.c,v 1.227 2014/11/28 02:46:39 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -528,6 +528,7 @@ file_ms_alloc(int flags)
+ 	ms->name_max = FILE_NAME_MAX;
+ 	ms->elf_shnum_max = FILE_ELF_SHNUM_MAX;
+ 	ms->elf_phnum_max = FILE_ELF_PHNUM_MAX;
++	ms->elf_notes_max = FILE_ELF_NOTES_MAX;
+ 	return ms;
+ free:
+ 	free(ms);
+diff --git a/src/elfclass.h b/src/elfclass.h
+index e144d112..5360b0b5 100644
+--- a/src/elfclass.h
++++ b/src/elfclass.h
+@@ -32,17 +32,18 @@
+ 	swap = (u.c[sizeof(int32_t) - 1] + 1) != elfhdr.e_ident[EI_DATA];
+ 
+ 	type = elf_getu16(swap, elfhdr.e_type);
++	notecount = ms->elf_notes_max;
+ 	switch (type) {
+ #ifdef ELFCORE
+ 	case ET_CORE:
+ 		phnum = elf_getu16(swap, elfhdr.e_phnum);
+ 		if (phnum > ms->elf_phnum_max)
+-			return toomany(ms, "program", phnum);
++			return toomany(ms, "program headers", phnum);
+ 		flags |= FLAGS_IS_CORE;
+ 		if (dophn_core(ms, clazz, swap, fd,
+ 		    (off_t)elf_getu(swap, elfhdr.e_phoff), phnum,
+ 		    (size_t)elf_getu16(swap, elfhdr.e_phentsize),
+-		    fsize, &flags) == -1)
++		    fsize, &flags, &notecount) == -1)
+ 			return -1;
+ 		break;
+ #endif
+@@ -57,22 +58,25 @@
+ 		if (dophn_exec(ms, clazz, swap, fd,
+ 		    (off_t)elf_getu(swap, elfhdr.e_phoff), phnum,
+ 		    (size_t)elf_getu16(swap, elfhdr.e_phentsize),
+-		    fsize, &flags, shnum) == -1)
++		    fsize, shnum, &flags, &notecount) == -1)
+ 			return -1;
+ 		/*FALLTHROUGH*/
+ 	case ET_REL:
+ 		shnum = elf_getu16(swap, elfhdr.e_shnum);
+ 		if (shnum > ms->elf_shnum_max)
+-			return toomany(ms, "section", shnum);
++			return toomany(ms, "section headers", shnum);
+ 		if (doshn(ms, clazz, swap, fd,
+ 		    (off_t)elf_getu(swap, elfhdr.e_shoff), shnum,
+ 		    (size_t)elf_getu16(swap, elfhdr.e_shentsize),
+-		    fsize, &flags, elf_getu16(swap, elfhdr.e_machine),
+-		    (int)elf_getu16(swap, elfhdr.e_shstrndx)) == -1)
++		    fsize, elf_getu16(swap, elfhdr.e_machine),
++		    (int)elf_getu16(swap, elfhdr.e_shstrndx),
++		    &flags, &notecount) == -1)
+ 			return -1;
+ 		break;
+ 
+ 	default:
+ 		break;
+ 	}
++	if (notecount == 0)
++		return toomany(ms, "notes", ms->elf_notes_max);
+ 	return 1;
+diff --git a/src/file.c b/src/file.c
+index cabd4e1a..f1312cff 100644
+--- a/src/file.c
++++ b/src/file.c
+@@ -32,7 +32,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: file.c,v 1.158 2014/11/28 02:35:05 christos Exp $")
++FILE_RCSID("@(#)$File: file.c,v 1.159 2014/11/28 02:46:39 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -125,6 +125,7 @@ private struct {
+ 	{ "name",	MAGIC_PARAM_NAME_MAX, 0 },
+ 	{ "elf_phnum",	MAGIC_PARAM_ELF_PHNUM_MAX, 0 },
+ 	{ "elf_shnum",	MAGIC_PARAM_ELF_SHNUM_MAX, 0 },
++	{ "elf_notes",	MAGIC_PARAM_ELF_NOTES_MAX, 0 },
+ };
+ 
+ private char *progname;		/* used throughout 		*/
+diff --git a/src/file.h b/src/file.h
+index 6d422a3c..e977a2c4 100644
+--- a/src/file.h
++++ b/src/file.h
+@@ -27,7 +27,7 @@
+  */
+ /*
+  * file.h - definitions for file(1) program
+- * @(#)$File: file.h,v 1.161 2014/12/04 15:56:46 christos Exp $
++ * @(#)$File: file.h,v 1.162 2014/12/11 12:34:24 christos Exp $
+  */
+ 
+ #ifndef __file_h__
+@@ -407,10 +407,12 @@ struct magic_set {
+ 	uint16_t name_max;
+ 	uint16_t elf_shnum_max;
+ 	uint16_t elf_phnum_max;
++	uint16_t elf_notes_max;
+ #define	FILE_INDIR_MAX			15
+ #define	FILE_NAME_MAX			30
+ #define	FILE_ELF_SHNUM_MAX		32768
+ #define	FILE_ELF_PHNUM_MAX		128
++#define	FILE_ELF_NOTES_MAX		256
+ };
+ 
+ /* Type for Unicode characters */
+diff --git a/src/file_opts.h b/src/file_opts.h
+index 130ca40a..3286ac60 100644
+--- a/src/file_opts.h
++++ b/src/file_opts.h
+@@ -46,6 +46,7 @@ OPT('p', "preserve-date", 0, "        preserve access times on files\n")
+ OPT('P', "parameter", 0, "            set file engine parameter limits\n"
+     "                               indir        15 recursion limit for indirection\n"
+     "                               name         30 use limit for name/use magic\n"
++    "                               elf_notes   256 max ELF notes processed\n"
+     "                               elf_phnum   128 max ELF prog sections processed\n"
+     "                               elf_shnum 32768 max ELF sections processed\n")
+ OPT('r', "raw", 0, "                  don't translate unprintable chars to \\ooo\n")
+diff --git a/src/magic.c b/src/magic.c
+index 1edd7f66..0c3371bf 100644
+--- a/src/magic.c
++++ b/src/magic.c
+@@ -33,7 +33,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: magic.c,v 1.89 2014/11/28 02:46:39 christos Exp $")
++FILE_RCSID("@(#)$File: magic.c,v 1.90 2014/12/04 15:56:46 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -554,6 +554,9 @@ magic_setparam(struct magic_set *ms, int param, const void *val)
+ 	case MAGIC_PARAM_ELF_SHNUM_MAX:
+ 		ms->elf_shnum_max = *(const size_t *)val;
+ 		return 0;
++	case MAGIC_PARAM_ELF_NOTES_MAX:
++		ms->elf_notes_max = *(const size_t *)val;
++		return 0;
+ 	default:
+ 		errno = EINVAL;
+ 		return -1;
+@@ -576,6 +579,9 @@ magic_getparam(struct magic_set *ms, int param, void *val)
+ 	case MAGIC_PARAM_ELF_SHNUM_MAX:
+ 		*(size_t *)val = ms->elf_shnum_max;
+ 		return 0;
++	case MAGIC_PARAM_ELF_NOTES_MAX:
++		*(size_t *)val = ms->elf_notes_max;
++		return 0;
+ 	default:
+ 		errno = EINVAL;
+ 		return -1;
+diff --git a/src/magic.h.in b/src/magic.h.in
+index 856478b6..0d4c5ce8 100644
+--- a/src/magic.h.in
++++ b/src/magic.h.in
+@@ -107,6 +107,7 @@ int magic_errno(magic_t);
+ #define MAGIC_PARAM_NAME_MAX		1
+ #define MAGIC_PARAM_ELF_PHNUM_MAX	2
+ #define MAGIC_PARAM_ELF_SHNUM_MAX	3
++#define MAGIC_PARAM_ELF_NOTES_MAX	4
+ 
+ int magic_setparam(magic_t, int, const void *);
+ int magic_getparam(magic_t, int, void *);
+diff --git a/src/readelf.c b/src/readelf.c
+index 9d54fc97..8e50d728 100644
+--- a/src/readelf.c
++++ b/src/readelf.c
+@@ -27,7 +27,7 @@
+ #include "file.h"
+ 
+ #ifndef lint
+-FILE_RCSID("@(#)$File: readelf.c,v 1.114 2014/12/11 14:19:36 christos Exp $")
++FILE_RCSID("@(#)$File: readelf.c,v 1.115 2014/12/16 20:53:05 christos Exp $")
+ #endif
+ 
+ #ifdef BUILTIN_ELF
+@@ -43,14 +43,14 @@ FILE_RCSID("@(#)$File: readelf.c,v 1.114 2014/12/11 14:19:36 christos Exp $")
+ 
+ #ifdef	ELFCORE
+ private int dophn_core(struct magic_set *, int, int, int, off_t, int, size_t,
+-    off_t, int *);
++    off_t, int *, uint16_t *);
+ #endif
+ private int dophn_exec(struct magic_set *, int, int, int, off_t, int, size_t,
+-    off_t, int *, int);
++    off_t, int, int *, uint16_t *);
+ private int doshn(struct magic_set *, int, int, int, off_t, int, size_t,
+-    off_t, int *, int, int);
++    off_t, int, int, int *, uint16_t *);
+ private size_t donote(struct magic_set *, void *, size_t, size_t, int,
+-    int, size_t, int *);
++    int, size_t, int *, uint16_t *);
+ 
+ #define	ELF_ALIGN(a)	((((a) + align - 1) / align) * align)
+ 
+@@ -67,7 +67,7 @@ private uint64_t getu64(int, uint64_t);
+ private int
+ toomany(struct magic_set *ms, const char *name, uint16_t num)
+ {
+-	if (file_printf(ms, ", too many %s header sections (%u)", name, num
++	if (file_printf(ms, ", too many %s (%u)", name, num
+ 	    ) == -1)
+ 		return -1;
+ 	return 0;
+@@ -293,15 +293,19 @@ private const char os_style_names[][8] = {
+ 	"NetBSD",
+ };
+ 
+-#define FLAGS_DID_CORE		0x01
+-#define FLAGS_DID_NOTE		0x02
+-#define FLAGS_DID_BUILD_ID	0x04
+-#define FLAGS_DID_CORE_STYLE	0x08
+-#define FLAGS_IS_CORE		0x10
++#define FLAGS_DID_CORE			0x001
++#define FLAGS_DID_OS_NOTE		0x002
++#define FLAGS_DID_BUILD_ID		0x004
++#define FLAGS_DID_CORE_STYLE		0x008
++#define FLAGS_DID_NETBSD_PAX		0x010
++#define FLAGS_DID_NETBSD_MARCH		0x020
++#define FLAGS_DID_NETBSD_CMODEL		0x040
++#define FLAGS_DID_NETBSD_UNKNOWN	0x080
++#define FLAGS_IS_CORE			0x100
+ 
+ private int
+ dophn_core(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
+-    int num, size_t size, off_t fsize, int *flags)
++    int num, size_t size, off_t fsize, int *flags, uint16_t *notecount)
+ {
+ 	Elf32_Phdr ph32;
+ 	Elf64_Phdr ph64;
+@@ -347,7 +351,7 @@ dophn_core(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
+ 			if (offset >= (size_t)bufsize)
+ 				break;
+ 			offset = donote(ms, nbuf, offset, (size_t)bufsize,
+-			    clazz, swap, 4, flags);
++			    clazz, swap, 4, flags, notecount);
+ 			if (offset == 0)
+ 				break;
+ 
+@@ -477,133 +481,127 @@ do_note_freebsd_version(struct magic_set *ms, int swap, void *v)
+ 	}
+ }
+ 
+-private size_t
+-donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
+-    int clazz, int swap, size_t align, int *flags)
++private int
++do_bid_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
++    int swap __attribute__((__unused__)), uint32_t namesz, uint32_t descsz,
++    size_t noff, size_t doff, int *flags)
+ {
+-	Elf32_Nhdr nh32;
+-	Elf64_Nhdr nh64;
+-	size_t noff, doff;
+-#ifdef ELFCORE
+-	int os_style = -1;
+-#endif
+-	uint32_t namesz, descsz;
+-	unsigned char *nbuf = CAST(unsigned char *, vbuf);
+-	char sbuf[512];
+-
+-	if (xnh_sizeof + offset > size) {
+-		/*
+-		 * We're out of note headers.
+-		 */
+-		return xnh_sizeof + offset;
+-	}
+-
+-	(void)memcpy(xnh_addr, &nbuf[offset], xnh_sizeof);
+-	offset += xnh_sizeof;
+-
+-	namesz = xnh_namesz;
+-	descsz = xnh_descsz;
+-	if ((namesz == 0) && (descsz == 0)) {
+-		/*
+-		 * We're out of note headers.
+-		 */
+-		return (offset >= size) ? offset : size;
+-	}
+-
+-	if (namesz & 0x80000000) {
+-	    (void)file_printf(ms, ", bad note name size 0x%lx",
+-		(unsigned long)namesz);
+-	    return 0;
+-	}
+-
+-	if (descsz & 0x80000000) {
+-	    (void)file_printf(ms, ", bad note description size 0x%lx",
+-		(unsigned long)descsz);
+-	    return 0;
+-	}
+-
+-
+-	noff = offset;
+-	doff = ELF_ALIGN(offset + namesz);
+-
+-	if (offset + namesz > size) {
+-		/*
+-		 * We're past the end of the buffer.
+-		 */
+-		return doff;
+-	}
+-
+-	offset = ELF_ALIGN(doff + descsz);
+-	if (doff + descsz > size) {
+-		/*
+-		 * We're past the end of the buffer.
+-		 */
+-		return (offset >= size) ? offset : size;
++	if (namesz == 4 && strcmp((char *)&nbuf[noff], "GNU") == 0 &&
++	    type == NT_GNU_BUILD_ID && (descsz == 16 || descsz == 20)) {
++		uint8_t desc[20];
++		uint32_t i;
++		*flags |= FLAGS_DID_BUILD_ID;
++		if (file_printf(ms, ", BuildID[%s]=", descsz == 16 ? "md5/uuid" :
++		    "sha1") == -1)
++			return 1;
++		(void)memcpy(desc, &nbuf[doff], descsz);
++		for (i = 0; i < descsz; i++)
++		    if (file_printf(ms, "%02x", desc[i]) == -1)
++			return 1;
++		return 1;
+ 	}
++	return 0;
++}
+ 
+-	if ((*flags & (FLAGS_DID_NOTE|FLAGS_DID_BUILD_ID)) ==
+-	    (FLAGS_DID_NOTE|FLAGS_DID_BUILD_ID))
+-		goto core;
+-
++private int
++do_os_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
++    int swap, uint32_t namesz, uint32_t descsz,
++    size_t noff, size_t doff, int *flags)
++{
+ 	if (namesz == 5 && strcmp((char *)&nbuf[noff], "SuSE") == 0 &&
+-	    xnh_type == NT_GNU_VERSION && descsz == 2) {
++	    type == NT_GNU_VERSION && descsz == 2) {
++	    *flags |= FLAGS_DID_OS_NOTE;
+ 	    file_printf(ms, ", for SuSE %d.%d", nbuf[doff], nbuf[doff + 1]);
++	    return 1;
+ 	}
++
+ 	if (namesz == 4 && strcmp((char *)&nbuf[noff], "GNU") == 0 &&
+-	    xnh_type == NT_GNU_VERSION && descsz == 16) {
++	    type == NT_GNU_VERSION && descsz == 16) {
+ 		uint32_t desc[4];
+ 		(void)memcpy(desc, &nbuf[doff], sizeof(desc));
+ 
++		*flags |= FLAGS_DID_OS_NOTE;
+ 		if (file_printf(ms, ", for GNU/") == -1)
+-			return size;
++			return 1;
+ 		switch (elf_getu32(swap, desc[0])) {
+ 		case GNU_OS_LINUX:
+ 			if (file_printf(ms, "Linux") == -1)
+-				return size;
++				return 1;
+ 			break;
+ 		case GNU_OS_HURD:
+ 			if (file_printf(ms, "Hurd") == -1)
+-				return size;
++				return 1;
+ 			break;
+ 		case GNU_OS_SOLARIS:
+ 			if (file_printf(ms, "Solaris") == -1)
+-				return size;
++				return 1;
+ 			break;
+ 		case GNU_OS_KFREEBSD:
+ 			if (file_printf(ms, "kFreeBSD") == -1)
+-				return size;
++				return 1;
+ 			break;
+ 		case GNU_OS_KNETBSD:
+ 			if (file_printf(ms, "kNetBSD") == -1)
+-				return size;
++				return 1;
+ 			break;
+ 		default:
+ 			if (file_printf(ms, "<unknown>") == -1)
+-				return size; 
++				return 1; 
+ 		}
+ 		if (file_printf(ms, " %d.%d.%d", elf_getu32(swap, desc[1]),
+ 		    elf_getu32(swap, desc[2]), elf_getu32(swap, desc[3])) == -1)
+-			return size;
+-		*flags |= FLAGS_DID_NOTE;
+-		return size;
++			return 1;
++		return 1;
+ 	}
+ 
+-	if (namesz == 4 && strcmp((char *)&nbuf[noff], "GNU") == 0 &&
+-	    xnh_type == NT_GNU_BUILD_ID && (descsz == 16 || descsz == 20)) {
+-	    uint8_t desc[20];
+-	    uint32_t i;
+-	    if (file_printf(ms, ", BuildID[%s]=", descsz == 16 ? "md5/uuid" :
+-		"sha1") == -1)
+-		    return size;
+-	    (void)memcpy(desc, &nbuf[doff], descsz);
+-	    for (i = 0; i < descsz; i++)
+-		if (file_printf(ms, "%02x", desc[i]) == -1)
+-		    return size;
+-	    *flags |= FLAGS_DID_BUILD_ID;
++	if (namesz == 7 && strcmp((char *)&nbuf[noff], "NetBSD") == 0) {
++	    	if (type == NT_NETBSD_VERSION && descsz == 4) {
++			*flags |= FLAGS_DID_OS_NOTE;
++			do_note_netbsd_version(ms, swap, &nbuf[doff]);
++			return 1;
++		}
++	}
++
++	if (namesz == 8 && strcmp((char *)&nbuf[noff], "FreeBSD") == 0) {
++	    	if (type == NT_FREEBSD_VERSION && descsz == 4) {
++			*flags |= FLAGS_DID_OS_NOTE;
++			do_note_freebsd_version(ms, swap, &nbuf[doff]);
++			return 1;
++		}
+ 	}
+ 
++	if (namesz == 8 && strcmp((char *)&nbuf[noff], "OpenBSD") == 0 &&
++	    type == NT_OPENBSD_VERSION && descsz == 4) {
++		*flags |= FLAGS_DID_OS_NOTE;
++		if (file_printf(ms, ", for OpenBSD") == -1)
++			return 1;
++		/* Content of note is always 0 */
++		return 1;
++	}
++
++	if (namesz == 10 && strcmp((char *)&nbuf[noff], "DragonFly") == 0 &&
++	    type == NT_DRAGONFLY_VERSION && descsz == 4) {
++		uint32_t desc;
++		*flags |= FLAGS_DID_OS_NOTE;
++		if (file_printf(ms, ", for DragonFly") == -1)
++			return 1;
++		(void)memcpy(&desc, &nbuf[doff], sizeof(desc));
++		desc = elf_getu32(swap, desc);
++		if (file_printf(ms, " %d.%d.%d", desc / 100000,
++		    desc / 10000 % 10, desc % 10000) == -1)
++			return 1;
++		return 1;
++	}
++	return 0;
++}
++
++private int
++do_pax_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
++    int swap, uint32_t namesz, uint32_t descsz,
++    size_t noff, size_t doff, int *flags)
++{
+ 	if (namesz == 4 && strcmp((char *)&nbuf[noff], "PaX") == 0 &&
+-	    xnh_type == NT_NETBSD_PAX && descsz == 4) {
++	    type == NT_NETBSD_PAX && descsz == 4) {
+ 		static const char *pax[] = {
+ 		    "+mprotect",
+ 		    "-mprotect",
+@@ -616,80 +614,32 @@ donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
+ 		size_t i;
+ 		int did = 0;
+ 
++		*flags |= FLAGS_DID_NETBSD_PAX;
+ 		(void)memcpy(&desc, &nbuf[doff], sizeof(desc));
+ 		desc = elf_getu32(swap, desc);
+ 
+ 		if (desc && file_printf(ms, ", PaX: ") == -1)
+-			return size;
++			return 1;
+ 
+ 		for (i = 0; i < __arraycount(pax); i++) {
+ 			if (((1 << i) & desc) == 0)
+ 				continue;
+ 			if (file_printf(ms, "%s%s", did++ ? "," : "",
+ 			    pax[i]) == -1)
+-				return size;
+-		}
+-	}
+-
+-	if (namesz == 7 && strcmp((char *)&nbuf[noff], "NetBSD") == 0) {
+-		switch (xnh_type) {
+-		case NT_NETBSD_VERSION:
+-			if (descsz == 4) {
+-				do_note_netbsd_version(ms, swap, &nbuf[doff]);
+-				*flags |= FLAGS_DID_NOTE;
+-				return size;
+-			}
+-			break;
+-		case NT_NETBSD_MARCH:
+-			if (file_printf(ms, ", compiled for: %.*s", (int)descsz,
+-			    (const char *)&nbuf[doff]) == -1)
+-				return size;
+-			break;
+-		case NT_NETBSD_CMODEL:
+-			if (file_printf(ms, ", compiler model: %.*s",
+-			    (int)descsz, (const char *)&nbuf[doff]) == -1)
+-				return size;
+-			break;
+-		default:
+-			if (file_printf(ms, ", note=%u", xnh_type) == -1)
+-				return size;
+-			break;
+-		}
+-		return size;
+-	}
+-
+-	if (namesz == 8 && strcmp((char *)&nbuf[noff], "FreeBSD") == 0) {
+-	    	if (xnh_type == NT_FREEBSD_VERSION && descsz == 4) {
+-			do_note_freebsd_version(ms, swap, &nbuf[doff]);
+-			*flags |= FLAGS_DID_NOTE;
+-			return size;
++				return 1;
+ 		}
++		return 1;
+ 	}
++	return 0;
++}
+ 
+-	if (namesz == 8 && strcmp((char *)&nbuf[noff], "OpenBSD") == 0 &&
+-	    xnh_type == NT_OPENBSD_VERSION && descsz == 4) {
+-		if (file_printf(ms, ", for OpenBSD") == -1)
+-			return size;
+-		/* Content of note is always 0 */
+-		*flags |= FLAGS_DID_NOTE;
+-		return size;
+-	}
+-
+-	if (namesz == 10 && strcmp((char *)&nbuf[noff], "DragonFly") == 0 &&
+-	    xnh_type == NT_DRAGONFLY_VERSION && descsz == 4) {
+-		uint32_t desc;
+-		if (file_printf(ms, ", for DragonFly") == -1)
+-			return size;
+-		(void)memcpy(&desc, &nbuf[doff], sizeof(desc));
+-		desc = elf_getu32(swap, desc);
+-		if (file_printf(ms, " %d.%d.%d", desc / 100000,
+-		    desc / 10000 % 10, desc % 10000) == -1)
+-			return size;
+-		*flags |= FLAGS_DID_NOTE;
+-		return size;
+-	}
+-
+-core:
++private int
++do_core_note(struct magic_set *ms, unsigned char *nbuf, uint32_t type,
++    int swap, uint32_t namesz, uint32_t descsz,
++    size_t noff, size_t doff, int *flags, size_t size, int clazz)
++{
++#ifdef ELFCORE
++	int os_style = -1;
+ 	/*
+ 	 * Sigh.  The 2.0.36 kernel in Debian 2.1, at
+ 	 * least, doesn't correctly implement name
+@@ -718,20 +668,17 @@ core:
+ 		os_style = OS_STYLE_NETBSD;
+ 	}
+ 
+-#ifdef ELFCORE
+-	if ((*flags & FLAGS_DID_CORE) != 0)
+-		return size;
+-
+ 	if (os_style != -1 && (*flags & FLAGS_DID_CORE_STYLE) == 0) {
+ 		if (file_printf(ms, ", %s-style", os_style_names[os_style])
+ 		    == -1)
+-			return size;
++			return 1;
+ 		*flags |= FLAGS_DID_CORE_STYLE;
+ 	}
+ 
+ 	switch (os_style) {
+ 	case OS_STYLE_NETBSD:
+-		if (xnh_type == NT_NETBSD_CORE_PROCINFO) {
++		if (type == NT_NETBSD_CORE_PROCINFO) {
++			char sbuf[512];
+ 			uint32_t signo;
+ 			/*
+ 			 * Extract the program name.  It is at
+@@ -741,7 +688,7 @@ core:
+ 			if (file_printf(ms, ", from '%.31s'",
+ 			    file_printable(sbuf, sizeof(sbuf),
+ 			    (const char *)&nbuf[doff + 0x7c])) == -1)
+-				return size;
++				return 1;
+ 			
+ 			/*
+ 			 * Extract the signal number.  It is at
+@@ -751,14 +698,14 @@ core:
+ 			    sizeof(signo));
+ 			if (file_printf(ms, " (signal %u)",
+ 			    elf_getu32(swap, signo)) == -1)
+-				return size;
++				return 1;
+ 			*flags |= FLAGS_DID_CORE;
+-			return size;
++			return 1;
+ 		}
+ 		break;
+ 
+ 	default:
+-		if (xnh_type == NT_PRPSINFO && *flags & FLAGS_IS_CORE) {
++		if (type == NT_PRPSINFO && *flags & FLAGS_IS_CORE) {
+ 			size_t i, j;
+ 			unsigned char c;
+ 			/*
+@@ -826,7 +773,7 @@ core:
+ 				 * Try next offsets, in case this match is
+ 				 * in the middle of a string.
+ 				 */
+-				for (k = i + 1 ; k < NOFFSETS ; k++) {
++				for (k = i + 1 ; k < NOFFSETS; k++) {
+ 					size_t no;
+ 					int adjust = 1;
+ 					if (prpsoffsets(k) >= prpsoffsets(i))
+@@ -851,9 +798,9 @@ core:
+ 					cp--;
+ 				if (file_printf(ms, ", from '%.*s'",
+ 				    (int)(cp - cname), cname) == -1)
+-					return size;
++					return 1;
+ 				*flags |= FLAGS_DID_CORE;
+-				return size;
++				return 1;
+ 
+ 			tryanother:
+ 				;
+@@ -862,6 +809,124 @@ core:
+ 		break;
+ 	}
+ #endif
++	return 0;
++}
++
++private size_t
++donote(struct magic_set *ms, void *vbuf, size_t offset, size_t size,
++    int clazz, int swap, size_t align, int *flags, uint16_t *notecount)
++{
++	Elf32_Nhdr nh32;
++	Elf64_Nhdr nh64;
++	size_t noff, doff;
++	uint32_t namesz, descsz;
++	unsigned char *nbuf = CAST(unsigned char *, vbuf);
++
++	if (*notecount == 0)
++		return 0;
++	--*notecount;
++
++	if (xnh_sizeof + offset > size) {
++		/*
++		 * We're out of note headers.
++		 */
++		return xnh_sizeof + offset;
++	}
++
++	(void)memcpy(xnh_addr, &nbuf[offset], xnh_sizeof);
++	offset += xnh_sizeof;
++
++	namesz = xnh_namesz;
++	descsz = xnh_descsz;
++	if ((namesz == 0) && (descsz == 0)) {
++		/*
++		 * We're out of note headers.
++		 */
++		return (offset >= size) ? offset : size;
++	}
++
++	if (namesz & 0x80000000) {
++	    (void)file_printf(ms, ", bad note name size 0x%lx",
++		(unsigned long)namesz);
++	    return 0;
++	}
++
++	if (descsz & 0x80000000) {
++	    (void)file_printf(ms, ", bad note description size 0x%lx",
++		(unsigned long)descsz);
++	    return 0;
++	}
++
++	noff = offset;
++	doff = ELF_ALIGN(offset + namesz);
++
++	if (offset + namesz > size) {
++		/*
++		 * We're past the end of the buffer.
++		 */
++		return doff;
++	}
++
++	offset = ELF_ALIGN(doff + descsz);
++	if (doff + descsz > size) {
++		/*
++		 * We're past the end of the buffer.
++		 */
++		return (offset >= size) ? offset : size;
++	}
++
++	if ((*flags & FLAGS_DID_OS_NOTE) == 0) {
++		if (do_os_note(ms, nbuf, xnh_type, swap,
++		    namesz, descsz, noff, doff, flags))
++			return size;
++	}
++
++	if ((*flags & FLAGS_DID_BUILD_ID) == 0) {
++		if (do_bid_note(ms, nbuf, xnh_type, swap,
++		    namesz, descsz, noff, doff, flags))
++			return size;
++	}
++		
++	if ((*flags & FLAGS_DID_NETBSD_PAX) == 0) {
++		if (do_pax_note(ms, nbuf, xnh_type, swap,
++		    namesz, descsz, noff, doff, flags))
++			return size;
++	}
++
++	if ((*flags & FLAGS_DID_CORE) == 0) {
++		if (do_core_note(ms, nbuf, xnh_type, swap,
++		    namesz, descsz, noff, doff, flags, size, clazz))
++			return size;
++	}
++
++	if (namesz == 7 && strcmp((char *)&nbuf[noff], "NetBSD") == 0) {
++		switch (xnh_type) {
++	    	case NT_NETBSD_VERSION:
++			return size;
++		case NT_NETBSD_MARCH:
++			if (*flags & FLAGS_DID_NETBSD_MARCH)
++				return size;
++			if (file_printf(ms, ", compiled for: %.*s", (int)descsz,
++			    (const char *)&nbuf[doff]) == -1)
++				return size;
++			break;
++		case NT_NETBSD_CMODEL:
++			if (*flags & FLAGS_DID_NETBSD_CMODEL)
++				return size;
++			if (file_printf(ms, ", compiler model: %.*s",
++			    (int)descsz, (const char *)&nbuf[doff]) == -1)
++				return size;
++			break;
++		default:
++			if (*flags & FLAGS_DID_NETBSD_UNKNOWN)
++				return size;
++			if (file_printf(ms, ", note=%u", xnh_type) == -1)
++				return size;
++			break;
++		}
++		return size;
++	}
++
+ 	return offset;
+ }
+ 
+@@ -917,7 +982,8 @@ static const cap_desc_t cap_desc_386[] = {
+ 
+ private int
+ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
+-    size_t size, off_t fsize, int *flags, int mach, int strtab)
++    size_t size, off_t fsize, int mach, int strtab, int *flags,
++    uint16_t *notecount)
+ {
+ 	Elf32_Shdr sh32;
+ 	Elf64_Shdr sh64;
+@@ -994,7 +1060,7 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
+ 				if (noff >= (off_t)xsh_size)
+ 					break;
+ 				noff = donote(ms, nbuf, (size_t)noff,
+-				    xsh_size, clazz, swap, 4, flags);
++				    xsh_size, clazz, swap, 4, flags, notecount);
+ 				if (noff == 0)
+ 					break;
+ 			}
+@@ -1161,7 +1227,8 @@ doshn(struct magic_set *ms, int clazz, int swap, int fd, off_t off, int num,
+  */
+ private int
+ dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
+-    int num, size_t size, off_t fsize, int *flags, int sh_num)
++    int num, size_t size, off_t fsize, int sh_num, int *flags,
++    uint16_t *notecount)
+ {
+ 	Elf32_Phdr ph32;
+ 	Elf64_Phdr ph64;
+@@ -1242,7 +1309,7 @@ dophn_exec(struct magic_set *ms, int clazz, int swap, int fd, off_t off,
+ 					break;
+ 				offset = donote(ms, nbuf, offset,
+ 				    (size_t)bufsize, clazz, swap, align,
+-				    flags);
++				    flags, notecount);
+ 				if (offset == 0)
+ 					break;
+ 			}
+@@ -1277,7 +1344,7 @@ file_tryelf(struct magic_set *ms, int fd, const unsigned char *buf,
+ 	int flags = 0;
+ 	Elf32_Ehdr elf32hdr;
+ 	Elf64_Ehdr elf64hdr;
+-	uint16_t type, phnum, shnum;
++	uint16_t type, phnum, shnum, notecount;
+ 
+ 	if (ms->flags & (MAGIC_MIME|MAGIC_APPLE))
+ 		return 0;

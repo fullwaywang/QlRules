@@ -1,0 +1,76 @@
+commit 095b4ce16bb46acb259ea1a4ca6562a623e58d93
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Thu Aug 3 12:43:56 2017 -0500
+
+    [libpng16] Disabled new limit test on IDAT chunks. It was producing too small
+    
+    a limit for some files.
+
+diff --git a/pngpread.c b/pngpread.c
+index fcee949ee..6445623d5 100644
+--- a/pngpread.c
++++ b/pngpread.c
+@@ -226,14 +226,19 @@ png_push_read_chunk(png_structrp png_ptr, png_inforp info_ptr)
+ 
+    if (chunk_name == png_IDAT)
+    {
++#if 0 /* some pngtests are failing */
+       size_t row_factor =
+-         (png_ptr->rowbytes + 1 + (png_ptr->interlaced? 6: 0));
++         (png_ptr->width * png_ptr->channels * (png_ptr->bit_depth > 8? 2: 1)
++          + 1 + (png_ptr->interlaced? 6: 0));
+       if (png_ptr->height > PNG_UINT_32_MAX/row_factor)
+          limit=PNG_UINT_31_MAX;
+       else
+          limit = png_ptr->height * row_factor;
+       limit += 6 + 5*limit/32566; /* zlib+deflate overhead */
+       limit=limit < PNG_UINT_31_MAX? limit : PNG_UINT_31_MAX;
++#else
++      limit=PNG_UINT_31_MAX;
++#endif
+    }
+    else
+    {
+@@ -247,7 +252,11 @@ png_push_read_chunk(png_structrp png_ptr, png_inforp info_ptr)
+ # endif
+    }
+    if (png_ptr->push_length > limit)
++   {
++      printf(" png_ptr->push_length = %lu, limit = %lu\n",
++         (unsigned long)png_ptr->push_length,(unsigned long)limit);
+       png_chunk_error(png_ptr, "chunk data is too large");
++   }
+ 
+    if (chunk_name == png_IHDR)
+    {
+diff --git a/pngrutil.c b/pngrutil.c
+index f7964fc9a..0d8ab5fd5 100644
+--- a/pngrutil.c
++++ b/pngrutil.c
+@@ -196,18 +196,25 @@ png_read_chunk_header(png_structrp png_ptr)
+    }
+    else
+    {
++#if 0 /* some pngtests are failing */
+       size_t row_factor =
+-         (png_ptr->rowbytes + 1 + (png_ptr->interlaced? 6: 0));
++         (png_ptr->width * png_ptr->channels * (png_ptr->bit_depth > 8? 2: 1)
++          + 1 + (png_ptr->interlaced? 6: 0));
+       if (png_ptr->height > PNG_UINT_32_MAX/row_factor)
+          limit=PNG_UINT_31_MAX;
+       else
+          limit = png_ptr->height * row_factor;
+       limit += 6 + 5*limit/32566; /* zlib+deflate overhead */
+       limit=limit < PNG_UINT_31_MAX? limit : PNG_UINT_31_MAX;
++#else
++      limit=PNG_UINT_31_MAX;
++#endif
+    }
+ 
+    if (length > limit)
+    {
++      printf(" length = %lu, limit = %lu\n",
++         (unsigned long)length,(unsigned long)limit);
+       png_chunk_error(png_ptr, "chunk data is too large");
+    }
+ 

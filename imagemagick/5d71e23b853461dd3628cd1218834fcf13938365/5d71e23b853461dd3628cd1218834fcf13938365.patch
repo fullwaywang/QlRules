@@ -1,0 +1,25 @@
+commit 5d71e23b853461dd3628cd1218834fcf13938365
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Oct 6 09:14:15 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1336
+
+diff --git a/coders/svg.c b/coders/svg.c
+index 82c3b4e3d..e9780ceca 100644
+--- a/coders/svg.c
++++ b/coders/svg.c
+@@ -575,10 +575,12 @@ static void SVGStripString(const MagickBooleanType trim,char *message)
+       {
+         for ( ; *p != '\0'; p++)
+           if ((*p == '*') && (*(p+1) == '/'))
+-            break;
++            {
++              p+=2;
++              break;
++            }
+         if (*p == '\0')
+           break;
+-        p+=2;
+       }
+     *q++=(*p);
+   }

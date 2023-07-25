@@ -1,0 +1,37 @@
+commit ad3b6fa7d83db7de951ed891649af93a47e74be5
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sun Jan 17 00:55:44 2016 +0100
+
+    swscale/swscale_unscaled: Fix odd height inputs for bayer_to_rgb24_wrapper()
+    
+    Fixes: 372d2df1f04b49e25f109f07f90b1505/asan_heap-oob_2835d2e_8501_99e0114d7ba3a6db885d0b4684d200c1.cine
+    Fixes out of array read
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libswscale/swscale_unscaled.c b/libswscale/swscale_unscaled.c
+index 89cb90d793..8ff1b01102 100644
+--- a/libswscale/swscale_unscaled.c
++++ b/libswscale/swscale_unscaled.c
+@@ -1059,6 +1059,8 @@ static int bayer_to_rgb24_wrapper(SwsContext *c, const uint8_t* src[], int srcSt
+     default: return 0;
+     }
+ 
++    av_assert0(srcSliceH > 1);
++
+     copy(srcPtr, srcStride[0], dstPtr, dstStride[0], c->srcW);
+     srcPtr += 2 * srcStride[0];
+     dstPtr += 2 * dstStride[0];
+@@ -1069,7 +1071,10 @@ static int bayer_to_rgb24_wrapper(SwsContext *c, const uint8_t* src[], int srcSt
+         dstPtr += 2 * dstStride[0];
+     }
+ 
+-    copy(srcPtr, srcStride[0], dstPtr, dstStride[0], c->srcW);
++    if (i + 1 == srcSliceH) {
++        copy(srcPtr, -srcStride[0], dstPtr, -dstStride[0], c->srcW);
++    } else if (i < srcSliceH)
++        copy(srcPtr, srcStride[0], dstPtr, dstStride[0], c->srcW);
+     return srcSliceH;
+ }
+ 

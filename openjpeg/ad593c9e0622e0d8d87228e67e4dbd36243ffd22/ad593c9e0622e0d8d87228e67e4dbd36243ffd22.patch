@@ -1,0 +1,32 @@
+commit ad593c9e0622e0d8d87228e67e4dbd36243ffd22
+Author: Matthieu Darbois <mayeut@users.noreply.github.com>
+Date:   Fri Apr 29 23:51:14 2016 +0200
+
+    Fix heap-buffer-overflow in color_esycc_to_rgb (#748)
+    
+    When all components do not have the same dx/dy, components buffer are
+    read beyond their end.
+    Do not convert in this case.
+    
+    Update uclouvain/openjpeg#725
+
+diff --git a/src/bin/common/color.c b/src/bin/common/color.c
+index cd4fafdd..00eac515 100644
+--- a/src/bin/common/color.c
++++ b/src/bin/common/color.c
+@@ -890,7 +890,14 @@ void color_esycc_to_rgb(opj_image_t *image)
+ 	int flip_value = (1 << (image->comps[0].prec-1));
+ 	int max_value = (1 << image->comps[0].prec) - 1;
+ 	
+-	if(image->numcomps < 3) return;
++	if (
++		    (image->numcomps < 3)
++		 || (image->comps[0].dx != image->comps[1].dx) || (image->comps[0].dx != image->comps[2].dx)
++		 || (image->comps[0].dy != image->comps[1].dy) || (image->comps[0].dy != image->comps[2].dy)
++	   ) {
++		fprintf(stderr,"%s:%d:color_esycc_to_rgb\n\tCAN NOT CONVERT\n", __FILE__,__LINE__);
++		return;
++	}
+ 	
+ 	w = image->comps[0].w;
+ 	h = image->comps[0].h;

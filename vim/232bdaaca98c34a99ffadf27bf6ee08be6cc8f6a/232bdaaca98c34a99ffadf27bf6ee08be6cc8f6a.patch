@@ -1,0 +1,53 @@
+commit 232bdaaca98c34a99ffadf27bf6ee08be6cc8f6a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri Jan 13 14:17:58 2023 +0000
+
+    patch 9.0.1189: invalid memory access with folding and using "L"
+    
+    Problem:    Invalid memory access with folding and using "L".
+    Solution:   Prevent the cursor from moving to line zero.
+
+diff --git a/src/normal.c b/src/normal.c
+index c319be599..3d9f74dec 100644
+--- a/src/normal.c
++++ b/src/normal.c
+@@ -3729,7 +3729,8 @@ nv_scroll(cmdarg_T *cap)
+ 		{
+ 		    (void)hasFolding(curwin->w_cursor.lnum,
+ 						&curwin->w_cursor.lnum, NULL);
+-		    --curwin->w_cursor.lnum;
++		    if (curwin->w_cursor.lnum > curwin->w_topline)
++			--curwin->w_cursor.lnum;
+ 		}
+ 	    }
+ 	    else
+diff --git a/src/testdir/test_fold.vim b/src/testdir/test_fold.vim
+index adf9e5207..f915a6613 100644
+--- a/src/testdir/test_fold.vim
++++ b/src/testdir/test_fold.vim
+@@ -1675,4 +1675,12 @@ func Test_sort_closed_fold()
+   bwipe!
+ endfunc
+ 
++func Test_indent_with_L_command()
++  " The "L" command moved the cursor to line zero, causing the text saved for
++  " undo to use line number -1, which caused trouble for undo later.
++  new
++  sil! norm 8RV{zf8=Lu
++  bwipe!
++endfunc
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 1d81e7b6f..64f7d887b 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1189,
+ /**/
+     1188,
+ /**/

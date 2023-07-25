@@ -1,0 +1,29 @@
+commit eb82ce76ddca13ad6fb13376bb58b9fd3f850e9e
+Author: James Zern <jzern@google.com>
+Date:   Fri Jun 29 01:12:20 2018 -0700
+
+    muxread,anmf: fail on multiple image chunks
+    
+    treat an ANMF chunk containing multiple VP8/VP8L file as malformed.
+    fixes a WebPMuxImage::img_ leak.
+    
+    Though the invalid free in #9106 was avoided in (ubsan):
+    be738c6d muxread,ChunkVerifyAndAssign: validate chunk_size
+    that file would still cause a leak similar to #9099.
+    
+    BUG=oss-fuzz:9099,oss-fuzz:9106
+    
+    Change-Id: Ib873446a1188afeeb2fe5d53a86b75e0c5de9573
+
+diff --git a/src/mux/muxread.c b/src/mux/muxread.c
+index ef50dae5..fbe9f051 100644
+--- a/src/mux/muxread.c
++++ b/src/mux/muxread.c
+@@ -138,6 +138,7 @@ static int MuxImageParse(const WebPChunk* const chunk, int copy_data,
+         wpi->is_partial_ = 1;  // Waiting for a VP8 chunk.
+         break;
+       case WEBP_CHUNK_IMAGE:
++        if (wpi->img_ != NULL) goto Fail;  // Only 1 image chunk allowed.
+         if (ChunkSetNth(&subchunk, &wpi->img_, 1) != WEBP_MUX_OK) goto Fail;
+         if (!MuxImageFinalize(wpi)) goto Fail;
+         wpi->is_partial_ = 0;  // wpi is completely filled.

@@ -1,0 +1,178 @@
+commit 0f6e28f686dbb59ab3b562408ab9b2234797b9b1
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Feb 20 20:49:35 2022 +0000
+
+    patch 8.2.4428: crash when switching tabpage while in the cmdline window
+    
+    Problem:    Crash when switching tabpage while in the cmdline window.
+    Solution:   Disallow switching tabpage when in the cmdline window.
+
+diff --git a/src/evalvars.c b/src/evalvars.c
+index 40375588c..dabd49b67 100644
+--- a/src/evalvars.c
++++ b/src/evalvars.c
+@@ -2199,12 +2199,7 @@ get_user_var_name(expand_T *xp, int idx)
+     }
+ 
+     // b: variables
+-    ht =
+-#ifdef FEAT_CMDWIN
+-	// In cmdwin, the alternative buffer should be used.
+-	is_in_cmdwin() ? &prevwin->w_buffer->b_vars->dv_hashtab :
+-#endif
+-	&curbuf->b_vars->dv_hashtab;
++    ht = &prevwin_curwin()->w_buffer->b_vars->dv_hashtab;
+     if (bdone < ht->ht_used)
+     {
+ 	if (bdone++ == 0)
+@@ -2217,12 +2212,7 @@ get_user_var_name(expand_T *xp, int idx)
+     }
+ 
+     // w: variables
+-    ht =
+-#ifdef FEAT_CMDWIN
+-	// In cmdwin, the alternative window should be used.
+-	is_in_cmdwin() ? &prevwin->w_vars->dv_hashtab :
+-#endif
+-	&curwin->w_vars->dv_hashtab;
++    ht = &prevwin_curwin()->w_vars->dv_hashtab;
+     if (wdone < ht->ht_used)
+     {
+ 	if (wdone++ == 0)
+diff --git a/src/proto/window.pro b/src/proto/window.pro
+index 654d36a6e..11c2d47c7 100644
+--- a/src/proto/window.pro
++++ b/src/proto/window.pro
+@@ -1,4 +1,5 @@
+ /* window.c */
++win_T *prevwin_curwin(void);
+ void do_window(int nchar, long Prenum, int xchar);
+ void get_wincmd_addr_type(char_u *arg, exarg_T *eap);
+ int win_split(int size, int flags);
+diff --git a/src/usercmd.c b/src/usercmd.c
+index d4a7a9c15..1ff4d0d49 100644
+--- a/src/usercmd.c
++++ b/src/usercmd.c
+@@ -141,11 +141,7 @@ find_ucmd(
+     /*
+      * Look for buffer-local user commands first, then global ones.
+      */
+-    gap =
+-#ifdef FEAT_CMDWIN
+-	is_in_cmdwin() ? &prevwin->w_buffer->b_ucmds :
+-#endif
+-	&curbuf->b_ucmds;
++    gap = &prevwin_curwin()->w_buffer->b_ucmds;
+     for (;;)
+     {
+ 	for (j = 0; j < gap->ga_len; ++j)
+@@ -358,11 +354,7 @@ expand_user_command_name(int idx)
+ get_user_commands(expand_T *xp UNUSED, int idx)
+ {
+     // In cmdwin, the alternative buffer should be used.
+-    buf_T *buf =
+-#ifdef FEAT_CMDWIN
+-	is_in_cmdwin() ? prevwin->w_buffer :
+-#endif
+-	curbuf;
++    buf_T *buf = prevwin_curwin()->w_buffer;
+ 
+     if (idx < buf->b_ucmds.ga_len)
+ 	return USER_CMD_GA(&buf->b_ucmds, idx)->uc_name;
+@@ -386,11 +378,7 @@ get_user_command_name(int idx, int cmdidx)
+     if (cmdidx == CMD_USER_BUF)
+     {
+ 	// In cmdwin, the alternative buffer should be used.
+-	buf_T *buf =
+-#ifdef FEAT_CMDWIN
+-		    is_in_cmdwin() ? prevwin->w_buffer :
+-#endif
+-		    curbuf;
++	buf_T *buf = prevwin_curwin()->w_buffer;
+ 
+ 	if (idx < buf->b_ucmds.ga_len)
+ 	    return USER_CMD_GA(&buf->b_ucmds, idx)->uc_name;
+@@ -478,11 +466,7 @@ uc_list(char_u *name, size_t name_len)
+     garray_T	*gap;
+ 
+     // In cmdwin, the alternative buffer should be used.
+-    gap =
+-#ifdef FEAT_CMDWIN
+-	    is_in_cmdwin() ? &prevwin->w_buffer->b_ucmds :
+-#endif
+-	    &curbuf->b_ucmds;
++    gap = &prevwin_curwin()->w_buffer->b_ucmds;
+     for (;;)
+     {
+ 	for (i = 0; i < gap->ga_len; ++i)
+diff --git a/src/version.c b/src/version.c
+index c5f5c22f9..777476d80 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4428,
+ /**/
+     4427,
+ /**/
+diff --git a/src/window.c b/src/window.c
+index 1f5e70960..b00ed977f 100644
+--- a/src/window.c
++++ b/src/window.c
+@@ -110,6 +110,21 @@ log_frame_layout(frame_T *frame)
+ }
+ #endif
+ 
++/*
++ * Return the current window, unless in the cmdline window and "prevwin" is
++ * set, then return "prevwin".
++ */
++    win_T *
++prevwin_curwin(void)
++{
++    return
++#ifdef FEAT_CMDWIN
++	// In cmdwin, the alternative buffer should be used.
++	is_in_cmdwin() && prevwin != NULL ? prevwin :
++#endif
++	curwin;
++}
++
+ /*
+  * All CTRL-W window commands are handled here, called from normal_cmd().
+  */
+@@ -3927,6 +3942,14 @@ win_new_tabpage(int after)
+     tabpage_T	*newtp;
+     int		n;
+ 
++#ifdef FEAT_CMDWIN
++    if (cmdwin_type != 0)
++    {
++	emsg(_(e_invalid_in_cmdline_window));
++	return FAIL;
++    }
++#endif
++
+     newtp = alloc_tabpage();
+     if (newtp == NULL)
+ 	return FAIL;
+@@ -4301,6 +4324,7 @@ goto_tabpage(int n)
+ 	text_locked_msg();
+ 	return;
+     }
++    CHECK_CMDWIN;
+ 
+     // If there is only one it can't work.
+     if (first_tabpage->tp_next == NULL)
+@@ -4368,6 +4392,8 @@ goto_tabpage_tp(
+     int		trigger_enter_autocmds,
+     int		trigger_leave_autocmds)
+ {
++    CHECK_CMDWIN;
++
+     // Don't repeat a message in another tab page.
+     set_keep_msg(NULL, 0);
+ 

@@ -1,0 +1,8 @@
+commit 07a66c9bc341f902878e37d7da8647d6ef150987
+Merge: 2300c1b bd4f96e
+Author: Bas Alberts <13686387+anticomputer@users.noreply.github.com>
+Date:   Fri Mar 31 13:29:29 2023 -0400
+
+    Merge pull request from GHSA-r8vr-c48j-fcc5
+    
+    Fix quadratic behavior in rendering

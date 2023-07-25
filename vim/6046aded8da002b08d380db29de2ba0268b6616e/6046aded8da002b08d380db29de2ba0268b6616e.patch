@@ -1,0 +1,68 @@
+commit 6046aded8da002b08d380db29de2ba0268b6616e
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Jun 22 13:51:54 2022 +0100
+
+    patch 8.2.5148: invalid memory access when using expression on command line
+    
+    Problem:    Invalid memory access when using an expression on the command line.
+    Solution:   Make sure the position does not go negative.
+
+diff --git a/src/ex_getln.c b/src/ex_getln.c
+index af4dc19be..b499aba14 100644
+--- a/src/ex_getln.c
++++ b/src/ex_getln.c
+@@ -1206,6 +1206,7 @@ cmdline_insert_reg(int *gotesc UNUSED)
+ {
+     int		i;
+     int		c;
++    int		save_new_cmdpos = new_cmdpos;
+ 
+ #ifdef USE_ON_FLY_SCROLL
+     dont_scroll = TRUE;	// disallow scrolling here
+@@ -1224,8 +1225,6 @@ cmdline_insert_reg(int *gotesc UNUSED)
+ #ifdef FEAT_EVAL
+     /*
+      * Insert the result of an expression.
+-     * Need to save the current command line, to be able to enter
+-     * a new one...
+      */
+     new_cmdpos = -1;
+     if (c == '=')
+@@ -1266,6 +1265,8 @@ cmdline_insert_reg(int *gotesc UNUSED)
+ 	}
+ #endif
+     }
++    new_cmdpos = save_new_cmdpos;
++
+     // remove the double quote
+     redrawcmd();
+ 
+diff --git a/src/testdir/test_cmdline.vim b/src/testdir/test_cmdline.vim
+index 2289c343e..9c08d1380 100644
+--- a/src/testdir/test_cmdline.vim
++++ b/src/testdir/test_cmdline.vim
+@@ -1987,6 +1987,11 @@ func Test_cmdline_expr()
+   call assert_equal("\"e \<C-\>\<C-Y>", @:)
+ endfunc
+ 
++" This was making the insert position negative
++func Test_cmdline_expr_register()
++  exe "sil! norm! ?\<C-\>e0\<C-R>0\<Esc>?\<C-\>e0\<CR>"
++endfunc
++
+ " Test for 'imcmdline' and 'imsearch'
+ " This test doesn't actually test the input method functionality.
+ func Test_cmdline_inputmethod()
+diff --git a/src/version.c b/src/version.c
+index 35024fb59..e567a3a99 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5148,
+ /**/
+     5147,
+ /**/

@@ -1,0 +1,22 @@
+commit c3f23b836e5a1766c36617fe1da30d22f7b63de2
+Author: Frank Morgner <frankmorgner@gmail.com>
+Date:   Sun Nov 3 04:45:28 2019 +0100
+
+    fixed  UNKNOWN READ
+    
+    Reported by OSS-Fuzz
+    https://oss-fuzz.com/testcase-detail/5681169970757632
+
+diff --git a/src/libopensc/card-setcos.c b/src/libopensc/card-setcos.c
+index 4cf328ad..1b4e8f3e 100644
+--- a/src/libopensc/card-setcos.c
++++ b/src/libopensc/card-setcos.c
+@@ -868,7 +868,7 @@ static void parse_sec_attr_44(sc_file_t *file, const u8 *buf, size_t len)
+ 			}
+ 
+ 			/* Encryption key present ? */
+-			iPinCount = iACLen - 1;		
++			iPinCount = iACLen > 0 ? iACLen - 1 : 0;
+ 
+ 			if (buf[iOffset] & 0x20) {
+ 				int iSC;

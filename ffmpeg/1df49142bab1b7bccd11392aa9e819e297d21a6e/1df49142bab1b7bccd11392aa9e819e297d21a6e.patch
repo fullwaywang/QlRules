@@ -1,0 +1,23 @@
+commit 1df49142bab1b7bccd11392aa9e819e297d21a6e	1df49142bab1b7bccd11392aa9e819e297d21a6e
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 20 17:42:18 2012 +0200
+
+    avsdec: Set dimensions instead of relying on the demuxer.
+    
+    This fixes out of array writes.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/avs.c b/libavcodec/avs.c
+index 17d4e10fa4..801e1bcd78 100644
+--- a/libavcodec/avs.c
++++ b/libavcodec/avs.c
+@@ -162,6 +162,7 @@ static av_cold int avs_decode_init(AVCodecContext * avctx)
+     AvsContext *const avs = avctx->priv_data;
+     avctx->pix_fmt = PIX_FMT_PAL8;
+     avcodec_get_frame_defaults(&avs->picture);
++    avcodec_set_dimensions(avctx, 318, 198);
+     return 0;
+ }
+ 

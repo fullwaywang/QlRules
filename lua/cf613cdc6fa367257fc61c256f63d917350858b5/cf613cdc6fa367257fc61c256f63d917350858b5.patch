@@ -1,0 +1,25 @@
+commit cf613cdc6fa367257fc61c256f63d917350858b5
+Author: Roberto Ierusalimschy <roberto@inf.puc-rio.br>
+Date:   Wed Dec 15 11:29:07 2021 -0300
+
+    Bug: finalizers can be called with an invalid stack
+    
+    The call to 'checkstackGC' can run finalizers, which will find an
+    inconsistent CallInfo, as 'ci' is half updated at the point of call.
+
+diff --git a/ldo.c b/ldo.c
+index f282a773..a48e35f9 100644
+--- a/ldo.c
++++ b/ldo.c
+@@ -530,10 +530,10 @@ int luaD_pretailcall (lua_State *L, CallInfo *ci, StkId func,
+       int fsize = p->maxstacksize;  /* frame size */
+       int nfixparams = p->numparams;
+       int i;
++      checkstackGCp(L, fsize - delta, func);
+       ci->func -= delta;  /* restore 'func' (if vararg) */
+       for (i = 0; i < narg1; i++)  /* move down function and arguments */
+         setobjs2s(L, ci->func + i, func + i);
+-      checkstackGC(L, fsize);
+       func = ci->func;  /* moved-down function */
+       for (; narg1 <= nfixparams; narg1++)
+         setnilvalue(s2v(func + narg1));  /* complete missing arguments */

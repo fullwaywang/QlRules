@@ -1,0 +1,51 @@
+commit a5538c62293fa782fcc382d0635cfc0c8b9190e3
+Author: Christoph M. Becker <cmbecker69@gmx.de>
+Date:   Mon Jun 14 13:22:27 2021 +0200
+
+    Fix #81122: SSRF bypass in FILTER_VALIDATE_URL
+    
+    We need to ensure that the password detected by parse_url() is actually
+    a valid password; we can re-use is_userinfo_valid() for that.
+
+diff --git a/ext/filter/logical_filters.c b/ext/filter/logical_filters.c
+index 1cf345dbb5..3f314fefa0 100644
+--- a/ext/filter/logical_filters.c
++++ b/ext/filter/logical_filters.c
+@@ -609,7 +609,9 @@ bad_url:
+ 		RETURN_VALIDATION_FAILED
+ 	}
+ 
+-	if (url->user != NULL && !is_userinfo_valid(url->user)) {
++	if (url->user != NULL && !is_userinfo_valid(url->user)
++		|| url->pass != NULL && !is_userinfo_valid(url->pass)
++	) {
+ 		php_url_free(url);
+ 		RETURN_VALIDATION_FAILED
+ 
+diff --git a/ext/filter/tests/bug81122.phpt b/ext/filter/tests/bug81122.phpt
+new file mode 100644
+index 0000000000..d89d4114a5
+--- /dev/null
++++ b/ext/filter/tests/bug81122.phpt
+@@ -0,0 +1,21 @@
++--TEST--
++Bug #81122 (SSRF bypass in FILTER_VALIDATE_URL)
++--SKIPIF--
++<?php
++if (!extension_loaded('filter')) die("skip filter extension not available");
++?>
++--FILE--
++<?php
++$urls = [
++    "https://example.com:\\@test.com/",
++    "https://user:\\epass@test.com",
++    "https://user:\\@test.com",
++];
++foreach ($urls as $url) {
++    var_dump(filter_var($url, FILTER_VALIDATE_URL));
++}
++?>
++--EXPECT--
++bool(false)
++bool(false)
++bool(false)

@@ -1,0 +1,27 @@
+commit 1285baaab550e3e761590ef6dfb1d9bd9d1332e4	1285baaab550e3e761590ef6dfb1d9bd9d1332e4
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Jan 25 22:28:57 2012 +0100
+
+    smackerdec: Check that the last indexes are within the table.
+    
+    Fixes CVE-2011-3944
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/smacker.c b/libavcodec/smacker.c
+index 30f99b488d..2a8bae8a1b 100644
+--- a/libavcodec/smacker.c
++++ b/libavcodec/smacker.c
+@@ -259,6 +259,11 @@ static int smacker_decode_header_tree(SmackVContext *smk, GetBitContext *gb, int
+     if(ctx.last[0] == -1) ctx.last[0] = huff.current++;
+     if(ctx.last[1] == -1) ctx.last[1] = huff.current++;
+     if(ctx.last[2] == -1) ctx.last[2] = huff.current++;
++    if(huff.current > huff.length){
++        ctx.last[0] = ctx.last[1] = ctx.last[2] = 1;
++        av_log(smk->avctx, AV_LOG_ERROR, "bigtree damaged\n");
++        return -1;
++    }
+ 
+     *recodes = huff.values;
+ 

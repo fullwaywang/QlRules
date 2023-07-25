@@ -1,0 +1,40 @@
+commit 76401e172ea3a55182be2b8e2aca4d07270f6da6
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Mon Aug 1 12:16:49 2016 -0400
+
+    Evaluate lazy pixel cache morphology to prevent buffer overflow (bug report from Ibrahim M. El-Sayed)
+
+diff --git a/ChangeLog b/ChangeLog
+index bca3aee88..4cf2e838f 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,7 @@
++2016-07-01  7.0.2-7 Cristy  <quetzlzacatenango@image...>
++  * Evaluate lazy pixel cache morphology to prevent buffer overflow (bug report
++    from Ibrahim M. El-Sayed).
++
+ 2016-07-30  7.0.2-6 Cristy  <quetzlzacatenango@image...>
+   * Release ImageMagick version 7.0.2-6, GIT revision 18651:df24175:20160729.
+ 
+diff --git a/MagickCore/enhance.c b/MagickCore/enhance.c
+index 315cb24e4..2bd1363e4 100644
+--- a/MagickCore/enhance.c
++++ b/MagickCore/enhance.c
+@@ -1049,6 +1049,8 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+   if (SetImageGray(image,exception) != MagickFalse)
+     (void) SetImageColorspace(image,GRAYColorspace,exception);
++  if (SyncImagePixelCache(image,exception) == MagickFalse)
++    return(MagickFalse);
+   black=(double *) AcquireQuantumMemory(GetPixelChannels(image),sizeof(*black));
+   white=(double *) AcquireQuantumMemory(GetPixelChannels(image),sizeof(*white));
+   histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,GetPixelChannels(image)*
+@@ -1533,6 +1535,8 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
+ #endif
+   if (image->debug != MagickFalse)
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
++  if (SyncImagePixelCache(image,exception) == MagickFalse)
++    return(MagickFalse);
+   equalize_map=(double *) AcquireQuantumMemory(MaxMap+1UL,
+     GetPixelChannels(image)*sizeof(*equalize_map));
+   histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,GetPixelChannels(image)*

@@ -1,0 +1,124 @@
+commit b166ac4749c78f475b1708f0345e6ca2749c5d6d
+Author: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+Date:   Mon Sep 10 17:37:42 2018 +0200
+
+    CVE-2018-10933: Introduced new auth states
+    
+    Introduced the states SSH_AUTH_STATE_PUBKEY_OFFER_SENT and
+    SSH_AUTH_STATE_PUBKEY_AUTH_SENT to know when SSH2_MSG_USERAUTH_PK_OK and
+    SSH2_MSG_USERAUTH_SUCCESS should be expected.
+    
+    Fixes T101
+    
+    Signed-off-by: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+    Reviewed-by: Andreas Schneider <asn@cryptomilk.org>
+
+diff --git a/include/libssh/auth.h b/include/libssh/auth.h
+index 3913f219..8daab47d 100644
+--- a/include/libssh/auth.h
++++ b/include/libssh/auth.h
+@@ -76,6 +76,10 @@ enum ssh_auth_state_e {
+   SSH_AUTH_STATE_GSSAPI_TOKEN,
+   /** We have sent the MIC and expecting to be authenticated */
+   SSH_AUTH_STATE_GSSAPI_MIC_SENT,
++  /** We have offered a pubkey to check if it is supported */
++  SSH_AUTH_STATE_PUBKEY_OFFER_SENT,
++  /** We have sent pubkey and signature expecting to be authenticated */
++  SSH_AUTH_STATE_PUBKEY_AUTH_SENT,
+ };
+ 
+ /** @internal
+diff --git a/src/auth.c b/src/auth.c
+index 97b6a6e1..41b76aa6 100644
+--- a/src/auth.c
++++ b/src/auth.c
+@@ -85,6 +85,8 @@ static int ssh_auth_response_termination(void *user) {
+         case SSH_AUTH_STATE_GSSAPI_REQUEST_SENT:
+         case SSH_AUTH_STATE_GSSAPI_TOKEN:
+         case SSH_AUTH_STATE_GSSAPI_MIC_SENT:
++        case SSH_AUTH_STATE_PUBKEY_AUTH_SENT:
++        case SSH_AUTH_STATE_PUBKEY_OFFER_SENT:
+             return 0;
+         default:
+             return 1;
+@@ -167,6 +169,8 @@ static int ssh_userauth_get_response(ssh_session session) {
+         case SSH_AUTH_STATE_GSSAPI_REQUEST_SENT:
+         case SSH_AUTH_STATE_GSSAPI_TOKEN:
+         case SSH_AUTH_STATE_GSSAPI_MIC_SENT:
++        case SSH_AUTH_STATE_PUBKEY_OFFER_SENT:
++        case SSH_AUTH_STATE_PUBKEY_AUTH_SENT:
+         case SSH_AUTH_STATE_NONE:
+             /* not reached */
+             rc = SSH_AUTH_ERROR;
+@@ -312,24 +316,30 @@ SSH_PACKET_CALLBACK(ssh_packet_userauth_success) {
+ SSH_PACKET_CALLBACK(ssh_packet_userauth_pk_ok) {
+     int rc;
+ 
+-  SSH_LOG(SSH_LOG_TRACE, "Received SSH_USERAUTH_PK_OK/INFO_REQUEST/GSSAPI_RESPONSE");
+-
+-  if (session->auth.state == SSH_AUTH_STATE_KBDINT_SENT) {
+-    /* Assuming we are in keyboard-interactive context */
+     SSH_LOG(SSH_LOG_TRACE,
+-            "keyboard-interactive context, assuming SSH_USERAUTH_INFO_REQUEST");
+-    rc = ssh_packet_userauth_info_request(session,type,packet,user);
++            "Received SSH_USERAUTH_PK_OK/INFO_REQUEST/GSSAPI_RESPONSE");
++
++    if (session->auth.state == SSH_AUTH_STATE_KBDINT_SENT) {
++        /* Assuming we are in keyboard-interactive context */
++        SSH_LOG(SSH_LOG_TRACE,
++                "keyboard-interactive context, "
++                "assuming SSH_USERAUTH_INFO_REQUEST");
++        rc = ssh_packet_userauth_info_request(session,type,packet,user);
+ #ifdef WITH_GSSAPI
+-  } else if (session->auth.state == SSH_AUTH_STATE_GSSAPI_REQUEST_SENT) {
+-    rc = ssh_packet_userauth_gssapi_response(session, type, packet, user);
++    } else if (session->auth.state == SSH_AUTH_STATE_GSSAPI_REQUEST_SENT) {
++        rc = ssh_packet_userauth_gssapi_response(session, type, packet, user);
+ #endif
+-  } else {
+-    session->auth.state = SSH_AUTH_STATE_PK_OK;
+-    SSH_LOG(SSH_LOG_TRACE, "Assuming SSH_USERAUTH_PK_OK");
+-    rc = SSH_PACKET_USED;
+-  }
++    } else if (session->auth.state == SSH_AUTH_STATE_PUBKEY_OFFER_SENT) {
++        session->auth.state = SSH_AUTH_STATE_PK_OK;
++        SSH_LOG(SSH_LOG_TRACE, "Assuming SSH_USERAUTH_PK_OK");
++        rc = SSH_PACKET_USED;
++    } else {
++        session->auth.state = SSH_AUTH_STATE_ERROR;
++        SSH_LOG(SSH_LOG_TRACE, "SSH_USERAUTH_PK_OK received in wrong state");
++        rc = SSH_PACKET_USED;
++    }
+ 
+-  return rc;
++    return rc;
+ }
+ 
+ /**
+@@ -553,7 +563,7 @@ int ssh_userauth_try_publickey(ssh_session session,
+     ssh_string_free(pubkey_s);
+ 
+     session->auth.current_method = SSH_AUTH_METHOD_PUBLICKEY;
+-    session->auth.state = SSH_AUTH_STATE_NONE;
++    session->auth.state = SSH_AUTH_STATE_PUBKEY_OFFER_SENT;
+     session->pending_call_state = SSH_PENDING_CALL_AUTH_OFFER_PUBKEY;
+     rc = ssh_packet_send(session);
+     if (rc == SSH_ERROR) {
+@@ -701,7 +711,7 @@ int ssh_userauth_publickey(ssh_session session,
+     }
+ 
+     session->auth.current_method = SSH_AUTH_METHOD_PUBLICKEY;
+-    session->auth.state = SSH_AUTH_STATE_NONE;
++    session->auth.state = SSH_AUTH_STATE_PUBKEY_AUTH_SENT;
+     session->pending_call_state = SSH_PENDING_CALL_AUTH_PUBKEY;
+     rc = ssh_packet_send(session);
+     if (rc == SSH_ERROR) {
+@@ -797,7 +807,7 @@ static int ssh_userauth_agent_publickey(ssh_session session,
+     }
+ 
+     session->auth.current_method = SSH_AUTH_METHOD_PUBLICKEY;
+-    session->auth.state = SSH_AUTH_STATE_NONE;
++    session->auth.state = SSH_AUTH_STATE_PUBKEY_AUTH_SENT;
+     session->pending_call_state = SSH_PENDING_CALL_AUTH_AGENT;
+     rc = ssh_packet_send(session);
+     if (rc == SSH_ERROR) {

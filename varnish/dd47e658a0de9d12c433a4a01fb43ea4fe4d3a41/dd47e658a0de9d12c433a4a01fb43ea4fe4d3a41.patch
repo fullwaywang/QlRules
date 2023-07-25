@@ -1,0 +1,44 @@
+commit dd47e658a0de9d12c433a4a01fb43ea4fe4d3a41
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Thu Aug 15 11:16:22 2019 +0200
+
+    Do not set the proto txt.b value when third field is missing
+    
+    In http1_splitline, if the third field is missing, we would still set the
+    txt.b value to where the field would have been, with a NULL txt.e
+    entry. This would cause http_Proto to attempt to parse the values
+    there. Fix this by only setting the .b and .e if the third field was
+    present.
+
+diff --git a/bin/varnishd/http1/cache_http1_proto.c b/bin/varnishd/http1/cache_http1_proto.c
+index 0531d7462..53d542196 100644
+--- a/bin/varnishd/http1/cache_http1_proto.c
++++ b/bin/varnishd/http1/cache_http1_proto.c
+@@ -266,7 +266,6 @@ http1_splitline(struct http *hp, struct http_conn *htc, const int *hf,
+ 		if (vct_isctl(*p))
+ 			return (400);
+ 	}
+-	hp->hd[hf[2]].b = p;
+ 	if (q < p)
+ 		*q = '\0';	/* Nul guard for the 2nd field. If q == p
+ 				 * (the third optional field is not
+@@ -274,13 +273,15 @@ http1_splitline(struct http *hp, struct http_conn *htc, const int *hf,
+ 				 * cover this field. */
+ 
+ 	/* Third field is optional and cannot contain CTL except TAB */
++	q = p;
+ 	for (; p < htc->rxbuf_e && !vct_iscrlf(p, htc->rxbuf_e); p++) {
+-		if (vct_isctl(*p) && !vct_issp(*p)) {
+-			hp->hd[hf[2]].b = NULL;
++		if (vct_isctl(*p) && !vct_issp(*p))
+ 			return (400);
+-		}
+ 	}
+-	hp->hd[hf[2]].e = p;
++	if (p > q) {
++		hp->hd[hf[2]].b = q;
++		hp->hd[hf[2]].e = p;
++	}
+ 
+ 	/* Skip CRLF */
+ 	i = vct_iscrlf(p, htc->rxbuf_e);

@@ -1,0 +1,28 @@
+commit b4ef4c17d618eba0adccc4c7d9e9a1ef809fc9b6
+Author: Michael Heimpold <mhei@heimpold.de>
+Date:   Sat Jan 8 20:00:50 2022 +0100
+
+    modbus_reply: fix copy & paste error in sanity check (fixes #614)
+    
+    While handling MODBUS_FC_WRITE_AND_READ_REGISTERS, both address offsets
+    must be checked, i.e. the read and the write address must be within the
+    mapping range.
+    
+    At the moment, only the read address was considered, it looks like a
+    simple copy and paste error, so let's fix it.
+    
+    Signed-off-by: Michael Heimpold <mhei@heimpold.de>
+
+diff --git a/src/modbus.c b/src/modbus.c
+index 99f333b..e13bd0d 100644
+--- a/src/modbus.c
++++ b/src/modbus.c
+@@ -961,7 +961,7 @@ int modbus_reply(modbus_t *ctx, const uint8_t *req,
+                 nb_write, nb, MODBUS_MAX_WR_WRITE_REGISTERS, MODBUS_MAX_WR_READ_REGISTERS);
+         } else if (mapping_address < 0 ||
+                    (mapping_address + nb) > mb_mapping->nb_registers ||
+-                   mapping_address < 0 ||
++                   mapping_address_write < 0 ||
+                    (mapping_address_write + nb_write) > mb_mapping->nb_registers) {
+             rsp_length = response_exception(
+                 ctx, &sft, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp, FALSE,

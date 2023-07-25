@@ -1,0 +1,90 @@
+commit 7c824682d2028432ee082703ef0ab399867a089b
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun May 8 22:32:58 2022 +0100
+
+    patch 8.2.4919: can add invalid bytes with :spellgood
+    
+    Problem:    Can add invalid bytes with :spellgood.
+    Solution:   Check for a valid word string.
+
+diff --git a/src/errors.h b/src/errors.h
+index 1e9be6c3e..087f49753 100644
+--- a/src/errors.h
++++ b/src/errors.h
+@@ -3273,3 +3273,7 @@ EXTERN char e_stray_closing_curly_str[]
+ EXTERN char e_missing_close_curly_str[]
+ 	INIT(= N_("E1279: Missing '}': %s"));
+ #endif
++#ifdef FEAT_SPELL
++EXTERN char e_illegal_character_in_word[]
++	INIT(= N_("E1280: Illegal character in word"));
++#endif
+diff --git a/src/mbyte.c b/src/mbyte.c
+index 2b7f9991a..a01a05140 100644
+--- a/src/mbyte.c
++++ b/src/mbyte.c
+@@ -4226,7 +4226,7 @@ theend:
+     convert_setup(&vimconv, NULL, NULL);
+ }
+ 
+-#if defined(FEAT_GUI_GTK) || defined(PROTO)
++#if defined(FEAT_GUI_GTK) || defined(FEAT_SPELL) || defined(PROTO)
+ /*
+  * Return TRUE if string "s" is a valid utf-8 string.
+  * When "end" is NULL stop at the first NUL.
+diff --git a/src/spellfile.c b/src/spellfile.c
+index 22cf82da0..f0d6d96a4 100644
+--- a/src/spellfile.c
++++ b/src/spellfile.c
+@@ -4390,6 +4390,10 @@ store_word(
+     int		res = OK;
+     char_u	*p;
+ 
++    // Avoid adding illegal bytes to the word tree.
++    if (enc_utf8 && !utf_valid_string(word, NULL))
++	return FAIL;
++
+     (void)spell_casefold(curwin, word, len, foldword, MAXWLEN);
+     for (p = pfxlist; res == OK; ++p)
+     {
+@@ -6190,6 +6194,12 @@ spell_add_word(
+     int		i;
+     char_u	*spf;
+ 
++    if (enc_utf8 && !utf_valid_string(word, NULL))
++    {
++	emsg(_(e_illegal_character_in_word));
++	return;
++    }
++
+     if (idx == 0)	    // use internal wordlist
+     {
+ 	if (int_wordlist == NULL)
+diff --git a/src/testdir/test_spell_utf8.vim b/src/testdir/test_spell_utf8.vim
+index 79dc3e4a4..17fa23555 100644
+--- a/src/testdir/test_spell_utf8.vim
++++ b/src/testdir/test_spell_utf8.vim
+@@ -780,5 +780,10 @@ func Test_no_crash_with_weird_text()
+   bwipe!
+ endfunc
+ 
++" Invalid bytes may cause trouble when creating the word list.
++func Test_check_for_valid_word()
++  call assert_fails("spellgood! 0\xac", 'E1280:')
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index f949dd6d7..c4f5655bf 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4919,
+ /**/
+     4918,
+ /**/

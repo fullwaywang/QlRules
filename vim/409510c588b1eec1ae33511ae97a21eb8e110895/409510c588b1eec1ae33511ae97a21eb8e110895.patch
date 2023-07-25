@@ -1,0 +1,97 @@
+commit 409510c588b1eec1ae33511ae97a21eb8e110895
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Jun 1 15:23:13 2022 +0100
+
+    patch 8.2.5050: using freed memory when searching for pattern in path
+    
+    Problem:    Using freed memory when searching for pattern in path.
+    Solution:   Make a copy of the line.
+
+diff --git a/src/search.c b/src/search.c
+index ea72ec7fb..35dc89b8f 100644
+--- a/src/search.c
++++ b/src/search.c
+@@ -3305,6 +3305,21 @@ update_search_stat(
+ }
+ 
+ #if defined(FEAT_FIND_ID) || defined(PROTO)
++
++/*
++ * Get line "lnum" and copy it into "buf[LSIZE]".
++ * The copy is made because the regexp may make the line invalid when using a
++ * mark.
++ */
++    static char_u *
++get_line_and_copy(linenr_T lnum, char_u *buf)
++{
++    char_u *line = ml_get(lnum);
++
++    vim_strncpy(buf, line, LSIZE - 1);
++    return buf;
++}
++
+ /*
+  * Find identifiers or defines in included files.
+  * If p_ic && compl_status_sol() then ptr must be in lowercase.
+@@ -3409,7 +3424,7 @@ find_pattern_in_path(
+ 	end_lnum = curbuf->b_ml.ml_line_count;
+     if (lnum > end_lnum)		// do at least one line
+ 	lnum = end_lnum;
+-    line = ml_get(lnum);
++    line = get_line_and_copy(lnum, file_line);
+ 
+     for (;;)
+     {
+@@ -3738,7 +3753,7 @@ search_line:
+ 		    {
+ 			if (lnum >= end_lnum)
+ 			    goto exit_matched;
+-			line = ml_get(++lnum);
++			line = get_line_and_copy(++lnum, file_line);
+ 		    }
+ 		    else if (vim_fgets(line = file_line,
+ 						      LSIZE, files[depth].fp))
+@@ -3950,7 +3965,7 @@ exit_matched:
+ 	{
+ 	    if (++lnum > end_lnum)
+ 		break;
+-	    line = ml_get(lnum);
++	    line = get_line_and_copy(lnum, file_line);
+ 	}
+ 	already = NULL;
+     }
+diff --git a/src/testdir/test_tagjump.vim b/src/testdir/test_tagjump.vim
+index aacfb9bae..060cc3b18 100644
+--- a/src/testdir/test_tagjump.vim
++++ b/src/testdir/test_tagjump.vim
+@@ -1290,6 +1290,17 @@ func Test_inc_search()
+   close!
+ endfunc
+ 
++" this was using a line from ml_get() freed by the regexp
++func Test_isearch_copy_line()
++  new
++  norm o
++  norm 0
++  0norm o
++  sil! norm bc0
++  sil! isearch \%')
++  bwipe!
++endfunc
++
+ " Test for :dsearch, :dlist, :djump and :dsplit commands
+ " Test for [d, ]d, [D, ]D, [ CTRL-D, ] CTRL-D and CTRL-W d commands
+ func Test_macro_search()
+diff --git a/src/version.c b/src/version.c
+index 97ca8ce5c..ba8688bc5 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5050,
+ /**/
+     5049,
+ /**/

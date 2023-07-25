@@ -1,0 +1,39 @@
+commit b1d34de46a11323fccffa9fadeb33be670d602f5	b1d34de46a11323fccffa9fadeb33be670d602f5
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Mon Mar 14 17:19:44 2016 +0800
+
+    Fix inappropriate fetch of entities content
+    
+    For https://bugzilla.gnome.org/show_bug.cgi?id=761430
+    
+    libfuzzer regression testing exposed another case where the parser would
+    fetch content of an external entity while not in validating mode.
+    Plug that hole
+
+diff --git a/parser.c b/parser.c
+index c424fc1e..f6d652ee 100644
+--- a/parser.c
++++ b/parser.c
+@@ -2861,7 +2861,21 @@ xmlStringLenDecodeEntities(xmlParserCtxtPtr ctxt, const xmlChar *str, int len,
+ 	        ctxt->nbentities += ent->checked / 2;
+ 	    if (ent != NULL) {
+                 if (ent->content == NULL) {
+-		    xmlLoadEntityContent(ctxt, ent);
++		    /*
++		     * Note: external parsed entities will not be loaded,
++		     * it is not required for a non-validating parser to
++		     * complete external PEreferences coming from the
++		     * internal subset
++		     */
++		    if (((ctxt->options & XML_PARSE_NOENT) != 0) ||
++			((ctxt->options & XML_PARSE_DTDVALID) != 0) ||
++			(ctxt->validate != 0)) {
++			xmlLoadEntityContent(ctxt, ent);
++		    } else {
++			xmlWarningMsg(ctxt, XML_ERR_ENTITY_PROCESSING,
++		  "not validating will not read content for PE entity %s\n",
++		                      ent->name, NULL);
++		    }
+ 		}
+ 		ctxt->depth++;
+ 		rep = xmlStringDecodeEntities(ctxt, ent->content, what,

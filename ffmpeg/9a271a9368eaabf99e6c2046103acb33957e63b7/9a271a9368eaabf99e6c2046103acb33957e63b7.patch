@@ -1,0 +1,38 @@
+commit 9a271a9368eaabf99e6c2046103acb33957e63b7	9a271a9368eaabf99e6c2046103acb33957e63b7
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Aug 24 03:19:40 2013 +0200
+
+    jpeg2000: check log2_cblk dimensions
+    
+    Fixes out of array access
+    Fixes Ticket2895
+    
+    Found-by: Piotr Bandurski <ami_stuff@o2.pl>
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/jpeg2000dec.c b/libavcodec/jpeg2000dec.c
+index 34ac536056..8c0e6ffd66 100644
+--- a/libavcodec/jpeg2000dec.c
++++ b/libavcodec/jpeg2000dec.c
+@@ -384,6 +384,11 @@ static int get_cox(Jpeg2000DecoderContext *s, Jpeg2000CodingStyle *c)
+         return AVERROR_INVALIDDATA;
+     }
+ 
++    if (c->log2_cblk_width > 6 || c->log2_cblk_height > 6) {
++        avpriv_request_sample(s->avctx, "cblk size > 64");
++        return AVERROR_PATCHWELCOME;
++    }
++
+     c->cblk_style = bytestream2_get_byteu(&s->g);
+     if (c->cblk_style != 0) { // cblk style
+         av_log(s->avctx, AV_LOG_WARNING, "extra cblk styles %X\n", c->cblk_style);
+@@ -1025,6 +1030,9 @@ static int decode_cblk(Jpeg2000DecoderContext *s, Jpeg2000CodingStyle *codsty,
+     int bpass_csty_symbol           = codsty->cblk_style & JPEG2000_CBLK_BYPASS;
+     int vert_causal_ctx_csty_symbol = codsty->cblk_style & JPEG2000_CBLK_VSC;
+ 
++    av_assert0(width  <= JPEG2000_MAX_CBLKW);
++    av_assert0(height <= JPEG2000_MAX_CBLKH);
++
+     for (y = 0; y < height; y++)
+         memset(t1->data[y], 0, width * sizeof(**t1->data));
+ 

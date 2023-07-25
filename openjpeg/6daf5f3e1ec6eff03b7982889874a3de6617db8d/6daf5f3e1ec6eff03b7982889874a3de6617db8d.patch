@@ -1,0 +1,19 @@
+commit 6daf5f3e1ec6eff03b7982889874a3de6617db8d
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Mon Nov 30 22:37:07 2020 +0100
+
+    Encoder: avoid global buffer overflow on irreversible conversion when too many decomposition levels are specified (fixes #1286)
+
+diff --git a/src/lib/openjp2/dwt.c b/src/lib/openjp2/dwt.c
+index ee9eb5e6..4164ba09 100644
+--- a/src/lib/openjp2/dwt.c
++++ b/src/lib/openjp2/dwt.c
+@@ -1976,7 +1976,7 @@ void opj_dwt_calc_explicit_stepsizes(opj_tccp_t * tccp, OPJ_UINT32 prec)
+         if (tccp->qntsty == J2K_CCP_QNTSTY_NOQNT) {
+             stepsize = 1.0;
+         } else {
+-            OPJ_FLOAT64 norm = opj_dwt_norms_real[orient][level];
++            OPJ_FLOAT64 norm = opj_dwt_getnorm_real(level, orient);
+             stepsize = (1 << (gain)) / norm;
+         }
+         opj_dwt_encode_stepsize((OPJ_INT32) floor(stepsize * 8192.0),

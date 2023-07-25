@@ -1,0 +1,102 @@
+commit e0f5d62bd6690169998474b62f92a8c5ddf0e699
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Sun Mar 3 22:33:38 2019 -0800
+
+    Fix bug #77586 - phar_tar_writeheaders_int() buffer overflow
+
+diff --git a/NEWS b/NEWS
+index 640dd59a95..4620c58dec 100644
+--- a/NEWS
++++ b/NEWS
+@@ -3,18 +3,19 @@ PHP                                                                        NEWS
+ ?? ??? 2019, PHP 7.1.27
+ 
+ - Core:
+-  . Fixed bug #77630 (rename() across the device may allow unwanted access during 
++  . Fixed bug #77630 (rename() across the device may allow unwanted access during
+     processing). (Stas)
+-	
++
+ - EXIF:
+   . Fixed bug #77509 (Uninitialized read in exif_process_IFD_in_TIFF). (Stas)
+-  . Fixed bug #77540 (Invalid Read on exif_process_SOFn). (Stas) 
+-  . Fixed bug #77563 (Uninitialized read in exif_process_IFD_in_MAKERNOTE). (Stas) 
++  . Fixed bug #77540 (Invalid Read on exif_process_SOFn). (Stas)
++  . Fixed bug #77563 (Uninitialized read in exif_process_IFD_in_MAKERNOTE). (Stas)
+   . Fixed bug #77659 (Uninitialized read in exif_process_IFD_in_MAKERNOTE). (Stas)
+ 
+ - PHAR:
+   . Fixed bug #77396 (Null Pointer Dereference in phar_create_or_parse_filename).
+-    (bishop) 
++    (bishop)
++  . Fixed bug #77586 (phar_tar_writeheaders_int() buffer overflow). (bishop)
+ 
+ - SPL:
+   . Fixed bug #77431 (openFile() silently truncates after a null byte). (cmb)
+diff --git a/ext/phar/tar.c b/ext/phar/tar.c
+index 9de3047f7c..20f6882727 100644
+--- a/ext/phar/tar.c
++++ b/ext/phar/tar.c
+@@ -762,7 +762,12 @@ static int phar_tar_writeheaders_int(phar_entry_info *entry, void *argument) /*
+ 	header.typeflag = entry->tar_type;
+ 
+ 	if (entry->link) {
+-		strncpy(header.linkname, entry->link, strlen(entry->link));
++		if (strlcpy(header.linkname, entry->link, sizeof(header.linkname)) >= sizeof(header.linkname)) {
++			if (fp->error) {
++				spprintf(fp->error, 4096, "tar-based phar \"%s\" cannot be created, link \"%s\" is too long for format", entry->phar->fname, entry->link);
++			}
++			return ZEND_HASH_APPLY_STOP;
++		}
+ 	}
+ 
+ 	strncpy(header.magic, "ustar", sizeof("ustar")-1);
+diff --git a/ext/phar/tests/bug71488.phpt b/ext/phar/tests/bug71488.phpt
+index 53f1304343..9c58d89488 100644
+--- a/ext/phar/tests/bug71488.phpt
++++ b/ext/phar/tests/bug71488.phpt
+@@ -13,5 +13,6 @@ DONE
+ <?php
+ @unlink(__DIR__."/bug71488.test");
+ ?>
+---EXPECT--
+-DONE
++--EXPECTF--
++Fatal error: Uncaught BadMethodCallException: tar-based phar "%s/bug71488.test" cannot be created, link "%s" is too long for format in %sbug71488.php:%d
++Stack trace:%A
+\ No newline at end of file
+diff --git a/ext/phar/tests/bug77586.phpt b/ext/phar/tests/bug77586.phpt
+new file mode 100644
+index 0000000000..039cc16994
+--- /dev/null
++++ b/ext/phar/tests/bug77586.phpt
+@@ -0,0 +1,21 @@
++--TEST--
++Bug #77586 Symbolic link names in tar-formatted phar must be less than 100 bytes.
++--SKIPIF--
++<?php if (!extension_loaded("phar") || true /* blocked by bug 65332 */) die("skip"); ?>
++--FILE--
++<?php
++$dir = __DIR__."/bug77586";
++$phar = new PharData($dir . "/bug77586.tar");
++$phar->buildFromDirectory($dir . "/files");
++?>
++--CLEAN--
++<?php
++$dir = __DIR__."/bug77586";
++unlink($dir . "/bug77586.tar");
++?>
++--EXPECTF--
++Fatal error: Uncaught PharException: tar-based phar "%s/bug77586.tar" cannot be created, link "%s" is too long for format %s
++Stack trace:
++#0 %s/bug77586.php(%d): PharData->buildFromDirectory('%s')
++#1 {main}
++  thrown in %s/bug77586.php %s on line %d
+diff --git a/ext/phar/tests/bug77586/files/link-nktarAMLdJBv7BGYnpzg-ZDycSpWN3Ne3kacltOSE-EqfhStJ1EoBpGuoua6VE-dne29hvpNWXiVbepwIf8-NRHWM9LITLo3nXZnKVNC b/ext/phar/tests/bug77586/files/link-nktarAMLdJBv7BGYnpzg-ZDycSpWN3Ne3kacltOSE-EqfhStJ1EoBpGuoua6VE-dne29hvpNWXiVbepwIf8-NRHWM9LITLo3nXZnKVNC
+new file mode 100644
+index 0000000000..1de565933b
+--- /dev/null
++++ b/ext/phar/tests/bug77586/files/link-nktarAMLdJBv7BGYnpzg-ZDycSpWN3Ne3kacltOSE-EqfhStJ1EoBpGuoua6VE-dne29hvpNWXiVbepwIf8-NRHWM9LITLo3nXZnKVNC
+@@ -0,0 +1 @@
++target
+\ No newline at end of file

@@ -1,0 +1,35 @@
+commit 0971c7a4e537ea120a6bb2195960be8d0815e97b
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Jun 26 12:59:02 2022 +0100
+
+    patch 8.2.5162: reading before the start of the line with BS in Replace mode
+    
+    Problem:    Reading before the start of the line with BS in Replace mode.
+    Solution:   Check the cursor column is more than zero.
+
+diff --git a/src/edit.c b/src/edit.c
+index dbfa0ae5f..a8e695c91 100644
+--- a/src/edit.c
++++ b/src/edit.c
+@@ -4183,7 +4183,7 @@ ins_bs(
+ #endif
+ 
+ 	    // delete characters until we are at or before want_vcol
+-	    while (vcol > want_vcol
++	    while (vcol > want_vcol && curwin->w_cursor.col > 0
+ 		    && (cc = *(ml_get_cursor() - 1), VIM_ISWHITE(cc)))
+ 		ins_bs_one(&vcol);
+ 
+diff --git a/src/version.c b/src/version.c
+index 9fba35bea..cf2e77d9f 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5162,
+ /**/
+     5161,
+ /**/

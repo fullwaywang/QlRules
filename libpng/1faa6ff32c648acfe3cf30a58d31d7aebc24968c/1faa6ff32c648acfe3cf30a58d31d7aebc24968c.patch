@@ -1,0 +1,92 @@
+commit 1faa6ff32c648acfe3cf30a58d31d7aebc24968c
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Sun Dec 15 08:47:52 2013 -0600
+
+    [libpng17] Handle zero-length PLTE chunk or NULL palette with png_error()
+    
+    instead of png_chunk_report(), which by default issues a warning
+    rather than an error, leading to later reading from a NULL pointer
+    (png_ptr->palette) in png_do_expand_palette().
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index 230005c6a..102da627f 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,5 +1,5 @@
+ 
+-Libpng 1.7.0beta24 - December 14, 2013
++Libpng 1.7.0beta24 - December 15, 2013
+ 
+ This is not intended to be a public release.  It will be replaced
+ within a few weeks by a public version or by another test version.
+@@ -437,7 +437,7 @@ Version 1.7.0beta23 [November 24, 2013]
+     This reverts to the previous 'static' implementation and works round
+     the 'unused static function' warning by using PNG_UNUSED().
+ 
+-Version 1.7.0beta24 [December 14, 2013]
++Version 1.7.0beta24 [December 15, 2013]
+   Removed or marked PNG_UNUSED some harmless "dead assignments" reported
+     by clang scan-build.
+   Changed tabs to 3 spaces in png_debug macros and changed '"%s"m'
+@@ -456,6 +456,10 @@ Version 1.7.0beta24 [December 14, 2013]
+     segment of the DLL by 1208 bytes, about 0.6%. It also simplifies
+     maintenance by removing the declarations from pngpriv.h and allowing
+     easier changes to the internal interfaces.
++  Handle zero-length PLTE chunk or NULL palette with png_error()
++    instead of png_chunk_report(), which by default issues a warning
++    rather than an error, leading to later reading from a NULL pointer
++    (png_ptr->palette) in png_do_expand_palette().
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index ff3778a25..27a48f250 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -4726,7 +4726,7 @@ Version 1.7.0beta23 [November 24, 2013]
+     This reverts to the previous 'static' implementation and works round
+     the 'unused static function' warning by using PNG_UNUSED().
+ 
+-Version 1.7.0beta24 [December 14, 2013]
++Version 1.7.0beta24 [December 15, 2013]
+   Removed or marked PNG_UNUSED some harmless "dead assignments" reported
+     by clang scan-build.
+   Changed tabs to 3 spaces in png_debug macros and changed '"%s"m'
+@@ -4745,6 +4745,10 @@ Version 1.7.0beta24 [December 14, 2013]
+     segment of the DLL by 1208 bytes, about 0.6%. It also simplifies
+     maintenance by removing the declarations from pngpriv.h and allowing
+     easier changes to the internal interfaces.
++  Handle zero-length PLTE chunk or NULL palette with png_error()
++    instead of png_chunk_report(), which by default issues a warning
++    rather than an error, leading to later reading from a NULL pointer
++    (png_ptr->palette) in png_do_expand_palette().
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/pngrtran.c b/pngrtran.c
+index bbddfad56..4da0a2246 100644
+--- a/pngrtran.c
++++ b/pngrtran.c
+@@ -1839,6 +1839,9 @@ png_read_transform_info(png_structrp png_ptr, png_inforp info_ptr)
+ 
+          info_ptr->bit_depth = 8;
+          info_ptr->num_trans = 0;
++
++         if (png_ptr->palette == NULL)
++            png_error (png_ptr, "Palette is NULL in indexed image");
+       }
+       else
+       {
+diff --git a/pngset.c b/pngset.c
+index 368e4a602..8076fc227 100644
+--- a/pngset.c
++++ b/pngset.c
+@@ -528,7 +528,7 @@ png_set_PLTE(png_structrp png_ptr, png_inforp info_ptr,
+ #        endif
+       ))
+    {
+-      png_chunk_report(png_ptr, "Invalid palette", PNG_CHUNK_ERROR);
++      png_error(png_ptr, "Invalid palette");
+       return;
+    }
+ 

@@ -1,0 +1,28 @@
+commit 2a6eb06254df79e96b3d791b6b89b2534ced3119	2a6eb06254df79e96b3d791b6b89b2534ced3119
+Author: Alex Converse <alex.converse@gmail.com>
+Date:   Thu Nov 3 15:55:52 2011 -0700
+
+    vp6: Fix illegal read.
+
+diff --git a/libavcodec/vp6.c b/libavcodec/vp6.c
+index e29f9014aa..03024fa865 100644
+--- a/libavcodec/vp6.c
++++ b/libavcodec/vp6.c
+@@ -376,7 +376,7 @@ static void vp6_parse_coeff_huffman(VP56Context *s)
+         if (b > 3) pt = 1;
+         vlc_coeff = &s->dccv_vlc[pt];
+ 
+-        for (coeff_idx=0; coeff_idx<64; ) {
++        for (coeff_idx = 0;;) {
+             int run = 1;
+             if (coeff_idx<2 && s->nb_null[coeff_idx][pt]) {
+                 s->nb_null[coeff_idx][pt]--;
+@@ -413,6 +413,8 @@ static void vp6_parse_coeff_huffman(VP56Context *s)
+                 }
+             }
+             coeff_idx+=run;
++            if (coeff_idx >= 64)
++                break;
+             cg = FFMIN(vp6_coeff_groups[coeff_idx], 3);
+             vlc_coeff = &s->ract_vlc[pt][ct][cg];
+         }

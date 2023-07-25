@@ -1,0 +1,53 @@
+commit 8e4b76da1d7e987d43ca960dfbc372d1c617466f
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat May 7 11:28:06 2022 +0100
+
+    patch 8.2.4901: NULL pointer access when using invalid pattern
+    
+    Problem:    NULL pointer access when using invalid pattern.
+    Solution:   Check for failed regexp program.
+
+diff --git a/src/buffer.c b/src/buffer.c
+index 461950307..da0555e86 100644
+--- a/src/buffer.c
++++ b/src/buffer.c
+@@ -2957,7 +2957,7 @@ fname_match(
+ 	rmp->rm_ic = p_fic || ignore_case;
+ 	if (vim_regexec(rmp, name, (colnr_T)0))
+ 	    match = name;
+-	else
++	else if (rmp->regprog != NULL)
+ 	{
+ 	    // Replace $(HOME) with '~' and try matching again.
+ 	    p = home_replace_save(NULL, name);
+diff --git a/src/testdir/test_buffer.vim b/src/testdir/test_buffer.vim
+index fc391dcce..aea399558 100644
+--- a/src/testdir/test_buffer.vim
++++ b/src/testdir/test_buffer.vim
+@@ -410,6 +410,13 @@ func Test_buffer_scheme()
+   set shellslash&
+ endfunc
+ 
++" this was using a NULL pointer after failing to use the pattern
++func Test_buf_pattern_invalid()
++  vsplit 0000000
++  silent! buf [0--]\&\zs*\zs*e
++  bwipe!
++endfunc
++
+ " Test for the 'maxmem' and 'maxmemtot' options
+ func Test_buffer_maxmem()
+   " use 1KB per buffer and 2KB for all the buffers
+diff --git a/src/version.c b/src/version.c
+index ad38b8138..647011ae1 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4901,
+ /**/
+     4900,
+ /**/

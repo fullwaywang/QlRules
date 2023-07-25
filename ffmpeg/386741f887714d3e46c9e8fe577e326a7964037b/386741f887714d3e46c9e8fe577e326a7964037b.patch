@@ -1,0 +1,43 @@
+commit 386741f887714d3e46c9e8fe577e326a7964037b	386741f887714d3e46c9e8fe577e326a7964037b
+Author: Alex Converse <alex.converse@gmail.com>
+Date:   Thu Jan 26 17:30:49 2012 +0100
+
+    kmvc: Check palsize.
+    
+    Fixes: CVE-2011-3952
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Based on fix by Michael Niedermayer
+
+diff --git a/libavcodec/kmvc.c b/libavcodec/kmvc.c
+index 2b54b84e99..a6bb13b95a 100644
+--- a/libavcodec/kmvc.c
++++ b/libavcodec/kmvc.c
+@@ -33,6 +33,7 @@
+ #define KMVC_KEYFRAME 0x80
+ #define KMVC_PALETTE  0x40
+ #define KMVC_METHOD   0x0F
++#define MAX_PALSIZE   256
+ 
+ /*
+  * Decoder context
+@@ -43,7 +44,7 @@ typedef struct KmvcContext {
+ 
+     int setpal;
+     int palsize;
+-    uint32_t pal[256];
++    uint32_t pal[MAX_PALSIZE];
+     uint8_t *cur, *prev;
+     uint8_t *frm0, *frm1;
+     GetByteContext g;
+@@ -380,6 +381,10 @@ static av_cold int decode_init(AVCodecContext * avctx)
+         c->palsize = 127;
+     } else {
+         c->palsize = AV_RL16(avctx->extradata + 10);
++        if (c->palsize >= MAX_PALSIZE) {
++            av_log(avctx, AV_LOG_ERROR, "KMVC palette too large\n");
++            return AVERROR_INVALIDDATA;
++        }
+     }
+ 
+     if (avctx->extradata_size == 1036) {        // palette in extradata

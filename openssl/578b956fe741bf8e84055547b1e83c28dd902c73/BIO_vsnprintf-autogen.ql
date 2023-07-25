@@ -1,49 +1,50 @@
+/**
+ * @name openssl-578b956fe741bf8e84055547b1e83c28dd902c73-BIO_vsnprintf
+ * @id cpp/openssl/578b956fe741bf8e84055547b1e83c28dd902c73/BIO-vsnprintf
+ * @description openssl-578b956fe741bf8e84055547b1e83c28dd902c73-BIO_vsnprintf CVE-2016-0799
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Parameter vbuf, Parameter vn, Parameter vformat, Parameter vargs, Variable vretlen, Variable vtruncated, Function func) {
+predicate func_0(Parameter vformat_801, Parameter vargs_801, Function func) {
 	exists(IfStmt target_0 |
-		target_0.getCondition().(NotExpr).getType().hasName("int")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("_dopr")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getType().hasName("int")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(AddressOfExpr).getType().hasName("char **")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vbuf
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1).(Literal).getValue()="0"
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(AddressOfExpr).getType().hasName("size_t *")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vn
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(3).(AddressOfExpr).getType().hasName("size_t *")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(3).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vretlen
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(4).(AddressOfExpr).getType().hasName("int *")
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(4).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vtruncated
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vformat
-		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(6).(VariableAccess).getTarget()=vargs
-		and target_0.getThen().(ReturnStmt).getExpr().(UnaryMinusExpr).getType().hasName("int")
+		target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("_dopr")
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0) instanceof AddressOfExpr
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1) instanceof Literal
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2) instanceof AddressOfExpr
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(3) instanceof AddressOfExpr
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(4) instanceof AddressOfExpr
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vformat_801
+		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(6).(VariableAccess).getTarget()=vargs_801
 		and target_0.getThen().(ReturnStmt).getExpr().(UnaryMinusExpr).getValue()="-1"
-		and target_0.getThen().(ReturnStmt).getExpr().(UnaryMinusExpr).getOperand().(Literal).getValue()="1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_0)
+		and (func.getEntryPoint().(BlockStmt).getStmt(2)=target_0 or func.getEntryPoint().(BlockStmt).getStmt(2).getFollowingStmt()=target_0))
 }
 
-predicate func_1(Parameter vbuf) {
+predicate func_1(Parameter vbuf_801) {
 	exists(AddressOfExpr target_1 |
-		target_1.getType().hasName("char **")
-		and target_1.getOperand().(VariableAccess).getTarget()=vbuf)
+		target_1.getOperand().(VariableAccess).getTarget()=vbuf_801
+		and target_1.getParent().(FunctionCall).getParent().(ExprStmt).getExpr() instanceof FunctionCall)
 }
 
-predicate func_2(Parameter vn) {
+predicate func_2(Parameter vn_801) {
 	exists(AddressOfExpr target_2 |
-		target_2.getType().hasName("size_t *")
-		and target_2.getOperand().(VariableAccess).getTarget()=vn)
+		target_2.getOperand().(VariableAccess).getTarget()=vn_801
+		and target_2.getParent().(FunctionCall).getParent().(ExprStmt).getExpr() instanceof FunctionCall)
 }
 
-predicate func_3(Variable vretlen) {
+predicate func_3(Variable vretlen_803) {
 	exists(AddressOfExpr target_3 |
-		target_3.getType().hasName("size_t *")
-		and target_3.getOperand().(VariableAccess).getTarget()=vretlen)
+		target_3.getOperand().(VariableAccess).getTarget()=vretlen_803
+		and target_3.getParent().(FunctionCall).getParent().(ExprStmt).getExpr() instanceof FunctionCall)
 }
 
-predicate func_4(Variable vtruncated) {
+predicate func_4(Variable vtruncated_804) {
 	exists(AddressOfExpr target_4 |
-		target_4.getType().hasName("int *")
-		and target_4.getOperand().(VariableAccess).getTarget()=vtruncated)
+		target_4.getOperand().(VariableAccess).getTarget()=vtruncated_804
+		and target_4.getParent().(FunctionCall).getParent().(ExprStmt).getExpr() instanceof FunctionCall)
 }
 
 predicate func_5(Function func) {
@@ -52,40 +53,38 @@ predicate func_5(Function func) {
 		and target_5.getEnclosingFunction() = func)
 }
 
-predicate func_8(Parameter vformat, Parameter vargs, Function func) {
+predicate func_8(Parameter vformat_801, Parameter vargs_801, Function func) {
 	exists(ExprStmt target_8 |
 		target_8.getExpr().(FunctionCall).getTarget().hasName("_dopr")
-		and target_8.getExpr().(FunctionCall).getType().hasName("void")
 		and target_8.getExpr().(FunctionCall).getArgument(0) instanceof AddressOfExpr
 		and target_8.getExpr().(FunctionCall).getArgument(1) instanceof Literal
 		and target_8.getExpr().(FunctionCall).getArgument(2) instanceof AddressOfExpr
 		and target_8.getExpr().(FunctionCall).getArgument(3) instanceof AddressOfExpr
 		and target_8.getExpr().(FunctionCall).getArgument(4) instanceof AddressOfExpr
-		and target_8.getExpr().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vformat
-		and target_8.getExpr().(FunctionCall).getArgument(6).(VariableAccess).getTarget()=vargs
-		and target_8.getEnclosingFunction() = func
+		and target_8.getExpr().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vformat_801
+		and target_8.getExpr().(FunctionCall).getArgument(6).(VariableAccess).getTarget()=vargs_801
 		and func.getEntryPoint().(BlockStmt).getAStmt()=target_8)
 }
 
-from Function func, Parameter vbuf, Parameter vn, Parameter vformat, Parameter vargs, Variable vretlen, Variable vtruncated
+from Function func, Parameter vbuf_801, Parameter vn_801, Parameter vformat_801, Parameter vargs_801, Variable vretlen_803, Variable vtruncated_804
 where
-not func_0(vbuf, vn, vformat, vargs, vretlen, vtruncated, func)
-and func_1(vbuf)
-and func_2(vn)
-and func_3(vretlen)
-and func_4(vtruncated)
+not func_0(vformat_801, vargs_801, func)
+and func_1(vbuf_801)
+and func_2(vn_801)
+and func_3(vretlen_803)
+and func_4(vtruncated_804)
 and func_5(func)
-and func_8(vformat, vargs, func)
-and vbuf.getType().hasName("char *")
-and vn.getType().hasName("size_t")
-and vformat.getType().hasName("const char *")
-and vargs.getType().hasName("va_list")
-and vretlen.getType().hasName("size_t")
-and vtruncated.getType().hasName("int")
-and vbuf.getParentScope+() = func
-and vn.getParentScope+() = func
-and vformat.getParentScope+() = func
-and vargs.getParentScope+() = func
-and vretlen.getParentScope+() = func
-and vtruncated.getParentScope+() = func
-select func, vbuf, vn, vformat, vargs, vretlen, vtruncated
+and func_8(vformat_801, vargs_801, func)
+and vbuf_801.getType().hasName("char *")
+and vn_801.getType().hasName("size_t")
+and vformat_801.getType().hasName("const char *")
+and vargs_801.getType().hasName("va_list")
+and vretlen_803.getType().hasName("size_t")
+and vtruncated_804.getType().hasName("int")
+and vbuf_801.getParentScope+() = func
+and vn_801.getParentScope+() = func
+and vformat_801.getParentScope+() = func
+and vargs_801.getParentScope+() = func
+and vretlen_803.getParentScope+() = func
+and vtruncated_804.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

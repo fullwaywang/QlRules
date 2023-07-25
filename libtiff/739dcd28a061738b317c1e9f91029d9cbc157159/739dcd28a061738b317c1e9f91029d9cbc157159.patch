@@ -1,0 +1,120 @@
+commit 739dcd28a061738b317c1e9f91029d9cbc157159	739dcd28a061738b317c1e9f91029d9cbc157159
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Tue Oct 25 21:35:15 2016 +0000
+
+    * libtiff/tif_dir.c: discard values of SMinSampleValue and
+    SMaxSampleValue when they have been read and the value of
+    SamplesPerPixel is changed afterwards (like when reading a
+    OJPEG compressed image with a missing SamplesPerPixel tag,
+    and whose photometric is RGB or YCbCr, forcing SamplesPerPixel
+    being 3). Otherwise when rewriting the directory (for example
+    with tiffset, we will expect 3 values whereas the array had been
+    allocated with just one), thus causing a out of bound read access.
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2500
+    (CVE-2014-8127, duplicate: CVE-2016-3658)
+    
+    * libtiff/tif_write.c: avoid null pointer dereference on td_stripoffset
+    when writing directory, if FIELD_STRIPOFFSETS was artificially set
+    for a hack case in OJPEG case.
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2500
+    (CVE-2014-8127, duplicate: CVE-2016-3658)
+
+diff --git a/ChangeLog b/ChangeLog
+index ae09b648..29941fc3 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,22 @@
++2016-10-25 Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_dir.c: discard values of SMinSampleValue and
++	SMaxSampleValue when they have been read and the value of
++	SamplesPerPixel is changed afterwards (like when reading a
++	OJPEG compressed image with a missing SamplesPerPixel tag,
++	and whose photometric is RGB or YCbCr, forcing SamplesPerPixel
++	being 3). Otherwise when rewriting the directory (for example
++	with tiffset, we will expect 3 values whereas the array had been
++	allocated with just one), thus causing a out of bound read access.
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2500
++	(CVE-2014-8127, duplicate: CVE-2016-3658)
++	
++	* libtiff/tif_write.c: avoid null pointer dereference on td_stripoffset
++	when writing directory, if FIELD_STRIPOFFSETS was artificially set
++	for a hack case	in OJPEG case.
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2500
++	(CVE-2014-8127, duplicate: CVE-2016-3658)
++
+ 2016-10-25 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* tools/tiffinfo.c: fix out-of-bound read on some tiled images.
+diff --git a/libtiff/tif_dir.c b/libtiff/tif_dir.c
+index ca5d979f..ad21655a 100644
+--- a/libtiff/tif_dir.c
++++ b/libtiff/tif_dir.c
+@@ -1,4 +1,4 @@
+-/* $Id: tif_dir.c,v 1.126 2016-09-04 21:32:56 erouault Exp $ */
++/* $Id: tif_dir.c,v 1.127 2016-10-25 21:35:15 erouault Exp $ */
+ 
+ /*
+  * Copyright (c) 1988-1997 Sam Leffler
+@@ -256,6 +256,28 @@ _TIFFVSetField(TIFF* tif, uint32 tag, va_list ap)
+ 		v = (uint16) va_arg(ap, uint16_vap);
+ 		if (v == 0)
+ 			goto badvalue;
++        if( v != td->td_samplesperpixel )
++        {
++            /* See http://bugzilla.maptools.org/show_bug.cgi?id=2500 */
++            if( td->td_sminsamplevalue != NULL )
++            {
++                TIFFWarningExt(tif->tif_clientdata,module,
++                    "SamplesPerPixel tag value is changing, "
++                    "but SMinSampleValue tag was read with a different value. Cancelling it");
++                TIFFClrFieldBit(tif,FIELD_SMINSAMPLEVALUE);
++                _TIFFfree(td->td_sminsamplevalue);
++                td->td_sminsamplevalue = NULL;
++            }
++            if( td->td_smaxsamplevalue != NULL )
++            {
++                TIFFWarningExt(tif->tif_clientdata,module,
++                    "SamplesPerPixel tag value is changing, "
++                    "but SMaxSampleValue tag was read with a different value. Cancelling it");
++                TIFFClrFieldBit(tif,FIELD_SMAXSAMPLEVALUE);
++                _TIFFfree(td->td_smaxsamplevalue);
++                td->td_smaxsamplevalue = NULL;
++            }
++        }
+ 		td->td_samplesperpixel = (uint16) v;
+ 		break;
+ 	case TIFFTAG_ROWSPERSTRIP:
+diff --git a/libtiff/tif_dirwrite.c b/libtiff/tif_dirwrite.c
+index 837fdd0f..d34f6f61 100644
+--- a/libtiff/tif_dirwrite.c
++++ b/libtiff/tif_dirwrite.c
+@@ -1,4 +1,4 @@
+-/* $Id: tif_dirwrite.c,v 1.82 2016-09-02 22:42:00 erouault Exp $ */
++/* $Id: tif_dirwrite.c,v 1.83 2016-10-25 21:35:15 erouault Exp $ */
+ 
+ /*
+  * Copyright (c) 1988-1997 Sam Leffler
+@@ -542,8 +542,20 @@ TIFFWriteDirectorySec(TIFF* tif, int isimage, int imagedone, uint64* pdiroff)
+ 			{
+ 				if (!isTiled(tif))
+ 				{
+-					if (!TIFFWriteDirectoryTagLongLong8Array(tif,&ndir,dir,TIFFTAG_STRIPOFFSETS,tif->tif_dir.td_nstrips,tif->tif_dir.td_stripoffset))
+-						goto bad;
++                    /* td_stripoffset might be NULL in an odd OJPEG case. See
++                     *  tif_dirread.c around line 3634.
++                     * XXX: OJPEG hack.
++                     * If a) compression is OJPEG, b) it's not a tiled TIFF,
++                     * and c) the number of strips is 1,
++                     * then we tolerate the absence of stripoffsets tag,
++                     * because, presumably, all required data is in the
++                     * JpegInterchangeFormat stream.
++                     * We can get here when using tiffset on such a file.
++                     * See http://bugzilla.maptools.org/show_bug.cgi?id=2500
++                    */
++                    if (tif->tif_dir.td_stripoffset != NULL &&
++                        !TIFFWriteDirectoryTagLongLong8Array(tif,&ndir,dir,TIFFTAG_STRIPOFFSETS,tif->tif_dir.td_nstrips,tif->tif_dir.td_stripoffset))
++                        goto bad;
+ 				}
+ 				else
+ 				{

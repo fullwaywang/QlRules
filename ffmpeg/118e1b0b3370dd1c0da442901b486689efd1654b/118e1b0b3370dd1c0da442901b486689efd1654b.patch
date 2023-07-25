@@ -1,0 +1,25 @@
+commit 118e1b0b3370dd1c0da442901b486689efd1654b
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri Feb 2 21:44:57 2018 +0100
+
+    avcodec/utvideodec: Fix bytes left check in decode_frame()
+    
+    Fixes: out of array read
+    Fixes: poc-2017.avi
+    
+    Found-by: GwanYeong Kim <gy741.kim@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/utvideodec.c b/libavcodec/utvideodec.c
+index 608c8c4998..1bcd14e74c 100644
+--- a/libavcodec/utvideodec.c
++++ b/libavcodec/utvideodec.c
+@@ -676,7 +676,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
+             for (j = 0; j < c->slices; j++) {
+                 slice_end   = bytestream2_get_le32u(&gb);
+                 if (slice_end < 0 || slice_end < slice_start ||
+-                    bytestream2_get_bytes_left(&gb) < slice_end) {
++                    bytestream2_get_bytes_left(&gb) < slice_end + 1024LL) {
+                     av_log(avctx, AV_LOG_ERROR, "Incorrect slice size\n");
+                     return AVERROR_INVALIDDATA;
+                 }

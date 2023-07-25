@@ -1,0 +1,132 @@
+commit 31458a18788b0cf0b722acda9bb2f2fe13a3fb32
+Author: Manuel Pégourié-Gonnard <manuel.pegourie-gonnard@arm.com>
+Date:   Mon Jun 26 10:11:49 2017 +0200
+
+    Only return VERIFY_FAILED from a single point
+    
+    Everything else is a fatal error. Also improve documentation about that for
+    the vrfy callback.
+
+diff --git a/ChangeLog b/ChangeLog
+index 9bf6a1719..d35457b96 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -6,6 +6,9 @@ Changes
+    * Certificate verification functions now set flags to -1 in case the full
+      chain was not verified due to an internal error (including in the verify
+      callback) or chain length limitations.
++   * With authmode set to optional, handshake is now aborted if the
++     verification of the peer's certificate failed due to an overlong chain or
++     a fatal error in the vrfy callback.
+ 
+ = mbed TLS 2.5.1 released 2017-06-21
+ 
+diff --git a/include/mbedtls/error.h b/include/mbedtls/error.h
+index 5e549f6b6..31591e2d6 100644
+--- a/include/mbedtls/error.h
++++ b/include/mbedtls/error.h
+@@ -71,7 +71,7 @@
+  * Name      ID  Nr of Errors
+  * PEM       1   9
+  * PKCS#12   1   4 (Started from top)
+- * X509      2   19
++ * X509      2   20
+  * PKCS5     2   4 (Started from top)
+  * DHM       3   9
+  * PK        3   14 (Started from top)
+diff --git a/include/mbedtls/ssl.h b/include/mbedtls/ssl.h
+index 51c1c60d7..cc0007006 100644
+--- a/include/mbedtls/ssl.h
++++ b/include/mbedtls/ssl.h
+@@ -1052,7 +1052,7 @@ void mbedtls_ssl_conf_authmode( mbedtls_ssl_config *conf, int authmode );
+  *
+  *                 If set, the verify callback is called for each
+  *                 certificate in the chain. For implementation
+- *                 information, please see \c x509parse_verify()
++ *                 information, please see \c mbedtls_x509_crt_verify()
+  *
+  * \param conf     SSL configuration
+  * \param f_vrfy   verification function
+diff --git a/include/mbedtls/x509.h b/include/mbedtls/x509.h
+index f219bf128..128eaded6 100644
+--- a/include/mbedtls/x509.h
++++ b/include/mbedtls/x509.h
+@@ -76,6 +76,7 @@
+ #define MBEDTLS_ERR_X509_ALLOC_FAILED                     -0x2880  /**< Allocation of memory failed. */
+ #define MBEDTLS_ERR_X509_FILE_IO_ERROR                    -0x2900  /**< Read/write of file failed. */
+ #define MBEDTLS_ERR_X509_BUFFER_TOO_SMALL                 -0x2980  /**< Destination buffer is too small. */
++#define MBEDTLS_ERR_X509_FATAL_ERROR                      -0x3000  /**< A fatal error occured, eg the chain is too long or the vrfy callback failed. */
+ /* \} name */
+ 
+ /**
+diff --git a/include/mbedtls/x509_crt.h b/include/mbedtls/x509_crt.h
+index 383e484f7..fd203360c 100644
+--- a/include/mbedtls/x509_crt.h
++++ b/include/mbedtls/x509_crt.h
+@@ -267,7 +267,13 @@ int mbedtls_x509_crt_verify_info( char *buf, size_t size, const char *prefix,
+  *
+  *                 All flags left after returning from the callback
+  *                 are also returned to the application. The function should
+- *                 return 0 for anything but a fatal error.
++ *                 return 0 for anything (including invalid certificates)
++ *                 other than fatal error, as a non-zero return code
++ *                 immediately aborts the verification process. For fatal
++ *                 errors, a specific error code should be used (different
++ *                 from MBEDTLS_ERR_X509_CERT_VERIFY_FAILED which should not
++ *                 be returned at this point), or MBEDTLS_ERR_X509_FATAL_ERROR
++ *                 can be used if no better code is available.
+  *
+  * \note           In case verification failed, the results can be displayed
+  *                 using \c mbedtls_x509_crt_verify_info()
+diff --git a/library/error.c b/library/error.c
+index dd2db0c45..db42381c4 100644
+--- a/library/error.c
++++ b/library/error.c
+@@ -480,6 +480,8 @@ void mbedtls_strerror( int ret, char *buf, size_t buflen )
+             mbedtls_snprintf( buf, buflen, "X509 - Read/write of file failed" );
+         if( use_ret == -(MBEDTLS_ERR_X509_BUFFER_TOO_SMALL) )
+             mbedtls_snprintf( buf, buflen, "X509 - Destination buffer is too small" );
++        if( use_ret == -(MBEDTLS_ERR_X509_FATAL_ERROR) )
++            mbedtls_snprintf( buf, buflen, "X509 - A fatal error occured, eg the chain is too long or the vrfy callback failed" );
+ #endif /* MBEDTLS_X509_USE_C || MBEDTLS_X509_CREATE_C */
+         // END generated code
+ 
+diff --git a/library/x509_crt.c b/library/x509_crt.c
+index ee5f27e46..ec5f77268 100644
+--- a/library/x509_crt.c
++++ b/library/x509_crt.c
+@@ -2057,8 +2057,8 @@ static int x509_crt_verify_child(
+     /* path_cnt is 0 for the first intermediate CA */
+     if( 1 + path_cnt > MBEDTLS_X509_MAX_INTERMEDIATE_CA )
+     {
+-        *flags |= MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+-        return( MBEDTLS_ERR_X509_CERT_VERIFY_FAILED );
++        /* return immediately as the goal is to avoid unbounded recursion */
++        return( MBEDTLS_ERR_X509_FATAL_ERROR );
+     }
+ 
+     if( mbedtls_x509_time_is_past( &child->valid_to ) )
+@@ -2310,6 +2310,10 @@ int mbedtls_x509_crt_verify_with_profile( mbedtls_x509_crt *crt,
+     }
+ 
+ exit:
++    /* prevent misuse of the vrfy callback */
++    if( ret == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED )
++        ret = MBEDTLS_ERR_X509_FATAL_ERROR;
++
+     if( ret != 0 )
+     {
+         *flags = (uint32_t) -1;
+diff --git a/tests/suites/test_suite_x509parse.data b/tests/suites/test_suite_x509parse.data
+index 6df529875..ea56f3fbc 100644
+--- a/tests/suites/test_suite_x509parse.data
++++ b/tests/suites/test_suite_x509parse.data
+@@ -1204,7 +1204,7 @@ mbedtls_x509_crt_verify_max:"data_files/test-ca2.crt":"data_files/dir-maxpath":M
+ 
+ X509 CRT verify long chain (max intermediate CA + 1)
+ depends_on:MBEDTLS_SHA256_C:MBEDTLS_ECDSA_C:MBEDTLS_ECP_DP_SECP256R1_ENABLED
+-mbedtls_x509_crt_verify_max:"data_files/dir-maxpath/00.crt":"data_files/dir-maxpath":MBEDTLS_X509_MAX_INTERMEDIATE_CA+1:MBEDTLS_ERR_X509_CERT_VERIFY_FAILED:-1
++mbedtls_x509_crt_verify_max:"data_files/dir-maxpath/00.crt":"data_files/dir-maxpath":MBEDTLS_X509_MAX_INTERMEDIATE_CA+1:MBEDTLS_ERR_X509_FATAL_ERROR:-1
+ 
+ X509 CRT verify chain #1 (zero pathlen intermediate)
+ depends_on:MBEDTLS_SHA256_C:MBEDTLS_RSA_C

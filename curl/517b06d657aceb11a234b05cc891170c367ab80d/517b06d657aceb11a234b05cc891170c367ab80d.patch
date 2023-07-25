@@ -1,0 +1,57 @@
+commit 517b06d657aceb11a234b05cc891170c367ab80d
+Author: Steve Holme <steve_holme@hotmail.com>
+Date:   Thu Feb 20 23:51:36 2014 +0000
+
+    url: Fixed connection re-use when using different log-in credentials
+    
+    In addition to FTP, other connection based protocols such as IMAP, POP3,
+    SMTP, SCP, SFTP and LDAP require a new connection when different log-in
+    credentials are specified. Fixed the detection logic to include these
+    other protocols.
+    
+    Bug: http://curl.haxx.se/docs/adv_20140326A.html
+
+diff --git a/lib/http.c b/lib/http.c
+index 558699967..4a29058c2 100644
+--- a/lib/http.c
++++ b/lib/http.c
+@@ -145,7 +145,7 @@ const struct Curl_handler Curl_handler_https = {
+   ZERO_NULL,                            /* readwrite */
+   PORT_HTTPS,                           /* defport */
+   CURLPROTO_HTTP | CURLPROTO_HTTPS,     /* protocol */
+-  PROTOPT_SSL                           /* flags */
++  PROTOPT_SSL | PROTOPT_CREDSPERREQUEST /* flags */
+ };
+ #endif
+ 
+diff --git a/lib/url.c b/lib/url.c
+index 2240f1132..0e420c7a3 100644
+--- a/lib/url.c
++++ b/lib/url.c
+@@ -3060,9 +3060,10 @@ ConnectionExists(struct SessionHandle *data,
+           continue;
+       }
+ 
+-      if((needle->handler->protocol & CURLPROTO_FTP) || wantNTLMhttp) {
+-        /* This is FTP or HTTP+NTLM, verify that we're using the same name
+-           and password as well */
++      if((!(needle->handler->flags & PROTOPT_CREDSPERREQUEST)) ||
++         wantNTLMhttp) {
++        /* This protocol requires credentials per connection or is HTTP+NTLM,
++           so verify that we're using the same name and password as well */
+         if(!strequal(needle->user, check->user) ||
+            !strequal(needle->passwd, check->passwd)) {
+           /* one of them was different */
+diff --git a/lib/urldata.h b/lib/urldata.h
+index 3ab4ed9fc..25f967693 100644
+--- a/lib/urldata.h
++++ b/lib/urldata.h
+@@ -795,6 +795,8 @@ struct Curl_handler {
+                                       gets a default */
+ #define PROTOPT_NOURLQUERY (1<<6)   /* protocol can't handle
+                                         url query strings (?foo=bar) ! */
++#define PROTOPT_CREDSPERREQUEST (1<<7) /* requires login creditials per request
++                                          as opposed to per connection */
+ 
+ 
+ /* return the count of bytes sent, or -1 on error */

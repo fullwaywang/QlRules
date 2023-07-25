@@ -1,0 +1,27 @@
+commit be818df547c3b0ae4fadb50fd210139a8636706a	be818df547c3b0ae4fadb50fd210139a8636706a
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Mon Nov 12 14:42:45 2012 +0100
+
+    wavpack: fix out of array access
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/wavpack.c b/libavcodec/wavpack.c
+index 69637fee51..2935abfa8b 100644
+--- a/libavcodec/wavpack.c
++++ b/libavcodec/wavpack.c
+@@ -1208,11 +1208,12 @@ static int wavpack_decode_frame(AVCodecContext *avctx, void *data,
+     }
+ 
+     /* get output buffer */
+-    s->frame.nb_samples = s->samples;
++    s->frame.nb_samples = s->samples + 1;
+     if ((ret = avctx->get_buffer(avctx, &s->frame)) < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
+         return ret;
+     }
++    s->frame.nb_samples = s->samples;
+ 
+     while (buf_size > 0) {
+         if (!s->multichannel) {

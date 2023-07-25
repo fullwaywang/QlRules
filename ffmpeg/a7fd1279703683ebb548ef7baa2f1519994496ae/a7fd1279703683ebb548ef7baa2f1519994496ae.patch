@@ -1,0 +1,30 @@
+commit a7fd1279703683ebb548ef7baa2f1519994496ae
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Sat Oct 12 11:07:54 2019 +0200
+
+    avfilter/vf_colorconstancy: fix overreads in gauss array
+    
+    Fixes #8250
+
+diff --git a/libavfilter/vf_colorconstancy.c b/libavfilter/vf_colorconstancy.c
+index e3bb39e51b..cc081e957f 100644
+--- a/libavfilter/vf_colorconstancy.c
++++ b/libavfilter/vf_colorconstancy.c
+@@ -280,7 +280,7 @@ static int slice_get_derivative(AVFilterContext* ctx, void* arg, int jobnr, int
+                     dst[INDX2D(r, c, width)] = 0;
+                     for (g = 0; g < filtersize; ++g) {
+                         dst[INDX2D(r, c, width)] += GAUSS(src, r,                        c + GINDX(filtersize, g),
+-                                                          in_linesize, height, width, gauss[GINDX(filtersize, g)]);
++                                                          in_linesize, height, width, gauss[g]);
+                     }
+                 }
+             }
+@@ -295,7 +295,7 @@ static int slice_get_derivative(AVFilterContext* ctx, void* arg, int jobnr, int
+                     dst[INDX2D(r, c, width)] = 0;
+                     for (g = 0; g < filtersize; ++g) {
+                         dst[INDX2D(r, c, width)] += GAUSS(src, r + GINDX(filtersize, g), c,
+-                                                          width, height, width, gauss[GINDX(filtersize, g)]);
++                                                          width, height, width, gauss[g]);
+                     }
+                 }
+             }

@@ -1,0 +1,18 @@
+commit 748a03651e5b138bcaf160d15133de2f4b1b89ce
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Sun Jan 20 11:01:24 2019 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/1452
+
+diff --git a/coders/sixel.c b/coders/sixel.c
+index a8a658f35..ae32db874 100644
+--- a/coders/sixel.c
++++ b/coders/sixel.c
+@@ -1057,6 +1057,7 @@ static Image *ReadSIXELImage(const ImageInfo *image_info,ExceptionInfo *exceptio
+   if (sixel_decode(image,(unsigned char *) sixel_buffer,&sixel_pixels,&image->columns,&image->rows,&sixel_palette,&image->colors,exception) == MagickFalse)
+     {
+       sixel_buffer=(char *) RelinquishMagickMemory(sixel_buffer);
++      sixel_pixels=(unsigned char *) RelinquishMagickMemory(sixel_pixels);
+       ThrowReaderException(CorruptImageError,"CorruptImage");
+     }
+   sixel_buffer=(char *) RelinquishMagickMemory(sixel_buffer);

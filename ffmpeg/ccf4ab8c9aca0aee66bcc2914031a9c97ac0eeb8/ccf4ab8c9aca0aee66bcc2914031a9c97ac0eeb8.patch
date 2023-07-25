@@ -1,0 +1,35 @@
+commit ccf4ab8c9aca0aee66bcc2914031a9c97ac0eeb8
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Sun Oct 13 17:23:10 2019 +0200
+
+    avfilter/vf_edgedetect: check if height is big enough
+    
+    Fixes #8260
+
+diff --git a/libavfilter/vf_edgedetect.c b/libavfilter/vf_edgedetect.c
+index a0ddcbbf5c..11a31fa4ff 100644
+--- a/libavfilter/vf_edgedetect.c
++++ b/libavfilter/vf_edgedetect.c
+@@ -150,7 +150,8 @@ static void gaussian_blur(AVFilterContext *ctx, int w, int h,
+     int i, j;
+ 
+     memcpy(dst, src, w); dst += dst_linesize; src += src_linesize;
+-    memcpy(dst, src, w); dst += dst_linesize; src += src_linesize;
++    if (h > 1)
++        memcpy(dst, src, w); dst += dst_linesize; src += src_linesize;
+     for (j = 2; j < h - 2; j++) {
+         dst[0] = src[0];
+         dst[1] = src[1];
+@@ -180,8 +181,10 @@ static void gaussian_blur(AVFilterContext *ctx, int w, int h,
+         dst += dst_linesize;
+         src += src_linesize;
+     }
+-    memcpy(dst, src, w); dst += dst_linesize; src += src_linesize;
+-    memcpy(dst, src, w);
++    if (h > 2)
++        memcpy(dst, src, w); dst += dst_linesize; src += src_linesize;
++    if (h > 3)
++        memcpy(dst, src, w);
+ }
+ 
+ enum {

@@ -1,0 +1,63 @@
+commit 32ee5213fe64f1e10ec76c1ee861ee6f233120dd
+Author: Nikias Bassen <nikias@gmx.li>
+Date:   Fri Feb 10 13:42:46 2017 +0100
+
+    bplist: Fix data range check for string/data/dict/array nodes
+    
+    Passing a size of 0xFFFFFFFFFFFFFFFF to parse_string_node() might result
+    in a memcpy with a size of -1, leading to undefined behavior.
+    This commit makes sure that the actual node data (which depends on the size)
+    is in the range start_of_object..start_of_object+size.
+    
+    Credit to OSS-Fuzz
+
+diff --git a/src/bplist.c b/src/bplist.c
+index 0fd149e..7d21b27 100644
+--- a/src/bplist.c
++++ b/src/bplist.c
+@@ -654,14 +654,14 @@ static plist_t parse_bin_node(struct bplist_data *bplist, const char** object)
+         return parse_date_node(object, size);
+ 
+     case BPLIST_DATA:
+-        if (*object + size > bplist->offset_table) {
++        if (*object + size < *object || *object + size > bplist->offset_table) {
+             PLIST_BIN_ERR("%s: BPLIST_DATA data bytes point outside of valid range\n", __func__);
+             return NULL;
+         }
+         return parse_data_node(object, size);
+ 
+     case BPLIST_STRING:
+-        if (*object + size > bplist->offset_table) {
++        if (*object + size < *object || *object + size > bplist->offset_table) {
+             PLIST_BIN_ERR("%s: BPLIST_STRING data bytes point outside of valid range\n", __func__);
+             return NULL;
+         }
+@@ -672,7 +672,7 @@ static plist_t parse_bin_node(struct bplist_data *bplist, const char** object)
+             PLIST_BIN_ERR("%s: Integer overflow when calculating BPLIST_UNICODE data size.\n", __func__);
+             return NULL;
+         }
+-        if (*object + size*2 > bplist->offset_table) {
++        if (*object + size*2 < *object || *object + size*2 > bplist->offset_table) {
+             PLIST_BIN_ERR("%s: BPLIST_UNICODE data bytes point outside of valid range\n", __func__);
+             return NULL;
+         }
+@@ -680,7 +680,7 @@ static plist_t parse_bin_node(struct bplist_data *bplist, const char** object)
+ 
+     case BPLIST_SET:
+     case BPLIST_ARRAY:
+-        if (*object + size > bplist->offset_table) {
++        if (*object + size < *object || *object + size > bplist->offset_table) {
+             PLIST_BIN_ERR("%s: BPLIST_ARRAY data bytes point outside of valid range\n", __func__);
+             return NULL;
+         }
+@@ -694,8 +694,8 @@ static plist_t parse_bin_node(struct bplist_data *bplist, const char** object)
+         return parse_uid_node(object, size);
+ 
+     case BPLIST_DICT:
+-        if (*object + size > bplist->offset_table) {
+-            PLIST_BIN_ERR("%s: BPLIST_REAL data bytes point outside of valid range\n", __func__);
++        if (*object + size < *object || *object + size > bplist->offset_table) {
++            PLIST_BIN_ERR("%s: BPLIST_DICT data bytes point outside of valid range\n", __func__);
+             return NULL;
+         }
+         return parse_dict_node(bplist, object, size);

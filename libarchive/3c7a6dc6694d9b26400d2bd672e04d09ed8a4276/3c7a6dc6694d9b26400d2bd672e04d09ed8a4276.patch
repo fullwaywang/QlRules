@@ -1,0 +1,35 @@
+commit 3c7a6dc6694d9b26400d2bd672e04d09ed8a4276
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Sun Jul 26 17:09:22 2015 -0700
+
+    Issue #582: reject sparse blocks with negative size or offset, detect overflow when tracking sparse blocks
+
+diff --git a/libarchive/archive_read_support_format_tar.c b/libarchive/archive_read_support_format_tar.c
+index 1e780936..01d85cf6 100644
+--- a/libarchive/archive_read_support_format_tar.c
++++ b/libarchive/archive_read_support_format_tar.c
+@@ -604,8 +604,12 @@ archive_read_format_tar_skip(struct archive_read *a)
+ 	/* Do not consume the hole of a sparse file. */
+ 	request = 0;
+ 	for (p = tar->sparse_list; p != NULL; p = p->next) {
+-		if (!p->hole)
++		if (!p->hole) {
++			if (p->remaining >= INT64_MAX - request) {
++				return ARCHIVE_FATAL;
++			}
+ 			request += p->remaining;
++		}
+ 	}
+ 	if (request > tar->entry_bytes_remaining)
+ 		request = tar->entry_bytes_remaining;
+@@ -2123,6 +2127,10 @@ gnu_add_sparse_entry(struct archive_read *a, struct tar *tar,
+ 	else
+ 		tar->sparse_list = p;
+ 	tar->sparse_last = p;
++	if (remaining < 0 || offset < 0) {
++		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC, "Malformed sparse map data");
++		return (ARCHIVE_FATAL);
++	}
+ 	p->offset = offset;
+ 	p->remaining = remaining;
+ 	return (ARCHIVE_OK);

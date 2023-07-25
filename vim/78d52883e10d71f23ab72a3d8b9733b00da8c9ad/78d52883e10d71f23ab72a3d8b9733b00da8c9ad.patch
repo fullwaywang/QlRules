@@ -1,0 +1,57 @@
+commit 78d52883e10d71f23ab72a3d8b9733b00da8c9ad
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue May 24 13:57:54 2022 +0100
+
+    patch 8.2.5013: after text formatting cursor may be in an invalid position
+    
+    Problem:    After text formatting the cursor may be in an invalid position.
+    Solution:   Correct the cursor position after formatting.
+
+diff --git a/src/testdir/test_textformat.vim b/src/testdir/test_textformat.vim
+index d33e2508d..c5f597580 100644
+--- a/src/testdir/test_textformat.vim
++++ b/src/testdir/test_textformat.vim
+@@ -1291,4 +1291,16 @@ func Test_fo_2()
+   close!
+ endfunc
+ 
++" This was leaving the cursor after the end of a line.  Complicated way to
++" have the problem show up with valgrind.
++func Test_correct_cursor_position()
++  set encoding=iso8859
++  new
++  norm a0000
++  sil! norm gggg0i0gw0gg
++
++  bwipe!
++  set encoding=utf8
++endfunc
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/textformat.c b/src/textformat.c
+index 7e32c1ccc..5ba2f1798 100644
+--- a/src/textformat.c
++++ b/src/textformat.c
+@@ -870,6 +870,9 @@ op_format(
+     {
+ 	curwin->w_cursor = saved_cursor;
+ 	saved_cursor.lnum = 0;
++
++	// formatting may have made the cursor position invalid
++	check_cursor();
+     }
+ 
+     if (oap->is_VIsual)
+diff --git a/src/version.c b/src/version.c
+index dea37d6cd..f737b1b7d 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5013,
+ /**/
+     5012,
+ /**/

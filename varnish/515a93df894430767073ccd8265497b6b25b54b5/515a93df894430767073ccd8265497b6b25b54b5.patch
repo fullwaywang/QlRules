@@ -1,0 +1,201 @@
+commit 515a93df894430767073ccd8265497b6b25b54b5
+Author: Asad Sajjad Ahmed <asadsa@varnish-software.com>
+Date:   Fri Sep 30 14:42:53 2022 +0200
+
+    hpack: fix pseudo-headers handling
+    
+    We should apply the same restrictions on the list of allowed characters inside
+    H/2 pseudo-headers as we do for H/1. This error is translated into the
+    headers we send to a backend over H/1.
+    
+    Failure to do so could permit various exploits against a backend not handling
+    malformed H/1 requests.
+    
+    Signed-off-by: Asad Sajjad Ahmed <asadsa@varnish-software.com>
+
+diff --git a/bin/varnishd/http2/cache_http2_hpack.c b/bin/varnishd/http2/cache_http2_hpack.c
+index 6e67b55c5..f58788b12 100644
+--- a/bin/varnishd/http2/cache_http2_hpack.c
++++ b/bin/varnishd/http2/cache_http2_hpack.c
+@@ -96,13 +96,18 @@ h2h_addhdr(struct http *hp, char *b, size_t namelen, size_t len)
+ {
+ 	/* XXX: This might belong in cache/cache_http.c */
+ 	const char *b0;
++	int disallow_empty;
+ 	unsigned n;
++	char *p;
++	int i;
+ 
+ 	CHECK_OBJ_NOTNULL(hp, HTTP_MAGIC);
+ 	AN(b);
+ 	assert(namelen >= 2);	/* 2 chars from the ': ' that we added */
+ 	assert(namelen <= len);
+ 
++	disallow_empty = 0;
++
+ 	if (len > UINT_MAX) {	/* XXX: cache_param max header size */
+ 		VSLb(hp->vsl, SLT_BogoHeader, "Header too large: %.20s", b);
+ 		return (H2SE_ENHANCE_YOUR_CALM);
+@@ -117,10 +122,24 @@ h2h_addhdr(struct http *hp, char *b, size_t namelen, size_t len)
+ 			b += namelen;
+ 			len -= namelen;
+ 			n = HTTP_HDR_METHOD;
++			disallow_empty = 1;
++
++			/* First field cannot contain SP or CTL */
++			for (p = b, i = 0; i < len; p++, i++) {
++				if (vct_issp(*p) || vct_isctl(*p))
++					return (H2SE_PROTOCOL_ERROR);
++			}
+ 		} else if (!strncmp(b, ":path: ", namelen)) {
+ 			b += namelen;
+ 			len -= namelen;
+ 			n = HTTP_HDR_URL;
++			disallow_empty = 1;
++
++			/* Second field cannot contain LWS or CTL */
++			for (p = b, i = 0; i < len; p++, i++) {
++				if (vct_islws(*p) || vct_isctl(*p))
++					return (H2SE_PROTOCOL_ERROR);
++			}
+ 		} else if (!strncmp(b, ":scheme: ", namelen)) {
+ 			/* XXX: What to do about this one? (typically
+ 			   "http" or "https"). For now set it as a normal
+@@ -128,6 +147,15 @@ h2h_addhdr(struct http *hp, char *b, size_t namelen, size_t len)
+ 			b++;
+ 			len-=1;
+ 			n = hp->nhd;
++
++			for (p = b + namelen, i = 0; i < len-namelen;
++			    p++, i++) {
++				if (vct_issp(*p) || vct_isctl(*p))
++					return (H2SE_PROTOCOL_ERROR);
++			}
++
++			if (!i)
++				return (H2SE_PROTOCOL_ERROR);
+ 		} else if (!strncmp(b, ":authority: ", namelen)) {
+ 			b+=6;
+ 			len-=6;
+@@ -164,6 +192,13 @@ h2h_addhdr(struct http *hp, char *b, size_t namelen, size_t len)
+ 	hp->hd[n].b = b;
+ 	hp->hd[n].e = b + len;
+ 
++	if (disallow_empty && !Tlen(hp->hd[n])) {
++		VSLb(hp->vsl, SLT_BogoHeader,
++		    "Empty pseudo-header %.*s",
++		    (int)namelen, b0);
++		return (H2SE_PROTOCOL_ERROR);
++	}
++
+ 	return (0);
+ }
+ 
+diff --git a/bin/varnishtest/tests/t02023.vtc b/bin/varnishtest/tests/t02023.vtc
+new file mode 100644
+index 000000000..cfd843da3
+--- /dev/null
++++ b/bin/varnishtest/tests/t02023.vtc
+@@ -0,0 +1,48 @@
++varnishtest "Empty pseudo-headers"
++
++server s1 {
++	rxreq
++	txresp
++} -start
++
++varnish v1 -arg "-p feature=+http2" -vcl+backend {
++} -start
++
++client c1 {
++	txreq -url ""
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	txreq -req ""
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	txreq -proto ""
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -url ""
++		rxrst
++	} -run
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -scheme ""
++		rxrst
++	} -run
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -req ""
++		rxrst
++	} -run
++} -run
+diff --git a/bin/varnishtest/tests/t02024.vtc b/bin/varnishtest/tests/t02024.vtc
+new file mode 100644
+index 000000000..0d0a1abc5
+--- /dev/null
++++ b/bin/varnishtest/tests/t02024.vtc
+@@ -0,0 +1,48 @@
++varnishtest "Garbage pseudo-headers"
++
++server s1 {
++	rxreq
++	txresp
++} -start
++
++varnish v1 -arg "-p feature=+http2" -vcl+backend {
++} -start
++
++client c1 {
++	txreq -url " "
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	txreq -req " "
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	txreq -proto " "
++	rxresp
++	expect resp.status == 400
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -url " "
++		rxrst
++	} -run
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -scheme " "
++		rxrst
++	} -run
++} -run
++
++client c1 {
++	stream 1 {
++		txreq -req " "
++		rxrst
++	} -run
++} -run

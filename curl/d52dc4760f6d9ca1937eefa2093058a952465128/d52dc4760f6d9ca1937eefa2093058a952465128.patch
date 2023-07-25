@@ -1,0 +1,33 @@
+commit d52dc4760f6d9ca1937eefa2093058a952465128
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Thu Mar 8 10:33:16 2018 +0100
+
+    readwrite: make sure excess reads don't go beyond buffer end
+    
+    CVE-2018-1000122
+    Bug: https://curl.haxx.se/docs/adv_2018-b047.html
+    
+    Detected by OSS-fuzz
+
+diff --git a/lib/transfer.c b/lib/transfer.c
+index c46ac25f4..fd9af3155 100644
+--- a/lib/transfer.c
++++ b/lib/transfer.c
+@@ -808,10 +808,15 @@ static CURLcode readwrite_data(struct Curl_easy *data,
+ 
+     } /* if(!header and data to read) */
+ 
+-    if(conn->handler->readwrite &&
+-       (excess > 0 && !conn->bits.stream_was_rewound)) {
++    if(conn->handler->readwrite && excess && !conn->bits.stream_was_rewound) {
+       /* Parse the excess data */
+       k->str += nread;
++
++      if(&k->str[excess] > &k->buf[data->set.buffer_size]) {
++        /* the excess amount was too excessive(!), make sure
++           it doesn't read out of buffer */
++        excess = &k->buf[data->set.buffer_size] - k->str;
++      }
+       nread = (ssize_t)excess;
+ 
+       result = conn->handler->readwrite(data, conn, &nread, &readmore);

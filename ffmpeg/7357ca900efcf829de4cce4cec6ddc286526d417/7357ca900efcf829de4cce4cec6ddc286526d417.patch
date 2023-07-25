@@ -1,0 +1,27 @@
+commit 7357ca900efcf829de4cce4cec6ddc286526d417	7357ca900efcf829de4cce4cec6ddc286526d417
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Thu Jan 24 00:27:10 2013 +0100
+
+    sanm: Check decoded_size.
+    
+    This prevents a buffer overflow in rle_decode()
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/sanm.c b/libavcodec/sanm.c
+index db22fc99ef..70ad1f8fed 100644
+--- a/libavcodec/sanm.c
++++ b/libavcodec/sanm.c
+@@ -639,6 +639,11 @@ static int old_codec47(SANMVideoContext *ctx, int top,
+     decoded_size = bytestream2_get_le32(&ctx->gb);
+     bytestream2_skip(&ctx->gb, 8);
+ 
++    if (decoded_size > height * stride - left - top * stride) {
++        decoded_size = height * stride - left - top * stride;
++        av_log(ctx->avctx, AV_LOG_WARNING, "decoded size is too large\n");
++    }
++
+     if (skip & 1)
+         bytestream2_skip(&ctx->gb, 0x8080);
+     if (!seq) {

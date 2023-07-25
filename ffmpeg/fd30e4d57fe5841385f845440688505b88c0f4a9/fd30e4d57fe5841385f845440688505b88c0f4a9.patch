@@ -1,0 +1,25 @@
+commit fd30e4d57fe5841385f845440688505b88c0f4a9
+Author: Matt Wolenetz <wolenetz@google.com>
+Date:   Wed Dec 14 15:24:42 2016 -0800
+
+    lavf/mov.c: Avoid heap allocation wrap in mov_read_hdlr
+    
+    Core of patch is from paul@paulmehta.com
+    Reference https://crbug.com/643950
+    
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+    Check value reduced as the code does not support larger lengths
+
+diff --git a/libavformat/mov.c b/libavformat/mov.c
+index 6fd43a0a4e..8c54539c5f 100644
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -742,6 +742,8 @@ static int mov_read_hdlr(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+ 
+     title_size = atom.size - 24;
+     if (title_size > 0) {
++        if (title_size > FFMIN(INT_MAX, SIZE_MAX-1))
++            return AVERROR_INVALIDDATA;
+         title_str = av_malloc(title_size + 1); /* Add null terminator */
+         if (!title_str)
+             return AVERROR(ENOMEM);

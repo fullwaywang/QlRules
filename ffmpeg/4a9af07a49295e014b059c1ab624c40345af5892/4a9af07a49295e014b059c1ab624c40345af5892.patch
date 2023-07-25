@@ -1,0 +1,27 @@
+commit 4a9af07a49295e014b059c1ab624c40345af5892
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sun Nov 15 14:52:08 2015 +0100
+
+    avcodec/smacker: Check that the data size is a multiple of a sample vector
+    
+    Fixes out of array access
+    Fixes: ce19e41f0ef1e52a23edc488faecdb58/asan_heap-oob_2504e97_4202_ffa0df1baed14022b9bfd4f8ac23d0cb.smk
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/smacker.c b/libavcodec/smacker.c
+index b2fc29b138..4014e8d04c 100644
+--- a/libavcodec/smacker.c
++++ b/libavcodec/smacker.c
+@@ -670,6 +670,10 @@ static int smka_decode_frame(AVCodecContext *avctx, void *data,
+ 
+     /* get output buffer */
+     frame->nb_samples = unp_size / (avctx->channels * (bits + 1));
++    if (unp_size % (avctx->channels * (bits + 1))) {
++        av_log(avctx, AV_LOG_ERROR, "unp_size %d is odd\n", unp_size);
++        return AVERROR(EINVAL);
++    }
+     if ((ret = ff_get_buffer(avctx, frame, 0)) < 0)
+         return ret;
+     samples  = (int16_t *)frame->data[0];

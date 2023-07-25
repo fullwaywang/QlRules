@@ -1,0 +1,81 @@
+commit 4a80ebe491609e04110a1dd540a0ca79d3be3d04	4a80ebe491609e04110a1dd540a0ca79d3be3d04
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 20 18:13:29 2012 +0200
+
+    indeo3: Fix reallocation code so that it doesnt become inconsistent.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/indeo3.c b/libavcodec/indeo3.c
+index c24252a043..f27e27de70 100644
+--- a/libavcodec/indeo3.c
++++ b/libavcodec/indeo3.c
+@@ -148,14 +148,11 @@ static av_cold void build_requant_tab(void)
+ 
+ 
+ static av_cold int allocate_frame_buffers(Indeo3DecodeContext *ctx,
+-                                          AVCodecContext *avctx)
++                                          AVCodecContext *avctx, int luma_width, int luma_height)
+ {
+-    int p, luma_width, luma_height, chroma_width, chroma_height;
++    int p, chroma_width, chroma_height;
+     int luma_pitch, chroma_pitch, luma_size, chroma_size;
+ 
+-    luma_width  = ctx->width;
+-    luma_height = ctx->height;
+-
+     if (luma_width  < 16 || luma_width  > 640 ||
+         luma_height < 16 || luma_height > 480 ||
+         luma_width  &  3 || luma_height &   3) {
+@@ -164,6 +161,9 @@ static av_cold int allocate_frame_buffers(Indeo3DecodeContext *ctx,
+         return AVERROR_INVALIDDATA;
+     }
+ 
++    ctx->width  = luma_width ;
++    ctx->height = luma_height;
++
+     chroma_width  = FFALIGN(luma_width  >> 2, 4);
+     chroma_height = FFALIGN(luma_height >> 2, 4);
+ 
+@@ -204,6 +204,9 @@ static av_cold void free_frame_buffers(Indeo3DecodeContext *ctx)
+ {
+     int p;
+ 
++    ctx->width=
++    ctx->height= 0;
++
+     for (p = 0; p < 3; p++) {
+         av_freep(&ctx->planes[p].buffers[0]);
+         av_freep(&ctx->planes[p].buffers[1]);
+@@ -928,11 +931,8 @@ static int decode_frame_headers(Indeo3DecodeContext *ctx, AVCodecContext *avctx,
+ 
+         av_dlog(avctx, "Frame dimensions changed!\n");
+ 
+-        ctx->width  = width;
+-        ctx->height = height;
+-
+         free_frame_buffers(ctx);
+-        if ((res = allocate_frame_buffers(ctx, avctx)) < 0)
++        if ((res = allocate_frame_buffers(ctx, avctx, width, height)) < 0)
+              return res;
+         avcodec_set_dimensions(avctx, width, height);
+     }
+@@ -1024,8 +1024,6 @@ static av_cold int decode_init(AVCodecContext *avctx)
+     Indeo3DecodeContext *ctx = avctx->priv_data;
+ 
+     ctx->avctx     = avctx;
+-    ctx->width     = avctx->width;
+-    ctx->height    = avctx->height;
+     avctx->pix_fmt = PIX_FMT_YUV410P;
+     avcodec_get_frame_defaults(&ctx->frame);
+ 
+@@ -1033,7 +1031,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
+ 
+     ff_dsputil_init(&ctx->dsp, avctx);
+ 
+-    return allocate_frame_buffers(ctx, avctx);
++    return allocate_frame_buffers(ctx, avctx, avctx->width, avctx->height);
+ }
+ 
+ 

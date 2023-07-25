@@ -1,0 +1,21 @@
+commit 6f1879d498bcc5cce12fe0c5decb8dbc0f608e5d
+Author: dirk <dirk@git.imagemagick.org>
+Date:   Fri Jan 15 01:13:19 2016 +0100
+
+    Fixed overflow.
+
+diff --git a/coders/psd.c b/coders/psd.c
+index 907e45dd5..5f5fba6c6 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -2363,8 +2363,8 @@ static MagickBooleanType WriteImageChannels(const PSDInfo *psd_info,
+   compact_pixels=(unsigned char *) NULL;
+   if (next_image->compression == RLECompression)
+     {
+-      compact_pixels=(unsigned char *) AcquireQuantumMemory(2*channels*
+-        next_image->columns,packet_size*sizeof(*compact_pixels));
++      compact_pixels=(unsigned char *) AcquireQuantumMemory((2*channels*
++        next_image->columns)+1,packet_size*sizeof(*compact_pixels));
+       if (compact_pixels == (unsigned char *) NULL)
+         ThrowWriterException(ResourceLimitError,"MemoryAllocationFailed");
+     }

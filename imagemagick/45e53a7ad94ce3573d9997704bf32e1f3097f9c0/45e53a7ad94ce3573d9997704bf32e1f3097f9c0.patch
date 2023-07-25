@@ -1,0 +1,41 @@
+commit 45e53a7ad94ce3573d9997704bf32e1f3097f9c0
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Jun 24 12:15:25 2017 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/526
+    https://github.com/ImageMagick/ImageMagick/issues/527
+
+diff --git a/coders/png.c b/coders/png.c
+index 774a6829e..1dc31ff2f 100644
+--- a/coders/png.c
++++ b/coders/png.c
+@@ -4384,7 +4384,13 @@ static Image *ReadOneJNGImage(MngInfo *mng_info,
+           ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+ 
+         for (i=0; i < (ssize_t) length; i++)
+-          chunk[i]=(unsigned char) ReadBlobByte(image);
++        {
++          int
++            c;
++
++          c=ReadBlobByte(image);
++          chunk[i]=(unsigned char) c;
++        }
+ 
+         p=chunk;
+       }
+@@ -5247,7 +5253,13 @@ static Image *ReadOneMNGImage(MngInfo* mng_info, const ImageInfo *image_info,
+                 "MemoryAllocationFailed");
+ 
+             for (i=0; i < (ssize_t) length; i++)
+-              chunk[i]=(unsigned char) ReadBlobByte(image);
++            {
++              int
++                c;
++
++              c=ReadBlobByte(image);
++              chunk[i]=(unsigned char) c;
++            }
+ 
+             p=chunk;
+           }

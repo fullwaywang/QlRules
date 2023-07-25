@@ -1,0 +1,49 @@
+commit 8ca35831e91c3db8c6d281d09b605001003bec08
+Author: Glenn Randers-Pehrson <glennrp@gmail.com>
+Date:   Thu Jun 22 13:05:22 2017 -0400
+
+    coders/png.c: Stop a memory leak in read_user_chunk_callback() (reference
+    
+    https://github.com/ImageMagick/ImageMagick/issues/517).
+
+diff --git a/ChangeLog b/ChangeLog
+index cd7af7c90..c3749bd40 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,7 @@
++2017-06-10  7.0.6-0 Glenn Randers-Pehrson <glennrp@image...>
++  * Stop a memory leak in read_user_chunk_callback() (reference
++    https://github.com/ImageMagick/ImageMagick/issues/517).
++
+ 2017-06-10  7.0.6-0 Cristy  <quetzlzacatenango@image...>
+   * Release ImageMagick version 7.0.6-0, GIT revision 20194:b0c0d00:20170611.
+ 
+diff --git a/coders/png.c b/coders/png.c
+index ffc6f6d00..e6e6f2803 100644
+--- a/coders/png.c
++++ b/coders/png.c
+@@ -1904,6 +1904,7 @@ static int read_user_chunk_callback(png_struct *ping, png_unknown_chunkp chunk)
+               p[4] != '\0' || p[5] != '\0')
+             {
+               /* Chunk is malformed */
++              profile=DestroyStringInfo(profile);
+               return(-1);
+             }
+          }
+@@ -1917,6 +1918,8 @@ static int read_user_chunk_callback(png_struct *ping, png_unknown_chunkp chunk)
+       (void) SetImageProfile(image,"exif",profile,
+         error_info->exception);
+ 
++      profile=DestroyStringInfo(profile);
++
+       return(1);
+     }
+ 
+@@ -2290,6 +2293,7 @@ static Image *ReadOnePNGImage(MngInfo *mng_info,
+       /*
+         PNG image is corrupt.
+       */
++      printf("  destroy_read_struct\n");
+       png_destroy_read_struct(&ping,&ping_info,&end_info);
+ 
+ #ifdef IMPNG_SETJMP_NOT_THREAD_SAFE

@@ -1,0 +1,27 @@
+commit 7fd4ce6a997be5f5c9e744ac527725c2850de203
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Wed Oct 15 01:53:55 2014 +0100
+
+    Fix for session tickets memory leak.
+    
+    CVE-2014-3567
+    
+    Reviewed-by: Rich Salz <rsalz@openssl.org>
+    Reviewed-by: Matt Caswell <matt@openssl.org>
+    (cherry picked from commit 5dc6070a03779cd524f0e67f76c945cb0ac38320)
+
+diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
+index 12ee3c9a10..d6aff4b682 100644
+--- a/ssl/t1_lib.c
++++ b/ssl/t1_lib.c
+@@ -2348,7 +2348,10 @@ static int tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
+ 	HMAC_Final(&hctx, tick_hmac, NULL);
+ 	HMAC_CTX_cleanup(&hctx);
+ 	if (CRYPTO_memcmp(tick_hmac, etick + eticklen, mlen))
++		{
++		EVP_CIPHER_CTX_cleanup(&ctx);
+ 		return 2;
++		}
+ 	/* Attempt to decrypt session data */
+ 	/* Move p after IV to start of encrypted ticket, update length */
+ 	p = etick + 16 + EVP_CIPHER_CTX_iv_length(&ctx);

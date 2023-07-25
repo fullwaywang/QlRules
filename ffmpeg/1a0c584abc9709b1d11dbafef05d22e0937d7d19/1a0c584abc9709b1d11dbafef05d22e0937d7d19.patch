@@ -1,0 +1,40 @@
+commit 1a0c584abc9709b1d11dbafef05d22e0937d7d19
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Wed Oct 16 16:27:06 2019 +0200
+
+    avfilter/f_reverse: fix memory leaks
+    
+    Fixes #8283
+
+diff --git a/libavfilter/f_reverse.c b/libavfilter/f_reverse.c
+index 5f27927075..1e27264dd6 100644
+--- a/libavfilter/f_reverse.c
++++ b/libavfilter/f_reverse.c
+@@ -58,6 +58,11 @@ static av_cold void uninit(AVFilterContext *ctx)
+ {
+     ReverseContext *s = ctx->priv;
+ 
++    while (s->nb_frames > 0) {
++        av_frame_free(&s->frames[s->nb_frames - 1]);
++        s->nb_frames--;
++    }
++
+     av_freep(&s->pts);
+     av_freep(&s->frames);
+ }
+@@ -103,6 +108,7 @@ static int request_frame(AVFilterLink *outlink)
+         AVFrame *out = s->frames[s->nb_frames - 1];
+         out->pts     = s->pts[s->flush_idx++];
+         ret          = ff_filter_frame(outlink, out);
++        s->frames[s->nb_frames - 1] = NULL;
+         s->nb_frames--;
+     }
+ 
+@@ -262,6 +268,7 @@ static int areverse_request_frame(AVFilterLink *outlink)
+         else
+             reverse_samples_packed(out);
+         ret = ff_filter_frame(outlink, out);
++        s->frames[s->nb_frames - 1] = NULL;
+         s->nb_frames--;
+     }
+ 

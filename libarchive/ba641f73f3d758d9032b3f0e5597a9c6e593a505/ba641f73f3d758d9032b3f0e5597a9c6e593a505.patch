@@ -1,0 +1,23 @@
+commit ba641f73f3d758d9032b3f0e5597a9c6e593a505
+Author: Martin Matuska <martin@matuska.org>
+Date:   Sun Apr 21 00:53:02 2019 +0200
+
+    Fix typo in preprocessor macro in archive_read_format_zip_cleanup()
+    
+    Frees lzma_stream on cleanup()
+    
+    Fixes #1165
+
+diff --git a/libarchive/archive_read_support_format_zip.c b/libarchive/archive_read_support_format_zip.c
+index 677c4370..6937969c 100644
+--- a/libarchive/archive_read_support_format_zip.c
++++ b/libarchive/archive_read_support_format_zip.c
+@@ -2751,7 +2751,7 @@ archive_read_format_zip_cleanup(struct archive_read *a)
+ 		inflateEnd(&zip->stream);
+ #endif
+ 
+-#if HAVA_LZMA_H && HAVE_LIBLZMA
++#if HAVE_LZMA_H && HAVE_LIBLZMA
+     if (zip->zipx_lzma_valid) {
+ 		lzma_end(&zip->zipx_lzma_stream);
+ 	}

@@ -1,0 +1,35 @@
+commit f5e06689d193619c57c33270c83f5e40781a261d
+Author: W.C.A. Wijngaards <wouter@nlnetlabs.nl>
+Date:   Tue Dec 3 15:10:36 2019 +0100
+
+    - Fix Assert Causing DoS in synth_cname(),
+      reported by X41 D-Sec.
+
+diff --git a/doc/Changelog b/doc/Changelog
+index 0bca5d9e..59541fa3 100644
+--- a/doc/Changelog
++++ b/doc/Changelog
+@@ -3,6 +3,8 @@
+ 	  from 'quick' to 'basic' because this is an I/O lock.
+ 	- Fix text around serial arithmatic used for RRSIG times to refer
+ 	  to correct RFC number.
++	- Fix Assert Causing DoS in synth_cname(),
++	  reported by X41 D-Sec.
+ 
+ 2 December 2019: Wouter
+ 	- Merge pull request #122 from he32: In tcp_callback_writer(),
+diff --git a/iterator/iter_scrub.c b/iterator/iter_scrub.c
+index 3f1438a4..cceec3d5 100644
+--- a/iterator/iter_scrub.c
++++ b/iterator/iter_scrub.c
+@@ -217,6 +217,10 @@ synth_cname(uint8_t* qname, size_t qnamelen, struct rrset_parse* dname_rrset,
+ 	size_t dtarglen;
+ 	if(!parse_get_cname_target(dname_rrset, &dtarg, &dtarglen))
+ 		return 0; 
++	if(qnamelen <= dname_rrset->dname_len)
++		return 0;
++	if(qnamelen == 0)
++		return 0;
+ 	log_assert(qnamelen > dname_rrset->dname_len);
+ 	/* DNAME from com. to net. with qname example.com. -> example.net. */
+ 	/* so: \3com\0 to \3net\0 and qname \7example\3com\0 */

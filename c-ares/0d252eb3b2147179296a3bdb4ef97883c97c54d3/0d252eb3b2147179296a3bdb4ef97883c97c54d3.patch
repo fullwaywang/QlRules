@@ -1,0 +1,46 @@
+commit 0d252eb3b2147179296a3bdb4ef97883c97c54d3
+Author: bradh352 <brad@brad-house.com>
+Date:   Thu Nov 12 10:24:40 2020 -0500
+
+    ares_parse_{a,aaaa}_reply could return larger *naddrttls than passed in
+    
+    If there are more ttls returned than the maximum provided by the requestor, then
+    the *naddrttls response would be larger than the actual number of elements in
+    the addrttls array.
+    
+    This bug could lead to invalid memory accesses in applications using c-ares.
+    
+    This behavior appeared to break with PR #257
+    
+    Fixes: #371
+    Reported By: Momtchil Momtchev (@mmomtchev)
+    Fix By: Brad House (@bradh352)
+
+diff --git a/src/lib/ares_parse_a_reply.c b/src/lib/ares_parse_a_reply.c
+index d8a9e9b..e71c993 100644
+--- a/src/lib/ares_parse_a_reply.c
++++ b/src/lib/ares_parse_a_reply.c
+@@ -197,7 +197,8 @@ int ares_parse_a_reply(const unsigned char *abuf, int alen,
+ 
+   if (naddrttls)
+     {
+-      *naddrttls = naddrs;
++      /* Truncated to at most *naddrttls entries */
++      *naddrttls = (naddrs > *naddrttls)?*naddrttls:naddrs;
+     }
+ 
+   ares__freeaddrinfo_cnames(ai.cnames);
+diff --git a/src/lib/ares_parse_aaaa_reply.c b/src/lib/ares_parse_aaaa_reply.c
+index 0d39bfa..346d430 100644
+--- a/src/lib/ares_parse_aaaa_reply.c
++++ b/src/lib/ares_parse_aaaa_reply.c
+@@ -200,7 +200,8 @@ int ares_parse_aaaa_reply(const unsigned char *abuf, int alen,
+ 
+   if (naddrttls)
+     {
+-      *naddrttls = naddrs;
++      /* Truncated to at most *naddrttls entries */
++      *naddrttls = (naddrs > *naddrttls)?*naddrttls:naddrs;
+     }
+ 
+   ares__freeaddrinfo_cnames(ai.cnames);

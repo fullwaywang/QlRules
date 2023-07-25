@@ -1,0 +1,22 @@
+commit 72b9537d8886f679494651df517dfed9b420cf1f	72b9537d8886f679494651df517dfed9b420cf1f
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 13 22:57:23 2012 +0200
+
+    dfa: Fix out of array write in decode_dds1()
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/dfa.c b/libavcodec/dfa.c
+index 13637d6a05..9664b47d4f 100644
+--- a/libavcodec/dfa.c
++++ b/libavcodec/dfa.c
+@@ -149,7 +149,7 @@ static int decode_dds1(GetByteContext *gb, uint8_t *frame, int width, int height
+             bitbuf = bytestream2_get_le16u(gb);
+             mask = 1;
+         }
+-        if (frame_end - frame < 2)
++        if (frame_end - frame < width + 2)
+             return -1;
+         if (bitbuf & mask) {
+             v = bytestream2_get_le16(gb);

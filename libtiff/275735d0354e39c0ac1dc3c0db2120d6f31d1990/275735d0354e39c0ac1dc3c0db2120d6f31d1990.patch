@@ -1,0 +1,22 @@
+commit 275735d0354e39c0ac1dc3c0db2120d6f31d1990	275735d0354e39c0ac1dc3c0db2120d6f31d1990
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Mon Jun 27 16:09:43 2022 +0200
+
+    _TIFFCheckFieldIsValidForCodec(): return FALSE when passed a codec-specific tag and the codec is not configured (fixes #433)
+    
+    This avoids crashes when querying such tags
+
+diff --git a/libtiff/tif_dirinfo.c b/libtiff/tif_dirinfo.c
+index c30f569b..3371cb5c 100644
+--- a/libtiff/tif_dirinfo.c
++++ b/libtiff/tif_dirinfo.c
+@@ -1191,6 +1191,9 @@ _TIFFCheckFieldIsValidForCodec(TIFF *tif, ttag_t tag)
+ 	    default:
+ 		return 1;
+ 	}
++	if( !TIFFIsCODECConfigured(tif->tif_dir.td_compression) ) {
++		return 0;
++	}
+ 	/* Check if codec specific tags are allowed for the current
+ 	 * compression scheme (codec) */
+ 	switch (tif->tif_dir.td_compression) {

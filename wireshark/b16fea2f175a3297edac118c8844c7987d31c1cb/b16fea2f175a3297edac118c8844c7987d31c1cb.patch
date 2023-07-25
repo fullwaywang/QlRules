@@ -1,0 +1,38 @@
+commit b16fea2f175a3297edac118c8844c7987d31c1cb
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Fri Mar 1 11:18:53 2019 +0100
+
+    srvloc: check buffer index to prevent heap overflow.
+    
+    Bug: 15546
+    Change-Id: I35eee1f6e1127db74339ec7218d7681bd93de59c
+    Reviewed-on: https://code.wireshark.org/review/32285
+    Petri-Dish: Alexis La Goutte <alexis.lagoutte@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 8f15ebed65ceea5c856fce055b5d83fb0c4b597b)
+    Reviewed-on: https://code.wireshark.org/review/32340
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+    Reviewed-by: Dario Lombardo <lomato@gmail.com>
+    (cherry picked from commit f43ac1291b80bbccdd1ef3e6118f72e08dc8beac)
+    Reviewed-on: https://code.wireshark.org/review/32722
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/dissectors/packet-srvloc.c b/epan/dissectors/packet-srvloc.c
+index 963fe976e2..dbbdcdad8b 100644
+--- a/epan/dissectors/packet-srvloc.c
++++ b/epan/dissectors/packet-srvloc.c
+@@ -456,9 +456,13 @@ unicode_to_bytes(tvbuff_t *tvb, int offset, int length, gboolean endianness)
+         for (i = length; i > 0; i--) {
+             c_char = ascii_text[i];
+             if (c_char != 0) {
++                if (i == 0)
++                    break;
+                 i--;
+                 c_char1 = ascii_text[i];
+                 if (c_char1 == 0) {
++                    if (i == 0)
++                        break;
+                     i--;
+                     c_char1 = ascii_text[i];
+                 }

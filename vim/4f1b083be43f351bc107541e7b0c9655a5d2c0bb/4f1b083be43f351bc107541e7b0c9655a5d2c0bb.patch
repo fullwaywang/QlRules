@@ -1,0 +1,62 @@
+commit 4f1b083be43f351bc107541e7b0c9655a5d2c0bb
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Aug 29 20:45:16 2022 +0100
+
+    patch 9.0.0322: crash when no errors and 'quickfixtextfunc' is set
+    
+    Problem:    Crash when no errors and 'quickfixtextfunc' is set.
+    Solution:   Do not handle errors if there aren't any.
+
+diff --git a/src/quickfix.c b/src/quickfix.c
+index 78f6880d8..ab288e0c4 100644
+--- a/src/quickfix.c
++++ b/src/quickfix.c
+@@ -4761,7 +4761,7 @@ qf_fill_buffer(qf_list_T *qfl, buf_T *buf, qfline_T *old_last, int qf_winid)
+     }
+ 
+     // Check if there is anything to display
+-    if (qfl != NULL)
++    if (qfl != NULL && qfl->qf_start != NULL)
+     {
+ 	char_u		dirname[MAXPATHL];
+ 	int		invalid_val = FALSE;
+diff --git a/src/testdir/test_quickfix.vim b/src/testdir/test_quickfix.vim
+index 31d36ef1d..ee43cb685 100644
+--- a/src/testdir/test_quickfix.vim
++++ b/src/testdir/test_quickfix.vim
+@@ -4107,6 +4107,22 @@ func Xgetlist_empty_tests(cchar)
+   endif
+ endfunc
+ 
++func Test_empty_list_quickfixtextfunc()
++  " This was crashing.  Can only reproduce by running it in a separate Vim
++  " instance.
++  let lines =<< trim END
++      func s:Func(o)
++              cgetexpr '0'
++      endfunc
++      cope
++      let &quickfixtextfunc = 's:Func'
++      cgetfile [ex
++  END
++  call writefile(lines, 'Xquickfixtextfunc')
++  call RunVim([], [], '-e -s -S Xquickfixtextfunc -c qa')
++  call delete('Xquickfixtextfunc')
++endfunc
++
+ func Test_getqflist()
+   call Xgetlist_empty_tests('c')
+   call Xgetlist_empty_tests('l')
+diff --git a/src/version.c b/src/version.c
+index a1fc74f82..be50c4206 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -707,6 +707,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    322,
+ /**/
+     321,
+ /**/

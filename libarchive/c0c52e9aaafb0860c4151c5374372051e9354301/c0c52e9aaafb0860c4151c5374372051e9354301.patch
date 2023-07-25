@@ -1,0 +1,52 @@
+commit c0c52e9aaafb0860c4151c5374372051e9354301
+Author: Tim Kientzle <kientzle@gmail.com>
+Date:   Thu Oct 22 21:43:07 2015 -0700
+
+    Don't try to be smart about probing the min/max tim_t values.
+    Just assume that a signed time_t is really a 64-bit or 32-bit integer.
+
+diff --git a/libarchive/archive_read_support_format_mtree.c b/libarchive/archive_read_support_format_mtree.c
+index b5f8e30d..3abe1985 100644
+--- a/libarchive/archive_read_support_format_mtree.c
++++ b/libarchive/archive_read_support_format_mtree.c
+@@ -148,9 +148,12 @@ get_time_t_max(void)
+ 		return (~(time_t)0);
+ 	} else {
+ 		/* Time_t is signed. */
+-		const uintmax_t max_unsigned_time_t = (uintmax_t)(~(time_t)0);
+-		const uintmax_t max_signed_time_t = max_unsigned_time_t >> 1;
+-		return (time_t)max_signed_time_t;
++		/* Assume it's the same as int64_t or int32_t */
++		if (sizeof(time_t) == sizeof(int64_t)) {
++			return (time_t)INT64_MAX;
++		} else {
++			return (time_t)INT32_MAX;
++		}
+ 	}
+ #endif
+ }
+@@ -166,10 +169,11 @@ get_time_t_min(void)
+ 		return (time_t)0;
+ 	} else {
+ 		/* Time_t is signed. */
+-		const uintmax_t max_unsigned_time_t = (uintmax_t)(~(time_t)0);
+-		const uintmax_t max_signed_time_t = max_unsigned_time_t >> 1;
+-		const intmax_t min_signed_time_t = (intmax_t)~max_signed_time_t;
+-		return (time_t)min_signed_time_t;
++		if (sizeof(time_t) == sizeof(int64_t)) {
++			return (time_t)INT64_MIN;
++		} else {
++			return (time_t)INT32_MIN;
++		}
+ 	}
+ #endif
+ }
+@@ -1561,7 +1565,7 @@ parse_keyword(struct archive_read *a, struct mtree *mtree,
+ 			int64_t m;
+ 			int64_t my_time_t_max = get_time_t_max();
+ 			int64_t my_time_t_min = get_time_t_min();
+-			long ns;
++			long ns = 0;
+ 
+ 			*parsed_kws |= MTREE_HAS_MTIME;
+ 			m = mtree_atol10(&val);

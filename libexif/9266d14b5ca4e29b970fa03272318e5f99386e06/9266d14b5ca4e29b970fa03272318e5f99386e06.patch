@@ -1,0 +1,42 @@
+commit 9266d14b5ca4e29b970fa03272318e5f99386e06
+Author: Marcus Meissner <marcus@jet.franken.de>
+Date:   Thu Nov 5 09:50:08 2020 +0100
+
+    fixed a incorrect overflow check that could be optimized away.
+    
+    inspired by:
+    https://android.googlesource.com/platform/external/libexif/+/8e7345f3bc0bad06ac369d6cbc1124c8ceaf7d4b
+    
+    https://source.android.com/security/bulletin/2020-11-01
+    
+    CVE-2020-0452
+
+diff --git a/NEWS b/NEWS
+index c9408d9..430f63f 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,7 +1,8 @@
+-libexif-0.6.23 (20xx-xx-xx):
++libexif-0.6.22.1 (20xx-xx-xx):
+   * Translation updates: es, pl, uk, fr
+   * Security fixes:
+     * CVE-2020-0198: unsigned integer overflow in exif_data_load_data_content
++    * CVE-2020-0452: compiler optimization could remove an a bufferoverflow check, making a buffer overflow possible with some EXIF tags
+ 
+ libexif-0.6.22 (2020-05-18):
+   * New translations: ms
+diff --git a/libexif/exif-entry.c b/libexif/exif-entry.c
+index 3fc0ff9..4b866ce 100644
+--- a/libexif/exif-entry.c
++++ b/libexif/exif-entry.c
+@@ -1371,8 +1371,8 @@ exif_entry_get_value (ExifEntry *e, char *val, unsigned int maxlen)
+ 	{
+ 		unsigned char *utf16;
+ 
+-		/* Sanity check the size to prevent overflow */
+-		if (e->size+sizeof(uint16_t)+1 < e->size) break;
++		/* Sanity check the size to prevent overflow. Note EXIF files are 64kb at most. */
++		if (e->size >= 65536 - sizeof(uint16_t)*2) break;
+ 
+ 		/* The tag may not be U+0000-terminated , so make a local
+ 		   U+0000-terminated copy before converting it */

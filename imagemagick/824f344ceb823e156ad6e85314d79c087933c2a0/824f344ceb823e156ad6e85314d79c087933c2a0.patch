@@ -1,0 +1,28 @@
+commit 824f344ceb823e156ad6e85314d79c087933c2a0
+Author: Dirk Lemstra <dirk@lemstra.org>
+Date:   Sat Jun 13 17:53:45 2020 +0200
+
+    Check the type of the field before performing the multiplication (details in #2132)
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 66eee571c..eeb616ab8 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -694,9 +694,16 @@ static MagickBooleanType TIFFGetProfiles(TIFF *tiff,Image *image,
+   if ((TIFFGetField(tiff,TIFFTAG_RICHTIFFIPTC,&length,&profile) == 1) &&
+       (profile != (unsigned char *) NULL))
+     {
++      const TIFFField
++        *field;
++
+       if (TIFFIsByteSwapped(tiff) != 0)
+         TIFFSwabArrayOfLong((uint32 *) profile,(size_t) length);
+-      status=ReadProfile(image,"iptc",profile,4L*length,exception);
++      field=TIFFFieldWithTag(tiff,TIFFTAG_RICHTIFFIPTC);
++      if (TIFFFieldDataType(field) == TIFF_LONG)
++        status=ReadProfile(image,"iptc",profile,4L*length,exception);
++      else
++        status=ReadProfile(image,"iptc",profile,length,exception);
+     }
+ #endif
+ #if defined(TIFFTAG_XMLPACKET)

@@ -1,0 +1,23 @@
+commit d23b8462b5a4a9da78ed45c4a7a3b35d538df909	d23b8462b5a4a9da78ed45c4a7a3b35d538df909
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue May 7 16:07:27 2013 +0200
+
+    gifdec: reset previous Graphic Control Extension disposal type
+    
+    This fixes out of array accesses.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/gifdec.c b/libavcodec/gifdec.c
+index 997bd42ecb..5ca82e3255 100644
+--- a/libavcodec/gifdec.c
++++ b/libavcodec/gifdec.c
+@@ -461,6 +461,7 @@ static int gif_decode_frame(AVCodecContext *avctx, void *data, int *got_frame, A
+ 
+     if (s->keyframe) {
+         s->keyframe_ok = 0;
++        s->gce_prev_disposal = GCE_DISPOSAL_NONE;
+         if ((ret = gif_read_header1(s)) < 0)
+             return ret;
+ 

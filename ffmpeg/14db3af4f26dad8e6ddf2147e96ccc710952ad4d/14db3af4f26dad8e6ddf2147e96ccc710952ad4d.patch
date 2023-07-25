@@ -1,0 +1,22 @@
+commit 14db3af4f26dad8e6ddf2147e96ccc710952ad4d	14db3af4f26dad8e6ddf2147e96ccc710952ad4d
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Nov 18 17:56:24 2011 +0100
+
+    qdm2dec: check remaining input bits in the mainloop of qdm2_fft_decode_tones()
+    This is neccessary but likely not sufficient to prevent out of array reads.
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/qdm2.c b/libavcodec/qdm2.c
+index fe785af3db..a057c1e0b4 100644
+--- a/libavcodec/qdm2.c
++++ b/libavcodec/qdm2.c
+@@ -1329,7 +1329,7 @@ static void qdm2_fft_decode_tones (QDM2Context *q, int duration, GetBitContext *
+     local_int_10 = 1 << (q->group_order - duration - 1);
+     offset = 1;
+ 
+-    while (1) {
++    while (get_bits_left(gb)>0) {
+         if (q->superblocktype_2_3) {
+             while ((n = qdm2_get_vlc(gb, &vlc_tab_fft_tone_offset[local_int_8], 1, 2)) < 2) {
+                 offset = 1;

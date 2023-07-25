@@ -1,0 +1,34 @@
+commit 80bd7b41b30af6ee96f519e629463583318de3b0
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Fri Jul 25 00:50:06 2014 +0100
+
+    Fix SRP ciphersuite DoS vulnerability.
+    
+    If a client attempted to use an SRP ciphersuite and it had not been
+    set up correctly it would crash with a null pointer read. A malicious
+    server could exploit this in a DoS attack.
+    
+    Thanks to Joonas Kuorilehto and Riku Hietamäki from Codenomicon
+    for reporting this issue.
+    
+    CVE-2014-2970
+    Reviewed-by: Tim Hudson <tjh@openssl.org>
+
+diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
+index 749d88d1a9..3616c0a11e 100644
+--- a/ssl/t1_lib.c
++++ b/ssl/t1_lib.c
+@@ -1088,6 +1088,13 @@ void ssl_set_client_disabled(SSL *s)
+ 		c->mask_k |= SSL_kPSK;
+ 		}
+ #endif /* OPENSSL_NO_PSK */
++#ifndef OPENSSL_NO_SRP
++	if (!(s->srp_ctx.srp_Mask & SSL_kSRP))
++		{
++		c->mask_a |= SSL_aSRP;
++		c->mask_k |= SSL_kSRP;
++		}
++#endif
+ 	c->valid = 1;
+ 	}
+ 

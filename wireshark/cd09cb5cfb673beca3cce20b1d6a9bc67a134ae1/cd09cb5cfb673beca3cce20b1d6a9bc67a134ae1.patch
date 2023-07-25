@@ -1,0 +1,26 @@
+commit cd09cb5cfb673beca3cce20b1d6a9bc67a134ae1
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Mon Jan 7 14:41:29 2019 -0800
+
+    epan: Add a boundary check to get_t61_string.
+    
+    Add a boundary check to make sure we don't go past the end of "ptr".
+    
+    Bug: 15373
+    Change-Id: I85394e8e6e477b47919362af146051cc8911254b
+    Reviewed-on: https://code.wireshark.org/review/31440
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/charsets.c b/epan/charsets.c
+index 7f298fdba2..ebeb2dcbcc 100644
+--- a/epan/charsets.c
++++ b/epan/charsets.c
+@@ -1382,7 +1382,7 @@ get_t61_string(wmem_allocator_t *scope, const guint8 *ptr, gint length)
+     for (i = 0, c = (guint8 *)ptr; i < length; c++, i++) {
+         if (!t61_tab[*c]) {
+             wmem_strbuf_append_unichar(strbuf, UNREPL);
+-        } else if ((*c & 0xf0) == 0xc0) {
++        } else if (i < length - 1 && (*c & 0xf0) == 0xc0) {
+             gint j = *c & 0x0f;
+             /* If this is the end of the string, or if the base
+              * character is just a space, treat this as a regular

@@ -1,0 +1,56 @@
+commit 0e8e938d497260dd57be67b4966cb27a5f72376f
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jun 18 12:51:11 2022 +0100
+
+    patch 8.2.5122: lisp indenting my run over the end of the line
+    
+    Problem:    Lisp indenting my run over the end of the line.
+    Solution:   Check for NUL earlier.
+
+diff --git a/src/indent.c b/src/indent.c
+index 794fa2c34..fa177bcf2 100644
+--- a/src/indent.c
++++ b/src/indent.c
+@@ -2029,6 +2029,8 @@ get_lisp_indent(void)
+ 			    }
+ 			}
+ 		    }
++		    if (*that == NUL)
++			break;
+ 		}
+ 		if (*that == '(' || *that == '[')
+ 		    ++parencount;
+diff --git a/src/testdir/test_indent.vim b/src/testdir/test_indent.vim
+index be55227bd..3b5b64317 100644
+--- a/src/testdir/test_indent.vim
++++ b/src/testdir/test_indent.vim
+@@ -144,6 +144,16 @@ func Test_lisp_indent()
+   close!
+ endfunc
+ 
++func Test_lisp_indent_quoted()
++  " This was going past the end of the line
++  new
++  setlocal lisp autoindent
++  call setline(1, ['"[', '='])
++  normal Gvk=
++
++  bwipe!
++endfunc
++
+ " Test for setting the 'indentexpr' from a modeline
+ func Test_modeline_indent_expr()
+   let modeline = &modeline
+diff --git a/src/version.c b/src/version.c
+index 89e1fa1b7..5411e1c18 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5122,
+ /**/
+     5121,
+ /**/

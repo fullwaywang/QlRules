@@ -1,0 +1,31 @@
+commit 7e90aed666e809c0db5de9d1816802a7dcea28d9
+Author: Dario Lombardo <lomato@gmail.com>
+Date:   Mon Jun 24 23:36:15 2019 +0200
+
+    asn1: don't increment a buffer beyond its end.
+    
+    Bug: 15870
+    Change-Id: I04cbb822f0e77c8e0ac8513e3a5c13116920ca6e
+    Reviewed-on: https://code.wireshark.org/review/33731
+    Petri-Dish: Anders Broman <a.broman58@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 45a3d0787f3c9f6f5fb5b53a8c29771b3f28e406)
+    Reviewed-on: https://code.wireshark.org/review/33736
+    Petri-Dish: Dario Lombardo <lomato@gmail.com>
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/asn1.c b/epan/asn1.c
+index bf30529cc6..1faef845ee 100644
+--- a/epan/asn1.c
++++ b/epan/asn1.c
+@@ -234,6 +234,9 @@ double asn1_get_real(const guint8 *real_ptr, gint len) {
+       DISSECTOR_ASSERT_NOT_REACHED();
+     }
+ 
++    /* Ensure the buffer len and its content are coherent */
++    DISSECTOR_ASSERT(lenE < len - 1);
++
+     Eneg = (*p) & 0x80 ? TRUE : FALSE;
+     for (i = 0; i < lenE; i++) {
+       if(Eneg) {

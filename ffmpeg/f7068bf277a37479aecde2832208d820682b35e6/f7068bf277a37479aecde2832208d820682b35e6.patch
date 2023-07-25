@@ -1,0 +1,28 @@
+commit f7068bf277a37479aecde2832208d820682b35e6
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Mon Jul 13 15:46:10 2015 +0200
+
+    avcodec/alac: Clear pointers in allocate_buffers()
+    
+    Fixes: 06a4edb39ad8a9883175f9bd428334a2_signal_sigsegv_7ffff713351a_706_mov__alac__ALAC_6ch.mov
+    
+    Found-by: Samuel Groß, Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/alac.c b/libavcodec/alac.c
+index b0527f1439..a5948bba7e 100644
+--- a/libavcodec/alac.c
++++ b/libavcodec/alac.c
+@@ -534,6 +534,12 @@ static int allocate_buffers(ALACContext *alac)
+     int ch;
+     int buf_size = alac->max_samples_per_frame * sizeof(int32_t);
+ 
++    for (ch = 0; ch < 2; ch++) {
++        alac->predict_error_buffer[ch]  = NULL;
++        alac->output_samples_buffer[ch] = NULL;
++        alac->extra_bits_buffer[ch]     = NULL;
++    }
++
+     for (ch = 0; ch < FFMIN(alac->channels, 2); ch++) {
+         FF_ALLOC_OR_GOTO(alac->avctx, alac->predict_error_buffer[ch],
+                          buf_size, buf_alloc_fail);

@@ -1,0 +1,35 @@
+commit bdc33cfaecb1b4cf2c114ed9015713ddf8569a60
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Tue Nov 27 13:38:10 2018 -0800
+
+    IxVeriWave: Fix a buffer boundary.
+    
+    Pass the correct buffer size to find_signature so that we don't read
+    past it.
+    
+    Bug: 15279
+    Change-Id: I822ed0fe8b48196dadd9c0062ed53fa1c4f6f404
+    Reviewed-on: https://code.wireshark.org/review/30809
+    Petri-Dish: Gerald Combs <gerald@wireshark.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+    (cherry picked from commit 1e13c1838a7f2f2cf629c96c99f20ff5a9f3a25b)
+    Reviewed-on: https://code.wireshark.org/review/30813
+
+diff --git a/wiretap/vwr.c b/wiretap/vwr.c
+index 8725ba9c3c..173614ec34 100644
+--- a/wiretap/vwr.c
++++ b/wiretap/vwr.c
+@@ -2155,9 +2155,10 @@ static gboolean vwr_read_s3_W_rec(vwr_t *vwr, wtap_rec *record,
+         end_time = e_time / NS_IN_US;                       /* convert to microseconds first */
+ 
+         /* extract the 32 LSBs of the signature timestamp field */
+-        m_ptr = &(rec[stats_offset+8+12]);
++        int m_ptr_offset = stats_offset + 8 + 12;
++        m_ptr = rec + m_ptr_offset;
+         pay_off = 42;         /* 24 (MAC) + 8 (SNAP) + IP */
+-        sig_off = find_signature(m_ptr, rec_size - 20, pay_off, flow_id, flow_seq);
++        sig_off = find_signature(m_ptr, rec_size - m_ptr_offset, pay_off, flow_id, flow_seq);
+         if (m_ptr[sig_off] == 0xdd)
+             sig_ts = get_signature_ts(m_ptr, sig_off, rec_size - vVW510021_W_STATS_TRAILER_LEN);
+         else

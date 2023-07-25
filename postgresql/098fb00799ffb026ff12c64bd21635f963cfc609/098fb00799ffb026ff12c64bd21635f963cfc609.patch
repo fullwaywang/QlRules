@@ -1,0 +1,115 @@
+commit 098fb00799ffb026ff12c64bd21635f963cfc609
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Nov 9 07:32:09 2020 -0800
+
+    Ignore attempts to \gset into specially treated variables.
+    
+    If an interactive psql session used \gset when querying a compromised
+    server, the attacker could execute arbitrary code as the operating
+    system account running psql.  Using a prefix not found among specially
+    treated variables, e.g. every lowercase string, precluded the attack.
+    Fix by issuing a warning and setting no variable for the column in
+    question.  Users wanting the old behavior can use a prefix and then a
+    meta-command like "\set HISTSIZE :prefix_HISTSIZE".  Back-patch to 9.5
+    (all supported versions).
+    
+    Reviewed by Robert Haas.  Reported by Nick Cleaton.
+    
+    Security: CVE-2020-25696
+
+diff --git a/src/bin/psql/common.c b/src/bin/psql/common.c
+index ff673665d8..dfbc22970f 100644
+--- a/src/bin/psql/common.c
++++ b/src/bin/psql/common.c
+@@ -786,6 +786,13 @@ StoreQueryTuple(const PGresult *result)
+ 			/* concatenate prefix and column name */
+ 			varname = psprintf("%s%s", pset.gset_prefix, colname);
+ 
++			if (VariableHasHook(pset.vars, varname))
++			{
++				pg_log_warning("attempt to \\gset into specially treated variable \"%s\" ignored",
++							   varname);
++				continue;
++			}
++
+ 			if (!PQgetisnull(result, 0, i))
+ 				value = PQgetvalue(result, 0, i);
+ 			else
+diff --git a/src/bin/psql/variables.c b/src/bin/psql/variables.c
+index 52aa5e5f16..84349fc753 100644
+--- a/src/bin/psql/variables.c
++++ b/src/bin/psql/variables.c
+@@ -360,6 +360,32 @@ SetVariableHooks(VariableSpace space, const char *name,
+ 		(void) (*ahook) (current->value);
+ }
+ 
++/*
++ * Return true iff the named variable has substitute and/or assign hook
++ * functions.
++ */
++bool
++VariableHasHook(VariableSpace space, const char *name)
++{
++	struct _variable *current;
++
++	Assert(space);
++	Assert(name);
++
++	for (current = space->next; current; current = current->next)
++	{
++		int			cmp = strcmp(current->name, name);
++
++		if (cmp == 0)
++			return (current->substitute_hook != NULL ||
++					current->assign_hook != NULL);
++		if (cmp > 0)
++			break;				/* it's not there */
++	}
++
++	return false;
++}
++
+ /*
+  * Convenience function to set a variable's value to "on".
+  */
+diff --git a/src/bin/psql/variables.h b/src/bin/psql/variables.h
+index ab5e51f20b..b932472021 100644
+--- a/src/bin/psql/variables.h
++++ b/src/bin/psql/variables.h
+@@ -90,6 +90,7 @@ bool		DeleteVariable(VariableSpace space, const char *name);
+ void		SetVariableHooks(VariableSpace space, const char *name,
+ 							 VariableSubstituteHook shook,
+ 							 VariableAssignHook ahook);
++bool		VariableHasHook(VariableSpace space, const char *name);
+ 
+ void		PsqlVarEnumError(const char *name, const char *value, const char *suggestions);
+ 
+diff --git a/src/test/regress/expected/psql.out b/src/test/regress/expected/psql.out
+index daac0ff49d..7204fdb0b4 100644
+--- a/src/test/regress/expected/psql.out
++++ b/src/test/regress/expected/psql.out
+@@ -106,6 +106,10 @@ select 10 as test01, 20 as test02, 'Hello' as test03 \gset pref01_
+ select 10 as "bad name"
+ \gset
+ invalid variable name: "bad name"
++select 97 as "EOF", 'ok' as _foo \gset IGNORE
++attempt to \gset into specially treated variable "IGNOREEOF" ignored
++\echo :IGNORE_foo :IGNOREEOF
++ok 0
+ -- multiple backslash commands in one line
+ select 1 as x, 2 as y \gset pref01_ \\ \echo :pref01_x
+ 1
+diff --git a/src/test/regress/sql/psql.sql b/src/test/regress/sql/psql.sql
+index 47b28d2a07..537d5332aa 100644
+--- a/src/test/regress/sql/psql.sql
++++ b/src/test/regress/sql/psql.sql
+@@ -55,6 +55,9 @@ select 10 as test01, 20 as test02, 'Hello' as test03 \gset pref01_
+ select 10 as "bad name"
+ \gset
+ 
++select 97 as "EOF", 'ok' as _foo \gset IGNORE
++\echo :IGNORE_foo :IGNOREEOF
++
+ -- multiple backslash commands in one line
+ select 1 as x, 2 as y \gset pref01_ \\ \echo :pref01_x
+ select 3 as x, 4 as y \gset pref01_ \echo :pref01_x \echo :pref01_y

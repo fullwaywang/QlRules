@@ -1,0 +1,50 @@
+commit a59f2dfd0cf9ee1a584d3de5b7c2d47648e79060
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed May 11 11:42:28 2022 +0100
+
+    patch 8.2.4938: crash when matching buffer with invalid pattern
+    
+    Problem:    Crash when matching buffer with invalid pattern.
+    Solution:   Check for NULL regprog.
+
+diff --git a/src/buffer.c b/src/buffer.c
+index 35711f5fe..dfdb0c430 100644
+--- a/src/buffer.c
++++ b/src/buffer.c
+@@ -2932,7 +2932,7 @@ buflist_match(
+ 
+     // First try the short file name, then the long file name.
+     match = fname_match(rmp, buf->b_sfname, ignore_case);
+-    if (match == NULL)
++    if (match == NULL && rmp->regprog != NULL)
+ 	match = fname_match(rmp, buf->b_ffname, ignore_case);
+ 
+     return match;
+diff --git a/src/testdir/test_buffer.vim b/src/testdir/test_buffer.vim
+index aea399558..55ef0fda7 100644
+--- a/src/testdir/test_buffer.vim
++++ b/src/testdir/test_buffer.vim
+@@ -415,6 +415,10 @@ func Test_buf_pattern_invalid()
+   vsplit 0000000
+   silent! buf [0--]\&\zs*\zs*e
+   bwipe!
++
++  vsplit 00000000000000000000000000
++  silent! buf [0--]\&\zs*\zs*e
++  bwipe!
+ endfunc
+ 
+ " Test for the 'maxmem' and 'maxmemtot' options
+diff --git a/src/version.c b/src/version.c
+index 8cc9cebac..0a3a5df8b 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4938,
+ /**/
+     4937,
+ /**/

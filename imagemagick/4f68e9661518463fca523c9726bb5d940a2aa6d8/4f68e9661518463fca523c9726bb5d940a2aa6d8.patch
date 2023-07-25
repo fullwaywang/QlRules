@@ -1,0 +1,19 @@
+commit 4f68e9661518463fca523c9726bb5d940a2aa6d8
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Mon Aug 31 16:19:40 2015 -0400
+
+    https://bugs.launchpad.net/ubuntu/+source/imagemagick/+bug/1490362
+
+diff --git a/coders/tga.c b/coders/tga.c
+index c2d760425..781933dfb 100644
+--- a/coders/tga.c
++++ b/coders/tga.c
+@@ -315,6 +315,8 @@ static Image *ReadTGAImage(const ImageInfo *image_info,
+       /*
+         Read TGA raster colormap.
+       */
++      if (image->colors < tga_info.colormap_index)
++        image->colors=tga_info.colormap_index;
+       if (AcquireImageColormap(image,image->colors,exception) == MagickFalse)
+         ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+       for (i=0; i < (ssize_t) tga_info.colormap_index; i++)

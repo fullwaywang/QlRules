@@ -1,140 +1,74 @@
+/**
+ * @name openssl-52e623c4cb06fffa9d5e75c60b34b4bc130b12e9-ssl3_get_certificate_request
+ * @id cpp/openssl/52e623c4cb06fffa9d5e75c60b34b4bc130b12e9/ssl3-get-certificate-request
+ * @description openssl-52e623c4cb06fffa9d5e75c60b34b4bc130b12e9-ssl/s3_clnt.c-ssl3_get_certificate_request CVE-2016-6306
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Function func) {
-	exists(Literal target_0 |
-		target_0.getValue()="2008"
-		and not target_0.getValue()="2014"
-		and target_0.getEnclosingFunction() = func)
+predicate func_0(Parameter vs_1973, Variable vnc_1976, Variable vllen_1977, ExprStmt target_1, BitwiseAndExpr target_2, RelationalOperation target_3, RelationalOperation target_4) {
+	exists(IfStmt target_0 |
+		target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vnc_1976
+		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(Literal).getValue()="2"
+		and target_0.getCondition().(RelationalOperation).getLesserOperand().(VariableAccess).getTarget()=vllen_1977
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ssl3_send_alert")
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vs_1973
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="50"
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ERR_put_error")
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(3) instanceof StringLiteral
+		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(4) instanceof Literal
+		and target_0.getThen().(BlockStmt).getStmt(2).(GotoStmt).toString() = "goto ..."
+		and target_0.getThen().(BlockStmt).getStmt(2).(GotoStmt).getName() ="err"
+		and target_1.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
+		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_2.getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation())
+		and target_3.getLesserOperand().(VariableAccess).getLocation().isBefore(target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation())
+		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation().isBefore(target_4.getGreaterOperand().(AddExpr).getAnOperand().(AddExpr).getAnOperand().(VariableAccess).getLocation()))
 }
 
-predicate func_1(Function func) {
-	exists(Literal target_1 |
-		target_1.getValue()="2017"
-		and not target_1.getValue()="2023"
-		and target_1.getEnclosingFunction() = func)
+predicate func_1(Parameter vs_1973, ExprStmt target_1) {
+		target_1.getExpr().(FunctionCall).getTarget().hasName("ssl3_send_alert")
+		and target_1.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vs_1973
+		and target_1.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
+		and target_1.getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="50"
 }
 
-predicate func_2(Function func) {
-	exists(Literal target_2 |
-		target_2.getValue()="2025"
-		and not target_2.getValue()="2031"
-		and target_2.getEnclosingFunction() = func)
+predicate func_2(Parameter vs_1973, BitwiseAndExpr target_2) {
+		target_2.getLeftOperand().(PointerFieldAccess).getTarget().getName()="options"
+		and target_2.getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vs_1973
+		and target_2.getRightOperand().(Literal).getValue()="536870912"
 }
 
-predicate func_3(Function func) {
-	exists(Literal target_3 |
-		target_3.getValue()="2045"
-		and not target_3.getValue()="2051"
-		and target_3.getEnclosingFunction() = func)
+predicate func_3(Variable vnc_1976, Variable vllen_1977, RelationalOperation target_3) {
+		 (target_3 instanceof GTExpr or target_3 instanceof LTExpr)
+		and target_3.getLesserOperand().(VariableAccess).getTarget()=vnc_1976
+		and target_3.getGreaterOperand().(VariableAccess).getTarget()=vllen_1977
 }
 
-predicate func_4(Function func) {
-	exists(Literal target_4 |
-		target_4.getValue()="2051"
-		and not target_4.getValue()="2057"
-		and target_4.getEnclosingFunction() = func)
+predicate func_4(Variable vnc_1976, Variable vllen_1977, RelationalOperation target_4) {
+		 (target_4 instanceof GTExpr or target_4 instanceof LTExpr)
+		and target_4.getGreaterOperand().(AddExpr).getAnOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vnc_1976
+		and target_4.getGreaterOperand().(AddExpr).getAnOperand().(Literal).getValue()="2"
+		and target_4.getLesserOperand().(VariableAccess).getTarget()=vllen_1977
 }
 
-predicate func_5(Function func) {
-	exists(Literal target_5 |
-		target_5.getValue()="2070"
-		and not target_5.getValue()="2076"
-		and target_5.getEnclosingFunction() = func)
-}
-
-predicate func_6(Function func) {
-	exists(Literal target_6 |
-		target_6.getValue()="2080"
-		and not target_6.getValue()="2091"
-		and target_6.getEnclosingFunction() = func)
-}
-
-predicate func_7(Function func) {
-	exists(Literal target_7 |
-		target_7.getValue()="2092"
-		and not target_7.getValue()="2103"
-		and target_7.getEnclosingFunction() = func)
-}
-
-predicate func_8(Function func) {
-	exists(Literal target_8 |
-		target_8.getValue()="2100"
-		and not target_8.getValue()="2111"
-		and target_8.getEnclosingFunction() = func)
-}
-
-predicate func_9(Function func) {
-	exists(Literal target_9 |
-		target_9.getValue()="2104"
-		and not target_9.getValue()="2115"
-		and target_9.getEnclosingFunction() = func)
-}
-
-predicate func_10(Parameter vs, Variable vnc, Variable vllen) {
-	exists(IfStmt target_10 |
-		target_10.getCondition().(GTExpr).getType().hasName("int")
-		and target_10.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getType().hasName("unsigned long")
-		and target_10.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(VariableAccess).getTarget()=vnc
-		and target_10.getCondition().(GTExpr).getGreaterOperand().(AddExpr).getRightOperand().(Literal).getValue()="2"
-		and target_10.getCondition().(GTExpr).getLesserOperand().(VariableAccess).getTarget()=vllen
-		and target_10.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ssl3_send_alert")
-		and target_10.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getType().hasName("int")
-		and target_10.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vs
-		and target_10.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
-		and target_10.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="50"
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("ERR_put_error")
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getType().hasName("void")
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(Literal).getValue()="20"
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="135"
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="132"
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(3).(StringLiteral).getValue()="s3_clnt.c"
-		and target_10.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(4).(Literal).getValue()="2083")
-}
-
-predicate func_13(Parameter vs, Variable vnc, Variable vl, Variable vllen) {
-	exists(ExprStmt target_13 |
-		target_13.getExpr().(FunctionCall).getTarget().hasName("ssl3_send_alert")
-		and target_13.getExpr().(FunctionCall).getType().hasName("int")
-		and target_13.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vs
-		and target_13.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
-		and target_13.getExpr().(FunctionCall).getArgument(2).(Literal).getValue()="50"
-		and target_13.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getType().hasName("int")
-		and target_13.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(AddExpr).getLeftOperand().(VariableAccess).getTarget()=vl
-		and target_13.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getLeftOperand().(AddExpr).getRightOperand().(VariableAccess).getTarget()=vnc
-		and target_13.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getGreaterOperand().(AddExpr).getRightOperand().(Literal).getValue()="2"
-		and target_13.getParent().(BlockStmt).getParent().(IfStmt).getCondition().(GTExpr).getLesserOperand().(VariableAccess).getTarget()=vllen)
-}
-
-predicate func_15(Function func) {
-	exists(GotoStmt target_15 |
-		func.getEntryPoint().(BlockStmt).getAStmt()=target_15)
-}
-
-from Function func, Parameter vs, Variable vnc, Variable vl, Variable vllen, Variable vp, Variable vq
+from Function func, Parameter vs_1973, Variable vnc_1976, Variable vllen_1977, ExprStmt target_1, BitwiseAndExpr target_2, RelationalOperation target_3, RelationalOperation target_4
 where
-func_0(func)
-and func_1(func)
-and func_2(func)
-and func_3(func)
-and func_4(func)
-and func_5(func)
-and func_6(func)
-and func_7(func)
-and func_8(func)
-and func_9(func)
-and not func_10(vs, vnc, vllen)
-and func_13(vs, vnc, vl, vllen)
-and func_15(func)
-and vs.getType().hasName("SSL *")
-and vnc.getType().hasName("unsigned long")
-and vl.getType().hasName("unsigned long")
-and vllen.getType().hasName("unsigned int")
-and vp.getType().hasName("const unsigned char *")
-and vq.getType().hasName("const unsigned char *")
-and vs.getParentScope+() = func
-and vnc.getParentScope+() = func
-and vl.getParentScope+() = func
-and vllen.getParentScope+() = func
-and vp.getParentScope+() = func
-and vq.getParentScope+() = func
-select func, vs, vnc, vl, vllen, vp, vq
+not func_0(vs_1973, vnc_1976, vllen_1977, target_1, target_2, target_3, target_4)
+and func_1(vs_1973, target_1)
+and func_2(vs_1973, target_2)
+and func_3(vnc_1976, vllen_1977, target_3)
+and func_4(vnc_1976, vllen_1977, target_4)
+and vs_1973.getType().hasName("SSL *")
+and vnc_1976.getType().hasName("unsigned long")
+and vllen_1977.getType().hasName("unsigned int")
+and vs_1973.getParentScope+() = func
+and vnc_1976.getParentScope+() = func
+and vllen_1977.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

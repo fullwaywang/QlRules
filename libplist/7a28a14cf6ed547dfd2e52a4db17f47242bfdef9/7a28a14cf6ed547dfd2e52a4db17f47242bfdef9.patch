@@ -1,0 +1,31 @@
+commit 7a28a14cf6ed547dfd2e52a4db17f47242bfdef9
+Author: Nikias Bassen <nikias@gmx.li>
+Date:   Mon Jan 16 02:00:27 2017 +0100
+
+    bplist: Disallow key nodes with non-string node types
+    
+    As reported in #86, the binary plist parser would force the type of the
+    key node to be of type PLIST_KEY while the node might be of a different
+    i.e. non-string type. A following plist_free() might then call free() on
+    an invalid pointer; e.g. if the node is of type integer, its value would
+    be considered a pointer, and free() would cause an error.
+    We prevent this issue by disallowing non-string key nodes during parsing.
+
+diff --git a/src/bplist.c b/src/bplist.c
+index 0122e08..73fa4e0 100644
+--- a/src/bplist.c
++++ b/src/bplist.c
+@@ -441,6 +441,13 @@ static plist_t parse_dict_node(struct bplist_data *bplist, const char** bnode, u
+             plist_free(node);
+             return NULL;
+         }
++
++        if (plist_get_data(key)->type != PLIST_STRING) {
++            fprintf(stderr, "ERROR: Malformed binary plist dict, invalid node type for key!\n");
++            plist_free(node);
++            return NULL;
++        }
++
+         /* enforce key type */
+         plist_get_data(key)->type = PLIST_KEY;
+         if (!plist_get_data(key)->strval) {

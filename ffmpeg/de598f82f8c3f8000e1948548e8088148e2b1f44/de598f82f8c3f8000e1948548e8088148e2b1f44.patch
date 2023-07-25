@@ -1,0 +1,35 @@
+commit de598f82f8c3f8000e1948548e8088148e2b1f44
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Tue Oct 15 16:38:40 2019 +0200
+
+    avfilter/vf_edgedetect: fix heap-buffer overflow
+    
+    Fixes #8275
+
+diff --git a/libavfilter/vf_edgedetect.c b/libavfilter/vf_edgedetect.c
+index ea0efe0de3..25424dbcce 100644
+--- a/libavfilter/vf_edgedetect.c
++++ b/libavfilter/vf_edgedetect.c
+@@ -155,7 +155,8 @@ static void gaussian_blur(AVFilterContext *ctx, int w, int h,
+     }
+     for (j = 2; j < h - 2; j++) {
+         dst[0] = src[0];
+-        dst[1] = src[1];
++        if (w > 1)
++            dst[1] = src[1];
+         for (i = 2; i < w - 2; i++) {
+             /* Gaussian mask of size 5x5 with sigma = 1.4 */
+             dst[i] = ((src[-2*src_linesize + i-2] + src[2*src_linesize + i-2]) * 2
+@@ -176,8 +177,10 @@ static void gaussian_blur(AVFilterContext *ctx, int w, int h,
+                     + src[i+1] * 12
+                     + src[i+2] *  5) / 159;
+         }
+-        dst[i    ] = src[i    ];
+-        dst[i + 1] = src[i + 1];
++        if (w > 2)
++            dst[i    ] = src[i    ];
++        if (w > 3)
++            dst[i + 1] = src[i + 1];
+ 
+         dst += dst_linesize;
+         src += src_linesize;

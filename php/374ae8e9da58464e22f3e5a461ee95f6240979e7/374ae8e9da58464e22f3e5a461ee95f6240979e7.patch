@@ -1,0 +1,21 @@
+commit 374ae8e9da58464e22f3e5a461ee95f6240979e7
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Tue Jul 12 21:52:27 2016 -0700
+
+    Fix for bug #72513
+    
+    This is applicable to 7 as well, but was somehow missing from the merge.
+
+diff --git a/Zend/zend_virtual_cwd.c b/Zend/zend_virtual_cwd.c
+index 965a59aa75..4dbbb5ea5b 100644
+--- a/Zend/zend_virtual_cwd.c
++++ b/Zend/zend_virtual_cwd.c
+@@ -1187,7 +1187,7 @@ CWD_API int virtual_file_ex(cwd_state *state, const char *path, verify_path_func
+ 	int add_slash;
+ 	void *tmp;
+ 
+-	if (path_length == 0 || path_length >= MAXPATHLEN-1) {
++	if (path_length <= 0 || path_length >= MAXPATHLEN-1) {
+ #ifdef ZEND_WIN32
+ 		_set_errno(EINVAL);
+ #else

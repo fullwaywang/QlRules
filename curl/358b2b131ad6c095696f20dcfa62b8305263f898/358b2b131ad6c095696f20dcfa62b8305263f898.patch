@@ -1,0 +1,41 @@
+commit 358b2b131ad6c095696f20dcfa62b8305263f898
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Tue Aug 1 17:16:46 2017 +0200
+
+    tftp: reject file name lengths that don't fit
+    
+    ... and thereby avoid telling send() to send off more bytes than the
+    size of the buffer!
+    
+    CVE-2017-1000100
+    
+    Bug: https://curl.haxx.se/docs/adv_20170809B.html
+    Reported-by: Even Rouault
+    
+    Credit to OSS-Fuzz for the discovery
+
+diff --git a/lib/tftp.c b/lib/tftp.c
+index 02bd84242..f6f4bce5b 100644
+--- a/lib/tftp.c
++++ b/lib/tftp.c
+@@ -5,7 +5,7 @@
+  *                            | (__| |_| |  _ <| |___
+  *                             \___|\___/|_| \_\_____|
+  *
+- * Copyright (C) 1998 - 2016, Daniel Stenberg, <daniel@haxx.se>, et al.
++ * Copyright (C) 1998 - 2017, Daniel Stenberg, <daniel@haxx.se>, et al.
+  *
+  * This software is licensed as described in the file COPYING, which
+  * you should have received as part of this distribution. The terms
+@@ -491,6 +491,11 @@ static CURLcode tftp_send_first(tftp_state_data_t *state, tftp_event_t event)
+     if(result)
+       return result;
+ 
++    if(strlen(filename) > (state->blksize - strlen(mode) - 4)) {
++      failf(data, "TFTP file name too long\n");
++      return CURLE_TFTP_ILLEGAL; /* too long file name field */
++    }
++
+     snprintf((char *)state->spacket.data+2,
+              state->blksize,
+              "%s%c%s%c", filename, '\0',  mode, '\0');

@@ -1,7 +1,7 @@
 /**
  * @name httpd-fa7b2a5250e54363b3a6c8ac3aaa7de4e8da9b2e-ap_increment_counts
  * @id cpp/httpd/fa7b2a5250e54363b3a6c8ac3aaa7de4e8da9b2e/ap-increment-counts
- * @description httpd-fa7b2a5250e54363b3a6c8ac3aaa7de4e8da9b2e-ap_increment_counts CVE-2021-34798
+ * @description httpd-fa7b2a5250e54363b3a6c8ac3aaa7de4e8da9b2e-server/scoreboard.c-ap_increment_counts CVE-2021-34798
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -63,5 +63,5 @@ and func_2(target_2)
 and func_3(vr_379, target_3)
 and func_4(vr_379, target_4)
 and vr_379.getType().hasName("request_rec *")
-and vr_379.getParentScope+() = func
+and vr_379.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

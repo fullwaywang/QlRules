@@ -1,0 +1,22 @@
+commit dd84447b63a71fa8c3f47071b09454efc667767b
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sun Jul 24 20:07:03 2016 -0400
+
+    Prevent buffer overflow (bug report from Ibrahim el-sayed)
+
+diff --git a/MagickCore/property.c b/MagickCore/property.c
+index 772f3d59f..0b4b75c49 100644
+--- a/MagickCore/property.c
++++ b/MagickCore/property.c
+@@ -665,6 +665,11 @@ static MagickBooleanType Get8BIMProperty(const Image *image,const char *key,
+     if ((count & 0x01) == 0)
+       (void) ReadPropertyByte(&info,&length);
+     count=(ssize_t) ReadPropertyMSBLong(&info,&length);
++    if ((count < 0) || ((size_t) count > length))
++      {
++        length=0; 
++        continue;
++      }
+     if ((*name != '\0') && (*name != '#'))
+       if ((resource == (char *) NULL) || (LocaleCompare(name,resource) != 0))
+         {

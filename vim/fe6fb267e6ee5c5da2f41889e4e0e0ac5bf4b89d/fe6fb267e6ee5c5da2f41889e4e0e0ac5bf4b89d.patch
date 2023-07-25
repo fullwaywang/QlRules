@@ -1,0 +1,112 @@
+commit fe6fb267e6ee5c5da2f41889e4e0e0ac5bf4b89d
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Jan 24 18:16:12 2022 +0000
+
+    patch 8.2.4206: condition with many "(" causes a crash
+    
+    Problem:    Condition with many "(" causes a crash.
+    Solution:   Limit recursion to 1000.
+
+diff --git a/src/errors.h b/src/errors.h
+index e632d5b24..d89c27c22 100644
+--- a/src/errors.h
++++ b/src/errors.h
+@@ -2718,6 +2718,8 @@ EXTERN char e_invalid_command_after_export[]
+ 	INIT(= N_("E1043: Invalid command after :export"));
+ EXTERN char e_export_with_invalid_argument[]
+ 	INIT(= N_("E1044: Export with invalid argument"));
++// E1045 not used
++// E1046 not used
+ EXTERN char e_syntax_error_in_import_str[]
+ 	INIT(= N_("E1047: Syntax error in import: %s"));
+ EXTERN char e_item_not_found_in_script_str[]
+@@ -2786,6 +2788,7 @@ EXTERN char e_missing_argument_type_for_str[]
+ // E1080 unused
+ EXTERN char e_cannot_unlet_str[]
+ 	INIT(= N_("E1081: Cannot unlet %s"));
++// E1082 unused
+ EXTERN char e_missing_backtick[]
+ 	INIT(= N_("E1083: Missing backtick"));
+ EXTERN char e_cannot_delete_vim9_script_function_str[]
+@@ -2906,6 +2909,7 @@ EXTERN char e_for_argument_must_be_sequence_of_lists[]
+ 	INIT(= N_("E1140: :for argument must be a sequence of lists"));
+ EXTERN char e_indexable_type_required[]
+ 	INIT(= N_("E1141: Indexable type required"));
++// E1142 unused
+ EXTERN char e_empty_expression_str[]
+ 	INIT(= N_("E1143: Empty expression: \"%s\""));
+ EXTERN char e_command_str_not_followed_by_white_space_str[]
+@@ -2966,7 +2970,8 @@ EXTERN char e_argument_name_shadows_existing_variable_str[]
+ 	INIT(= N_("E1167: Argument name shadows existing variable: %s"));
+ EXTERN char e_argument_already_declared_in_script_str[]
+ 	INIT(= N_("E1168: Argument already declared in the script: %s"));
+-// E1169 unused
++EXTERN char e_expression_too_recursive_str[]
++	INIT(= N_("E1169: Expression too recursive: %s"));
+ EXTERN char e_cannot_use_hash_curly_to_start_comment[]
+ 	INIT(= N_("E1170: Cannot use #{ to start a comment"));
+ EXTERN char e_missing_end_block[]
+diff --git a/src/eval.c b/src/eval.c
+index 2ca337749..d42e1f826 100644
+--- a/src/eval.c
++++ b/src/eval.c
+@@ -3526,6 +3526,7 @@ eval7(
+     char_u	*start_leader, *end_leader;
+     int		ret = OK;
+     char_u	*alias;
++    static	int recurse = 0;
+ 
+     /*
+      * Initialise variable so that clear_tv() can't mistake this for a
+@@ -3552,6 +3553,15 @@ eval7(
+ 	return FAIL;
+     }
+ 
++    // Limit recursion to 1000 levels.  At least at 10000 we run out of stack
++    // and crash.
++    if (recurse == 1000)
++    {
++	semsg(_(e_expression_too_recursive_str), *arg);
++	return FAIL;
++    }
++    ++recurse;
++
+     switch (**arg)
+     {
+     /*
+@@ -3781,6 +3791,8 @@ eval7(
+      */
+     if (ret == OK && evaluate && end_leader > start_leader)
+ 	ret = eval7_leader(rettv, FALSE, start_leader, &end_leader);
++
++    --recurse;
+     return ret;
+ }
+ 
+diff --git a/src/testdir/test_eval_stuff.vim b/src/testdir/test_eval_stuff.vim
+index ff6d695f6..6043ed9a1 100644
+--- a/src/testdir/test_eval_stuff.vim
++++ b/src/testdir/test_eval_stuff.vim
+@@ -590,4 +590,9 @@ func Test_curly_assignment()
+   unlet g:gvar
+ endfunc
+ 
++func Test_deep_recursion()
++  " this was running out of stack
++  call assert_fails("exe 'if ' .. repeat('(', 1002)", 'E1169: Expression too recursive: ((')
++endfunc
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 4cb980ea4..16a99ef92 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4206,
+ /**/
+     4205,
+ /**/

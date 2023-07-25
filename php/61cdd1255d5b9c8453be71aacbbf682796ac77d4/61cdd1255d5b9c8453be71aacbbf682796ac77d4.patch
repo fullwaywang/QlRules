@@ -1,0 +1,44 @@
+commit 61cdd1255d5b9c8453be71aacbbf682796ac77d4
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Mon Oct 10 22:54:29 2016 -0700
+
+    Fix bug #73257 and bug #73258 - SplObjectStorage unserialize allows use of non-object as key
+
+diff --git a/ext/spl/spl_observer.c b/ext/spl/spl_observer.c
+index c189205879..ad7887bd28 100644
+--- a/ext/spl/spl_observer.c
++++ b/ext/spl/spl_observer.c
+@@ -772,6 +772,9 @@ SPL_METHOD(SplObjectStorage, unserialize)
+ 	--p; /* for ';' */
+ 	count = Z_LVAL_P(pcount);
+ 
++	ZVAL_UNDEF(&entry);
++	ZVAL_UNDEF(&inf);
++
+ 	while (count-- > 0) {
+ 		spl_SplObjectStorageElement *pelement;
+ 		zend_string *hash;
+@@ -787,18 +790,17 @@ SPL_METHOD(SplObjectStorage, unserialize)
+ 		if (!php_var_unserialize(&entry, &p, s + buf_len, &var_hash)) {
+ 			goto outexcept;
+ 		}
+-		if (Z_TYPE(entry) != IS_OBJECT) {
+-			zval_ptr_dtor(&entry);
+-			goto outexcept;
+-		}
+ 		if (*p == ',') { /* new version has inf */
+ 			++p;
+ 			if (!php_var_unserialize(&inf, &p, s + buf_len, &var_hash)) {
+ 				zval_ptr_dtor(&entry);
+ 				goto outexcept;
+ 			}
+-		} else {
+-			ZVAL_UNDEF(&inf);
++		}
++		if (Z_TYPE(entry) != IS_OBJECT) {
++			zval_ptr_dtor(&entry);
++			zval_ptr_dtor(&inf);
++			goto outexcept;
+ 		}
+ 
+ 		hash = spl_object_storage_get_hash(intern, getThis(), &entry);

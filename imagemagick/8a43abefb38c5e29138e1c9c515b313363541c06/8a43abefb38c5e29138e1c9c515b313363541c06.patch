@@ -1,0 +1,19 @@
+commit 8a43abefb38c5e29138e1c9c515b313363541c06
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Sun Jan 20 11:04:31 2019 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/1451
+
+diff --git a/coders/psd.c b/coders/psd.c
+index 95dd4e6bb..7bbd3af4e 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -2782,6 +2782,8 @@ static size_t WritePSDChannel(const PSDInfo *psd_info,
+       if (deflateInit(&stream,level) != Z_OK)
+         {
+           quantum_info=DestroyQuantumInfo(quantum_info);
++          compressed_pixels=(unsigned char *) RelinquishMagickMemory(
++            compressed_pixels);
+           return(0);
+         }
+     }

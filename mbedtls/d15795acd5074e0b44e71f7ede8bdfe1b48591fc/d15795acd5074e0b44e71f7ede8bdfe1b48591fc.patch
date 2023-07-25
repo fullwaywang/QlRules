@@ -1,0 +1,98 @@
+commit d15795acd5074e0b44e71f7ede8bdfe1b48591fc
+Author: Manuel Pégourié-Gonnard <manuel.pegourie-gonnard@arm.com>
+Date:   Thu Jun 22 12:19:27 2017 +0200
+
+    Improve behaviour on fatal errors
+    
+    If we didn't walk the whole chain, then there may be any kind of errors in the
+    part of the chain we didn't check, so setting all flags looks like the safe
+    thing to do.
+
+diff --git a/ChangeLog b/ChangeLog
+index 2f0116bcf..9bf6a1719 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,5 +1,12 @@
+ mbed TLS ChangeLog (Sorted per branch, date)
+ 
++= mbed TLS 2.y.z released YYYY-MM-DD
++
++Changes
++   * Certificate verification functions now set flags to -1 in case the full
++     chain was not verified due to an internal error (including in the verify
++     callback) or chain length limitations.
++
+ = mbed TLS 2.5.1 released 2017-06-21
+ 
+ Security
+diff --git a/library/x509_crt.c b/library/x509_crt.c
+index d86857de8..ee5f27e46 100644
+--- a/library/x509_crt.c
++++ b/library/x509_crt.c
+@@ -2202,11 +2202,14 @@ int mbedtls_x509_crt_verify_with_profile( mbedtls_x509_crt *crt,
+     mbedtls_x509_sequence *cur = NULL;
+     mbedtls_pk_type_t pk_type;
+ 
+-    if( profile == NULL )
+-        return( MBEDTLS_ERR_X509_BAD_INPUT_DATA );
+-
+     *flags = 0;
+ 
++    if( profile == NULL )
++    {
++        ret = MBEDTLS_ERR_X509_BAD_INPUT_DATA;
++        goto exit;
++    }
++
+     if( cn != NULL )
+     {
+         name = &crt->subject;
+@@ -2280,7 +2283,7 @@ int mbedtls_x509_crt_verify_with_profile( mbedtls_x509_crt *crt,
+         ret = x509_crt_verify_top( crt, parent, ca_crl, profile,
+                                    pathlen, selfsigned, flags, f_vrfy, p_vrfy );
+         if( ret != 0 )
+-            return( ret );
++            goto exit;
+     }
+     else
+     {
+@@ -2295,17 +2298,24 @@ int mbedtls_x509_crt_verify_with_profile( mbedtls_x509_crt *crt,
+             ret = x509_crt_verify_child( crt, parent, trust_ca, ca_crl, profile,
+                                          pathlen, selfsigned, flags, f_vrfy, p_vrfy );
+             if( ret != 0 )
+-                return( ret );
++                goto exit;
+         }
+         else
+         {
+             ret = x509_crt_verify_top( crt, trust_ca, ca_crl, profile,
+                                        pathlen, selfsigned, flags, f_vrfy, p_vrfy );
+             if( ret != 0 )
+-                return( ret );
++                goto exit;
+         }
+     }
+ 
++exit:
++    if( ret != 0 )
++    {
++        *flags = (uint32_t) -1;
++        return( ret );
++    }
++
+     if( *flags != 0 )
+         return( MBEDTLS_ERR_X509_CERT_VERIFY_FAILED );
+ 
+diff --git a/tests/suites/test_suite_x509parse.data b/tests/suites/test_suite_x509parse.data
+index 9d3108aba..6df529875 100644
+--- a/tests/suites/test_suite_x509parse.data
++++ b/tests/suites/test_suite_x509parse.data
+@@ -1204,7 +1204,7 @@ mbedtls_x509_crt_verify_max:"data_files/test-ca2.crt":"data_files/dir-maxpath":M
+ 
+ X509 CRT verify long chain (max intermediate CA + 1)
+ depends_on:MBEDTLS_SHA256_C:MBEDTLS_ECDSA_C:MBEDTLS_ECP_DP_SECP256R1_ENABLED
+-mbedtls_x509_crt_verify_max:"data_files/dir-maxpath/00.crt":"data_files/dir-maxpath":MBEDTLS_X509_MAX_INTERMEDIATE_CA+1:MBEDTLS_ERR_X509_CERT_VERIFY_FAILED:0
++mbedtls_x509_crt_verify_max:"data_files/dir-maxpath/00.crt":"data_files/dir-maxpath":MBEDTLS_X509_MAX_INTERMEDIATE_CA+1:MBEDTLS_ERR_X509_CERT_VERIFY_FAILED:-1
+ 
+ X509 CRT verify chain #1 (zero pathlen intermediate)
+ depends_on:MBEDTLS_SHA256_C:MBEDTLS_RSA_C

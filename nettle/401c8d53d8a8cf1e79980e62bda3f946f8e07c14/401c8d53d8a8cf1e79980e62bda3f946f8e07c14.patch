@@ -1,0 +1,43 @@
+commit 401c8d53d8a8cf1e79980e62bda3f946f8e07c14
+Author: Niels Möller <nisse@lysator.liu.se>
+Date:   Sat Mar 13 16:29:50 2021 +0100
+
+    Analogous fix to ecc_gostdsa_verify.
+    
+    * ecc-gostdsa-verify.c (ecc_gostdsa_verify): Use ecc_mod_mul_canonical
+    to compute the scalars used for ecc multiplication.
+    
+    (cherry picked from commit fbaefb64b90cb45b7075a0ed72a92f2a1fbcd2ab)
+
+diff --git a/ChangeLog b/ChangeLog
+index fb2d7f66..5f8a22c2 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,5 +1,8 @@
+ 2021-03-13  Niels Möller  <nisse@lysator.liu.se>
+ 
++	* ecc-gostdsa-verify.c (ecc_gostdsa_verify): Use ecc_mod_mul_canonical
++	to compute the scalars used for ecc multiplication.
++
+ 	* ecc-ecdsa-sign.c (ecc_ecdsa_sign): Ensure s output is reduced to
+ 	canonical range.
+ 
+diff --git a/ecc-gostdsa-verify.c b/ecc-gostdsa-verify.c
+index c0613f4f..fcdd4644 100644
+--- a/ecc-gostdsa-verify.c
++++ b/ecc-gostdsa-verify.c
+@@ -102,11 +102,11 @@ ecc_gostdsa_verify (const struct ecc_curve *ecc,
+   ecc->q.invert (&ecc->q, vp, hp, vp + ecc->p.size);
+ 
+   /* z1 = s / h, P1 = z1 * G */
+-  ecc_mod_mul (&ecc->q, z1, sp, vp, z1);
++  ecc_mod_mul_canonical (&ecc->q, z1, sp, vp, z1);
+ 
+   /* z2 = - r / h, P2 = z2 * Y */
+-  ecc_mod_mul (&ecc->q, z2, rp, vp, z2);
+-  mpn_sub_n (z2, ecc->q.m, z2, ecc->p.size);
++  mpn_sub_n (hp, ecc->q.m, rp, ecc->p.size);
++  ecc_mod_mul_canonical (&ecc->q, z2, hp, vp, z2);
+ 
+    /* Total storage: 5*ecc->p.size + ecc->mul_itch */
+   ecc->mul (ecc, P2, z2, pp, z2 + ecc->p.size);

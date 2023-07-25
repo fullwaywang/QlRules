@@ -1,0 +1,56 @@
+commit 4e8c2ed53fcb54a34b3a6185b2584f26cf6874a3
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Thu Dec 1 18:28:16 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/312
+
+diff --git a/ChangeLog b/ChangeLog
+index a4d07cb2f..1421a6338 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,6 +1,8 @@
+ 2016-11-26  7.0.3-9 Cristy  <quetzlzacatenango@image...>
+   * Support the compare -read-mask option.
+   * Support read-masks for the -modulate option.
++  * Prevent buffer overflow when streaming an image (reference
++    https://github.com/ImageMagick/ImageMagick/issues/312).
+ 
+ 2016-11-15  7.0.3-8 Cristy  <quetzlzacatenango@image...>
+   * Release ImageMagick version 7.0.3-8, GIT revision 19067:5aceded:20161125.
+diff --git a/MagickCore/constitute.c b/MagickCore/constitute.c
+index f3dd1ec90..a7a526744 100644
+--- a/MagickCore/constitute.c
++++ b/MagickCore/constitute.c
+@@ -308,7 +308,8 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
+           read_info=DestroyImageInfo(read_info);
+           return(PingImage(image_info,exception));
+         }
+-      (void) CopyMagickString(ping_filename,read_info->filename,MagickPathExtent);
++      (void) CopyMagickString(ping_filename,read_info->filename,
++        MagickPathExtent);
+       images=NewImageList();
+       extent=(ssize_t) (read_info->scene+read_info->number_scenes);
+       for (scene=(ssize_t) read_info->scene; scene < (ssize_t) extent; scene++)
+diff --git a/MagickCore/stream.c b/MagickCore/stream.c
+index b9bf4fb87..009d10a26 100644
+--- a/MagickCore/stream.c
++++ b/MagickCore/stream.c
+@@ -811,7 +811,8 @@ MagickExport MagickBooleanType OpenStream(const ImageInfo *image_info,
+   MagickBooleanType
+     status;
+ 
+-  (void) CopyMagickString(stream_info->stream->filename,filename,MagickPathExtent);
++  (void) CopyMagickString(stream_info->stream->filename,filename,
++    MagickPathExtent);
+   status=OpenBlob(image_info,stream_info->stream,WriteBinaryBlobMode,exception);
+   return(status);
+ }
+@@ -1011,7 +1012,7 @@ MagickExport Image *ReadStream(const ImageInfo *image_info,StreamHandler stream,
+   read_info->stream=stream;
+   image=ReadImage(read_info,exception);
+   if (image != (Image *) NULL)
+-    InitializePixelChannelMap(image);
++    (void) SyncImagePixelCache(image,exception);
+   read_info=DestroyImageInfo(read_info);
+   return(image);
+ }

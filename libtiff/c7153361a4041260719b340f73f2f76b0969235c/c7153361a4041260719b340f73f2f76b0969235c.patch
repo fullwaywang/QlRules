@@ -1,0 +1,35 @@
+commit c7153361a4041260719b340f73f2f76b0969235c	c7153361a4041260719b340f73f2f76b0969235c
+Author: erouault <erouault>
+Date:   Tue Dec 20 17:28:17 2016 +0000
+
+    * tools/tiff2pdf.c: avoid potential heap-based overflow in
+    t2p_readwrite_pdf_image_tile().
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2640
+
+diff --git a/ChangeLog b/ChangeLog
+index 6be36026..91ba4e6e 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,9 @@
++2016-12-20 Even Rouault <even.rouault at spatialys.com>
++
++	* tools/tiff2pdf.c: avoid potential heap-based overflow in
++	t2p_readwrite_pdf_image_tile().
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2640
++
+ 2016-12-20 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* tools/tiff2pdf.c: avoid potential invalid memory read in
+diff --git a/tools/tiff2pdf.c b/tools/tiff2pdf.c
+index 47d76298..db196e04 100644
+--- a/tools/tiff2pdf.c
++++ b/tools/tiff2pdf.c
+@@ -2895,7 +2895,7 @@ tsize_t t2p_readwrite_pdf_image_tile(T2P* t2p, TIFF* input, TIFF* output, ttile_
+ 				return(0);
+ 			}
+ 			if(TIFFGetField(input, TIFFTAG_JPEGTABLES, &count, &jpt) != 0) {
+-				if (count >= 4) {
++				if (count > 4) {
+                                         int retTIFFReadRawTile;
+                     /* Ignore EOI marker of JpegTables */
+ 					_TIFFmemcpy(buffer, jpt, count - 2);

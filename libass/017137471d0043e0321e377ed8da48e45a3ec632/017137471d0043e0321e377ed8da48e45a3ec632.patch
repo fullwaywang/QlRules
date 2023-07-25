@@ -1,0 +1,37 @@
+commit 017137471d0043e0321e377ed8da48e45a3ec632
+Author: Oleg Oshmyan <chortos@inbox.lv>
+Date:   Tue Oct 27 15:46:04 2020 +0200
+
+    decode_font: fix subtraction broken by change to unsigned type
+    
+    This caused a one-byte buffer overwrite and an assertion failure.
+    
+    Regression in commit 910211f1c0078e37546f73e95306724358b89be2.
+    
+    Discovered by OSS-Fuzz.
+    
+    Fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=26674.
+    Fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=26678.
+
+diff --git a/libass/ass.c b/libass/ass.c
+index 428a332..5be09a7 100644
+--- a/libass/ass.c
++++ b/libass/ass.c
+@@ -857,7 +857,7 @@ static int decode_font(ASS_Track *track)
+         ass_msg(track->library, MSGL_ERR, "Bad encoded data size");
+         goto error_decode_font;
+     }
+-    buf = malloc(size / 4 * 3 + FFMAX(size % 4 - 1, 0));
++    buf = malloc(size / 4 * 3 + FFMAX(size % 4, 1) - 1);
+     if (!buf)
+         goto error_decode_font;
+     q = buf;
+@@ -871,7 +871,7 @@ static int decode_font(ASS_Track *track)
+         q = decode_chars(p, q, 3);
+     }
+     dsize = q - buf;
+-    assert(dsize == size / 4 * 3 + FFMAX(size % 4 - 1, 0));
++    assert(dsize == size / 4 * 3 + FFMAX(size % 4, 1) - 1);
+ 
+     if (track->library->extract_fonts) {
+         ass_add_font(track->library, track->parser_priv->fontname,

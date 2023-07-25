@@ -1,0 +1,10 @@
+commit 5b29af5c781980ea48320c612aa38d67bc737e90
+Merge: 1e0bc6e30f ff577b04c0
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Sun Aug 2 23:56:37 2020 -0700
+
+    Merge branch 'PHP-7.2' into PHP-7.3
+    
+    * PHP-7.2:
+      Fix #79877: getimagesize function silently truncates after a null byte
+      Fix #79797: Use of freed hash key in the phar_parse_zipfile function

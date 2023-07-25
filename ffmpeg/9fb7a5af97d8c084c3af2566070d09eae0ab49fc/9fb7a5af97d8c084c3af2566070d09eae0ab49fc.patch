@@ -1,0 +1,30 @@
+commit 9fb7a5af97d8c084c3af2566070d09eae0ab49fc	9fb7a5af97d8c084c3af2566070d09eae0ab49fc
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sun Dec 25 00:10:27 2011 +0100
+
+    ws_snd1: Fix wrong samples counts.
+    
+    This makes the check that avoids overwrite of the samples array actually
+    work properly.
+    
+    fixes CVE-2012-0848
+    CC: libav-stable@libav.org
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+    Signed-off-by: Justin Ruggles <justin.ruggles@gmail.com>
+
+diff --git a/libavcodec/ws-snd1.c b/libavcodec/ws-snd1.c
+index b2d086e073..e8e4d1567c 100644
+--- a/libavcodec/ws-snd1.c
++++ b/libavcodec/ws-snd1.c
+@@ -112,8 +112,8 @@ static int ws_snd_decode_frame(AVCodecContext *avctx, void *data,
+ 
+         /* make sure we don't write past the output buffer */
+         switch (code) {
+-        case 0:  smp = 4;                              break;
+-        case 1:  smp = 2;                              break;
++        case 0:  smp = 4 * (count + 1);                break;
++        case 1:  smp = 2 * (count + 1);                break;
+         case 2:  smp = (count & 0x20) ? 1 : count + 1; break;
+         default: smp = count + 1;                      break;
+         }

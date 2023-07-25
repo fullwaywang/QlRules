@@ -1,0 +1,38 @@
+commit 0a8e7244d494ae98e9756355dfbfb6697ded2ff9
+Author: Wan-Teh Chang <wtc@google.com>
+Date:   Mon Aug 10 13:24:59 2020 -0700
+
+    Set max image size to 16384 * 16384
+    
+    Fix https://crbug.com/oss-fuzz/24728 and
+    https://crbug.com/oss-fuzz/24734.
+
+diff --git a/include/avif/internal.h b/include/avif/internal.h
+index 1e26a9a..992bc55 100644
+--- a/include/avif/internal.h
++++ b/include/avif/internal.h
+@@ -241,6 +241,10 @@ typedef struct avifSequenceHeader
+ } avifSequenceHeader;
+ avifBool avifSequenceHeaderParse(avifSequenceHeader * header, const avifROData * sample);
+ 
++// A maximum image size to avoid out-of-memory errors or integer overflow in
++// (32-bit) int or unsigned int arithmetic operations.
++#define AVIF_MAX_IMAGE_SIZE (16384 * 16384)
++
+ #ifdef __cplusplus
+ } // extern "C"
+ #endif
+diff --git a/src/read.c b/src/read.c
+index e992219..fa1a513 100644
+--- a/src/read.c
++++ b/src/read.c
+@@ -980,6 +980,9 @@ static avifBool avifParseImageGridBox(avifImageGrid * grid, const uint8_t * raw,
+         CHECK(avifROStreamReadU32(&s, &grid->outputWidth));  // unsigned int(FieldLength) output_width;
+         CHECK(avifROStreamReadU32(&s, &grid->outputHeight)); // unsigned int(FieldLength) output_height;
+     }
++    if (grid->outputWidth > AVIF_MAX_IMAGE_SIZE / grid->outputHeight) {
++        return AVIF_FALSE;
++    }
+     return AVIF_TRUE;
+ }
+ 

@@ -1,6 +1,4 @@
-commit 8598060bacada41a0eb09d95c97744ff4e428f8e
-Reflog: HEAD@{0} (FullwayWang <fullwaywang@tencent.com>)
-Reflog message: reset: moving to 8598060bacada41a0eb09d95c97744ff4e428f8e
+commit 8598060bacada41a0eb09d95c97744ff4e428f8e	8598060bacada41a0eb09d95c97744ff4e428f8e
 Author: Daniel Veillard <veillard@redhat.com>
 Date:   Thu May 13 14:55:12 2021 +0200
 

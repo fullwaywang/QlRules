@@ -1,0 +1,25 @@
+commit dd01947397b98e94c3f2a79d5820aaf4594f4d3b
+Author: James Almer <jamrial@gmail.com>
+Date:   Tue Oct 15 11:38:23 2019 -0300
+
+    avformat/latmenc: abort if no extradata is available
+    
+    Fixes ticket #8273.
+    
+    Reviewed-by: Paul B Mahol <onemda@gmail.com>
+    Signed-off-by: James Almer <jamrial@gmail.com>
+
+diff --git a/libavformat/latmenc.c b/libavformat/latmenc.c
+index db867ebf1a..5ae677f5da 100644
+--- a/libavformat/latmenc.c
++++ b/libavformat/latmenc.c
+@@ -176,7 +176,8 @@ static int latm_write_packet(AVFormatContext *s, AVPacket *pkt)
+                 if (ret < 0)
+                     return ret;
+                 memcpy(par->extradata, side_data, side_data_size);
+-            }
++            } else
++                return AVERROR_INVALIDDATA;
+         }
+     }
+ 

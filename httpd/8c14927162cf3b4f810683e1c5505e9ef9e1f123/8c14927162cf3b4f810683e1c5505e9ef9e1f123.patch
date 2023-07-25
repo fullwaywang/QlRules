@@ -1,0 +1,58 @@
+commit 8c14927162cf3b4f810683e1c5505e9ef9e1f123
+Author: Eric Covener <covener@apache.org>
+Date:   Wed Jun 1 12:34:16 2022 +0000
+
+    Merge r1901500 from trunk:
+    
+    handle large writes in ap_rputs
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1901501 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/include/http_protocol.h b/include/http_protocol.h
+index 20bd202226..94c481e5f4 100644
+--- a/include/http_protocol.h
++++ b/include/http_protocol.h
+@@ -475,7 +475,27 @@ AP_DECLARE(int) ap_rwrite(const void *buf, int nbyte, request_rec *r);
+  */
+ static APR_INLINE int ap_rputs(const char *str, request_rec *r)
+ {
+-    return ap_rwrite(str, (int)strlen(str), r);
++    apr_size_t len;
++
++    len = strlen(str);
++
++    for (;;) {
++        if (len <= INT_MAX) {
++            return ap_rwrite(str, (int)len, r);
++        }
++        else {
++            int rc;
++
++            rc = ap_rwrite(str, INT_MAX, r);
++            if (rc < 0) {
++                return rc;
++            }
++            else {
++                str += INT_MAX;
++                len -= INT_MAX;
++            }
++        }
++    }
+ }
+ 
+ /**
+diff --git a/server/protocol.c b/server/protocol.c
+index 298f61e1fb..7adc7f75c1 100644
+--- a/server/protocol.c
++++ b/server/protocol.c
+@@ -2128,6 +2128,9 @@ AP_DECLARE(int) ap_rputc(int c, request_rec *r)
+ 
+ AP_DECLARE(int) ap_rwrite(const void *buf, int nbyte, request_rec *r)
+ {
++    if (nbyte < 0)
++        return -1;
++
+     if (r->connection->aborted)
+         return -1;
+ 

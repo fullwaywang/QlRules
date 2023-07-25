@@ -1,0 +1,45 @@
+commit 54ce8c522078cd0f39861df71db848648ec28ade	54ce8c522078cd0f39861df71db848648ec28ade
+Author: Thomas Bernard <miniupnp@free.fr>
+Date:   Sun Mar 8 18:21:56 2020 +0100
+
+    TIFFTAG_PREDICTOR is not supported for WebP
+    
+    fixes #158
+    https://gitlab.com/libtiff/libtiff/-/issues/158
+    
+    this bug was introduced by 9eacd59fecc4ef593ac17689bc530ab451c8ec14
+    merge request !32
+
+diff --git a/libtiff/tif_dirinfo.c b/libtiff/tif_dirinfo.c
+index 99b0a3ea..0354a93b 100644
+--- a/libtiff/tif_dirinfo.c
++++ b/libtiff/tif_dirinfo.c
+@@ -1236,10 +1236,6 @@ _TIFFCheckFieldIsValidForCodec(TIFF *tif, ttag_t tag)
+ 		if (tag == TIFFTAG_LERC_PARAMETERS)
+ 		    return 1;
+ 		break;
+-		  case COMPRESSION_WEBP:
+-		if (tag == TIFFTAG_PREDICTOR)
+-				return 1;
+-		break;
+ 	}
+ 	return 0;
+ }
+diff --git a/tools/tiffcp.c b/tools/tiffcp.c
+index ad551ef2..21ce4b2f 100644
+--- a/tools/tiffcp.c
++++ b/tools/tiffcp.c
+@@ -741,11 +741,12 @@ tiffcp(TIFF* in, TIFF* out)
+ 		case COMPRESSION_DEFLATE:
+                 case COMPRESSION_LZMA:
+                 case COMPRESSION_ZSTD:
+-								case COMPRESSION_WEBP:
+ 			if (predictor != (uint16)-1)
+ 				TIFFSetField(out, TIFFTAG_PREDICTOR, predictor);
+ 			else
+ 				CopyField(TIFFTAG_PREDICTOR, predictor);
++			/*fallthrough*/
++		case COMPRESSION_WEBP:
+ 			if (preset != -1) {
+                                 if (compression == COMPRESSION_ADOBE_DEFLATE
+                                          || compression == COMPRESSION_DEFLATE)

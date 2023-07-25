@@ -1,0 +1,19 @@
+commit fbb5e1c8211c4e88ecc367e784b79d457c300d6d
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat May 6 13:31:37 2017 -0400
+
+    ...
+
+diff --git a/coders/tga.c b/coders/tga.c
+index 886150e02..da22c712d 100644
+--- a/coders/tga.c
++++ b/coders/tga.c
+@@ -271,6 +271,8 @@ static Image *ReadTGAImage(const ImageInfo *image_info,
+ 
+           one=1;
+           image->colors=one << tga_info.bits_per_pixel;
++          if (image->colors > ((~0UL)/sizeof(*image->colormap)))
++            ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+           if (AcquireImageColormap(image,image->colors,exception) == MagickFalse)
+             ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+         }

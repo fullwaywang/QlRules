@@ -1,0 +1,24 @@
+commit 399631650b38eaf21c2f3c306b8b74e66be6a0d2
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Sep 8 06:16:15 2017 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/739
+
+diff --git a/coders/mpc.c b/coders/mpc.c
+index d628a9a60..680f5595e 100644
+--- a/coders/mpc.c
++++ b/coders/mpc.c
+@@ -569,8 +569,11 @@ static Image *ReadMPCImage(const ImageInfo *image_info,ExceptionInfo *exception)
+                   {
+                     image->number_meta_channels=StringToUnsignedLong(options);
+                     if (image->number_meta_channels > MaxPixelChannels)
+-                      ThrowReaderException(CorruptImageError,
+-                        "ImproperImageHeader");
++                      {
++                        options=DestroyString(options);
++                        ThrowReaderException(CorruptImageError,
++                          "ImproperImageHeader");
++                      }
+                     break;
+                   }
+                 break;

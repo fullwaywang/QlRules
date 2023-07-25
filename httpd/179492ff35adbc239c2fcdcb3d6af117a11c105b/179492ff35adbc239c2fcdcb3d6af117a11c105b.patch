@@ -1,0 +1,100 @@
+commit 179492ff35adbc239c2fcdcb3d6af117a11c105b
+Author: Jim Jagielski <jim@apache.org>
+Date:   Tue Feb 11 13:14:42 2020 +0000
+
+    Merge r1873745 from trunk:
+    
+    trap bad FTP responses
+    
+    Submitted by: covener
+    Reviewed by: covener, minfrin, jorton
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1873904 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/STATUS b/STATUS
+index 061debfb28..26b37e16a2 100644
+--- a/STATUS
++++ b/STATUS
+@@ -133,11 +133,6 @@ PATCHES ACCEPTED TO BACKPORT FROM TRUNK:
+   [ start all new proposals below, under PATCHES PROPOSED. ]
+ 
+ 
+-  *) trap mod_proxy_ftp errors
+-     trunk patch: http://svn.apache.org/r1873745
+-     2.4.x patch: svn merge -c 1873745 ^/httpd/httpd/trunk .
+-     +1: covener, minfrin, jorton
+-
+   *) factor out default regex flags:
+      trunk patch: http://svn.apache.org/r1873747
+      2.4.x patch: http://people.apache.org/~covener/patches/httpd-2.4.x-reg_default.diff
+diff --git a/modules/proxy/mod_proxy_ftp.c b/modules/proxy/mod_proxy_ftp.c
+index 801e351c2b..dfcaa80855 100644
+--- a/modules/proxy/mod_proxy_ftp.c
++++ b/modules/proxy/mod_proxy_ftp.c
+@@ -218,7 +218,7 @@ static int ftp_check_string(const char *x)
+  * (EBCDIC) machines either.
+  */
+ static apr_status_t ftp_string_read(conn_rec *c, apr_bucket_brigade *bb,
+-        char *buff, apr_size_t bufflen, int *eos)
++        char *buff, apr_size_t bufflen, int *eos, apr_size_t *outlen)
+ {
+     apr_bucket *e;
+     apr_status_t rv;
+@@ -230,6 +230,7 @@ static apr_status_t ftp_string_read(conn_rec *c, apr_bucket_brigade *bb,
+     /* start with an empty string */
+     buff[0] = 0;
+     *eos = 0;
++    *outlen = 0;
+ 
+     /* loop through each brigade */
+     while (!found) {
+@@ -273,6 +274,7 @@ static apr_status_t ftp_string_read(conn_rec *c, apr_bucket_brigade *bb,
+                 if (len > 0) {
+                     memcpy(pos, response, len);
+                     pos += len;
++                    *outlen += len;
+                 }
+             }
+             apr_bucket_delete(e);
+@@ -385,28 +387,36 @@ static int ftp_getrc_msg(conn_rec *ftp_ctrl, apr_bucket_brigade *bb, char *msgbu
+     char buff[5];
+     char *mb = msgbuf, *me = &msgbuf[msglen];
+     apr_status_t rv;
++    apr_size_t nread;
++    
+     int eos;
+ 
+-    if (APR_SUCCESS != (rv = ftp_string_read(ftp_ctrl, bb, response, sizeof(response), &eos))) {
++    if (APR_SUCCESS != (rv = ftp_string_read(ftp_ctrl, bb, response, sizeof(response), &eos, &nread))) {
+         return -1;
+     }
+ /*
+     ap_log_error(APLOG_MARK, APLOG_DEBUG, 0, NULL, APLOGNO(03233)
+                  "<%s", response);
+ */
++    if (nread < 4) { 
++        ap_log_error(APLOG_MARK, APLOG_INFO, 0, NULL, APLOGNO(10229) "Malformed FTP response '%s'", response);
++        *mb = '\0';
++        return -1;
++    }
++
+     if (!apr_isdigit(response[0]) || !apr_isdigit(response[1]) ||
+-    !apr_isdigit(response[2]) || (response[3] != ' ' && response[3] != '-'))
++        !apr_isdigit(response[2]) || (response[3] != ' ' && response[3] != '-'))
+         status = 0;
+     else
+         status = 100 * response[0] + 10 * response[1] + response[2] - 111 * '0';
+ 
+     mb = apr_cpystrn(mb, response + 4, me - mb);
+ 
+-    if (response[3] == '-') {
++    if (response[3] == '-') { /* multi-line reply "123-foo\nbar\n123 baz" */
+         memcpy(buff, response, 3);
+         buff[3] = ' ';
+         do {
+-            if (APR_SUCCESS != (rv = ftp_string_read(ftp_ctrl, bb, response, sizeof(response), &eos))) {
++            if (APR_SUCCESS != (rv = ftp_string_read(ftp_ctrl, bb, response, sizeof(response), &eos, &nread))) {
+                 return -1;
+             }
+             mb = apr_cpystrn(mb, response + (' ' == response[0] ? 1 : 4), me - mb);

@@ -1,0 +1,26 @@
+commit 75422280fbcdfbe9dc56bde5525b4d8b280f1bc5
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri Nov 27 20:52:39 2015 +0100
+
+    avcodec/jpeg2000dwt: Check ndeclevels before calling dwt_decode*()
+    
+    Fixes out of array access
+    Fixes: 01859c9a9ac6cd60a008274123275574/asan_heap-oob_1dff571_8250_50d3d1611e294c3519fd1fa82198b69b.avi
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/jpeg2000dwt.c b/libavcodec/jpeg2000dwt.c
+index 2bf25a8c4e..36e443d478 100644
+--- a/libavcodec/jpeg2000dwt.c
++++ b/libavcodec/jpeg2000dwt.c
+@@ -595,6 +595,9 @@ int ff_dwt_encode(DWTContext *s, void *t)
+ 
+ int ff_dwt_decode(DWTContext *s, void *t)
+ {
++    if (s->ndeclevels == 0)
++        return 0;
++
+     switch (s->type) {
+     case FF_DWT97:
+         dwt_decode97_float(s, t);

@@ -1,0 +1,18 @@
+commit b172f43caa048861899e78eb56607cb5b60e5cfb
+Author: Xinchen Hui <laruence@gmail.com>
+Date:   Wed Aug 17 16:56:20 2016 +0800
+
+    Unused label
+
+diff --git a/ext/session/session.c b/ext/session/session.c
+index 85c7276913..8e5caf9bb3 100644
+--- a/ext/session/session.c
++++ b/ext/session/session.c
+@@ -1115,7 +1115,6 @@ PS_SERIALIZER_DECODE_FUNC(php) /* {{{ */
+ 				PS_ADD_VARL(name);
+ 			}
+ 		}
+-skip:
+ 		zend_string_release(name);
+ 
+ 		p = q;

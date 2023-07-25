@@ -1,0 +1,8 @@
+commit 0c791d073d0eb344ee7aaafd221513dc9226762c
+Merge: dda748de e593f58a
+Author: metalefty <meta@vmeta.jp>
+Date:   Fri Jun 26 20:09:03 2020 +0900
+
+    Merge pull request from GHSA-j9fv-6fwf-p3g4
+    
+    Fix for CVE-2020-4044

@@ -1,0 +1,125 @@
+commit f6adec4e329ef0e25e14c63b735a5956dc67b8bc
+Author: Jeff King <peff@peff.net>
+Date:   Mon Sep 24 04:36:30 2018 -0400
+
+    submodule-config: ban submodule urls that start with dash
+    
+    The previous commit taught the submodule code to invoke our
+    "git clone $url $path" with a "--" separator so that we
+    aren't confused by urls or paths that start with dashes.
+    
+    However, that's just one code path. It's not clear if there
+    are others, and it would be an easy mistake to add one in
+    the future. Moreover, even with the fix in the previous
+    commit, it's quite hard to actually do anything useful with
+    such an entry. Any url starting with a dash must fall into
+    one of three categories:
+    
+     - it's meant as a file url, like "-path". But then any
+       clone is not going to have the matching path, since it's
+       by definition relative inside the newly created clone. If
+       you spell it as "./-path", the submodule code sees the
+       "/" and translates this to an absolute path, so it at
+       least works (assuming the receiver has the same
+       filesystem layout as you). But that trick does not apply
+       for a bare "-path".
+    
+     - it's meant as an ssh url, like "-host:path". But this
+       already doesn't work, as we explicitly disallow ssh
+       hostnames that begin with a dash (to avoid option
+       injection against ssh).
+    
+     - it's a remote-helper scheme, like "-scheme::data". This
+       _could_ work if the receiver bends over backwards and
+       creates a funny-named helper like "git-remote--scheme".
+       But normally there would not be any helper that matches.
+    
+    Since such a url does not work today and is not likely to do
+    anything useful in the future, let's simply disallow them
+    entirely. That protects the existing "git clone" path (in a
+    belt-and-suspenders way), along with any others that might
+    exist.
+    
+    Our tests cover two cases:
+    
+      1. A file url with "./" continues to work, showing that
+         there's an escape hatch for people with truly silly
+         repo names.
+    
+      2. A url starting with "-" is rejected.
+    
+    Note that we expect case (2) to fail, but it would have done
+    so even without this commit, for the reasons given above.
+    So instead of just expecting failure, let's also check for
+    the magic word "ignoring" on stderr. That lets us know that
+    we failed for the right reason.
+    
+    Signed-off-by: Jeff King <peff@peff.net>
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+diff --git a/submodule-config.c b/submodule-config.c
+index acb7767d37..6eb13a5536 100644
+--- a/submodule-config.c
++++ b/submodule-config.c
+@@ -367,6 +367,12 @@ static void warn_multiple_config(const unsigned char *treeish_name,
+ 			commit_string, name, option);
+ }
+ 
++static void warn_command_line_option(const char *var, const char *value)
++{
++	warning(_("ignoring '%s' which may be interpreted as"
++		  " a command-line option: %s"), var, value);
++}
++
+ struct parse_config_parameter {
+ 	struct submodule_cache *cache;
+ 	const unsigned char *treeish_name;
+@@ -432,6 +438,8 @@ static int parse_config(const char *var, const char *value, void *data)
+ 	} else if (!strcmp(item.buf, "url")) {
+ 		if (!value) {
+ 			ret = config_error_nonbool(var);
++		} else if (looks_like_command_line_option(value)) {
++			warn_command_line_option(var, value);
+ 		} else if (!me->overwrite && submodule->url) {
+ 			warn_multiple_config(me->treeish_name, submodule->name,
+ 					"url");
+diff --git a/t/t7416-submodule-dash-url.sh b/t/t7416-submodule-dash-url.sh
+new file mode 100755
+index 0000000000..459193c976
+--- /dev/null
++++ b/t/t7416-submodule-dash-url.sh
+@@ -0,0 +1,34 @@
++#!/bin/sh
++
++test_description='check handling of .gitmodule url with dash'
++. ./test-lib.sh
++
++test_expect_success 'create submodule with protected dash in url' '
++	git init upstream &&
++	git -C upstream commit --allow-empty -m base &&
++	mv upstream ./-upstream &&
++	git submodule add ./-upstream sub &&
++	git add sub .gitmodules &&
++	git commit -m submodule
++'
++
++test_expect_success 'clone can recurse submodule' '
++	test_when_finished "rm -rf dst" &&
++	git clone --recurse-submodules . dst &&
++	echo base >expect &&
++	git -C dst/sub log -1 --format=%s >actual &&
++	test_cmp expect actual
++'
++
++test_expect_success 'remove ./ protection from .gitmodules url' '
++	perl -i -pe "s{\./}{}" .gitmodules &&
++	git commit -am "drop protection"
++'
++
++test_expect_success 'clone rejects unprotected dash' '
++	test_when_finished "rm -rf dst" &&
++	test_must_fail git clone --recurse-submodules . dst 2>err &&
++	test_i18ngrep ignoring err
++'
++
++test_done

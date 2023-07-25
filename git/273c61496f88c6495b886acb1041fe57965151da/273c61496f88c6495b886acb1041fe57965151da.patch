@@ -1,0 +1,96 @@
+commit 273c61496f88c6495b886acb1041fe57965151da
+Author: Jeff King <peff@peff.net>
+Date:   Mon Sep 24 04:39:55 2018 -0400
+
+    submodule-config: ban submodule paths that start with a dash
+    
+    We recently banned submodule urls that look like
+    command-line options. This is the matching change to ban
+    leading-dash paths.
+    
+    As with the urls, this should not break any use cases that
+    currently work. Even with our "--" separator passed to
+    git-clone, git-submodule.sh gets confused. Without the code
+    portion of this patch, the clone of "-sub" added in t7417
+    would yield results like:
+    
+        /path/to/git-submodule: 410: cd: Illegal option -s
+        /path/to/git-submodule: 417: cd: Illegal option -s
+        /path/to/git-submodule: 410: cd: Illegal option -s
+        /path/to/git-submodule: 417: cd: Illegal option -s
+        Fetched in submodule path '-sub', but it did not contain b56243f8f4eb91b2f1f8109452e659f14dd3fbe4. Direct fetching of that commit failed.
+    
+    Moreover, naively adding such a submodule doesn't work:
+    
+      $ git submodule add $url -sub
+      The following path is ignored by one of your .gitignore files:
+      -sub
+    
+    even though there is no such ignore pattern (the test script
+    hacks around this with a well-placed "git mv").
+    
+    Unlike leading-dash urls, though, it's possible that such a
+    path _could_ be useful if we eventually made it work. So
+    this commit should be seen not as recommending a particular
+    policy, but rather temporarily closing off a broken and
+    possibly dangerous code-path. We may revisit this decision
+    later.
+    
+    There are two minor differences to the tests in t7416 (that
+    covered urls):
+    
+      1. We don't have a "./-sub" escape hatch to make this
+         work, since the submodule code expects to be able to
+         match canonical index names to the path field (so you
+         are free to add submodule config with that path, but we
+         would never actually use it, since an index entry would
+         never start with "./").
+    
+      2. After this patch, cloning actually succeeds. Since we
+         ignore the submodule.*.path value, we fail to find a
+         config stanza for our submodule at all, and simply
+         treat it as inactive. We still check for the "ignoring"
+         message.
+    
+    Signed-off-by: Jeff King <peff@peff.net>
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+diff --git a/submodule-config.c b/submodule-config.c
+index 6eb13a5536..774fb10544 100644
+--- a/submodule-config.c
++++ b/submodule-config.c
+@@ -398,6 +398,8 @@ static int parse_config(const char *var, const char *value, void *data)
+ 	if (!strcmp(item.buf, "path")) {
+ 		if (!value)
+ 			ret = config_error_nonbool(var);
++		else if (looks_like_command_line_option(value))
++			warn_command_line_option(var, value);
+ 		else if (!me->overwrite && submodule->path)
+ 			warn_multiple_config(me->treeish_name, submodule->name,
+ 					"path");
+diff --git a/t/t7417-submodule-path-url.sh b/t/t7417-submodule-path-url.sh
+new file mode 100755
+index 0000000000..638293f0da
+--- /dev/null
++++ b/t/t7417-submodule-path-url.sh
+@@ -0,0 +1,20 @@
++#!/bin/sh
++
++test_description='check handling of .gitmodule path with dash'
++. ./test-lib.sh
++
++test_expect_success 'create submodule with dash in path' '
++	git init upstream &&
++	git -C upstream commit --allow-empty -m base &&
++	git submodule add ./upstream sub &&
++	git mv sub ./-sub &&
++	git commit -m submodule
++'
++
++test_expect_success 'clone rejects unprotected dash' '
++	test_when_finished "rm -rf dst" &&
++	git clone --recurse-submodules . dst 2>err &&
++	test_i18ngrep ignoring err
++'
++
++test_done

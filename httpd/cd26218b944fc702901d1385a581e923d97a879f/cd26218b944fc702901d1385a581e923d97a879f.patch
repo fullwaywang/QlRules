@@ -1,0 +1,93 @@
+commit cd26218b944fc702901d1385a581e923d97a879f
+Author: Jim Jagielski <jim@apache.org>
+Date:   Tue Feb 11 13:16:38 2020 +0000
+
+    Merge r1873747 from trunk:
+    
+    factor out default regex flags
+    
+    
+    Submitted by: covener
+    Reviewed by: covener, minfrin, jorton
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1873905 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/STATUS b/STATUS
+index 26b37e16a2..4afd862b38 100644
+--- a/STATUS
++++ b/STATUS
+@@ -133,12 +133,6 @@ PATCHES ACCEPTED TO BACKPORT FROM TRUNK:
+   [ start all new proposals below, under PATCHES PROPOSED. ]
+ 
+ 
+-  *) factor out default regex flags:
+-     trunk patch: http://svn.apache.org/r1873747
+-     2.4.x patch: http://people.apache.org/~covener/patches/httpd-2.4.x-reg_default.diff
+-         (MMN, ap_regex.h conflicts)
+-     +1: covener, minfrin, jorton
+-
+   *) factor out chunked TE checks
+      trunk patch: http://svn.apache.org/r1873748
+      2.4.x patch: http://people.apache.org/~covener/patches/httpd-2.4.x-chunk.diff
+diff --git a/include/ap_mmn.h b/include/ap_mmn.h
+index e257c606ee..acdf7f1b1a 100644
+--- a/include/ap_mmn.h
++++ b/include/ap_mmn.h
+@@ -531,6 +531,7 @@
+  * 20120211.88 (2.4.40-dev) Add ap_dir_nofnmatch() and ap_dir_fnmatch().
+  * 20120211.89 (2.4.42-dev) Add add dns_pool to proxy_conn_pool and define
+  *                          AP_VOLATILIZE_T.
++ * 20120211.90 (2.4.42-dev) AP_REG_DEFAULT macro in ap_regex.h
+  */
+ 
+ #define MODULE_MAGIC_COOKIE 0x41503234UL /* "AP24" */
+@@ -538,7 +539,7 @@
+ #ifndef MODULE_MAGIC_NUMBER_MAJOR
+ #define MODULE_MAGIC_NUMBER_MAJOR 20120211
+ #endif
+-#define MODULE_MAGIC_NUMBER_MINOR 89                  /* 0...n */
++#define MODULE_MAGIC_NUMBER_MINOR 90                  /* 0...n */
+ 
+ /**
+  * Determine if the server's current MODULE_MAGIC_NUMBER is at least a
+diff --git a/include/ap_regex.h b/include/ap_regex.h
+index 7d8df791f0..e651eeaf7f 100644
+--- a/include/ap_regex.h
++++ b/include/ap_regex.h
+@@ -86,6 +86,8 @@ extern "C" {
+ 
+ #define AP_REG_MATCH "MATCH_" /** suggested prefix for ap_regname */
+ 
++#define AP_REG_DEFAULT (AP_REG_DOTALL|AP_REG_DOLLAR_ENDONLY)
++
+ /* Error values: */
+ enum {
+   AP_REG_ASSERT = 1,  /** internal error ? */
+diff --git a/server/core.c b/server/core.c
+index 7449d5e39d..dae71b6ccf 100644
+--- a/server/core.c
++++ b/server/core.c
+@@ -4944,7 +4944,7 @@ static int core_pre_config(apr_pool_t *pconf, apr_pool_t *plog, apr_pool_t *ptem
+     apr_pool_cleanup_register(pconf, NULL, reset_config_defines,
+                               apr_pool_cleanup_null);
+ 
+-    ap_regcomp_set_default_cflags(AP_REG_DOLLAR_ENDONLY);
++    ap_regcomp_set_default_cflags(AP_REG_DEFAULT);
+ 
+     mpm_common_pre_config(pconf);
+ 
+diff --git a/server/util_pcre.c b/server/util_pcre.c
+index 35831f500f..74722b4443 100644
+--- a/server/util_pcre.c
++++ b/server/util_pcre.c
+@@ -120,8 +120,7 @@ AP_DECLARE(void) ap_regfree(ap_regex_t *preg)
+  *            Compile a regular expression       *
+  *************************************************/
+ 
+-static int default_cflags = AP_REG_DOTALL |
+-                            AP_REG_DOLLAR_ENDONLY;
++static int default_cflags = AP_REG_DEFAULT;
+ 
+ AP_DECLARE(int) ap_regcomp_get_default_cflags(void)
+ {

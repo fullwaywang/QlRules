@@ -1,0 +1,50 @@
+commit ebbeb2c7ac1b00b6083905957837a271e80b187e
+Author: Ludwig Nussel <ludwig.nussel@suse.de>
+Date:   Thu Sep 20 14:57:20 2007 +0200
+
+    mount: doesn't drop privileges properly when calling helpers
+    
+    {,u}mount calls setuid() and setgid() in the wrong order and doesn't checking
+    the return value of set{u,g}id(() when running helpers like mount.nfs.
+    
+    Signed-off-by: Ludwig Nussel <ludwig.nussel@suse.de>
+    Signed-off-by: Karel Zak <kzak@redhat.com>
+
+diff --git a/mount/mount.c b/mount/mount.c
+index 40699f33d..5bc2b30c3 100644
+--- a/mount/mount.c
++++ b/mount/mount.c
+@@ -634,8 +634,12 @@ check_special_mountprog(const char *spec, const char *node, const char *type, in
+ 		 char *oo, *mountargs[10];
+ 		 int i = 0;
+ 
+-		 setuid(getuid());
+-		 setgid(getgid());
++		 if(setgid(getgid()) < 0)
++			 die(EX_FAIL, _("mount: cannot set group id: %s"), strerror(errno));
++
++		 if(setuid(getuid()) < 0)
++			 die(EX_FAIL, _("mount: cannot set user id: %s"), strerror(errno));
++
+ 		 oo = fix_opts_string (flags, extra_opts, NULL);
+ 		 mountargs[i++] = mountprog;				/* 1 */
+ 		 mountargs[i++] = (char *) spec;			/* 2 */
+diff --git a/mount/umount.c b/mount/umount.c
+index b3100c9a0..322161983 100644
+--- a/mount/umount.c
++++ b/mount/umount.c
+@@ -102,8 +102,12 @@ check_special_umountprog(const char *spec, const char *node,
+ 				char *umountargs[8];
+ 				int i = 0;
+ 
+-				setuid(getuid());
+-				setgid(getgid());
++				if(setgid(getgid()) < 0)
++					die(EX_FAIL, _("umount: cannot set group id: %s"), strerror(errno));
++
++				if(setuid(getuid()) < 0)
++					die(EX_FAIL, _("umount: cannot set user id: %s"), strerror(errno));
++
+ 				umountargs[i++] = umountprog;
+ 				umountargs[i++] = xstrdup(node);
+ 				if (nomtab)

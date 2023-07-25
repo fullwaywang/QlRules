@@ -1,0 +1,80 @@
+commit aecd0ada163a4d6c769cec178955d5f3e9316f2f
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Mon May 16 16:05:02 2016 -0400
+
+    Set pixel cache to undefined if any resource limit is exceeded
+
+diff --git a/MagickCore/cache.c b/MagickCore/cache.c
+index 2f671608f..921ddbf27 100644
+--- a/MagickCore/cache.c
++++ b/MagickCore/cache.c
+@@ -3504,6 +3504,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
+             }
+         }
+       RelinquishMagickResource(DiskResource,cache_info->length);
++      cache_info->type=UndefinedCache;
+       (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
+         "CacheResourcesExhausted","`%s'",image->filename);
+       return(MagickFalse);
+@@ -3516,6 +3517,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
+   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
+     {
+       RelinquishMagickResource(DiskResource,cache_info->length);
++      cache_info->type=UndefinedCache;
+       ThrowFileException(exception,CacheError,"UnableToOpenPixelCache",
+         image->filename);
+       return(MagickFalse);
+@@ -3524,6 +3526,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
+     cache_info->length);
+   if (status == MagickFalse)
+     {
++      cache_info->type=UndefinedCache;
+       ThrowFileException(exception,CacheError,"UnableToExtendCache",
+         image->filename);
+       return(MagickFalse);
+@@ -3582,6 +3585,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
+                   (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
+                     message);
+                 }
++              if (status == MagickFalse)
++                cache_info->type=UndefinedCache;
+               return(status);
+             }
+         }
+@@ -3606,6 +3611,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
+         cache_info->number_channels,format);
+       (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",message);
+     }
++  if (status == MagickFalse)
++    cache_info->type=UndefinedCache;
+   return(status);
+ }
+ 
+diff --git a/MagickCore/image.c b/MagickCore/image.c
+index 1b3519571..a41ad0cc6 100644
+--- a/MagickCore/image.c
++++ b/MagickCore/image.c
+@@ -843,7 +843,10 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
+       clone_image->colormap=(PixelInfo *) AcquireQuantumMemory(length,
+         sizeof(*clone_image->colormap));
+       if (clone_image->colormap == (PixelInfo *) NULL)
+-        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
++        {
++          clone_image=DestroyImage(clone_image);
++          ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
++        }
+       (void) CopyMagickMemory(clone_image->colormap,image->colormap,length*
+         sizeof(*clone_image->colormap));
+     }
+diff --git a/coders/wpg.c b/coders/wpg.c
+index 0dfdc47f0..782f25e82 100644
+--- a/coders/wpg.c
++++ b/coders/wpg.c
+@@ -1311,7 +1311,6 @@ static Image *ReadWPGImage(const ImageInfo *image_info,
+               status=SetImageExtent(image,image->columns,image->rows,exception);
+               if (status == MagickFalse)
+                 break;
+-
+               if ((image->colors == 0) && (bpp != 24))
+                 {
+                   size_t

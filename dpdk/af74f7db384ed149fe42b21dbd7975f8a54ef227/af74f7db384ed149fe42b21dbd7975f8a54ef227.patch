@@ -1,0 +1,39 @@
+commit af74f7db384ed149fe42b21dbd7975f8a54ef227
+Author: David Marchand <david.marchand@redhat.com>
+Date:   Tue Jan 18 15:53:30 2022 +0100
+
+    vhost: fix FD leak with inflight messages
+    
+    Even if unlikely, a buggy vhost-user master might attach fds to inflight
+    messages. Add checks like for other types of vhost-user messages.
+    
+    Fixes: d87f1a1cb7b6 ("vhost: support inflight info sharing")
+    Cc: stable@dpdk.org
+    
+    Signed-off-by: David Marchand <david.marchand@redhat.com>
+    Reviewed-by: Maxime Coquelin <maxime.coquelin@redhat.com>
+
+diff --git a/lib/vhost/vhost_user.c b/lib/vhost/vhost_user.c
+index 1ec4357bee..1d390677fa 100644
+--- a/lib/vhost/vhost_user.c
++++ b/lib/vhost/vhost_user.c
+@@ -1602,6 +1602,9 @@ vhost_user_get_inflight_fd(struct virtio_net **pdev,
+ 	int numa_node = SOCKET_ID_ANY;
+ 	void *addr;
+ 
++	if (validate_msg_fds(dev, ctx, 0) != 0)
++		return RTE_VHOST_MSG_RESULT_ERR;
++
+ 	if (ctx->msg.size != sizeof(ctx->msg.payload.inflight)) {
+ 		VHOST_LOG_CONFIG(ERR, "(%s) invalid get_inflight_fd message size is %d\n",
+ 			dev->ifname, ctx->msg.size);
+@@ -1699,6 +1702,9 @@ vhost_user_set_inflight_fd(struct virtio_net **pdev,
+ 	int fd, i;
+ 	int numa_node = SOCKET_ID_ANY;
+ 
++	if (validate_msg_fds(dev, ctx, 1) != 0)
++		return RTE_VHOST_MSG_RESULT_ERR;
++
+ 	fd = ctx->fds[0];
+ 	if (ctx->msg.size != sizeof(ctx->msg.payload.inflight) || fd < 0) {
+ 		VHOST_LOG_CONFIG(ERR, "(%s) invalid set_inflight_fd message size is %d,fd is %d\n",

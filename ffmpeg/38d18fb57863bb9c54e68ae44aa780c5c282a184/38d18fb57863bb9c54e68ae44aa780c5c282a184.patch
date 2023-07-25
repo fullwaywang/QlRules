@@ -1,0 +1,46 @@
+commit 38d18fb57863bb9c54e68ae44aa780c5c282a184
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri May 28 20:31:19 2021 +0200
+
+    avcodec/lpc: Avoid floating point division by 0
+    
+    Fixes: Ticket7996
+    Fixes: CVE-2020-20445
+    
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/lpc.c b/libavcodec/lpc.c
+index 1d1d04fd80..3ed61563ee 100644
+--- a/libavcodec/lpc.c
++++ b/libavcodec/lpc.c
+@@ -189,7 +189,7 @@ double ff_lpc_calc_ref_coefs_f(LPCContext *s, const float *samples, int len,
+     compute_ref_coefs(autoc, order, ref, error);
+     for (i = 0; i < order; i++)
+         avg_err = (avg_err + error[i])/2.0f;
+-    return signal/avg_err;
++    return avg_err ? signal/avg_err : NAN;
+ }
+ 
+ /**
+diff --git a/libavcodec/lpc.h b/libavcodec/lpc.h
+index 88ca247f87..52170fd623 100644
+--- a/libavcodec/lpc.h
++++ b/libavcodec/lpc.h
+@@ -143,7 +143,7 @@ static inline void compute_ref_coefs(const LPC_TYPE *autoc, int max_order,
+         gen0[i] = gen1[i] = autoc[i + 1];
+ 
+     err    = autoc[0];
+-    ref[0] = -gen1[0] / err;
++    ref[0] = -gen1[0] / ((USE_FIXED || err) ? err : 1);
+     err   +=  gen1[0] * ref[0];
+     if (error)
+         error[0] = err;
+@@ -152,7 +152,7 @@ static inline void compute_ref_coefs(const LPC_TYPE *autoc, int max_order,
+             gen1[j] = gen1[j + 1] + ref[i - 1] * gen0[j];
+             gen0[j] = gen1[j + 1] * ref[i - 1] + gen0[j];
+         }
+-        ref[i] = -gen1[0] / err;
++        ref[i] = -gen1[0] / ((USE_FIXED || err) ? err : 1);
+         err   +=  gen1[0] * ref[i];
+         if (error)
+             error[i] = err;

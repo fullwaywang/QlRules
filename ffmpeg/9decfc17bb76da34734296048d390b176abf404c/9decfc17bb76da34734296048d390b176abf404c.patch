@@ -1,0 +1,31 @@
+commit 9decfc17bb76da34734296048d390b176abf404c	9decfc17bb76da34734296048d390b176abf404c
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Thu Jan 26 19:31:01 2012 +0100
+
+    h264_sei: Fix infinite loop.
+    
+    Fixes not yet fixed parts of CVE-2011-3946.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/h264_sei.c b/libavcodec/h264_sei.c
+index 374e53dfcf..80d70e513c 100644
+--- a/libavcodec/h264_sei.c
++++ b/libavcodec/h264_sei.c
+@@ -169,11 +169,15 @@ int ff_h264_decode_sei(H264Context *h){
+ 
+         type=0;
+         do{
++            if (get_bits_left(&s->gb) < 8)
++                return -1;
+             type+= show_bits(&s->gb, 8);
+         }while(get_bits(&s->gb, 8) == 255);
+ 
+         size=0;
+         do{
++            if (get_bits_left(&s->gb) < 8)
++                return -1;
+             size+= show_bits(&s->gb, 8);
+         }while(get_bits(&s->gb, 8) == 255);
+ 

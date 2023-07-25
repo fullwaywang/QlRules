@@ -1,0 +1,90 @@
+commit 7c32e9cf93b712f8463573a59ed4e98fd10fa013
+Author: Andriy Gelman <andriy.gelman@gmail.com>
+Date:   Sun Aug 2 14:31:22 2020 -0400
+
+    avcodec/v4l2_m2m: adapt to call close() on init fail
+    
+    This fixes several mem leaks when init of encoder/decoder failed.
+    
+    Fixes ticket #8285
+    
+    Signed-off-by: Andriy Gelman <andriy.gelman@gmail.com>
+
+diff --git a/libavcodec/v4l2_m2m.c b/libavcodec/v4l2_m2m.c
+index d8d872ea09..944c1a2823 100644
+--- a/libavcodec/v4l2_m2m.c
++++ b/libavcodec/v4l2_m2m.c
+@@ -330,6 +330,7 @@ static void v4l2_m2m_destroy_context(void *opaque, uint8_t *context)
+ 
+     close(s->fd);
+     av_frame_free(&s->frame);
++    av_packet_unref(&s->buf_pkt);
+ 
+     av_free(s);
+ }
+@@ -339,6 +340,10 @@ int ff_v4l2_m2m_codec_end(V4L2m2mPriv *priv)
+     V4L2m2mContext *s = priv->context;
+     int ret;
+ 
++    if (!s)
++        return 0;
++
++    if (s->fd >= 0) {
+     ret = ff_v4l2_context_set_status(&s->output, VIDIOC_STREAMOFF);
+     if (ret)
+         av_log(s->avctx, AV_LOG_ERROR, "VIDIOC_STREAMOFF %s\n", s->output.name);
+@@ -346,6 +351,7 @@ int ff_v4l2_m2m_codec_end(V4L2m2mPriv *priv)
+     ret = ff_v4l2_context_set_status(&s->capture, VIDIOC_STREAMOFF);
+     if (ret)
+         av_log(s->avctx, AV_LOG_ERROR, "VIDIOC_STREAMOFF %s\n", s->capture.name);
++    }
+ 
+     ff_v4l2_context_release(&s->output);
+ 
+diff --git a/libavcodec/v4l2_m2m_dec.c b/libavcodec/v4l2_m2m_dec.c
+index b038efed9c..ab07c0a24a 100644
+--- a/libavcodec/v4l2_m2m_dec.c
++++ b/libavcodec/v4l2_m2m_dec.c
+@@ -205,9 +205,6 @@ static av_cold int v4l2_decode_init(AVCodecContext *avctx)
+     ret = ff_v4l2_m2m_codec_init(priv);
+     if (ret) {
+         av_log(avctx, AV_LOG_ERROR, "can't configure decoder\n");
+-        s->self_ref = NULL;
+-        av_buffer_unref(&priv->context_ref);
+-
+         return ret;
+     }
+ 
+@@ -216,10 +213,7 @@ static av_cold int v4l2_decode_init(AVCodecContext *avctx)
+ 
+ static av_cold int v4l2_decode_close(AVCodecContext *avctx)
+ {
+-    V4L2m2mPriv *priv = avctx->priv_data;
+-    V4L2m2mContext *s = priv->context;
+-    av_packet_unref(&s->buf_pkt);
+-    return ff_v4l2_m2m_codec_end(priv);
++    return ff_v4l2_m2m_codec_end(avctx->priv_data);
+ }
+ 
+ #define OFFSET(x) offsetof(V4L2m2mPriv, x)
+@@ -254,7 +248,7 @@ static const AVOption options[] = {
+         .close          = v4l2_decode_close, \
+         .bsfs           = bsf_name, \
+         .capabilities   = AV_CODEC_CAP_HARDWARE | AV_CODEC_CAP_DELAY | AV_CODEC_CAP_AVOID_PROBING, \
+-        .caps_internal  = FF_CODEC_CAP_SETS_PKT_DTS, \
++        .caps_internal  = FF_CODEC_CAP_SETS_PKT_DTS | FF_CODEC_CAP_INIT_CLEANUP, \
+         .wrapper_name   = "v4l2m2m", \
+     }
+ 
+diff --git a/libavcodec/v4l2_m2m_enc.c b/libavcodec/v4l2_m2m_enc.c
+index 56df4286ad..af0ed1e306 100644
+--- a/libavcodec/v4l2_m2m_enc.c
++++ b/libavcodec/v4l2_m2m_enc.c
+@@ -429,6 +429,7 @@ static const AVCodecDefault v4l2_m2m_defaults[] = {
+         .close          = v4l2_encode_close, \
+         .defaults       = v4l2_m2m_defaults, \
+         .capabilities   = AV_CODEC_CAP_HARDWARE | AV_CODEC_CAP_DELAY, \
++        .caps_internal  = FF_CODEC_CAP_INIT_CLEANUP, \
+         .wrapper_name   = "v4l2m2m", \
+     }
+ 

@@ -1,0 +1,79 @@
+commit 086003c9d616906e08bbeeab9c17b3aa4c6ff850
+Author: Pascal Quantin <pascal@wireshark.org>
+Date:   Wed Jan 22 11:38:02 2020 +0100
+
+    LTE RRC: fix a memory leak in composite TVB handling
+    
+    Bug: 16341
+    Change-Id: Ib6c020ea3df8b39a02f742f0684fca7db96f1fc3
+    Reviewed-on: https://code.wireshark.org/review/35899
+    Petri-Dish: Pascal Quantin <pascal@wireshark.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Pascal Quantin <pascal@wireshark.org>
+    (cherry picked from commit adeeb7f2da801303768ce96e2cacf6a703a69c6f)
+    Conflicts:
+            epan/dissectors/packet-lte-rrc.c
+    Reviewed-on: https://code.wireshark.org/review/35903
+
+diff --git a/epan/dissectors/asn1/lte-rrc/lte-rrc.cnf b/epan/dissectors/asn1/lte-rrc/lte-rrc.cnf
+index 2a00468a0f..eb2b9d20dd 100644
+--- a/epan/dissectors/asn1/lte-rrc/lte-rrc.cnf
++++ b/epan/dissectors/asn1/lte-rrc/lte-rrc.cnf
+@@ -438,7 +438,7 @@ MasterInformationBlock/schedulingInfoSIB1-BR-r13 TYPE=FT_UINT32 DISPLAY=BASE_DEC
+           tvbuff_t *gsm_rlcmac_dl_tvb = tvb_new_composite();
+           guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+           pd[0] = 0x40;
+-          tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_real_data(pd, 1, 1));
++          tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+           tvb_composite_append(gsm_rlcmac_dl_tvb, target_rat_msg_cont_tvb);
+           tvb_composite_finalize(gsm_rlcmac_dl_tvb);
+           add_new_data_source(actx->pinfo, gsm_rlcmac_dl_tvb, "GPRS DL control block");
+@@ -506,7 +506,7 @@ MasterInformationBlock/schedulingInfoSIB1-BR-r13 TYPE=FT_UINT32 DISPLAY=BASE_DEC
+         tvbuff_t *si_tvb = tvb_new_composite();
+         guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+         pd[0] = 0x06;
+-        tvb_composite_append(si_tvb, tvb_new_real_data(pd, 1, 1));
++        tvb_composite_append(si_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+         tvb_composite_append(si_tvb, sys_info_list_tvb);
+         tvb_composite_finalize(si_tvb);
+         add_new_data_source(actx->pinfo, si_tvb, "System Information");
+@@ -519,7 +519,7 @@ MasterInformationBlock/schedulingInfoSIB1-BR-r13 TYPE=FT_UINT32 DISPLAY=BASE_DEC
+         tvbuff_t *gsm_rlcmac_dl_tvb = tvb_new_composite();
+         guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+         pd[0] = 0x40;
+-        tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_real_data(pd, 1, 1));
++        tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+         tvb_composite_append(gsm_rlcmac_dl_tvb, sys_info_list_tvb);
+         tvb_composite_finalize(gsm_rlcmac_dl_tvb);
+         add_new_data_source(actx->pinfo, gsm_rlcmac_dl_tvb, "GPRS DL control block");
+diff --git a/epan/dissectors/packet-lte-rrc.c b/epan/dissectors/packet-lte-rrc.c
+index 71ad21350d..6cef81e81f 100644
+--- a/epan/dissectors/packet-lte-rrc.c
++++ b/epan/dissectors/packet-lte-rrc.c
+@@ -52217,7 +52217,7 @@ dissect_lte_rrc_T_targetRAT_MessageContainer(tvbuff_t *tvb _U_, int offset _U_,
+           tvbuff_t *gsm_rlcmac_dl_tvb = tvb_new_composite();
+           guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+           pd[0] = 0x40;
+-          tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_real_data(pd, 1, 1));
++          tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+           tvb_composite_append(gsm_rlcmac_dl_tvb, target_rat_msg_cont_tvb);
+           tvb_composite_finalize(gsm_rlcmac_dl_tvb);
+           add_new_data_source(actx->pinfo, gsm_rlcmac_dl_tvb, "GPRS DL control block");
+@@ -52279,7 +52279,7 @@ dissect_lte_rrc_SystemInfoListGERAN_item(tvbuff_t *tvb _U_, int offset _U_, asn1
+         tvbuff_t *si_tvb = tvb_new_composite();
+         guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+         pd[0] = 0x06;
+-        tvb_composite_append(si_tvb, tvb_new_real_data(pd, 1, 1));
++        tvb_composite_append(si_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+         tvb_composite_append(si_tvb, sys_info_list_tvb);
+         tvb_composite_finalize(si_tvb);
+         add_new_data_source(actx->pinfo, si_tvb, "System Information");
+@@ -52292,7 +52292,7 @@ dissect_lte_rrc_SystemInfoListGERAN_item(tvbuff_t *tvb _U_, int offset _U_, asn1
+         tvbuff_t *gsm_rlcmac_dl_tvb = tvb_new_composite();
+         guint8 *pd = (guint8 *) wmem_alloc(actx->pinfo->pool, 1);
+         pd[0] = 0x40;
+-        tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_real_data(pd, 1, 1));
++        tvb_composite_append(gsm_rlcmac_dl_tvb, tvb_new_child_real_data(tvb, pd, 1, 1));
+         tvb_composite_append(gsm_rlcmac_dl_tvb, sys_info_list_tvb);
+         tvb_composite_finalize(gsm_rlcmac_dl_tvb);
+         add_new_data_source(actx->pinfo, gsm_rlcmac_dl_tvb, "GPRS DL control block");

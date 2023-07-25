@@ -1,0 +1,23 @@
+commit 39bbdebb1ed8eb9c9b0cd6db85afde6ba89d86e4
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Mon Jul 13 16:05:21 2015 +0200
+
+    avcodec/sanm: Reset sizes in destroy_buffers()
+    
+    Fixes crash in 1288a2fe8e9ae6b00ca40e089d08ca65_signal_sigsegv_7ffff71426a7_354_accident.san with allocation limit 65536
+    
+    Found-by: Samuel Groß, Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/sanm.c b/libavcodec/sanm.c
+index 9e5ec5400e..2547abb840 100644
+--- a/libavcodec/sanm.c
++++ b/libavcodec/sanm.c
+@@ -457,6 +457,7 @@ static void destroy_buffers(SANMVideoContext *ctx)
+     ctx->frm0_size =
+     ctx->frm1_size =
+     ctx->frm2_size = 0;
++    init_sizes(ctx, 0, 0);
+ }
+ 
+ static av_cold int init_buffers(SANMVideoContext *ctx)

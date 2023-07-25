@@ -1,0 +1,272 @@
+commit 9c23f9bb5fe435b28245ba8ac65aa0ca6b902c04
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Dec 26 14:23:22 2021 +0000
+
+    patch 8.2.3902: Vim9: double free with nested :def function
+    
+    Problem:    Vim9: double free with nested :def function.
+    Solution:   Pass "line_to_free" from compile_def_function() and make sure
+                cmdlinep is valid.
+
+diff --git a/src/proto/userfunc.pro b/src/proto/userfunc.pro
+index 0320f09d3..311cee2e1 100644
+--- a/src/proto/userfunc.pro
++++ b/src/proto/userfunc.pro
+@@ -38,7 +38,7 @@ char_u *untrans_function_name(char_u *name);
+ char_u *get_scriptlocal_funcname(char_u *funcname);
+ char_u *save_function_name(char_u **name, int *is_global, int skip, int flags, funcdict_T *fudi);
+ void list_functions(regmatch_T *regmatch);
+-ufunc_T *define_function(exarg_T *eap, char_u *name_arg);
++ufunc_T *define_function(exarg_T *eap, char_u *name_arg, char_u **line_to_free);
+ void ex_function(exarg_T *eap);
+ void ex_defcompile(exarg_T *eap);
+ int eval_fname_script(char_u *p);
+diff --git a/src/testdir/test_vim9_func.vim b/src/testdir/test_vim9_func.vim
+index 5b8ad17c7..1a14c1016 100644
+--- a/src/testdir/test_vim9_func.vim
++++ b/src/testdir/test_vim9_func.vim
+@@ -1669,6 +1669,26 @@ def Test_error_in_nested_function()
+   assert_fails('FuncWithForwardCall()', 'E1096:', '', 1, 'FuncWithForwardCall')
+ enddef
+ 
++def Test_nested_functin_with_nextcmd()
++  var lines =<< trim END
++      vim9script
++      # Define an outer function
++      def FirstFunction()
++        # Define an inner function
++        def SecondFunction()
++          # the function has a body, a double free is detected.
++          AAAAA
++
++         # enddef followed by | or } followed by # one or more characters
++         enddef|BBBB
++      enddef
++
++      # Compile all functions
++      defcompile
++  END
++  CheckScriptFailure(lines, 'E476: Invalid command: AAAAA')
++enddef
++
+ def Test_return_type_wrong()
+   CheckScriptFailure([
+         'def Func(): number',
+diff --git a/src/userfunc.c b/src/userfunc.c
+index 897174092..80c64d0de 100644
+--- a/src/userfunc.c
++++ b/src/userfunc.c
+@@ -720,12 +720,14 @@ get_function_body(
+ 	}
+ 	else
+ 	{
+-	    vim_free(*line_to_free);
+ 	    if (eap->getline == NULL)
+ 		theline = getcmdline(':', 0L, indent, getline_options);
+ 	    else
+ 		theline = eap->getline(':', eap->cookie, indent,
+ 							      getline_options);
++	    if (*eap->cmdlinep == *line_to_free)
++		*eap->cmdlinep = theline;
++	    vim_free(*line_to_free);
+ 	    *line_to_free = theline;
+ 	}
+ 	if (KeyTyped)
+@@ -837,7 +839,8 @@ get_function_body(
+ 			// we can simply point into it, otherwise we need to
+ 			// change "eap->cmdlinep".
+ 			eap->nextcmd = nextcmd;
+-			if (*line_to_free != NULL)
++			if (*line_to_free != NULL
++					    && *eap->cmdlinep != *line_to_free)
+ 			{
+ 			    vim_free(*eap->cmdlinep);
+ 			    *eap->cmdlinep = *line_to_free;
+@@ -1161,7 +1164,7 @@ lambda_function_body(
+ 	}
+ 	if (ga_grow(gap, 1) == FAIL || ga_grow(freegap, 1) == FAIL)
+ 	    goto erret;
+-	if (cmdline != NULL)
++	if (eap.nextcmd != NULL)
+ 	    // more is following after the "}", which was skipped
+ 	    last = cmdline;
+ 	else
+@@ -1175,7 +1178,7 @@ lambda_function_body(
+ 	((char_u **)freegap->ga_data)[freegap->ga_len++] = pnl;
+     }
+ 
+-    if (cmdline != NULL)
++    if (eap.nextcmd != NULL)
+     {
+ 	garray_T *tfgap = &evalarg->eval_tofree_ga;
+ 
+@@ -1187,6 +1190,8 @@ lambda_function_body(
+ 	{
+ 	    ((char_u **)(tfgap->ga_data))[tfgap->ga_len++] = cmdline;
+ 	    evalarg->eval_using_cmdline = TRUE;
++	    if (cmdline == line_to_free)
++		line_to_free = NULL;
+ 	}
+     }
+     else
+@@ -3988,9 +3993,8 @@ list_functions(regmatch_T *regmatch)
+  * Returns a pointer to the function or NULL if no function defined.
+  */
+     ufunc_T *
+-define_function(exarg_T *eap, char_u *name_arg)
++define_function(exarg_T *eap, char_u *name_arg, char_u **line_to_free)
+ {
+-    char_u	*line_to_free = NULL;
+     int		j;
+     int		c;
+     int		saved_did_emsg;
+@@ -4258,7 +4262,7 @@ define_function(exarg_T *eap, char_u *name_arg)
+     if (get_function_args(&p, ')', &newargs,
+ 			eap->cmdidx == CMD_def ? &argtypes : NULL, FALSE,
+ 			 NULL, &varargs, &default_args, eap->skip,
+-			 eap, &line_to_free) == FAIL)
++			 eap, line_to_free) == FAIL)
+ 	goto errret_2;
+     whitep = p;
+ 
+@@ -4368,7 +4372,7 @@ define_function(exarg_T *eap, char_u *name_arg)
+ 
+     // Do not define the function when getting the body fails and when
+     // skipping.
+-    if (get_function_body(eap, &newlines, line_arg, &line_to_free) == FAIL
++    if (get_function_body(eap, &newlines, line_arg, line_to_free) == FAIL
+ 	    || eap->skip)
+ 	goto erret;
+ 
+@@ -4660,7 +4664,6 @@ errret_2:
+     }
+ ret_free:
+     ga_clear_strings(&argtypes);
+-    vim_free(line_to_free);
+     vim_free(fudi.fd_newkey);
+     if (name != name_arg)
+ 	vim_free(name);
+@@ -4676,7 +4679,10 @@ ret_free:
+     void
+ ex_function(exarg_T *eap)
+ {
+-    (void)define_function(eap, NULL);
++    char_u *line_to_free = NULL;
++
++    (void)define_function(eap, NULL, &line_to_free);
++    vim_free(line_to_free);
+ }
+ 
+ /*
+diff --git a/src/version.c b/src/version.c
+index 9a5ef2cc9..55ddb069c 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -749,6 +749,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    3902,
+ /**/
+     3901,
+ /**/
+diff --git a/src/vim9compile.c b/src/vim9compile.c
+index e9d6089b1..b23145ebc 100644
+--- a/src/vim9compile.c
++++ b/src/vim9compile.c
+@@ -812,11 +812,13 @@ func_needs_compiling(ufunc_T *ufunc, compiletype_T compile_type)
+  * Compile a nested :def command.
+  */
+     static char_u *
+-compile_nested_function(exarg_T *eap, cctx_T *cctx)
++compile_nested_function(exarg_T *eap, cctx_T *cctx, char_u **line_to_free)
+ {
+     int		is_global = *eap->arg == 'g' && eap->arg[1] == ':';
+     char_u	*name_start = eap->arg;
+     char_u	*name_end = to_name_end(eap->arg, TRUE);
++    int		off;
++    char_u	*func_name;
+     char_u	*lambda_name;
+     ufunc_T	*ufunc;
+     int		r = FAIL;
+@@ -866,7 +868,17 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx)
+     lambda_name = vim_strsave(get_lambda_name());
+     if (lambda_name == NULL)
+ 	return NULL;
+-    ufunc = define_function(eap, lambda_name);
++
++    // This may free the current line, make a copy of the name.
++    off = is_global ? 2 : 0;
++    func_name = vim_strnsave(name_start + off, name_end - name_start - off);
++    if (func_name == NULL)
++    {
++	r = FAIL;
++	goto theend;
++    }
++
++    ufunc = define_function(eap, lambda_name, line_to_free);
+ 
+     if (ufunc == NULL)
+     {
+@@ -911,21 +923,14 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx)
+ 
+     if (is_global)
+     {
+-	char_u *func_name = vim_strnsave(name_start + 2,
+-						    name_end - name_start - 2);
+-
+-	if (func_name == NULL)
+-	    r = FAIL;
+-	else
+-	{
+-	    r = generate_NEWFUNC(cctx, lambda_name, func_name);
+-	    lambda_name = NULL;
+-	}
++	r = generate_NEWFUNC(cctx, lambda_name, func_name);
++	func_name = NULL;
++	lambda_name = NULL;
+     }
+     else
+     {
+ 	// Define a local variable for the function reference.
+-	lvar_T	*lvar = reserve_local(cctx, name_start, name_end - name_start,
++	lvar_T	*lvar = reserve_local(cctx, func_name, name_end - name_start,
+ 						    TRUE, ufunc->uf_func_type);
+ 
+ 	if (lvar == NULL)
+@@ -937,6 +942,7 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx)
+ 
+ theend:
+     vim_free(lambda_name);
++    vim_free(func_name);
+     return r == FAIL ? NULL : (char_u *)"";
+ }
+ 
+@@ -2861,7 +2867,7 @@ compile_def_function(
+ 	    case CMD_def:
+ 	    case CMD_function:
+ 		    ea.arg = p;
+-		    line = compile_nested_function(&ea, &cctx);
++		    line = compile_nested_function(&ea, &cctx, &line_to_free);
+ 		    break;
+ 
+ 	    case CMD_return:
+diff --git a/src/vim9execute.c b/src/vim9execute.c
+index 49336c099..9814f2514 100644
+--- a/src/vim9execute.c
++++ b/src/vim9execute.c
+@@ -3345,10 +3345,12 @@ exec_instructions(ectx_T *ectx)
+ 		else
+ 		{
+ 		    exarg_T ea;
++		    char_u  *line_to_free = NULL;
+ 
+ 		    CLEAR_FIELD(ea);
+ 		    ea.cmd = ea.arg = iptr->isn_arg.string;
+-		    define_function(&ea, NULL);
++		    define_function(&ea, NULL, &line_to_free);
++		    vim_free(line_to_free);
+ 		}
+ 		break;
+ 

@@ -1,0 +1,20 @@
+commit 673fce6d40d9a594fb7a0ea17d296b7d3d9ea856
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Sat Oct 19 19:24:52 2019 +0200
+
+    avfilter/vf_tile: fix memory leak
+    
+    Fixes #8313
+
+diff --git a/libavfilter/vf_tile.c b/libavfilter/vf_tile.c
+index 439689a14d..6278f72abb 100644
+--- a/libavfilter/vf_tile.c
++++ b/libavfilter/vf_tile.c
+@@ -262,6 +262,7 @@ static av_cold void uninit(AVFilterContext *ctx)
+ {
+     TileContext *tile = ctx->priv;
+ 
++    av_frame_free(&tile->out_ref);
+     av_frame_free(&tile->prev_out_ref);
+ }
+ 

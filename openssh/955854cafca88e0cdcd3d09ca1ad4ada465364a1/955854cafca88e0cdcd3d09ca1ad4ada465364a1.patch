@@ -1,0 +1,31 @@
+commit 955854cafca88e0cdcd3d09ca1ad4ada465364a1
+Author: djm@openbsd.org <djm@openbsd.org>
+Date:   Wed May 6 20:57:38 2020 +0000
+
+    upstream: another case where a utimes() failure could make scp send
+    
+    a desynchronising error; reminded by Aymeric Vincent ok deraadt markus
+    
+    OpenBSD-Commit-ID: 2ea611d34d8ff6d703a7a8bf858aa5dbfbfa7381
+
+diff --git a/scp.c b/scp.c
+index 43902598..b4492a06 100644
+--- a/scp.c
++++ b/scp.c
+@@ -1,4 +1,4 @@
+-/* $OpenBSD: scp.c,v 1.209 2020/05/01 06:31:42 djm Exp $ */
++/* $OpenBSD: scp.c,v 1.210 2020/05/06 20:57:38 djm Exp $ */
+ /*
+  * scp - secure remote copy.  This is basically patched BSD rcp which
+  * uses ssh to do the data transfer (instead of using rcmd).
+@@ -1427,9 +1427,7 @@ sink(int argc, char **argv, const char *src)
+ 			sink(1, vect, src);
+ 			if (setimes) {
+ 				setimes = 0;
+-				if (utimes(vect[0], tv) == -1)
+-					run_err("%s: set times: %s",
+-					    vect[0], strerror(errno));
++				(void) utimes(vect[0], tv);
+ 			}
+ 			if (mod_flag)
+ 				(void) chmod(vect[0], mode);

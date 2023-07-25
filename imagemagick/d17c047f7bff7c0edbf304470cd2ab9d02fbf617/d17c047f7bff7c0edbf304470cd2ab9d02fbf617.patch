@@ -1,0 +1,24 @@
+commit d17c047f7bff7c0edbf304470cd2ab9d02fbf617
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Mon Apr 29 07:57:09 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1561
+
+diff --git a/coders/png.c b/coders/png.c
+index 84b95c234..077cc845b 100644
+--- a/coders/png.c
++++ b/coders/png.c
+@@ -8180,8 +8180,11 @@ Magick_png_write_raw_profile(const ImageInfo *image_info,png_struct *ping,
+    unsigned char
+      hex[16]={'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+ 
+-   if (LocaleNCompare((char *) profile_type+1, "ng-chunk-",9) == 0)
+-      return;
++   if (length > 1)
++     {
++       if (LocaleNCompare((char *) profile_type+1, "ng-chunk-",9) == 0)
++          return;
++     }
+ 
+    if (image_info->verbose)
+      {

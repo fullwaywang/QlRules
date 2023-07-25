@@ -1,0 +1,18 @@
+commit 6790815c75bdea0357df5564345847856e995d6b
+Author: dirk <dirk@git.imagemagick.org>
+Date:   Sat Sep 19 13:42:25 2015 +0200
+
+    Fixed memory leak in IsOptionMember.
+
+diff --git a/MagickCore/option.c b/MagickCore/option.c
+index cecf508ad..7c9393fcb 100644
+--- a/MagickCore/option.c
++++ b/MagickCore/option.c
+@@ -2426,6 +2426,7 @@ MagickExport MagickBooleanType IsOptionMember(const char *option,
+   if (option_list == (char **) NULL)
+     return(MagickFalse);
+   member=MagickFalse;
++  option_list[0]=DestroyString(option_list[0]);
+   for (i=1; i < (ssize_t) number_options; i++)
+   {
+     if ((*option_list[i] == '!') &&

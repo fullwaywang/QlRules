@@ -1,0 +1,69 @@
+commit 2fdef641fd0dd2828bd948234ae86de75221a11a
+Author: Patrick Steinhardt <ps@pks.im>
+Date:   Tue Nov 15 11:44:51 2016 +0100
+
+    smart_pkt: treat empty packet lines as error
+    
+    The Git protocol does not specify what should happen in the case
+    of an empty packet line (that is a packet line "0004"). We
+    currently indicate success, but do not return a packet in the
+    case where we hit an empty line. The smart protocol was not
+    prepared to handle such packets in all cases, though, resulting
+    in a `NULL` pointer dereference.
+    
+    Fix the issue by returning an error instead. As such kind of
+    packets is not even specified by upstream, this is the right
+    thing to do.
+
+diff --git a/src/transports/smart_pkt.c b/src/transports/smart_pkt.c
+index 6fe53b931..e05196cd8 100644
+--- a/src/transports/smart_pkt.c
++++ b/src/transports/smart_pkt.c
+@@ -437,13 +437,13 @@ int git_pkt_parse_line(
+ 
+ 	line += PKT_LEN_SIZE;
+ 	/*
+-	 * TODO: How do we deal with empty lines? Try again? with the next
+-	 * line?
++	 * The Git protocol does not specify empty lines as part
++	 * of the protocol. Not knowing what to do with an empty
++	 * line, we should return an error upon hitting one.
+ 	 */
+ 	if (len == PKT_LEN_SIZE) {
+-		*head = NULL;
+-		*out = line;
+-		return 0;
++		giterr_set_str(GITERR_NET, "Invalid empty packet");
++		return GIT_ERROR;
+ 	}
+ 
+ 	if (len == 0) { /* Flush pkt */
+diff --git a/src/transports/smart_protocol.c b/src/transports/smart_protocol.c
+index 53c0b089e..db6a8b9c8 100644
+--- a/src/transports/smart_protocol.c
++++ b/src/transports/smart_protocol.c
+@@ -763,14 +763,6 @@ static int add_push_report_sideband_pkt(git_push *push, git_pkt_data *data_pkt,
+ 		line_len -= (line_end - line);
+ 		line = line_end;
+ 
+-		/* When a valid packet with no content has been
+-		 * read, git_pkt_parse_line does not report an
+-		 * error, but the pkt pointer has not been set.
+-		 * Handle this by skipping over empty packets.
+-		 */
+-		if (pkt == NULL)
+-			continue;
+-
+ 		error = add_push_report_pkt(push, pkt);
+ 
+ 		git_pkt_free(pkt);
+@@ -825,9 +817,6 @@ static int parse_report(transport_smart *transport, git_push *push)
+ 
+ 		error = 0;
+ 
+-		if (pkt == NULL)
+-			continue;
+-
+ 		switch (pkt->type) {
+ 			case GIT_PKT_DATA:
+ 				/* This is a sideband packet which contains other packets */

@@ -1,0 +1,27 @@
+commit bd7b3d6d47ccbb5e1747126f8e2a297f38e56b8c
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Tue Oct 1 11:17:17 2019 +0200
+
+    Clear err_code and err_reason at start of request handling
+    
+    req->err_code and req->err_reason are set when going to synthetic
+    handling. From there the resp.reason HTTP field is set from
+    req->err_reason if set, or the generic code based on req->err_code is used
+    if it was NULL. This patch clears these members so that a value from the
+    handling of a previous request doesn't linger.
+    
+    Fixes: VSV00004
+
+diff --git a/bin/varnishd/cache/cache_req_fsm.c b/bin/varnishd/cache/cache_req_fsm.c
+index c04eb9bf7..6fdce85a2 100644
+--- a/bin/varnishd/cache/cache_req_fsm.c
++++ b/bin/varnishd/cache/cache_req_fsm.c
+@@ -806,6 +806,8 @@ cnt_recv_prep(struct req *req, const char *ci)
+ 	req->is_hit = 0;
+ 	req->is_hitmiss = 0;
+ 	req->is_hitpass = 0;
++	req->err_code = 0;
++	req->err_reason = NULL;
+ }
+ 
+ /*--------------------------------------------------------------------

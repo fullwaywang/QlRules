@@ -1,0 +1,94 @@
+commit 641f786bb1a1f6eb1ff8750782ed939780f2b31a
+Author: Matteo Collina <matteo.collina@gmail.com>
+Date:   Thu Oct 22 14:10:51 2020 +0200
+
+    http: unset `F_CHUNKED` on new `Transfer-Encoding`
+    
+    Duplicate `Transfer-Encoding` header should be a treated as a single,
+    but with original header values concatenated with a comma separator. In
+    the light of this, even if the past `Transfer-Encoding` ended with
+    `chunked`, we should be not let the `F_CHUNKED` to leak into the next
+    header, because mere presence of another header indicates that `chunked`
+    is not the last transfer-encoding token.
+    
+    CVE-ID: CVE-2020-8287
+    Refs: https://github.com/nodejs-private/llhttp-private/pull/3
+    Refs: https://hackerone.com/bugs?report_id=1002188&subject=nodejs
+    PR-URL: https://github.com/nodejs-private/node-private/pull/228
+    Reviewed-By: Fedor Indutny <fedor.indutny@gmail.com>
+    Reviewed-By: Rich Trott <rtrott@gmail.com>
+
+diff --git a/deps/llhttp/src/llhttp.c b/deps/llhttp/src/llhttp.c
+index acc35479f8..3019c41096 100644
+--- a/deps/llhttp/src/llhttp.c
++++ b/deps/llhttp/src/llhttp.c
+@@ -813,6 +813,14 @@ int llhttp__internal__c_or_flags_16(
+   return 0;
+ }
+ 
++int llhttp__internal__c_and_flags(
++    llhttp__internal_t* state,
++    const unsigned char* p,
++    const unsigned char* endp) {
++  state->flags &= -9;
++  return 0;
++}
++
+ int llhttp__internal__c_update_header_state_7(
+     llhttp__internal_t* state,
+     const unsigned char* p,
+@@ -5974,10 +5982,18 @@ static llparse_state_t llhttp__internal__run(
+     /* UNREACHABLE */;
+     abort();
+   }
++  s_n_llhttp__internal__n_invoke_and_flags: {
++    switch (llhttp__internal__c_and_flags(state, p, endp)) {
++      default:
++        goto s_n_llhttp__internal__n_header_value_te_chunked;
++    }
++    /* UNREACHABLE */;
++    abort();
++  }
+   s_n_llhttp__internal__n_invoke_or_flags_16: {
+     switch (llhttp__internal__c_or_flags_16(state, p, endp)) {
+       default:
+-        goto s_n_llhttp__internal__n_header_value_te_chunked;
++        goto s_n_llhttp__internal__n_invoke_and_flags;
+     }
+     /* UNREACHABLE */;
+     abort();
+@@ -7625,6 +7641,14 @@ int llhttp__internal__c_or_flags_16(
+   return 0;
+ }
+ 
++int llhttp__internal__c_and_flags(
++    llhttp__internal_t* state,
++    const unsigned char* p,
++    const unsigned char* endp) {
++  state->flags &= -9;
++  return 0;
++}
++
+ int llhttp__internal__c_update_header_state_7(
+     llhttp__internal_t* state,
+     const unsigned char* p,
+@@ -12522,10 +12546,18 @@ static llparse_state_t llhttp__internal__run(
+     /* UNREACHABLE */;
+     abort();
+   }
++  s_n_llhttp__internal__n_invoke_and_flags: {
++    switch (llhttp__internal__c_and_flags(state, p, endp)) {
++      default:
++        goto s_n_llhttp__internal__n_header_value_te_chunked;
++    }
++    /* UNREACHABLE */;
++    abort();
++  }
+   s_n_llhttp__internal__n_invoke_or_flags_16: {
+     switch (llhttp__internal__c_or_flags_16(state, p, endp)) {
+       default:
+-        goto s_n_llhttp__internal__n_header_value_te_chunked;
++        goto s_n_llhttp__internal__n_invoke_and_flags;
+     }
+     /* UNREACHABLE */;
+     abort();

@@ -1,0 +1,69 @@
+commit 8f3c3c6cd044e3b5bf08dbfa3b3f04bb3f711bad
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Oct 18 17:05:54 2022 +0100
+
+    patch 9.0.0789: dummy buffer ends up in a window
+    
+    Problem:    Dummy buffer ends up in a window.
+    Solution:   Disallow navigating to a dummy buffer.
+
+diff --git a/src/buffer.c b/src/buffer.c
+index 0849b7099..5a4825feb 100644
+--- a/src/buffer.c
++++ b/src/buffer.c
+@@ -1351,6 +1351,13 @@ do_buffer_ext(
+     if ((flags & DOBUF_NOPOPUP) && bt_popup(buf) && !bt_terminal(buf))
+ 	return OK;
+ #endif
++    if ((action == DOBUF_GOTO || action == DOBUF_SPLIT)
++						  && (buf->b_flags & BF_DUMMY))
++    {
++	// disallow navigating to the dummy buffer
++	semsg(_(e_buffer_nr_does_not_exist), count);
++	return FAIL;
++    }
+ 
+ #ifdef FEAT_GUI
+     need_mouse_correct = TRUE;
+diff --git a/src/testdir/test_autocmd.vim b/src/testdir/test_autocmd.vim
+index 0706e7307..6ba1b02df 100644
+--- a/src/testdir/test_autocmd.vim
++++ b/src/testdir/test_autocmd.vim
+@@ -3857,4 +3857,24 @@ func Test_autocmd_delete()
+   call assert_true(autocmd_delete([test_null_dict()]))
+ endfunc
+ 
++func Test_autocmd_split_dummy()
++  " Autocommand trying to split a window containing a dummy buffer.
++  auto BufReadPre * exe "sbuf " .. expand("<abuf>") 
++  " Avoid the "W11" prompt
++  au FileChangedShell * let v:fcs_choice = 'reload'
++  func Xautocmd_changelist()
++    cal writefile(['Xtestfile2:4:4'], 'Xerr')
++    edit Xerr
++    lex 'Xtestfile2:4:4'
++  endfunc
++  call Xautocmd_changelist()
++  call assert_fails('call Xautocmd_changelist()', 'E86:')
++
++  au! BufReadPre
++  au! FileChangedShell
++  delfunc Xautocmd_changelist
++  bwipe! Xerr
++  call delete('Xerr')
++endfunc
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 1c511f94b..05e619f06 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    789,
+ /**/
+     788,
+ /**/

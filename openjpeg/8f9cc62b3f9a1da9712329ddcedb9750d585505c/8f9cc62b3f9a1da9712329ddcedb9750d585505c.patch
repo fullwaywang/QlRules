@@ -1,0 +1,32 @@
+commit 8f9cc62b3f9a1da9712329ddcedb9750d585505c
+Author: mayeut <mayeut@users.noreply.github.com>
+Date:   Sun May 8 18:40:12 2016 +0200
+
+    Fix division by zero
+    
+    Fix uclouvain/openjpeg#733
+
+diff --git a/src/lib/openjp2/tcd.c b/src/lib/openjp2/tcd.c
+index 7ecd97cf..b8cd3072 100644
+--- a/src/lib/openjp2/tcd.c
++++ b/src/lib/openjp2/tcd.c
+@@ -720,7 +720,8 @@ static INLINE OPJ_BOOL opj_tcd_init_tile(opj_tcd_t *p_tcd, OPJ_UINT32 p_tile_no,
+ 		
+ 		/* compute l_data_size with overflow check */
+ 		l_data_size = (OPJ_UINT32)(l_tilec->x1 - l_tilec->x0);
+-		if ((((OPJ_UINT32)-1) / l_data_size) < (OPJ_UINT32)(l_tilec->y1 - l_tilec->y0)) {
++		/* issue 733, l_data_size == 0U, probably something wrong should be checked before getting here */
++		if ((l_data_size > 0U) && ((((OPJ_UINT32)-1) / l_data_size) < (OPJ_UINT32)(l_tilec->y1 - l_tilec->y0))) {
+ 			opj_event_msg(manager, EVT_ERROR, "Not enough memory for tile data\n");
+ 			return OPJ_FALSE;
+ 		}
+diff --git a/tests/nonregression/test_suite.ctest.in b/tests/nonregression/test_suite.ctest.in
+index f22a89f5..c48f66b2 100644
+--- a/tests/nonregression/test_suite.ctest.in
++++ b/tests/nonregression/test_suite.ctest.in
+@@ -557,3 +557,5 @@ opj_decompress -i @INPUT_NR_PATH@/basn6a08.jp2 -o @TEMP_PATH@/basn6a08_tif-15.ti
+ !opj_decompress -i @INPUT_NR_PATH@/issue725.jp2 -o @TEMP_PATH@/issue725.png
+ # issue 726
+ opj_decompress -i @INPUT_NR_PATH@/issue726.j2k -o @TEMP_PATH@/issue726.png
++# issue 733
++!opj_decompress -i @INPUT_NR_PATH@/issue733.jp2 -o @TEMP_PATH@/issue733.png

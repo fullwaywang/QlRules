@@ -1,0 +1,41 @@
+commit 441b6d9071d6341e58dfe10719375489c5b8e3f0
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Wed Apr 3 09:41:36 2019 -0700
+
+    DOF: Fix alias binding dissection.
+    
+    When adding generated IID and OID bytes to the tree, use a zero offset
+    and length like we do elsewhere in the dissector.
+    
+    Bug: 15617
+    Change-Id: Id900f2aeeef7926706b417622d452ffa72949e8a
+    (cherry picked from commit ecf03bb37b3345e684890f7eee031cb17a247939)
+    Reviewed-on: https://code.wireshark.org/review/32723
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+    (cherry picked from commit 651cd91b16b01e3da698b04542da376d946bc54b)
+    Reviewed-on: https://code.wireshark.org/review/32725
+
+diff --git a/epan/dissectors/packet-dof.c b/epan/dissectors/packet-dof.c
+index 4dd3f4a87d..23491e1df0 100644
+--- a/epan/dissectors/packet-dof.c
++++ b/epan/dissectors/packet-dof.c
+@@ -1391,16 +1391,17 @@ static int oap_1_tree_add_alias(dof_api_data *api_data, oap_1_packet_data *oap_p
+         key.sender = packet->sender_id;
+         key.alias = alias;
+         binding = oap_1_resolve_alias(&key);
++
+         if (binding)
+         {
+             options_tree = proto_item_add_subtree(ti, ett_oap_1_alias);
+ 
+             /* Decode the Interface */
+-            ti = proto_tree_add_bytes_format_value(tree, hf_oap_1_interfaceid, tvb, offset, alias_length, binding->iid, "%s", dof_iid_create_standard_string(binding->iid_length, binding->iid));
++            ti = proto_tree_add_bytes_format_value(tree, hf_oap_1_interfaceid, tvb, 0, 0, binding->iid, "%s", dof_iid_create_standard_string(binding->iid_length, binding->iid));
+             PROTO_ITEM_SET_GENERATED(ti);
+ 
+             /* Decode the Object ID */
+-            ti = proto_tree_add_bytes_format_value(tree, hf_oap_1_objectid, tvb, offset, alias_length, binding->oid, "%s", dof_oid_create_standard_string(binding->oid_length, binding->oid));
++            ti = proto_tree_add_bytes_format_value(tree, hf_oap_1_objectid, tvb, 0, 0, binding->oid, "%s", dof_oid_create_standard_string(binding->oid_length, binding->oid));
+             PROTO_ITEM_SET_GENERATED(ti);
+ 
+             proto_tree_add_uint_format(options_tree, hf_oap_1_alias_frame,

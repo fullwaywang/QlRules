@@ -1,0 +1,19 @@
+commit 20635b9b859fc649f7682ab08a4c58c644a94bf5
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Tue Jul 18 07:31:54 2017 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/581
+
+diff --git a/coders/xpm.c b/coders/xpm.c
+index 1469fe445..26c71be1a 100644
+--- a/coders/xpm.c
++++ b/coders/xpm.c
+@@ -826,7 +826,7 @@ static MagickBooleanType WritePICONImage(const ImageInfo *image_info,
+       symbol[j]='\0';
+       (void) CopyMagickString(buffer,symbol,MagickPathExtent);
+       (void) WriteBlobString(image,buffer);
+-      p+=GetPixelChannels(image);
++      p+=GetPixelChannels(picon);
+     }
+     (void) FormatLocaleString(buffer,MagickPathExtent,"\"%s\n",
+       y == (ssize_t) (picon->rows-1) ? "" : ",");

@@ -1,0 +1,27 @@
+commit 64c85430f95200b6b51fe9475bd5203f7c19daf1
+Author: Hugo Landau <hlandau@openssl.org>
+Date:   Thu Apr 21 16:10:33 2022 +0100
+
+    Fix bug in OPENSSL_LH_flush
+    
+    Fixes #18139.
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+    Reviewed-by: Tomas Mraz <tomas@openssl.org>
+    (Merged from https://github.com/openssl/openssl/pull/18141)
+    
+    (cherry picked from commit e5da68183410c06f7b350a0721bc2bd6057e438e)
+
+diff --git a/crypto/lhash/lhash.c b/crypto/lhash/lhash.c
+index a15857cf9f..1cd988f01f 100644
+--- a/crypto/lhash/lhash.c
++++ b/crypto/lhash/lhash.c
+@@ -100,6 +100,8 @@ void OPENSSL_LH_flush(OPENSSL_LHASH *lh)
+         }
+         lh->b[i] = NULL;
+     }
++
++    lh->num_items = 0;
+ }
+ 
+ void *OPENSSL_LH_insert(OPENSSL_LHASH *lh, void *data)

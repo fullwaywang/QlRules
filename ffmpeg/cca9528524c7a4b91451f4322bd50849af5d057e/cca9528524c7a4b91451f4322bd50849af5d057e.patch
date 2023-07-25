@@ -1,0 +1,22 @@
+commit cca9528524c7a4b91451f4322bd50849af5d057e	cca9528524c7a4b91451f4322bd50849af5d057e
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Apr 14 00:07:38 2012 +0200
+
+    mp3on4: allocate a large enough frame.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/mpegaudiodec.c b/libavcodec/mpegaudiodec.c
+index 5c389c9553..d7d359a740 100644
+--- a/libavcodec/mpegaudiodec.c
++++ b/libavcodec/mpegaudiodec.c
+@@ -1898,7 +1898,7 @@ static int decode_frame_mp3on4(AVCodecContext *avctx, void *data,
+     int fr, j, n, ch, ret;
+ 
+     /* get output buffer */
+-    s->frame->nb_samples = MPA_FRAME_SIZE;
++    s->frame->nb_samples = s->frames * MPA_FRAME_SIZE;
+     if ((ret = avctx->get_buffer(avctx, s->frame)) < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
+         return ret;

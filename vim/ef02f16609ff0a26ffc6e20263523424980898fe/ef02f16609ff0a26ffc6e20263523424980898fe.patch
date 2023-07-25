@@ -1,0 +1,59 @@
+commit ef02f16609ff0a26ffc6e20263523424980898fe
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat May 7 10:49:10 2022 +0100
+
+    patch 8.2.4899: with latin1 encoding CTRL-W might go before the cmdline
+    
+    Problem:    With latin1 encoding CTRL-W might go before the start of the
+                command line.
+    Solution:   Check already being at the start of the command line.
+
+diff --git a/src/ex_getln.c b/src/ex_getln.c
+index a97024b35..7020f5143 100644
+--- a/src/ex_getln.c
++++ b/src/ex_getln.c
+@@ -1082,10 +1082,13 @@ cmdline_erase_chars(
+ 	{
+ 	    while (p > ccline.cmdbuff && vim_isspace(p[-1]))
+ 		--p;
+-	    i = vim_iswordc(p[-1]);
+-	    while (p > ccline.cmdbuff && !vim_isspace(p[-1])
+-		    && vim_iswordc(p[-1]) == i)
+-		--p;
++	    if (p > ccline.cmdbuff)
++	    {
++		i = vim_iswordc(p[-1]);
++		while (p > ccline.cmdbuff && !vim_isspace(p[-1])
++			&& vim_iswordc(p[-1]) == i)
++		    --p;
++	    }
+ 	}
+ 	else
+ 	    --p;
+diff --git a/src/testdir/test_cmdline.vim b/src/testdir/test_cmdline.vim
+index 474638fb0..5a849f77f 100644
+--- a/src/testdir/test_cmdline.vim
++++ b/src/testdir/test_cmdline.vim
+@@ -773,6 +773,9 @@ func Test_cmdline_remove_char()
+ 
+     call feedkeys(":abc def\<S-Left>\<C-U>\<C-B>\"\<CR>", 'tx')
+     call assert_equal('"def', @:, e)
++
++    " This was going before the start in latin1.
++    call feedkeys(": \<C-W>\<CR>", 'tx')
+   endfor
+ 
+   let &encoding = encoding_save
+diff --git a/src/version.c b/src/version.c
+index 201d26f06..05888c722 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4899,
+ /**/
+     4898,
+ /**/

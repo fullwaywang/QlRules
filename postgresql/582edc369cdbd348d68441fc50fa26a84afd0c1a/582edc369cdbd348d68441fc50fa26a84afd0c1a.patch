@@ -1,0 +1,965 @@
+commit 582edc369cdbd348d68441fc50fa26a84afd0c1a
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Feb 26 07:39:44 2018 -0800
+
+    Empty search_path in Autovacuum and non-psql/pgbench clients.
+    
+    This makes the client programs behave as documented regardless of the
+    connect-time search_path and regardless of user-created objects.  Today,
+    a malicious user with CREATE permission on a search_path schema can take
+    control of certain of these clients' queries and invoke arbitrary SQL
+    functions under the client identity, often a superuser.  This is
+    exploitable in the default configuration, where all users have CREATE
+    privilege on schema "public".
+    
+    This changes behavior of user-defined code stored in the database, like
+    pg_index.indexprs and pg_extension_config_dump().  If they reach code
+    bearing unqualified names, "does not exist" or "no schema has been
+    selected to create in" errors might appear.  Users may fix such errors
+    by schema-qualifying affected names.  After upgrading, consider watching
+    server logs for these errors.
+    
+    The --table arguments of src/bin/scripts clients have been lax; for
+    example, "vacuumdb -Zt pg_am\;CHECKPOINT" performed a checkpoint.  That
+    now fails, but for now, "vacuumdb -Zt 'pg_am(amname);CHECKPOINT'" still
+    performs a checkpoint.
+    
+    Back-patch to 9.3 (all supported versions).
+    
+    Reviewed by Tom Lane, though this fix strategy was not his first choice.
+    Reported by Arseniy Sharoglazov.
+    
+    Security: CVE-2018-1058
+
+diff --git a/contrib/oid2name/oid2name.c b/contrib/oid2name/oid2name.c
+index 8af99decad..769e527384 100644
+--- a/contrib/oid2name/oid2name.c
++++ b/contrib/oid2name/oid2name.c
+@@ -11,6 +11,7 @@
+ 
+ #include "catalog/pg_class.h"
+ 
++#include "fe_utils/connect.h"
+ #include "libpq-fe.h"
+ #include "pg_getopt.h"
+ 
+@@ -266,6 +267,7 @@ sql_conn(struct options *my_opts)
+ 	bool		have_password = false;
+ 	char		password[100];
+ 	bool		new_pass;
++	PGresult   *res;
+ 
+ 	/*
+ 	 * Start the connection.  Loop until we have a password if requested by
+@@ -323,6 +325,17 @@ sql_conn(struct options *my_opts)
+ 		exit(1);
+ 	}
+ 
++	res = PQexec(conn, ALWAYS_SECURE_SEARCH_PATH_SQL);
++	if (PQresultStatus(res) != PGRES_TUPLES_OK)
++	{
++		fprintf(stderr, "oid2name: could not clear search_path: %s\n",
++				PQerrorMessage(conn));
++		PQclear(res);
++		PQfinish(conn);
++		exit(-1);
++	}
++	PQclear(res);
++
+ 	/* return the conn if good */
+ 	return conn;
+ }
+diff --git a/contrib/vacuumlo/vacuumlo.c b/contrib/vacuumlo/vacuumlo.c
+index 4074262b74..ab6b17c7f6 100644
+--- a/contrib/vacuumlo/vacuumlo.c
++++ b/contrib/vacuumlo/vacuumlo.c
+@@ -23,6 +23,7 @@
+ 
+ #include "catalog/pg_class.h"
+ 
++#include "fe_utils/connect.h"
+ #include "libpq-fe.h"
+ #include "pg_getopt.h"
+ 
+@@ -140,11 +141,8 @@ vacuumlo(const char *database, const struct _param *param)
+ 			fprintf(stdout, "Test run: no large objects will be removed!\n");
+ 	}
+ 
+-	/*
+-	 * Don't get fooled by any non-system catalogs
+-	 */
+-	res = PQexec(conn, "SET search_path = pg_catalog");
+-	if (PQresultStatus(res) != PGRES_COMMAND_OK)
++	res = PQexec(conn, ALWAYS_SECURE_SEARCH_PATH_SQL);
++	if (PQresultStatus(res) != PGRES_TUPLES_OK)
+ 	{
+ 		fprintf(stderr, "Failed to set search_path:\n");
+ 		fprintf(stderr, "%s", PQerrorMessage(conn));
+diff --git a/src/backend/postmaster/autovacuum.c b/src/backend/postmaster/autovacuum.c
+index 702f8d8188..21f5e2ce95 100644
+--- a/src/backend/postmaster/autovacuum.c
++++ b/src/backend/postmaster/autovacuum.c
+@@ -574,6 +574,12 @@ AutoVacLauncherMain(int argc, char *argv[])
+ 	/* must unblock signals before calling rebuild_database_list */
+ 	PG_SETMASK(&UnBlockSig);
+ 
++	/*
++	 * Set always-secure search path.  Launcher doesn't connect to a database,
++	 * so this has no effect.
++	 */
++	SetConfigOption("search_path", "", PGC_SUSET, PGC_S_OVERRIDE);
++
+ 	/*
+ 	 * Force zero_damaged_pages OFF in the autovac process, even if it is set
+ 	 * in postgresql.conf.  We don't really want such a dangerous option being
+@@ -1584,6 +1590,14 @@ AutoVacWorkerMain(int argc, char *argv[])
+ 
+ 	PG_SETMASK(&UnBlockSig);
+ 
++	/*
++	 * Set always-secure search path, so malicious users can't redirect user
++	 * code (e.g. pg_index.indexprs).  (That code runs in a
++	 * SECURITY_RESTRICTED_OPERATION sandbox, so malicious users could not
++	 * take control of the entire autovacuum worker in any case.)
++	 */
++	SetConfigOption("search_path", "", PGC_SUSET, PGC_S_OVERRIDE);
++
+ 	/*
+ 	 * Force zero_damaged_pages OFF in the autovac process, even if it is set
+ 	 * in postgresql.conf.  We don't really want such a dangerous option being
+diff --git a/src/bin/pg_basebackup/streamutil.c b/src/bin/pg_basebackup/streamutil.c
+index c88cede167..296b1888aa 100644
+--- a/src/bin/pg_basebackup/streamutil.c
++++ b/src/bin/pg_basebackup/streamutil.c
+@@ -24,6 +24,7 @@
+ #include "access/xlog_internal.h"
+ #include "common/fe_memutils.h"
+ #include "datatype/timestamp.h"
++#include "fe_utils/connect.h"
+ #include "port/pg_bswap.h"
+ #include "pqexpbuffer.h"
+ 
+@@ -208,6 +209,23 @@ GetConnection(void)
+ 	if (conn_opts)
+ 		PQconninfoFree(conn_opts);
+ 
++	/* Set always-secure search path, so malicious users can't get control. */
++	if (dbname != NULL)
++	{
++		PGresult   *res;
++
++		res = PQexec(tmpconn, ALWAYS_SECURE_SEARCH_PATH_SQL);
++		if (PQresultStatus(res) != PGRES_TUPLES_OK)
++		{
++			fprintf(stderr, _("%s: could not clear search_path: %s\n"),
++					progname, PQerrorMessage(tmpconn));
++			PQclear(res);
++			PQfinish(tmpconn);
++			exit(1);
++		}
++		PQclear(res);
++	}
++
+ 	/*
+ 	 * Ensure we have the same value of integer_datetimes (now always "on") as
+ 	 * the server we are connecting to.
+diff --git a/src/bin/pg_dump/pg_backup_db.c b/src/bin/pg_dump/pg_backup_db.c
+index 3b7dd24151..5e32ee8a5b 100644
+--- a/src/bin/pg_dump/pg_backup_db.c
++++ b/src/bin/pg_dump/pg_backup_db.c
+@@ -12,6 +12,7 @@
+ #include "postgres_fe.h"
+ 
+ #include "dumputils.h"
++#include "fe_utils/connect.h"
+ #include "fe_utils/string_utils.h"
+ #include "parallel.h"
+ #include "pg_backup_archiver.h"
+@@ -102,6 +103,10 @@ ReconnectToServer(ArchiveHandle *AH, const char *dbname, const char *username)
+ 
+ 	PQfinish(AH->connection);
+ 	AH->connection = newConn;
++
++	/* Start strict; later phases may override this. */
++	PQclear(ExecuteSqlQueryForSingleRow((Archive *) AH,
++										ALWAYS_SECURE_SEARCH_PATH_SQL));
+ }
+ 
+ /*
+@@ -304,6 +309,10 @@ ConnectDatabase(Archive *AHX,
+ 					  PQdb(AH->connection) ? PQdb(AH->connection) : "",
+ 					  PQerrorMessage(AH->connection));
+ 
++	/* Start strict; later phases may override this. */
++	PQclear(ExecuteSqlQueryForSingleRow((Archive *) AH,
++										ALWAYS_SECURE_SEARCH_PATH_SQL));
++
+ 	/*
+ 	 * We want to remember connection's actual password, whether or not we got
+ 	 * it by prompting.  So we don't just store the password variable.
+diff --git a/src/bin/pg_dump/pg_dump.c b/src/bin/pg_dump/pg_dump.c
+index 8b67ec1aa1..2c934e6365 100644
+--- a/src/bin/pg_dump/pg_dump.c
++++ b/src/bin/pg_dump/pg_dump.c
+@@ -60,6 +60,7 @@
+ #include "pg_backup_db.h"
+ #include "pg_backup_utils.h"
+ #include "pg_dump.h"
++#include "fe_utils/connect.h"
+ #include "fe_utils/string_utils.h"
+ 
+ 
+@@ -1021,6 +1022,8 @@ setup_connection(Archive *AH, const char *dumpencoding,
+ 	PGconn	   *conn = GetConnection(AH);
+ 	const char *std_strings;
+ 
++	PQclear(ExecuteSqlQueryForSingleRow(AH, ALWAYS_SECURE_SEARCH_PATH_SQL));
++
+ 	/*
+ 	 * Set the client encoding if requested.
+ 	 */
+@@ -1311,11 +1314,18 @@ expand_table_name_patterns(Archive *fout,
+ 
+ 	for (cell = patterns->head; cell; cell = cell->next)
+ 	{
++		/*
++		 * Query must remain ABSOLUTELY devoid of unqualified names.  This
++		 * would be unnecessary given a pg_table_is_visible() variant taking a
++		 * search_path argument.
++		 */
+ 		appendPQExpBuffer(query,
+ 						  "SELECT c.oid"
+ 						  "\nFROM pg_catalog.pg_class c"
+-						  "\n     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace"
+-						  "\nWHERE c.relkind in ('%c', '%c', '%c', '%c', '%c', '%c')\n",
++						  "\n     LEFT JOIN pg_catalog.pg_namespace n"
++						  "\n     ON n.oid OPERATOR(pg_catalog.=) c.relnamespace"
++						  "\nWHERE c.relkind OPERATOR(pg_catalog.=) ANY"
++						  "\n    (array['%c', '%c', '%c', '%c', '%c', '%c'])\n",
+ 						  RELKIND_RELATION, RELKIND_SEQUENCE, RELKIND_VIEW,
+ 						  RELKIND_MATVIEW, RELKIND_FOREIGN_TABLE,
+ 						  RELKIND_PARTITIONED_TABLE);
+@@ -1323,7 +1333,10 @@ expand_table_name_patterns(Archive *fout,
+ 							  false, "n.nspname", "c.relname", NULL,
+ 							  "pg_catalog.pg_table_is_visible(c.oid)");
+ 
++		ExecuteSqlStatement(fout, "RESET search_path");
+ 		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
++		PQclear(ExecuteSqlQueryForSingleRow(fout,
++											ALWAYS_SECURE_SEARCH_PATH_SQL));
+ 		if (strict_names && PQntuples(res) == 0)
+ 			exit_horribly(NULL, "no matching tables were found for pattern \"%s\"\n", cell->val);
+ 
+diff --git a/src/bin/pg_dump/pg_dumpall.c b/src/bin/pg_dump/pg_dumpall.c
+index fbb18b7ade..75e4a539bf 100644
+--- a/src/bin/pg_dump/pg_dumpall.c
++++ b/src/bin/pg_dump/pg_dumpall.c
+@@ -23,6 +23,7 @@
+ #include "dumputils.h"
+ #include "pg_backup.h"
+ #include "common/file_utils.h"
++#include "fe_utils/connect.h"
+ #include "fe_utils/string_utils.h"
+ 
+ /* version string we expect back from pg_dump */
+@@ -1717,10 +1718,7 @@ connectDatabase(const char *dbname, const char *connection_string,
+ 		exit_nicely(1);
+ 	}
+ 
+-	/*
+-	 * Make sure we are not fooled by non-system schemas in the search path.
+-	 */
+-	executeCommand(conn, "SET search_path = pg_catalog");
++	PQclear(executeQuery(conn, ALWAYS_SECURE_SEARCH_PATH_SQL));
+ 
+ 	return conn;
+ }
+diff --git a/src/bin/pg_rewind/libpq_fetch.c b/src/bin/pg_rewind/libpq_fetch.c
+index d1726d1c74..8f8d504455 100644
+--- a/src/bin/pg_rewind/libpq_fetch.c
++++ b/src/bin/pg_rewind/libpq_fetch.c
+@@ -24,6 +24,7 @@
+ #include "libpq-fe.h"
+ #include "catalog/catalog.h"
+ #include "catalog/pg_type.h"
++#include "fe_utils/connect.h"
+ #include "port/pg_bswap.h"
+ 
+ static PGconn *conn = NULL;
+@@ -54,6 +55,12 @@ libpqConnect(const char *connstr)
+ 
+ 	pg_log(PG_PROGRESS, "connected to server\n");
+ 
++	res = PQexec(conn, ALWAYS_SECURE_SEARCH_PATH_SQL);
++	if (PQresultStatus(res) != PGRES_TUPLES_OK)
++		pg_fatal("could not clear search_path: %s",
++				 PQresultErrorMessage(res));
++	PQclear(res);
++
+ 	/*
+ 	 * Check that the server is not in hot standby mode. There is no
+ 	 * fundamental reason that couldn't be made to work, but it doesn't
+diff --git a/src/bin/pg_upgrade/server.c b/src/bin/pg_upgrade/server.c
+index 5f55b585a8..5273ef6681 100644
+--- a/src/bin/pg_upgrade/server.c
++++ b/src/bin/pg_upgrade/server.c
+@@ -9,6 +9,7 @@
+ 
+ #include "postgres_fe.h"
+ 
++#include "fe_utils/connect.h"
+ #include "fe_utils/string_utils.h"
+ #include "pg_upgrade.h"
+ 
+@@ -40,6 +41,8 @@ connectToServer(ClusterInfo *cluster, const char *db_name)
+ 		exit(1);
+ 	}
+ 
++	PQclear(executeQueryOrDie(conn, ALWAYS_SECURE_SEARCH_PATH_SQL));
++
+ 	return conn;
+ }
+ 
+diff --git a/src/bin/scripts/clusterdb.c b/src/bin/scripts/clusterdb.c
+index 92c42f62bf..650d2ae261 100644
+--- a/src/bin/scripts/clusterdb.c
++++ b/src/bin/scripts/clusterdb.c
+@@ -195,17 +195,21 @@ cluster_one_database(const char *dbname, bool verbose, const char *table,
+ 
+ 	PGconn	   *conn;
+ 
++	conn = connectDatabase(dbname, host, port, username, prompt_password,
++						   progname, echo, false, false);
++
+ 	initPQExpBuffer(&sql);
+ 
+ 	appendPQExpBufferStr(&sql, "CLUSTER");
+ 	if (verbose)
+ 		appendPQExpBufferStr(&sql, " VERBOSE");
+ 	if (table)
+-		appendPQExpBuffer(&sql, " %s", table);
++	{
++		appendPQExpBufferChar(&sql, ' ');
++		appendQualifiedRelation(&sql, table, conn, progname, echo);
++	}
+ 	appendPQExpBufferChar(&sql, ';');
+ 
+-	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, false, false);
+ 	if (!executeMaintenanceCommand(conn, sql.data, echo))
+ 	{
+ 		if (table)
+@@ -234,7 +238,7 @@ cluster_all_databases(bool verbose, const char *maintenance_db,
+ 	int			i;
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname);
++									  prompt_password, progname, echo);
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", progname, echo);
+ 	PQfinish(conn);
+ 
+diff --git a/src/bin/scripts/common.c b/src/bin/scripts/common.c
+index e20a5e9146..db2b9f0d68 100644
+--- a/src/bin/scripts/common.c
++++ b/src/bin/scripts/common.c
+@@ -18,6 +18,8 @@
+ #include <unistd.h>
+ 
+ #include "common.h"
++#include "fe_utils/connect.h"
++#include "fe_utils/string_utils.h"
+ 
+ 
+ static PGcancel *volatile cancelConn = NULL;
+@@ -63,9 +65,10 @@ handle_help_version_opts(int argc, char *argv[],
+  * as before, else we might create password exposure hazards.)
+  */
+ PGconn *
+-connectDatabase(const char *dbname, const char *pghost, const char *pgport,
+-				const char *pguser, enum trivalue prompt_password,
+-				const char *progname, bool fail_ok, bool allow_password_reuse)
++connectDatabase(const char *dbname, const char *pghost,
++				const char *pgport, const char *pguser,
++				enum trivalue prompt_password, const char *progname,
++				bool echo, bool fail_ok, bool allow_password_reuse)
+ {
+ 	PGconn	   *conn;
+ 	bool		new_pass;
+@@ -142,6 +145,10 @@ connectDatabase(const char *dbname, const char *pghost, const char *pgport,
+ 		exit(1);
+ 	}
+ 
++	if (PQserverVersion(conn) >= 70300)
++		PQclear(executeQuery(conn, ALWAYS_SECURE_SEARCH_PATH_SQL,
++							 progname, echo));
++
+ 	return conn;
+ }
+ 
+@@ -149,24 +156,24 @@ connectDatabase(const char *dbname, const char *pghost, const char *pgport,
+  * Try to connect to the appropriate maintenance database.
+  */
+ PGconn *
+-connectMaintenanceDatabase(const char *maintenance_db, const char *pghost,
+-						   const char *pgport, const char *pguser,
+-						   enum trivalue prompt_password,
+-						   const char *progname)
++connectMaintenanceDatabase(const char *maintenance_db,
++						   const char *pghost, const char *pgport,
++						   const char *pguser, enum trivalue prompt_password,
++						   const char *progname, bool echo)
+ {
+ 	PGconn	   *conn;
+ 
+ 	/* If a maintenance database name was specified, just connect to it. */
+ 	if (maintenance_db)
+ 		return connectDatabase(maintenance_db, pghost, pgport, pguser,
+-							   prompt_password, progname, false, false);
++							   prompt_password, progname, echo, false, false);
+ 
+ 	/* Otherwise, try postgres first and then template1. */
+ 	conn = connectDatabase("postgres", pghost, pgport, pguser, prompt_password,
+-						   progname, true, false);
++						   progname, echo, true, false);
+ 	if (!conn)
+ 		conn = connectDatabase("template1", pghost, pgport, pguser,
+-							   prompt_password, progname, false, false);
++							   prompt_password, progname, echo, false, false);
+ 
+ 	return conn;
+ }
+@@ -252,6 +259,116 @@ executeMaintenanceCommand(PGconn *conn, const char *query, bool echo)
+ 	return r;
+ }
+ 
++
++/*
++ * Split TABLE[(COLUMNS)] into TABLE and [(COLUMNS)] portions.  When you
++ * finish using them, pg_free(*table).  *columns is a pointer into "spec",
++ * possibly to its NUL terminator.
++ */
++static void
++split_table_columns_spec(const char *spec, int encoding,
++						 char **table, const char **columns)
++{
++	bool		inquotes = false;
++	const char *cp = spec;
++
++	/*
++	 * Find the first '(' not identifier-quoted.  Based on
++	 * dequote_downcase_identifier().
++	 */
++	while (*cp && (*cp != '(' || inquotes))
++	{
++		if (*cp == '"')
++		{
++			if (inquotes && cp[1] == '"')
++				cp++;			/* pair does not affect quoting */
++			else
++				inquotes = !inquotes;
++			cp++;
++		}
++		else
++			cp += PQmblen(cp, encoding);
++	}
++	*table = pg_strdup(spec);
++	(*table)[cp - spec] = '\0'; /* no strndup */
++	*columns = cp;
++}
++
++/*
++ * Break apart TABLE[(COLUMNS)] of "spec".  With the reset_val of search_path
++ * in effect, have regclassin() interpret the TABLE portion.  Append to "buf"
++ * the qualified name of TABLE, followed by any (COLUMNS).  Exit on failure.
++ * We use this to interpret --table=foo under the search path psql would get,
++ * in advance of "ANALYZE public.foo" under the always-secure search path.
++ */
++void
++appendQualifiedRelation(PQExpBuffer buf, const char *spec,
++						PGconn *conn, const char *progname, bool echo)
++{
++	char	   *table;
++	const char *columns;
++	PQExpBufferData sql;
++	PGresult   *res;
++	int			ntups;
++
++	/* Before 7.3, the concept of qualifying a name did not exist. */
++	if (PQserverVersion(conn) < 70300)
++	{
++		appendPQExpBufferStr(&sql, spec);
++		return;
++	}
++
++	split_table_columns_spec(spec, PQclientEncoding(conn), &table, &columns);
++
++	/*
++	 * Query must remain ABSOLUTELY devoid of unqualified names.  This would
++	 * be unnecessary given a regclassin() variant taking a search_path
++	 * argument.
++	 */
++	initPQExpBuffer(&sql);
++	appendPQExpBufferStr(&sql,
++						 "SELECT c.relname, ns.nspname\n"
++						 " FROM pg_catalog.pg_class c,"
++						 " pg_catalog.pg_namespace ns\n"
++						 " WHERE c.relnamespace OPERATOR(pg_catalog.=) ns.oid\n"
++						 "  AND c.oid OPERATOR(pg_catalog.=) ");
++	appendStringLiteralConn(&sql, table, conn);
++	appendPQExpBufferStr(&sql, "::pg_catalog.regclass;");
++
++	executeCommand(conn, "RESET search_path", progname, echo);
++
++	/*
++	 * One row is a typical result, as is a nonexistent relation ERROR.
++	 * regclassin() unconditionally accepts all-digits input as an OID; if no
++	 * relation has that OID; this query returns no rows.  Catalog corruption
++	 * might elicit other row counts.
++	 */
++	res = executeQuery(conn, sql.data, progname, echo);
++	ntups = PQntuples(res);
++	if (ntups != 1)
++	{
++		fprintf(stderr,
++				ngettext("%s: query returned %d row instead of one: %s\n",
++						 "%s: query returned %d rows instead of one: %s\n",
++						 ntups),
++				progname, ntups, sql.data);
++		PQfinish(conn);
++		exit(1);
++	}
++	appendPQExpBufferStr(buf,
++						 fmtQualifiedId(PQserverVersion(conn),
++										PQgetvalue(res, 0, 1),
++										PQgetvalue(res, 0, 0)));
++	appendPQExpBufferStr(buf, columns);
++	PQclear(res);
++	termPQExpBuffer(&sql);
++	pg_free(table);
++
++	PQclear(executeQuery(conn, ALWAYS_SECURE_SEARCH_PATH_SQL,
++						 progname, echo));
++}
++
++
+ /*
+  * Check yes/no answer in a localized way.  1=yes, 0=no, -1=neither.
+  */
+diff --git a/src/bin/scripts/common.h b/src/bin/scripts/common.h
+index a660d6848a..30a39a6247 100644
+--- a/src/bin/scripts/common.h
++++ b/src/bin/scripts/common.h
+@@ -32,11 +32,12 @@ extern void handle_help_version_opts(int argc, char *argv[],
+ extern PGconn *connectDatabase(const char *dbname, const char *pghost,
+ 				const char *pgport, const char *pguser,
+ 				enum trivalue prompt_password, const char *progname,
+-				bool fail_ok, bool allow_password_reuse);
++				bool echo, bool fail_ok, bool allow_password_reuse);
+ 
+ extern PGconn *connectMaintenanceDatabase(const char *maintenance_db,
+-						   const char *pghost, const char *pgport, const char *pguser,
+-						   enum trivalue prompt_password, const char *progname);
++						   const char *pghost, const char *pgport,
++						   const char *pguser, enum trivalue prompt_password,
++						   const char *progname, bool echo);
+ 
+ extern PGresult *executeQuery(PGconn *conn, const char *query,
+ 			 const char *progname, bool echo);
+@@ -47,6 +48,9 @@ extern void executeCommand(PGconn *conn, const char *query,
+ extern bool executeMaintenanceCommand(PGconn *conn, const char *query,
+ 						  bool echo);
+ 
++extern void appendQualifiedRelation(PQExpBuffer buf, const char *name,
++						PGconn *conn, const char *progname, bool echo);
++
+ extern bool yesno_prompt(const char *question);
+ 
+ extern void setup_cancel_handler(void);
+diff --git a/src/bin/scripts/createdb.c b/src/bin/scripts/createdb.c
+index 81a8192136..fc108882e4 100644
+--- a/src/bin/scripts/createdb.c
++++ b/src/bin/scripts/createdb.c
+@@ -202,7 +202,7 @@ main(int argc, char *argv[])
+ 		maintenance_db = "template1";
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname);
++									  prompt_password, progname, echo);
+ 
+ 	if (echo)
+ 		printf("%s\n", sql.data);
+diff --git a/src/bin/scripts/createuser.c b/src/bin/scripts/createuser.c
+index c488c018e0..3420e62fdd 100644
+--- a/src/bin/scripts/createuser.c
++++ b/src/bin/scripts/createuser.c
+@@ -252,7 +252,7 @@ main(int argc, char *argv[])
+ 		login = TRI_YES;
+ 
+ 	conn = connectDatabase("postgres", host, port, username, prompt_password,
+-						   progname, false, false);
++						   progname, echo, false, false);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+diff --git a/src/bin/scripts/dropdb.c b/src/bin/scripts/dropdb.c
+index 81929c43c4..ba0038891d 100644
+--- a/src/bin/scripts/dropdb.c
++++ b/src/bin/scripts/dropdb.c
+@@ -129,7 +129,8 @@ main(int argc, char *argv[])
+ 		maintenance_db = "template1";
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db,
+-									  host, port, username, prompt_password, progname);
++									  host, port, username, prompt_password,
++									  progname, echo);
+ 
+ 	if (echo)
+ 		printf("%s\n", sql.data);
+diff --git a/src/bin/scripts/dropuser.c b/src/bin/scripts/dropuser.c
+index e3191afc31..d9e7f7b036 100644
+--- a/src/bin/scripts/dropuser.c
++++ b/src/bin/scripts/dropuser.c
+@@ -134,7 +134,7 @@ main(int argc, char *argv[])
+ 					  (if_exists ? "IF EXISTS " : ""), fmtId(dropuser));
+ 
+ 	conn = connectDatabase("postgres", host, port, username, prompt_password,
+-						   progname, false, false);
++						   progname, echo, false, false);
+ 
+ 	if (echo)
+ 		printf("%s\n", sql.data);
+diff --git a/src/bin/scripts/reindexdb.c b/src/bin/scripts/reindexdb.c
+index 64e9a2f3ce..be1c06ebbd 100644
+--- a/src/bin/scripts/reindexdb.c
++++ b/src/bin/scripts/reindexdb.c
+@@ -282,23 +282,24 @@ reindex_one_database(const char *name, const char *dbname, const char *type,
+ 	PGconn	   *conn;
+ 
+ 	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, false, false);
++						   progname, echo, false, false);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+-	appendPQExpBufferStr(&sql, "REINDEX");
++	appendPQExpBufferStr(&sql, "REINDEX ");
+ 
+ 	if (verbose)
+-		appendPQExpBufferStr(&sql, " (VERBOSE)");
++		appendPQExpBufferStr(&sql, "(VERBOSE) ");
+ 
+-	if (strcmp(type, "TABLE") == 0)
+-		appendPQExpBuffer(&sql, " TABLE %s", name);
+-	else if (strcmp(type, "INDEX") == 0)
+-		appendPQExpBuffer(&sql, " INDEX %s", name);
++	appendPQExpBufferStr(&sql, type);
++	appendPQExpBufferChar(&sql, ' ');
++	if (strcmp(type, "TABLE") == 0 ||
++		strcmp(type, "INDEX") == 0)
++		appendQualifiedRelation(&sql, name, conn, progname, echo);
+ 	else if (strcmp(type, "SCHEMA") == 0)
+-		appendPQExpBuffer(&sql, " SCHEMA %s", name);
++		appendPQExpBufferStr(&sql, name);
+ 	else if (strcmp(type, "DATABASE") == 0)
+-		appendPQExpBuffer(&sql, " DATABASE %s", fmtId(PQdb(conn)));
++		appendPQExpBufferStr(&sql, fmtId(PQdb(conn)));
+ 	appendPQExpBufferChar(&sql, ';');
+ 
+ 	if (!executeMaintenanceCommand(conn, sql.data, echo))
+@@ -335,7 +336,7 @@ reindex_all_databases(const char *maintenance_db,
+ 	int			i;
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname);
++									  prompt_password, progname, echo);
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", progname, echo);
+ 	PQfinish(conn);
+ 
+@@ -372,7 +373,7 @@ reindex_system_catalogs(const char *dbname, const char *host, const char *port,
+ 	PQExpBufferData sql;
+ 
+ 	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, false, false);
++						   progname, echo, false, false);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+diff --git a/src/bin/scripts/t/010_clusterdb.pl b/src/bin/scripts/t/010_clusterdb.pl
+index e2cff0fcab..a767338f92 100644
+--- a/src/bin/scripts/t/010_clusterdb.pl
++++ b/src/bin/scripts/t/010_clusterdb.pl
+@@ -26,7 +26,7 @@ $node->safe_psql('postgres',
+ );
+ $node->issues_sql_like(
+ 	[ 'clusterdb', '-t', 'test1' ],
+-	qr/statement: CLUSTER test1;/,
++	qr/statement: CLUSTER public\.test1;/,
+ 	'cluster specific table');
+ 
+ $node->command_ok([qw(clusterdb --echo --verbose dbname=template1)],
+diff --git a/src/bin/scripts/t/090_reindexdb.pl b/src/bin/scripts/t/090_reindexdb.pl
+index 3aa3a95350..e57a5e2bad 100644
+--- a/src/bin/scripts/t/090_reindexdb.pl
++++ b/src/bin/scripts/t/090_reindexdb.pl
+@@ -24,11 +24,11 @@ $node->safe_psql('postgres',
+ 	'CREATE TABLE test1 (a int); CREATE INDEX test1x ON test1 (a);');
+ $node->issues_sql_like(
+ 	[ 'reindexdb', '-t', 'test1', 'postgres' ],
+-	qr/statement: REINDEX TABLE test1;/,
++	qr/statement: REINDEX TABLE public\.test1;/,
+ 	'reindex specific table');
+ $node->issues_sql_like(
+ 	[ 'reindexdb', '-i', 'test1x', 'postgres' ],
+-	qr/statement: REINDEX INDEX test1x;/,
++	qr/statement: REINDEX INDEX public\.test1x;/,
+ 	'reindex specific index');
+ $node->issues_sql_like(
+ 	[ 'reindexdb', '-S', 'pg_catalog', 'postgres' ],
+@@ -40,7 +40,7 @@ $node->issues_sql_like(
+ 	'reindex system tables');
+ $node->issues_sql_like(
+ 	[ 'reindexdb', '-v', '-t', 'test1', 'postgres' ],
+-	qr/statement: REINDEX \(VERBOSE\) TABLE test1;/,
++	qr/statement: REINDEX \(VERBOSE\) TABLE public\.test1;/,
+ 	'reindex with verbose output');
+ 
+ $node->command_ok([qw(reindexdb --echo --table=pg_am dbname=template1)],
+diff --git a/src/bin/scripts/t/100_vacuumdb.pl b/src/bin/scripts/t/100_vacuumdb.pl
+index dd98df8c08..382210e3b6 100644
+--- a/src/bin/scripts/t/100_vacuumdb.pl
++++ b/src/bin/scripts/t/100_vacuumdb.pl
+@@ -3,7 +3,7 @@ use warnings;
+ 
+ use PostgresNode;
+ use TestLib;
+-use Test::More tests => 19;
++use Test::More tests => 23;
+ 
+ program_help_ok('vacuumdb');
+ program_version_ok('vacuumdb');
+@@ -26,12 +26,32 @@ $node->issues_sql_like(
+ 	qr/statement: VACUUM \(FREEZE\);/,
+ 	'vacuumdb -F');
+ $node->issues_sql_like(
+-	[ 'vacuumdb', '-z', 'postgres' ],
+-	qr/statement: VACUUM \(ANALYZE\);/,
+-	'vacuumdb -z');
++	[ 'vacuumdb', '-zj2', 'postgres' ],
++	qr/statement: VACUUM \(ANALYZE\) pg_catalog\./,
++	'vacuumdb -zj2');
+ $node->issues_sql_like(
+ 	[ 'vacuumdb', '-Z', 'postgres' ],
+ 	qr/statement: ANALYZE;/,
+ 	'vacuumdb -Z');
+ $node->command_ok([qw(vacuumdb -Z --table=pg_am dbname=template1)],
+ 	'vacuumdb with connection string');
++
++$node->command_fails([qw(vacuumdb -Zt pg_am;ABORT postgres)],
++	'trailing command in "-t", without COLUMNS');
++# Unwanted; better if it failed.
++$node->command_ok([qw(vacuumdb -Zt pg_am(amname);ABORT postgres)],
++	'trailing command in "-t", with COLUMNS');
++
++$node->safe_psql('postgres', q|
++  CREATE TABLE "need""q(uot" (")x" text);
++
++  CREATE FUNCTION f0(int) RETURNS int LANGUAGE SQL AS 'SELECT $1 * $1';
++  CREATE FUNCTION f1(int) RETURNS int LANGUAGE SQL AS 'SELECT f0($1)';
++  CREATE TABLE funcidx (x int);
++  INSERT INTO funcidx VALUES (0),(1),(2),(3);
++  CREATE INDEX i0 ON funcidx ((f1(x)));
++|);
++$node->command_ok([qw|vacuumdb -Z --table="need""q(uot"(")x") postgres|],
++	'column list');
++$node->command_fails([qw|vacuumdb -Zt funcidx postgres|],
++	'unqualifed name via functional index');
+diff --git a/src/bin/scripts/vacuumdb.c b/src/bin/scripts/vacuumdb.c
+index 663083828e..887fa48fbd 100644
+--- a/src/bin/scripts/vacuumdb.c
++++ b/src/bin/scripts/vacuumdb.c
+@@ -61,7 +61,9 @@ static void vacuum_all_databases(vacuumingOptions *vacopts,
+ 					 const char *progname, bool echo, bool quiet);
+ 
+ static void prepare_vacuum_command(PQExpBuffer sql, PGconn *conn,
+-					   vacuumingOptions *vacopts, const char *table);
++					   vacuumingOptions *vacopts, const char *table,
++					   bool table_pre_qualified,
++					   const char *progname, bool echo);
+ 
+ static void run_vacuum_command(PGconn *conn, const char *sql, bool echo,
+ 				   const char *table, const char *progname, bool async);
+@@ -361,7 +363,7 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
+ 		   (stage >= 0 && stage < ANALYZE_NUM_STAGES));
+ 
+ 	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, false, true);
++						   progname, echo, false, true);
+ 
+ 	if (!quiet)
+ 	{
+@@ -437,7 +439,7 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
+ 		for (i = 1; i < concurrentCons; i++)
+ 		{
+ 			conn = connectDatabase(dbname, host, port, username, prompt_password,
+-								   progname, false, true);
++								   progname, echo, false, true);
+ 			init_slot(slots + i, conn, progname);
+ 		}
+ 	}
+@@ -463,7 +465,8 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
+ 		ParallelSlot *free_slot;
+ 		const char *tabname = cell ? cell->val : NULL;
+ 
+-		prepare_vacuum_command(&sql, conn, vacopts, tabname);
++		prepare_vacuum_command(&sql, conn, vacopts, tabname,
++							   tables == &dbtables, progname, echo);
+ 
+ 		if (CancelRequested)
+ 		{
+@@ -554,8 +557,8 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 	int			stage;
+ 	int			i;
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db, host, port,
+-									  username, prompt_password, progname);
++	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
++									  prompt_password, progname, echo);
+ 	result = executeQuery(conn,
+ 						  "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;",
+ 						  progname, echo);
+@@ -618,8 +621,10 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+  * quoted.  The command is semicolon-terminated.
+  */
+ static void
+-prepare_vacuum_command(PQExpBuffer sql, PGconn *conn, vacuumingOptions *vacopts,
+-					   const char *table)
++prepare_vacuum_command(PQExpBuffer sql, PGconn *conn,
++					   vacuumingOptions *vacopts, const char *table,
++					   bool table_pre_qualified,
++					   const char *progname, bool echo)
+ {
+ 	resetPQExpBuffer(sql);
+ 
+@@ -675,7 +680,13 @@ prepare_vacuum_command(PQExpBuffer sql, PGconn *conn, vacuumingOptions *vacopts,
+ 	}
+ 
+ 	if (table)
+-		appendPQExpBuffer(sql, " %s", table);
++	{
++		appendPQExpBufferChar(sql, ' ');
++		if (table_pre_qualified)
++			appendPQExpBufferStr(sql, table);
++		else
++			appendQualifiedRelation(sql, table, conn, progname, echo);
++	}
+ 	appendPQExpBufferChar(sql, ';');
+ }
+ 
+diff --git a/src/fe_utils/string_utils.c b/src/fe_utils/string_utils.c
+index 8c05a80d31..b47a396af1 100644
+--- a/src/fe_utils/string_utils.c
++++ b/src/fe_utils/string_utils.c
+@@ -956,8 +956,9 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
+ 	}
+ 
+ 	/*
+-	 * Now decide what we need to emit.  Note there will be a leading "^(" in
+-	 * the patterns in any case.
++	 * Now decide what we need to emit.  We may run under a hostile
++	 * search_path, so qualify EVERY name.  Note there will be a leading "^("
++	 * in the patterns in any case.
+ 	 */
+ 	if (namebuf.len > 2)
+ 	{
+@@ -970,15 +971,18 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
+ 			WHEREAND();
+ 			if (altnamevar)
+ 			{
+-				appendPQExpBuffer(buf, "(%s ~ ", namevar);
++				appendPQExpBuffer(buf,
++								  "(%s OPERATOR(pg_catalog.~) ", namevar);
+ 				appendStringLiteralConn(buf, namebuf.data, conn);
+-				appendPQExpBuffer(buf, "\n        OR %s ~ ", altnamevar);
++				appendPQExpBuffer(buf,
++								  "\n        OR %s OPERATOR(pg_catalog.~) ",
++								  altnamevar);
+ 				appendStringLiteralConn(buf, namebuf.data, conn);
+ 				appendPQExpBufferStr(buf, ")\n");
+ 			}
+ 			else
+ 			{
+-				appendPQExpBuffer(buf, "%s ~ ", namevar);
++				appendPQExpBuffer(buf, "%s OPERATOR(pg_catalog.~) ", namevar);
+ 				appendStringLiteralConn(buf, namebuf.data, conn);
+ 				appendPQExpBufferChar(buf, '\n');
+ 			}
+@@ -994,7 +998,7 @@ processSQLNamePattern(PGconn *conn, PQExpBuffer buf, const char *pattern,
+ 		if (strcmp(schemabuf.data, "^(.*)$") != 0 && schemavar)
+ 		{
+ 			WHEREAND();
+-			appendPQExpBuffer(buf, "%s ~ ", schemavar);
++			appendPQExpBuffer(buf, "%s OPERATOR(pg_catalog.~) ", schemavar);
+ 			appendStringLiteralConn(buf, schemabuf.data, conn);
+ 			appendPQExpBufferChar(buf, '\n');
+ 		}
+diff --git a/src/include/fe_utils/connect.h b/src/include/fe_utils/connect.h
+new file mode 100644
+index 0000000000..fa293d2458
+--- /dev/null
++++ b/src/include/fe_utils/connect.h
+@@ -0,0 +1,28 @@
++/*-------------------------------------------------------------------------
++ *
++ * Interfaces in support of FE/BE connections.
++ *
++ *
++ * Portions Copyright (c) 1996-2018, PostgreSQL Global Development Group
++ * Portions Copyright (c) 1994, Regents of the University of California
++ *
++ * src/include/fe_utils/connect.h
++ *
++ *-------------------------------------------------------------------------
++ */
++#ifndef CONNECT_H
++#define CONNECT_H
++
++/*
++ * This SQL statement installs an always-secure search path, so malicious
++ * users can't take control.  CREATE of an unqualified name will fail, because
++ * this selects no creation schema.  This does not demote pg_temp, so it is
++ * suitable where we control the entire FE/BE connection but not suitable in
++ * SECURITY DEFINER functions.  This is portable to PostgreSQL 7.3, which
++ * introduced schemas.  When connected to an older version from code that
++ * might work with the old server, skip this.
++ */
++#define ALWAYS_SECURE_SEARCH_PATH_SQL \
++	"SELECT pg_catalog.set_config('search_path', '', false)"
++
++#endif							/* CONNECT_H */
+diff --git a/src/tools/findoidjoins/findoidjoins.c b/src/tools/findoidjoins/findoidjoins.c
+index 7ea53b8789..82ef113e92 100644
+--- a/src/tools/findoidjoins/findoidjoins.c
++++ b/src/tools/findoidjoins/findoidjoins.c
+@@ -9,6 +9,7 @@
+ 
+ #include "catalog/pg_class.h"
+ 
++#include "fe_utils/connect.h"
+ #include "libpq-fe.h"
+ #include "pqexpbuffer.h"
+ 
+@@ -46,6 +47,14 @@ main(int argc, char **argv)
+ 		exit(EXIT_FAILURE);
+ 	}
+ 
++	res = PQexec(conn, ALWAYS_SECURE_SEARCH_PATH_SQL);
++	if (!res || PQresultStatus(res) != PGRES_TUPLES_OK)
++	{
++		fprintf(stderr, "sql error:  %s\n", PQerrorMessage(conn));
++		exit(EXIT_FAILURE);
++	}
++	PQclear(res);
++
+ 	/* Get a list of relations that have OIDs */
+ 
+ 	printfPQExpBuffer(&sql, "%s",

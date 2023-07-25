@@ -1,0 +1,23 @@
+commit 529a25d6e5c3ff889257a57042872d84dc2312d5	529a25d6e5c3ff889257a57042872d84dc2312d5
+Author: Laurentiu Ion <ionlaurentiucristian@gmail.com>
+Date:   Sun Jan 8 23:05:37 2012 +0200
+
+    dpcm: Fix invalid writes
+    
+    Fixes bug: #152
+    
+    Signed-off-by: Ronald S. Bultje <rsbultje@gmail.com>
+
+diff --git a/libavcodec/dpcm.c b/libavcodec/dpcm.c
+index 935f67caca..1b0f6b005b 100644
+--- a/libavcodec/dpcm.c
++++ b/libavcodec/dpcm.c
+@@ -288,7 +288,7 @@ static int dpcm_decode_frame(AVCodecContext *avctx, void *data,
+     }
+     case CODEC_ID_SOL_DPCM:
+         if (avctx->codec_tag != 3) {
+-            uint8_t *output_samples_u8 = data;
++            uint8_t *output_samples_u8 = s->frame.data[0];
+             while (buf < buf_end) {
+                 uint8_t n = *buf++;
+ 

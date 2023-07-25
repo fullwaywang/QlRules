@@ -1,0 +1,24 @@
+commit 347cb14b7cba7560e53f4434b419b9d8800253e7
+Author: Sergey Volk <servolk@google.com>
+Date:   Wed Sep 7 14:05:35 2016 -0700
+
+    avformat/mov: Fix potential integer overflow in mov_read_keys
+    
+    Actual allocation size is computed as (count + 1)*sizeof(meta_keys), so
+    we need to check that (count + 1) won't cause overflow.
+    
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/mov.c b/libavformat/mov.c
+index f499906851..a7595c535f 100644
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -3278,7 +3278,7 @@ static int mov_read_keys(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+ 
+     avio_skip(pb, 4);
+     count = avio_rb32(pb);
+-    if (count > UINT_MAX / sizeof(*c->meta_keys)) {
++    if (count > UINT_MAX / sizeof(*c->meta_keys) - 1) {
+         av_log(c->fc, AV_LOG_ERROR,
+                "The 'keys' atom with the invalid key count: %d\n", count);
+         return AVERROR_INVALIDDATA;

@@ -1,0 +1,25 @@
+commit c77be3a35a0160d6af88056b0899f120f2eef38e	c77be3a35a0160d6af88056b0899f120f2eef38e
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Jan 24 20:54:27 2012 +0100
+
+    error concealment: initialize block index.
+    
+    Fixes CVE-2011-3941 (out of bounds write)
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/error_resilience.c b/libavcodec/error_resilience.c
+index 8bb5d0c0de..d55c0006ef 100644
+--- a/libavcodec/error_resilience.c
++++ b/libavcodec/error_resilience.c
+@@ -46,6 +46,9 @@ static void decode_mb(MpegEncContext *s, int ref)
+     s->dest[1] = s->current_picture.f.data[1] + (s->mb_y * (16 >> s->chroma_y_shift) * s->uvlinesize) + s->mb_x * (16 >> s->chroma_x_shift);
+     s->dest[2] = s->current_picture.f.data[2] + (s->mb_y * (16 >> s->chroma_y_shift) * s->uvlinesize) + s->mb_x * (16 >> s->chroma_x_shift);
+ 
++    ff_init_block_index(s);
++    ff_update_block_index(s);
++
+     if (CONFIG_H264_DECODER && s->codec_id == CODEC_ID_H264) {
+         H264Context *h = (void*)s;
+         h->mb_xy = s->mb_x + s->mb_y * s->mb_stride;

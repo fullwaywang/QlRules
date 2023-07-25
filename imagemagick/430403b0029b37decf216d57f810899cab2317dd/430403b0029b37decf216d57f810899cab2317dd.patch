@@ -1,0 +1,41 @@
+commit 430403b0029b37decf216d57f810899cab2317dd
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sun Feb 7 15:13:08 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/126
+
+diff --git a/MagickCore/quantum-import.c b/MagickCore/quantum-import.c
+index b04c82e72..a0085f3b7 100644
+--- a/MagickCore/quantum-import.c
++++ b/MagickCore/quantum-import.c
+@@ -1421,7 +1421,7 @@ static void ImportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
+ 
+           n=0;
+           quantum=0;
+-          for (x=0; x < (ssize_t) number_pixels; x+=2)
++          for (x=0; x < (ssize_t) number_pixels; x+=4)
+           {
+             for (i=0; i < 4; i++)
+             {
+diff --git a/MagickCore/quantum.c b/MagickCore/quantum.c
+index 9d8190a90..a594bb6fc 100644
+--- a/MagickCore/quantum.c
++++ b/MagickCore/quantum.c
+@@ -321,6 +321,9 @@ MagickExport size_t GetQuantumExtent(const Image *image,
+     case BGRAQuantum: packet_size=4; break;
+     case CMYKQuantum: packet_size=4; break;
+     case CMYKAQuantum: packet_size=5; break;
++    case CbYCrAQuantum: packet_size=4; break;
++    case CbYCrQuantum: packet_size=3; break;
++    case CbYCrYQuantum: packet_size=4; break;
+     default: break;
+   }
+   extent=MagickMax(image->columns,image->rows);
+@@ -872,7 +875,6 @@ MagickExport void SetQuantumPack(QuantumInfo *quantum_info,
+   quantum_info->pack=pack;
+ }
+ 
+-
+ /*
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %                                                                             %

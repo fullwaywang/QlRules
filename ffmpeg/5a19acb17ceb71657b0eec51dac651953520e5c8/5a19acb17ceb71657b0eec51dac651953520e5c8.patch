@@ -1,0 +1,22 @@
+commit 5a19acb17ceb71657b0eec51dac651953520e5c8	5a19acb17ceb71657b0eec51dac651953520e5c8
+Author: Laurent Aimar <fenrir@videolan.org>
+Date:   Sat Oct 1 00:45:04 2011 +0200
+
+    Fix out of bound reads in the QDM2 decoder.
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+    Signed-off-by: Justin Ruggles <justin.ruggles@gmail.com>
+
+diff --git a/libavcodec/qdm2.c b/libavcodec/qdm2.c
+index 4c7f881e2b..b68197de17 100644
+--- a/libavcodec/qdm2.c
++++ b/libavcodec/qdm2.c
+@@ -1355,6 +1355,8 @@ static void qdm2_fft_decode_tones (QDM2Context *q, int duration, GetBitContext *
+             return;
+ 
+         local_int_14 = (offset >> local_int_8);
++        if (local_int_14 >= FF_ARRAY_ELEMS(fft_level_index_table))
++            return;
+ 
+         if (q->nb_channels > 1) {
+             channel = get_bits1(gb);

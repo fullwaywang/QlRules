@@ -1,0 +1,26 @@
+commit a9d563d3d73874312080d30dc4ba07cecad56192
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Mon Oct 14 19:31:12 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1752
+
+diff --git a/coders/png.c b/coders/png.c
+index 7cb098da9..23cb0f69f 100644
+--- a/coders/png.c
++++ b/coders/png.c
+@@ -11390,11 +11390,13 @@ static MagickBooleanType WriteOnePNGImage(MngInfo *mng_info,
+       (void) LogMagickEvent(CoderEvent,GetMagickModule(),
+         "    Allocating %.20g bytes of memory for pixels",(double) rowbytes);
+     }
+-  pixel_info=AcquireVirtualMemory(rowbytes+256,sizeof(*ping_pixels));
++  pixel_info=AcquireVirtualMemory(rowbytes,GetPixelChannels(image)*
++    sizeof(*ping_pixels));
+   if (pixel_info == (MemoryInfo *) NULL)
+     png_error(ping,"Allocation of memory for pixels failed");
+   ping_pixels=(unsigned char *) GetVirtualMemoryBlob(pixel_info);
+-  (void) memset(ping_pixels,0,(rowbytes+256)*sizeof(*ping_pixels));
++  (void) memset(ping_pixels,0,rowbytes*GetPixelChannels(image)*
++    sizeof(*ping_pixels));
+   /*
+     Initialize image scanlines.
+   */

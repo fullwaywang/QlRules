@@ -1,0 +1,235 @@
+commit 00383e162ae2f8fc951f5745bf1011771acb8dce
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Wed Dec 2 14:02:17 2020 +0100
+
+    pi.c: avoid out of bounds access with POC (refs https://github.com/uclouvain/openjpeg/issues/1293#issuecomment-737122836)
+
+diff --git a/src/lib/openjp2/pi.c b/src/lib/openjp2/pi.c
+index 3dcdd4e9..d62b8d74 100644
+--- a/src/lib/openjp2/pi.c
++++ b/src/lib/openjp2/pi.c
+@@ -194,10 +194,12 @@ static void opj_get_all_encoding_parameters(const opj_image_t *p_image,
+  * @param   p_image     the image used to initialize the packet iterator (in fact only the number of components is relevant.
+  * @param   p_cp        the coding parameters.
+  * @param   tileno  the index of the tile from which creating the packet iterator.
++ * @param   manager Event manager
+  */
+ static opj_pi_iterator_t * opj_pi_create(const opj_image_t *p_image,
+         const opj_cp_t *p_cp,
+-        OPJ_UINT32 tileno);
++        OPJ_UINT32 tileno,
++        opj_event_mgr_t* manager);
+ /**
+  * FIXME DOC
+  */
+@@ -232,12 +234,6 @@ static OPJ_BOOL opj_pi_check_next_level(OPJ_INT32 pos,
+ ==========================================================
+ */
+ 
+-static void opj_pi_emit_error(opj_pi_iterator_t * pi, const char* msg)
+-{
+-    (void)pi;
+-    (void)msg;
+-}
+-
+ static OPJ_BOOL opj_pi_next_lrcp(opj_pi_iterator_t * pi)
+ {
+     opj_pi_comp_t *comp = NULL;
+@@ -274,7 +270,7 @@ static OPJ_BOOL opj_pi_next_lrcp(opj_pi_iterator_t * pi)
+                     /* include should be resized when a POC arises, or */
+                     /* the POC should be rejected */
+                     if (index >= pi->include_size) {
+-                        opj_pi_emit_error(pi, "Invalid access to pi->include");
++                        opj_event_msg(pi->manager, EVT_ERROR, "Invalid access to pi->include");
+                         return OPJ_FALSE;
+                     }
+                     if (!pi->include[index]) {
+@@ -320,7 +316,7 @@ static OPJ_BOOL opj_pi_next_rlcp(opj_pi_iterator_t * pi)
+                     index = pi->layno * pi->step_l + pi->resno * pi->step_r + pi->compno *
+                             pi->step_c + pi->precno * pi->step_p;
+                     if (index >= pi->include_size) {
+-                        opj_pi_emit_error(pi, "Invalid access to pi->include");
++                        opj_event_msg(pi->manager, EVT_ERROR, "Invalid access to pi->include");
+                         return OPJ_FALSE;
+                     }
+                     if (!pi->include[index]) {
+@@ -451,7 +447,7 @@ static OPJ_BOOL opj_pi_next_rpcl(opj_pi_iterator_t * pi)
+                         index = pi->layno * pi->step_l + pi->resno * pi->step_r + pi->compno *
+                                 pi->step_c + pi->precno * pi->step_p;
+                         if (index >= pi->include_size) {
+-                            opj_pi_emit_error(pi, "Invalid access to pi->include");
++                            opj_event_msg(pi->manager, EVT_ERROR, "Invalid access to pi->include");
+                             return OPJ_FALSE;
+                         }
+                         if (!pi->include[index]) {
+@@ -475,6 +471,13 @@ static OPJ_BOOL opj_pi_next_pcrl(opj_pi_iterator_t * pi)
+     opj_pi_resolution_t *res = NULL;
+     OPJ_UINT32 index = 0;
+ 
++    if (pi->poc.compno0 >= pi->numcomps ||
++            pi->poc.compno1 >= pi->numcomps + 1) {
++        opj_event_msg(pi->manager, EVT_ERROR,
++                      "opj_pi_next_pcrl(): invalid compno0/compno1");
++        return OPJ_FALSE;
++    }
++
+     if (!pi->first) {
+         comp = &pi->comps[pi->compno];
+         goto LABEL_SKIP;
+@@ -582,7 +585,7 @@ static OPJ_BOOL opj_pi_next_pcrl(opj_pi_iterator_t * pi)
+                         index = pi->layno * pi->step_l + pi->resno * pi->step_r + pi->compno *
+                                 pi->step_c + pi->precno * pi->step_p;
+                         if (index >= pi->include_size) {
+-                            opj_pi_emit_error(pi, "Invalid access to pi->include");
++                            opj_event_msg(pi->manager, EVT_ERROR, "Invalid access to pi->include");
+                             return OPJ_FALSE;
+                         }
+                         if (!pi->include[index]) {
+@@ -606,6 +609,13 @@ static OPJ_BOOL opj_pi_next_cprl(opj_pi_iterator_t * pi)
+     opj_pi_resolution_t *res = NULL;
+     OPJ_UINT32 index = 0;
+ 
++    if (pi->poc.compno0 >= pi->numcomps ||
++            pi->poc.compno1 >= pi->numcomps + 1) {
++        opj_event_msg(pi->manager, EVT_ERROR,
++                      "opj_pi_next_cprl(): invalid compno0/compno1");
++        return OPJ_FALSE;
++    }
++
+     if (!pi->first) {
+         comp = &pi->comps[pi->compno];
+         goto LABEL_SKIP;
+@@ -710,7 +720,7 @@ static OPJ_BOOL opj_pi_next_cprl(opj_pi_iterator_t * pi)
+                         index = pi->layno * pi->step_l + pi->resno * pi->step_r + pi->compno *
+                                 pi->step_c + pi->precno * pi->step_p;
+                         if (index >= pi->include_size) {
+-                            opj_pi_emit_error(pi, "Invalid access to pi->include");
++                            opj_event_msg(pi->manager, EVT_ERROR, "Invalid access to pi->include");
+                             return OPJ_FALSE;
+                         }
+                         if (!pi->include[index]) {
+@@ -987,7 +997,8 @@ static void opj_get_all_encoding_parameters(const opj_image_t *p_image,
+ 
+ static opj_pi_iterator_t * opj_pi_create(const opj_image_t *image,
+         const opj_cp_t *cp,
+-        OPJ_UINT32 tileno)
++        OPJ_UINT32 tileno,
++        opj_event_mgr_t* manager)
+ {
+     /* loop*/
+     OPJ_UINT32 pino, compno;
+@@ -1021,6 +1032,8 @@ static opj_pi_iterator_t * opj_pi_create(const opj_image_t *image,
+     l_current_pi = l_pi;
+     for (pino = 0; pino < l_poc_bound ; ++pino) {
+ 
++        l_current_pi->manager = manager;
++
+         l_current_pi->comps = (opj_pi_comp_t*) opj_calloc(image->numcomps,
+                               sizeof(opj_pi_comp_t));
+         if (! l_current_pi->comps) {
+@@ -1358,7 +1371,8 @@ static OPJ_BOOL opj_pi_check_next_level(OPJ_INT32 pos,
+ */
+ opj_pi_iterator_t *opj_pi_create_decode(opj_image_t *p_image,
+                                         opj_cp_t *p_cp,
+-                                        OPJ_UINT32 p_tile_no)
++                                        OPJ_UINT32 p_tile_no,
++                                        opj_event_mgr_t* manager)
+ {
+     OPJ_UINT32 numcomps = p_image->numcomps;
+ 
+@@ -1413,7 +1427,7 @@ opj_pi_iterator_t *opj_pi_create_decode(opj_image_t *p_image,
+     }
+ 
+     /* memory allocation for pi */
+-    l_pi = opj_pi_create(p_image, p_cp, p_tile_no);
++    l_pi = opj_pi_create(p_image, p_cp, p_tile_no, manager);
+     if (!l_pi) {
+         opj_free(l_tmp_data);
+         opj_free(l_tmp_ptr);
+@@ -1580,7 +1594,8 @@ OPJ_UINT32 opj_get_encoding_packet_count(const opj_image_t *p_image,
+ opj_pi_iterator_t *opj_pi_initialise_encode(const opj_image_t *p_image,
+         opj_cp_t *p_cp,
+         OPJ_UINT32 p_tile_no,
+-        J2K_T2_MODE p_t2_mode)
++        J2K_T2_MODE p_t2_mode,
++        opj_event_mgr_t* manager)
+ {
+     OPJ_UINT32 numcomps = p_image->numcomps;
+ 
+@@ -1634,7 +1649,7 @@ opj_pi_iterator_t *opj_pi_initialise_encode(const opj_image_t *p_image,
+     }
+ 
+     /* memory allocation for pi*/
+-    l_pi = opj_pi_create(p_image, p_cp, p_tile_no);
++    l_pi = opj_pi_create(p_image, p_cp, p_tile_no, manager);
+     if (!l_pi) {
+         opj_free(l_tmp_data);
+         opj_free(l_tmp_ptr);
+diff --git a/src/lib/openjp2/pi.h b/src/lib/openjp2/pi.h
+index 7fb3417f..0320523b 100644
+--- a/src/lib/openjp2/pi.h
++++ b/src/lib/openjp2/pi.h
+@@ -107,6 +107,8 @@ typedef struct opj_pi_iterator {
+     OPJ_UINT32 x, y;
+     /** FIXME DOC*/
+     OPJ_UINT32 dx, dy;
++    /** event manager */
++    opj_event_mgr_t* manager;
+ } opj_pi_iterator_t;
+ 
+ /** @name Exported functions */
+@@ -119,13 +121,15 @@ typedef struct opj_pi_iterator {
+  * @param   cp      the coding parameters.
+  * @param   tileno  index of the tile being encoded.
+  * @param   t2_mode the type of pass for generating the packet iterator
++ * @param   manager Event manager
+  *
+  * @return  a list of packet iterator that points to the first packet of the tile (not true).
+ */
+ opj_pi_iterator_t *opj_pi_initialise_encode(const opj_image_t *image,
+         opj_cp_t *cp,
+         OPJ_UINT32 tileno,
+-        J2K_T2_MODE t2_mode);
++        J2K_T2_MODE t2_mode,
++        opj_event_mgr_t* manager);
+ 
+ /**
+  * Updates the encoding parameters of the codec.
+@@ -161,12 +165,14 @@ Create a packet iterator for Decoder
+ @param image Raw image for which the packets will be listed
+ @param cp Coding parameters
+ @param tileno Number that identifies the tile for which to list the packets
++@param manager Event manager
+ @return Returns a packet iterator that points to the first packet of the tile
+ @see opj_pi_destroy
+ */
+ opj_pi_iterator_t *opj_pi_create_decode(opj_image_t * image,
+                                         opj_cp_t * cp,
+-                                        OPJ_UINT32 tileno);
++                                        OPJ_UINT32 tileno,
++                                        opj_event_mgr_t* manager);
+ /**
+  * Destroys a packet iterator array.
+  *
+diff --git a/src/lib/openjp2/t2.c b/src/lib/openjp2/t2.c
+index e452edd1..3b1162a1 100644
+--- a/src/lib/openjp2/t2.c
++++ b/src/lib/openjp2/t2.c
+@@ -245,7 +245,7 @@ OPJ_BOOL opj_t2_encode_packets(opj_t2_t* p_t2,
+                             l_image->numcomps : 1;
+     OPJ_UINT32 l_nb_pocs = l_tcp->numpocs + 1;
+ 
+-    l_pi = opj_pi_initialise_encode(l_image, l_cp, p_tile_no, p_t2_mode);
++    l_pi = opj_pi_initialise_encode(l_image, l_cp, p_tile_no, p_t2_mode, p_manager);
+     if (!l_pi) {
+         return OPJ_FALSE;
+     }
+@@ -425,7 +425,7 @@ OPJ_BOOL opj_t2_decode_packets(opj_tcd_t* tcd,
+ #endif
+ 
+     /* create a packet iterator */
+-    l_pi = opj_pi_create_decode(l_image, l_cp, p_tile_no);
++    l_pi = opj_pi_create_decode(l_image, l_cp, p_tile_no, p_manager);
+     if (!l_pi) {
+         return OPJ_FALSE;
+     }

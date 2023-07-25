@@ -1,0 +1,70 @@
+commit 89265224d314a056d77d974284802c1b8a0dc97f
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Wed Aug 11 11:12:46 2021 +0200
+
+    BUG/MAJOR: h2: enforce stricter syntax checks on the :method pseudo-header
+    
+    Before HTX was introduced, all the HTTP request elements passed in
+    pseudo-headers fields were used to build an HTTP/1 request whose syntax
+    was then scrutinized by the HTTP/1 parser, leaving no room to inject
+    invalid characters.
+    
+    While NUL, CR and LF are properly blocked, it is possible to inject
+    spaces in the method so that once translated to HTTP/1, fields are
+    shifted by one spcae, and a lenient HTTP/1 server could possibly be
+    fooled into using a part of the method as the URI. For example, the
+    following request:
+    
+       H2 request
+         :method: "GET /admin? HTTP/1.1"
+         :path:   "/static/images"
+    
+    would become:
+    
+       GET /admin? HTTP/1.1 /static/images HTTP/1.1
+    
+    It's important to note that the resulting request is *not* valid, and
+    that in order for this to be a problem, it requires that this request
+    is delivered to an already vulnerable HTTP/1 server.
+    
+    A workaround here is to reject malformed methods by placing this rule
+    in the frontend or backend, at least before leaving haproxy in H1:
+    
+       http-request reject if { method -m reg [^A-Z0-9] }
+    
+    Alternately H2 may be globally disabled by commenting out the "alpn"
+    directive on "bind" lines, and by rejecting H2 streams creation by
+    adding the following statement to the global section:
+    
+       tune.h2.max-concurrent-streams 0
+    
+    This patch adds a check for each character of the method to make sure
+    they belong to the ones permitted in a token, as mentioned in RFC7231#4.1.
+    
+    This should be backported to versions 2.0 and above. For older versions
+    not having HTX_FL_PARSING_ERROR, a "goto fail" works as well as it
+    results in a protocol error at the stream level. Non-HTX versions are
+    safe because the resulting invalid request will be rejected by the
+    internal HTTP/1 parser.
+    
+    Thanks to Tim Düsterhus for reporting that one.
+
+diff --git a/src/h2.c b/src/h2.c
+index b31ff934c..280bbd7d0 100644
+--- a/src/h2.c
++++ b/src/h2.c
+@@ -328,6 +328,14 @@ static struct htx_sl *h2_prepare_htx_reqline(uint32_t fields, struct ist *phdr,
+ 			flags |= HTX_SL_F_HAS_AUTHORITY;
+ 	}
+ 
++	/* The method is a non-empty token (RFC7231#4.1) */
++	if (!meth_sl.len)
++		goto fail;
++	for (i = 0; i < meth_sl.len; i++) {
++		if (!HTTP_IS_TOKEN(meth_sl.ptr[i]))
++			htx->flags |= HTX_FL_PARSING_ERROR;
++	}
++
+ 	/* make sure the final URI isn't empty. Note that 7540#8.1.2.3 states
+ 	 * that :path must not be empty.
+ 	 */

@@ -1,0 +1,27 @@
+commit 93f30f825c08477fe8f76be00539e96014cc83c8
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Thu Nov 5 14:52:33 2015 +0100
+
+    avcodec/hevc_ps: Check chroma_format_idc
+    
+    Fixes out of array access
+    Fixes: 24d05e8b84676799c735c9e27d97895e/asan_heap-oob_1b70f6a_2955_7c3652a7f370f9f3ef40642bc2c99bb2.bit
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/hevc_ps.c b/libavcodec/hevc_ps.c
+index 427cf098aa..14f908e8de 100644
+--- a/libavcodec/hevc_ps.c
++++ b/libavcodec/hevc_ps.c
+@@ -834,6 +834,10 @@ int ff_hevc_parse_sps(HEVCSPS *sps, GetBitContext *gb, unsigned int *sps_id,
+     }
+ 
+     sps->chroma_format_idc = get_ue_golomb_long(gb);
++    if (sps->chroma_format_idc > 3U) {
++        av_log(avctx, AV_LOG_ERROR, "chroma_format_idc %d is invalid\n", sps->chroma_format_idc);
++        return AVERROR_INVALIDDATA;
++    }
+ 
+     if (sps->chroma_format_idc == 3)
+         sps->separate_colour_plane_flag = get_bits1(gb);

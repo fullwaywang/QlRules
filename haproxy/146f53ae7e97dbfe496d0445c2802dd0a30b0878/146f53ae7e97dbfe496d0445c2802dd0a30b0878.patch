@@ -1,0 +1,98 @@
+commit 146f53ae7e97dbfe496d0445c2802dd0a30b0878
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Sun Nov 24 10:34:39 2019 +0100
+
+    BUG/MAJOR: h2: make header field name filtering stronger
+    
+    Tim Düsterhus found that the amount of sanitization we perform on HTTP
+    header field names received in H2 is insufficient. Currently we reject
+    upper case letters as mandated by RFC7540#8.1.2, but section 10.3 also
+    requires that intermediaries translating streams to HTTP/1 further
+    refine the filtering to also reject invalid names (which means any name
+    that doesn't match a token). There is a small trick here which is that
+    the colon character used to start pseudo-header names doesn't match a
+    token, so pseudo-header names fall into that category, thus we have to
+    swap the pseudo-header name lookup with this check so that we only check
+    from the second character (past the ':') in case of pseudo-header names.
+    
+    Another possibility could have been to perform this check only in the
+    HTX-to-H1 trancoder but doing would still expose the configured rules
+    and logs to such header names.
+    
+    This fix must be backported as far as 1.8 since this bug could be
+    exploited and serve as the base for an attack. In 2.0 and earlier,
+    functions h2_make_h1_request() and h2_make_h1_trailers() must also
+    be adapted to sanitize requests coming in legacy mode.
+
+diff --git a/src/h2.c b/src/h2.c
+index f35abc13a..c5307d9a0 100644
+--- a/src/h2.c
++++ b/src/h2.c
+@@ -337,12 +337,17 @@ int h2_make_htx_request(struct http_hdr *list, struct htx *htx, unsigned int *ms
+ 		}
+ 		else {
+ 			/* this can be any type of header */
+-			/* RFC7540#8.1.2: upper case not allowed in header field names */
+-			for (i = 0; i < list[idx].n.len; i++)
+-				if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A')
+-					goto fail;
+-
++			/* RFC7540#8.1.2: upper case not allowed in header field names.
++			 * #10.3: header names must be valid (i.e. match a token).
++			 * For pseudo-headers we check from 2nd char and for other ones
++			 * from the first char, because HTTP_IS_TOKEN() also excludes
++			 * the colon.
++			 */
+ 			phdr = h2_str_to_phdr(list[idx].n);
++
++			for (i = !!phdr; i < list[idx].n.len; i++)
++				if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A' || !HTTP_IS_TOKEN(list[idx].n.ptr[i]))
++					goto fail;
+ 		}
+ 
+ 		/* RFC7540#10.3: intermediaries forwarding to HTTP/1 must take care of
+@@ -588,12 +593,17 @@ int h2_make_htx_response(struct http_hdr *list, struct htx *htx, unsigned int *m
+ 		}
+ 		else {
+ 			/* this can be any type of header */
+-			/* RFC7540#8.1.2: upper case not allowed in header field names */
+-			for (i = 0; i < list[idx].n.len; i++)
+-				if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A')
+-					goto fail;
+-
++			/* RFC7540#8.1.2: upper case not allowed in header field names.
++			 * #10.3: header names must be valid (i.e. match a token).
++			 * For pseudo-headers we check from 2nd char and for other ones
++			 * from the first char, because HTTP_IS_TOKEN() also excludes
++			 * the colon.
++			 */
+ 			phdr = h2_str_to_phdr(list[idx].n);
++
++			for (i = !!phdr; i < list[idx].n.len; i++)
++				if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A' || !HTTP_IS_TOKEN(list[idx].n.ptr[i]))
++					goto fail;
+ 		}
+ 
+ 		/* RFC7540#10.3: intermediaries forwarding to HTTP/1 must take care of
+@@ -718,16 +728,14 @@ int h2_make_htx_trailers(struct http_hdr *list, struct htx *htx)
+ 			goto fail;
+ 		}
+ 
+-		/* RFC7540#8.1.2: upper case not allowed in header field names */
++		/* RFC7540#8.1.2: upper case not allowed in header field names.
++		 * #10.3: header names must be valid (i.e. match a token). This
++		 * also catches pseudo-headers which are forbidden in trailers.
++		 */
+ 		for (i = 0; i < list[idx].n.len; i++)
+-			if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A')
++			if ((uint8_t)(list[idx].n.ptr[i] - 'A') < 'Z' - 'A' || !HTTP_IS_TOKEN(list[idx].n.ptr[i]))
+ 				goto fail;
+ 
+-		if (h2_str_to_phdr(list[idx].n) != 0) {
+-			/* This is a pseudo-header (RFC7540#8.1.2.1) */
+-			goto fail;
+-		}
+-
+ 		/* these ones are forbidden in trailers (RFC7540#8.1.2.2) */
+ 		if (isteq(list[idx].n, ist("host")) ||
+ 		    isteq(list[idx].n, ist("content-length")) ||

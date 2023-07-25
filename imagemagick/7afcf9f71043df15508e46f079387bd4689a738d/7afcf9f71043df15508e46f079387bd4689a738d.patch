@@ -1,0 +1,39 @@
+commit 7afcf9f71043df15508e46f079387bd4689a738d
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Thu Aug 18 18:23:44 2016 -0400
+
+    Prevent buffer overflow in BMP & SGI coders (bug report from pwchen&rayzhong of tencent)
+
+diff --git a/ChangeLog b/ChangeLog
+index 3a9c38e2b..ff89b2021 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,5 +1,5 @@
+ 2016-08-15  7.0.2-10 Cristy  <quetzlzacatenango@image...>
+-  * Prevent buffer overflow in BMP coder (bug report from
++  * Prevent buffer overflow in BMP & SGI coders (bug report from
+     pwchen&rayzhong of tencent).
+ 
+ 2016-08-14  7.0.2-9 Cristy  <quetzlzacatenango@image...>
+diff --git a/coders/sgi.c b/coders/sgi.c
+index cd8c2b69e..1fe65e604 100644
+--- a/coders/sgi.c
++++ b/coders/sgi.c
+@@ -354,13 +354,15 @@ static Image *ReadSGIImage(const ImageInfo *image_info,ExceptionInfo *exception)
+     image->rows=iris_info.rows;
+     image->depth=(size_t) MagickMin(iris_info.depth,MAGICKCORE_QUANTUM_DEPTH);
+     if (iris_info.pixel_format == 0)
+-      image->depth=(size_t) MagickMin((size_t) 8*
+-        iris_info.bytes_per_pixel,MAGICKCORE_QUANTUM_DEPTH);
++      image->depth=(size_t) MagickMin((size_t) 8*iris_info.bytes_per_pixel,
++        MAGICKCORE_QUANTUM_DEPTH);
+     if (iris_info.depth < 3)
+       {
+         image->storage_class=PseudoClass;
+         image->colors=iris_info.bytes_per_pixel > 1 ? 65535 : 256;
+       }
++    if (EOFBlob(image) != MagickFalse)
++      ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+     if ((image_info->ping != MagickFalse)  && (image_info->number_scenes != 0))
+       if (image->scene >= (image_info->scene+image_info->number_scenes-1))
+         break;

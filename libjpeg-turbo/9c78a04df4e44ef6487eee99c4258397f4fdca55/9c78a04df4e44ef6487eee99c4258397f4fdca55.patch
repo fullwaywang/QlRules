@@ -1,0 +1,185 @@
+commit 9c78a04df4e44ef6487eee99c4258397f4fdca55
+Author: DRC <information@libjpeg-turbo.org>
+Date:   Fri Jul 20 17:21:36 2018 -0500
+
+    cjpeg: Fix OOB read caused by malformed 8-bit BMP
+    
+    ... in which one or more of the color indices is out of range for the
+    number of palette entries.
+    
+    Fix partly borrowed from jpeg-9c.  This commit also adopts Guido's
+    JERR_PPM_OUTOFRANGE enum value in lieu of our project-specific
+    JERR_PPM_TOOLARGE enum value.
+    
+    Fixes #258
+
+diff --git a/ChangeLog.md b/ChangeLog.md
+index 03f28dab..41da0602 100644
+--- a/ChangeLog.md
++++ b/ChangeLog.md
+@@ -47,6 +47,11 @@ a 4:2:2 or 4:2:0 JPEG image using the merged (non-fancy) upsampling algorithms
+ 7. The new CMake-based build system will now disable the MIPS DSPr2 SIMD
+ extensions if it detects that the compiler does not support DSPr2 instructions.
+ 
++8. Fixed out-of-bounds read in cjpeg that occurred when attempting to compress
++a specially-crafted malformed color-index (8-bit-per-sample) BMP file in which
++some of the samples (color indices) exceeded the bounds of the BMP file's color
++table.
++
+ 
+ 1.5.90 (2.0 beta1)
+ ==================
+diff --git a/cderror.h b/cderror.h
+index 37034a98..4f2c7a3e 100644
+--- a/cderror.h
++++ b/cderror.h
+@@ -2,7 +2,7 @@
+  * cderror.h
+  *
+  * Copyright (C) 1994-1997, Thomas G. Lane.
+- * Modified 2009 by Guido Vollbeding.
++ * Modified 2009-2017 by Guido Vollbeding.
+  * This file is part of the Independent JPEG Group's software.
+  * For conditions of distribution and use, see the accompanying README.ijg
+  * file.
+@@ -49,6 +49,7 @@ JMESSAGE(JERR_BMP_COLORSPACE, "BMP output must be grayscale or RGB")
+ JMESSAGE(JERR_BMP_COMPRESSED, "Sorry, compressed BMPs not yet supported")
+ JMESSAGE(JERR_BMP_EMPTY, "Empty BMP image")
+ JMESSAGE(JERR_BMP_NOT, "Not a BMP file - does not start with BM")
++JMESSAGE(JERR_BMP_OUTOFRANGE, "Numeric value out of range in BMP file")
+ JMESSAGE(JTRC_BMP, "%ux%u 24-bit BMP image")
+ JMESSAGE(JTRC_BMP_MAPPED, "%ux%u 8-bit colormapped BMP image")
+ JMESSAGE(JTRC_BMP_OS2, "%ux%u 24-bit OS2 BMP image")
+@@ -75,8 +76,8 @@ JMESSAGE(JWRN_GIF_NOMOREDATA, "Ran out of GIF bits")
+ #ifdef PPM_SUPPORTED
+ JMESSAGE(JERR_PPM_COLORSPACE, "PPM output must be grayscale or RGB")
+ JMESSAGE(JERR_PPM_NONNUMERIC, "Nonnumeric data in PPM file")
+-JMESSAGE(JERR_PPM_TOOLARGE, "Integer value too large in PPM file")
+ JMESSAGE(JERR_PPM_NOT, "Not a PPM/PGM file")
++JMESSAGE(JERR_PPM_OUTOFRANGE, "Numeric value out of range in PPM file")
+ JMESSAGE(JTRC_PGM, "%ux%u PGM image")
+ JMESSAGE(JTRC_PGM_TEXT, "%ux%u text PGM image")
+ JMESSAGE(JTRC_PPM, "%ux%u PPM image")
+diff --git a/rdbmp.c b/rdbmp.c
+index a02cfd90..51af2377 100644
+--- a/rdbmp.c
++++ b/rdbmp.c
+@@ -3,7 +3,7 @@
+  *
+  * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1996, Thomas G. Lane.
+- * Modified 2009-2010 by Guido Vollbeding.
++ * Modified 2009-2017 by Guido Vollbeding.
+  * libjpeg-turbo Modifications:
+  * Modified 2011 by Siarhei Siamashka.
+  * Copyright (C) 2015, 2017-2018, D. R. Commander.
+@@ -72,6 +72,7 @@ typedef struct _bmp_source_struct {
+   JDIMENSION row_width;         /* Physical width of scanlines in file */
+ 
+   int bits_per_pixel;           /* remembers 8- or 24-bit format */
++  int cmap_length;              /* colormap length */
+ 
+   boolean use_inversion_array;  /* TRUE = preload the whole image, which is
+                                    stored in bottom-up order, and feed it to
+@@ -155,6 +156,7 @@ get_8bit_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+ {
+   bmp_source_ptr source = (bmp_source_ptr)sinfo;
+   register JSAMPARRAY colormap = source->colormap;
++  int cmaplen = source->cmap_length;
+   JSAMPARRAY image_ptr;
+   register int t;
+   register JSAMPROW inptr, outptr;
+@@ -178,11 +180,15 @@ get_8bit_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+   if (cinfo->in_color_space == JCS_GRAYSCALE) {
+     for (col = cinfo->image_width; col > 0; col--) {
+       t = GETJSAMPLE(*inptr++);
++      if (t >= cmaplen)
++        ERREXIT(cinfo, JERR_BMP_OUTOFRANGE);
+       *outptr++ = colormap[0][t];
+     }
+   } else if (cinfo->in_color_space == JCS_CMYK) {
+     for (col = cinfo->image_width; col > 0; col--) {
+       t = GETJSAMPLE(*inptr++);
++      if (t >= cmaplen)
++        ERREXIT(cinfo, JERR_BMP_OUTOFRANGE);
+       rgb_to_cmyk(colormap[0][t], colormap[1][t], colormap[2][t], outptr,
+                   outptr + 1, outptr + 2, outptr + 3);
+       outptr += 4;
+@@ -197,6 +203,8 @@ get_8bit_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     if (aindex >= 0) {
+       for (col = cinfo->image_width; col > 0; col--) {
+         t = GETJSAMPLE(*inptr++);
++        if (t >= cmaplen)
++          ERREXIT(cinfo, JERR_BMP_OUTOFRANGE);
+         outptr[rindex] = colormap[0][t];
+         outptr[gindex] = colormap[1][t];
+         outptr[bindex] = colormap[2][t];
+@@ -206,6 +214,8 @@ get_8bit_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     } else {
+       for (col = cinfo->image_width; col > 0; col--) {
+         t = GETJSAMPLE(*inptr++);
++        if (t >= cmaplen)
++          ERREXIT(cinfo, JERR_BMP_OUTOFRANGE);
+         outptr[rindex] = colormap[0][t];
+         outptr[gindex] = colormap[1][t];
+         outptr[bindex] = colormap[2][t];
+@@ -539,6 +549,7 @@ start_input_bmp(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     /* Allocate space to store the colormap */
+     source->colormap = (*cinfo->mem->alloc_sarray)
+       ((j_common_ptr)cinfo, JPOOL_IMAGE, (JDIMENSION)biClrUsed, (JDIMENSION)3);
++    source->cmap_length = (int)biClrUsed;
+     /* and read it from the file */
+     read_colormap(source, (int)biClrUsed, mapentrysize);
+     /* account for size of colormap */
+diff --git a/rdppm.c b/rdppm.c
+index f3bb79ef..87bc3309 100644
+--- a/rdppm.c
++++ b/rdppm.c
+@@ -75,7 +75,7 @@ typedef struct {
+   JSAMPROW pixrow;              /* compressor input buffer */
+   size_t buffer_width;          /* width of I/O buffer */
+   JSAMPLE *rescale;             /* => maxval-remapping array, or NULL */
+-  int maxval;
++  unsigned int maxval;
+ } ppm_source_struct;
+ 
+ typedef ppm_source_struct *ppm_source_ptr;
+@@ -125,7 +125,7 @@ read_pbm_integer(j_compress_ptr cinfo, FILE *infile, unsigned int maxval)
+   }
+ 
+   if (val > maxval)
+-    ERREXIT(cinfo, JERR_PPM_TOOLARGE);
++    ERREXIT(cinfo, JERR_PPM_OUTOFRANGE);
+ 
+   return val;
+ }
+@@ -509,7 +509,7 @@ get_word_gray_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     temp  = UCH(*bufferptr++) << 8;
+     temp |= UCH(*bufferptr++);
+     if (temp > maxval)
+-      ERREXIT(cinfo, JERR_PPM_TOOLARGE);
++      ERREXIT(cinfo, JERR_PPM_OUTOFRANGE);
+     *ptr++ = rescale[temp];
+   }
+   return 1;
+@@ -536,17 +536,17 @@ get_word_rgb_row(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     temp  = UCH(*bufferptr++) << 8;
+     temp |= UCH(*bufferptr++);
+     if (temp > maxval)
+-      ERREXIT(cinfo, JERR_PPM_TOOLARGE);
++      ERREXIT(cinfo, JERR_PPM_OUTOFRANGE);
+     *ptr++ = rescale[temp];
+     temp  = UCH(*bufferptr++) << 8;
+     temp |= UCH(*bufferptr++);
+     if (temp > maxval)
+-      ERREXIT(cinfo, JERR_PPM_TOOLARGE);
++      ERREXIT(cinfo, JERR_PPM_OUTOFRANGE);
+     *ptr++ = rescale[temp];
+     temp  = UCH(*bufferptr++) << 8;
+     temp |= UCH(*bufferptr++);
+     if (temp > maxval)
+-      ERREXIT(cinfo, JERR_PPM_TOOLARGE);
++      ERREXIT(cinfo, JERR_PPM_OUTOFRANGE);
+     *ptr++ = rescale[temp];
+   }
+   return 1;

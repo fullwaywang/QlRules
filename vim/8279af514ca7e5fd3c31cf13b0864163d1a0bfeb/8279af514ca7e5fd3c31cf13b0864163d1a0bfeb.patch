@@ -1,0 +1,77 @@
+commit 8279af514ca7e5fd3c31cf13b0864163d1a0bfeb
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Sep 26 23:08:22 2022 +0100
+
+    patch 9.0.0598: using negative array index with negative width window
+    
+    Problem:    Using negative array index with negative width window.
+    Solution:   Make sure the window width does not become negative.
+
+diff --git a/src/testdir/test_cmdwin.vim b/src/testdir/test_cmdwin.vim
+index 6a420ed0a..dc6889495 100644
+--- a/src/testdir/test_cmdwin.vim
++++ b/src/testdir/test_cmdwin.vim
+@@ -404,5 +404,27 @@ func Test_cmdwin_freed_buffer_ptr()
+   bwipe!
+ endfunc
+ 
++" This was resulting in a window with negative width.
++" The test doesn't reproduce the illegal memory access though...
++func Test_cmdwin_split_often()
++  let lines = &lines
++  let columns = &columns
++  set t_WS=
++
++  try
++    set encoding=iso8859
++    set ruler
++    winsize 0 0
++    noremap 0 H
++    sil norm 0000000q:
++  catch /E36:/
++  endtry
++
++  bwipe!
++  set encoding=utf8
++  let &lines = lines
++  let &columns = columns
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index d6535b392..515be0b9a 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -699,6 +699,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    598,
+ /**/
+     597,
+ /**/
+diff --git a/src/window.c b/src/window.c
+index 755848e43..db08e4132 100644
+--- a/src/window.c
++++ b/src/window.c
+@@ -2089,6 +2089,8 @@ win_equal_rec(
+ 		if (hnc)	    // add next_curwin size
+ 		{
+ 		    next_curwin_size -= p_wiw - (m - n);
++		    if (next_curwin_size < 0)
++			next_curwin_size = 0;
+ 		    new_size += next_curwin_size;
+ 		    room -= new_size - next_curwin_size;
+ 		}
+@@ -6611,7 +6613,8 @@ scroll_to_fraction(win_T *wp, int prev_height)
+     void
+ win_new_width(win_T *wp, int width)
+ {
+-    wp->w_width = width;
++    // Should we give an error if width < 0?
++    wp->w_width = width < 0 ? 0 : width;
+     wp->w_lines_valid = 0;
+     changed_line_abv_curs_win(wp);
+     // Handled in win_fix_scroll()

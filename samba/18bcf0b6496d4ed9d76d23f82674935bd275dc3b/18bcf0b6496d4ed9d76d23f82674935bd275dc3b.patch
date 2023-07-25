@@ -1,0 +1,80 @@
+commit 18bcf0b6496d4ed9d76d23f82674935bd275dc3b	18bcf0b6496d4ed9d76d23f82674935bd275dc3b
+Author: Stefan Metzmacher <metze@samba.org>
+Date:   Thu Nov 24 18:22:23 2022 +0100
+
+    CVE-2022-38023 docs-xml/smbdotconf: change 'reject md5 servers' default to yes
+    
+    AES is supported by Windows >= 2008R2 and Samba >= 4.0 so there's no
+    reason to allow md5 servers by default.
+    
+    Note the change in netlogon_creds_cli_context_global() is only cosmetic,
+    but avoids confusion while reading the code. Check with:
+    
+     git show -U35 libcli/auth/netlogon_creds_cli.c
+    
+    BUG: https://bugzilla.samba.org/show_bug.cgi?id=15240
+    
+    Signed-off-by: Stefan Metzmacher <metze@samba.org>
+    Reviewed-by: Andrew Bartlett <abartlet@samba.org>
+    Reviewed-by: Ralph Boehme <slow@samba.org>
+    (cherry picked from commit 1c6c1129905d0c7a60018e7bf0f17a0fd198a584)
+
+diff --git a/docs-xml/smbdotconf/winbind/rejectmd5servers.xml b/docs-xml/smbdotconf/winbind/rejectmd5servers.xml
+index 151b4676c57..3bc4eaf7b02 100644
+--- a/docs-xml/smbdotconf/winbind/rejectmd5servers.xml
++++ b/docs-xml/smbdotconf/winbind/rejectmd5servers.xml
+@@ -13,10 +13,13 @@
+ 	This will prevent downgrade attacks.</para>
+ 
+ 	<para>The behavior can be controlled per netbios domain
+-	by using 'reject md5 servers:NETBIOSDOMAIN = yes' as option.</para>
++	by using 'reject md5 servers:NETBIOSDOMAIN = no' as option.</para>
++
++	<para>The default changed from 'no' to 'yes, with the patches for CVE-2022-38023,
++	see https://bugzilla.samba.org/show_bug.cgi?id=15240</para>
+ 
+ 	<para>This option overrides the <smbconfoption name="require strong key"/> option.</para>
+ </description>
+ 
+-<value type="default">no</value>
++<value type="default">yes</value>
+ </samba:parameter>
+diff --git a/lib/param/loadparm.c b/lib/param/loadparm.c
+index 151fe167b26..dfcc27ea68b 100644
+--- a/lib/param/loadparm.c
++++ b/lib/param/loadparm.c
+@@ -2665,6 +2665,7 @@ struct loadparm_context *loadparm_init(TALLOC_CTX *mem_ctx)
+ 	lpcfg_do_global_parameter(lp_ctx, "winbind sealed pipes", "True");
+ 	lpcfg_do_global_parameter(lp_ctx, "winbind scan trusted domains", "False");
+ 	lpcfg_do_global_parameter(lp_ctx, "require strong key", "True");
++	lpcfg_do_global_parameter(lp_ctx, "reject md5 servers", "True");
+ 	lpcfg_do_global_parameter(lp_ctx, "winbindd socket directory", dyn_WINBINDD_SOCKET_DIR);
+ 	lpcfg_do_global_parameter(lp_ctx, "ntp signd socket directory", dyn_NTP_SIGND_SOCKET_DIR);
+ 	lpcfg_do_global_parameter_var(lp_ctx, "gpo update command", "%s/samba-gpupdate", dyn_SCRIPTSBINDIR);
+diff --git a/libcli/auth/netlogon_creds_cli.c b/libcli/auth/netlogon_creds_cli.c
+index 3c3908ea735..df5f8a0fbfa 100644
+--- a/libcli/auth/netlogon_creds_cli.c
++++ b/libcli/auth/netlogon_creds_cli.c
+@@ -340,8 +340,8 @@ NTSTATUS netlogon_creds_cli_context_global(struct loadparm_context *lp_ctx,
+ 	const char *client_computer;
+ 	uint32_t proposed_flags;
+ 	uint32_t required_flags = 0;
+-	bool reject_md5_servers = false;
+-	bool require_strong_key = false;
++	bool reject_md5_servers = true;
++	bool require_strong_key = true;
+ 	int require_sign_or_seal = true;
+ 	bool seal_secure_channel = true;
+ 	enum dcerpc_AuthLevel auth_level = DCERPC_AUTH_LEVEL_NONE;
+diff --git a/source3/param/loadparm.c b/source3/param/loadparm.c
+index b56fd20e410..f934d48498c 100644
+--- a/source3/param/loadparm.c
++++ b/source3/param/loadparm.c
+@@ -664,6 +664,7 @@ static void init_globals(struct loadparm_context *lp_ctx, bool reinit_globals)
+ 	Globals.client_schannel = true;
+ 	Globals.winbind_sealed_pipes = true;
+ 	Globals.require_strong_key = true;
++	Globals.reject_md5_servers = true;
+ 	Globals.server_schannel = true;
+ 	Globals.read_raw = true;
+ 	Globals.write_raw = true;

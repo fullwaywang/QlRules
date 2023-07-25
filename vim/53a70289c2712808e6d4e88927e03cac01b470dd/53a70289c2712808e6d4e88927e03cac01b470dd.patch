@@ -1,0 +1,62 @@
+commit 53a70289c2712808e6d4e88927e03cac01b470dd
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon May 9 13:15:07 2022 +0100
+
+    patch 8.2.4925: trailing backslash may cause reading past end of line
+    
+    Problem:    Trailing backslash may cause reading past end of line.
+    Solution:   Check for NUL after backslash.
+
+diff --git a/src/testdir/test_textobjects.vim b/src/testdir/test_textobjects.vim
+index debbfb357..34894d068 100644
+--- a/src/testdir/test_textobjects.vim
++++ b/src/testdir/test_textobjects.vim
+@@ -185,10 +185,18 @@ func Test_string_html_objects()
+     call assert_equal("<div><div\nattr=\"attr\"\n></div></div>", @", e)
+ 
+     set quoteescape&
++
++    " this was going beyond the end of the line
++    %del
++    sil! norm i"\
++    sil! norm i"\
++    sil! norm i"\
++    call assert_equal('"\', getline(1))
++
++    bwipe!
+   endfor
+ 
+   set enc=utf-8
+-  bwipe!
+ endfunc
+ 
+ func Test_empty_html_tag()
+diff --git a/src/textobject.c b/src/textobject.c
+index e4a7db38e..edaa64c51 100644
+--- a/src/textobject.c
++++ b/src/textobject.c
+@@ -1664,7 +1664,11 @@ find_next_quote(
+ 	if (c == NUL)
+ 	    return -1;
+ 	else if (escape != NULL && vim_strchr(escape, c))
++	{
+ 	    ++col;
++	    if (line[col] == NUL)
++		return -1;
++	}
+ 	else if (c == quotechar)
+ 	    break;
+ 	if (has_mbyte)
+diff --git a/src/version.c b/src/version.c
+index d790a7540..8f33f05aa 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4925,
+ /**/
+     4924,
+ /**/

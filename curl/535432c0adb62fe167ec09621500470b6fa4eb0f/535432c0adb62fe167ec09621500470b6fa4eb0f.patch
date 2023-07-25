@@ -1,0 +1,119 @@
+commit 535432c0adb62fe167ec09621500470b6fa4eb0f
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Wed Jan 31 08:40:11 2018 +0100
+
+    FTP: reject path components with control codes
+    
+    Refuse to operate when given path components featuring byte values lower
+    than 32.
+    
+    Previously, inserting a %00 sequence early in the directory part when
+    using the 'singlecwd' ftp method could make curl write a zero byte
+    outside of the allocated buffer.
+    
+    Test case 340 verifies.
+    
+    CVE-2018-1000120
+    Reported-by: Duy Phan Thanh
+    Bug: https://curl.haxx.se/docs/adv_2018-9cd6.html
+
+diff --git a/lib/ftp.c b/lib/ftp.c
+index fec591918..e2cc38b62 100644
+--- a/lib/ftp.c
++++ b/lib/ftp.c
+@@ -1474,7 +1474,7 @@ static CURLcode ftp_state_list(struct connectdata *conn)
+       slashPos = strrchr(inpath, '/');
+       n = slashPos - inpath;
+     }
+-    result = Curl_urldecode(data, inpath, n, &lstArg, NULL, FALSE);
++    result = Curl_urldecode(data, inpath, n, &lstArg, NULL, TRUE);
+     if(result)
+       return result;
+   }
+@@ -3194,7 +3194,7 @@ static CURLcode ftp_done(struct connectdata *conn, CURLcode status,
+ 
+   if(!result)
+     /* get the "raw" path */
+-    result = Curl_urldecode(data, path_to_use, 0, &path, NULL, FALSE);
++    result = Curl_urldecode(data, path_to_use, 0, &path, NULL, TRUE);
+   if(result) {
+     /* We can limp along anyway (and should try to since we may already be in
+      * the error path) */
+@@ -4155,7 +4155,7 @@ CURLcode ftp_parse_url_path(struct connectdata *conn)
+       result = Curl_urldecode(conn->data, slash_pos ? cur_pos : "/",
+                               slash_pos ? dirlen : 1,
+                               &ftpc->dirs[0], NULL,
+-                              FALSE);
++                              TRUE);
+       if(result) {
+         freedirs(ftpc);
+         return result;
+@@ -4262,7 +4262,7 @@ CURLcode ftp_parse_url_path(struct connectdata *conn)
+     size_t dlen;
+     char *path;
+     CURLcode result =
+-      Curl_urldecode(conn->data, data->state.path, 0, &path, &dlen, FALSE);
++      Curl_urldecode(conn->data, data->state.path, 0, &path, &dlen, TRUE);
+     if(result) {
+       freedirs(ftpc);
+       return result;
+diff --git a/tests/data/Makefile.inc b/tests/data/Makefile.inc
+index 7a989867d..97daf00ce 100644
+--- a/tests/data/Makefile.inc
++++ b/tests/data/Makefile.inc
+@@ -57,6 +57,9 @@ test298 test299 test300 test301 test302 test303 test304 test305 test306 \
+ test307 test308 test309 test310 test311 test312 test313 test314 test315 \
+ test316 test317 test318 test319 test320 test321 test322 test323 test324 \
+ test325 test326 \
++\
++test340 \
++\
+ test350 test351 test352 test353 test354 \
+ test393 test394 test395 \
+ \
+diff --git a/tests/data/test340 b/tests/data/test340
+new file mode 100644
+index 000000000..d834d767c
+--- /dev/null
++++ b/tests/data/test340
+@@ -0,0 +1,40 @@
++<testcase>
++<info>
++<keywords>
++FTP
++PASV
++CWD
++--ftp-method
++singlecwd
++</keywords>
++</info>
++#
++# Server-side
++<reply>
++</reply>
++
++# Client-side
++<client>
++<server>
++ftp
++</server>
++ <name>
++FTP using %00 in path with singlecwd
++ </name>
++ <command>
++--ftp-method singlecwd ftp://%HOSTIP:%FTPPORT/%00first/second/third/340
++</command>
++</client>
++
++# Verify data after the test has been "shot"
++<verify>
++<protocol>
++USER anonymous
++PASS ftp@example.com
++PWD
++</protocol>
++<errorcode>
++3
++</errorcode>
++</verify>
++</testcase>

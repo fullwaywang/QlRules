@@ -1,0 +1,27 @@
+commit ea38e5a6b75706477898eb1e6582d667dbb9946c	ea38e5a6b75706477898eb1e6582d667dbb9946c
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Nov 28 03:46:56 2014 +0100
+
+    avcodec/hevc_ps: Check num_long_term_ref_pics_sps
+    
+    Fixes out of array access
+    Fixes: signal_sigsegv_35bd0f0_1182_cov_791726764_STRUCT_B_Samsung_4.bit
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/hevc_ps.c b/libavcodec/hevc_ps.c
+index 1f64971d1c..6b5e13fc5b 100644
+--- a/libavcodec/hevc_ps.c
++++ b/libavcodec/hevc_ps.c
+@@ -951,6 +951,11 @@ int ff_hevc_decode_nal_sps(HEVCContext *s)
+     sps->long_term_ref_pics_present_flag = get_bits1(gb);
+     if (sps->long_term_ref_pics_present_flag) {
+         sps->num_long_term_ref_pics_sps = get_ue_golomb_long(gb);
++        if (sps->num_long_term_ref_pics_sps > 31U) {
++            av_log(0, AV_LOG_ERROR, "num_long_term_ref_pics_sps %d is out of range.\n",
++                   sps->num_long_term_ref_pics_sps);
++            goto err;
++        }
+         for (i = 0; i < sps->num_long_term_ref_pics_sps; i++) {
+             sps->lt_ref_pic_poc_lsb_sps[i]       = get_bits(gb, sps->log2_max_poc_lsb);
+             sps->used_by_curr_pic_lt_sps_flag[i] = get_bits1(gb);

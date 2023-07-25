@@ -1,0 +1,19 @@
+commit 027f84c69f4ef30c0693832a6c396ef19e563ca1
+Author: Krzysztof Stachowiak <krzysiek.stachowiak@gmail.com>
+Date:   Tue Mar 13 11:29:24 2018 +0100
+
+    Prevent arithmetic overflow on bounds check
+
+diff --git a/library/ssl_cli.c b/library/ssl_cli.c
+index 279a127ba..df6abc389 100644
+--- a/library/ssl_cli.c
++++ b/library/ssl_cli.c
+@@ -2489,7 +2489,7 @@ static int ssl_parse_server_key_exchange( mbedtls_ssl_context *ssl )
+         sig_len = ( p[0] << 8 ) | p[1];
+         p += 2;
+ 
+-        if( end != p + sig_len )
++        if( p != end - sig_len )
+         {
+             MBEDTLS_SSL_DEBUG_MSG( 1, ( "bad server key exchange message" ) );
+             mbedtls_ssl_send_alert_message( ssl, MBEDTLS_SSL_ALERT_LEVEL_FATAL,

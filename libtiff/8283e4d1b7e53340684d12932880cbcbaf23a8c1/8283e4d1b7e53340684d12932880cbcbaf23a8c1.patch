@@ -1,0 +1,39 @@
+commit 8283e4d1b7e53340684d12932880cbcbaf23a8c1	8283e4d1b7e53340684d12932880cbcbaf23a8c1
+Author: erouault <erouault>
+Date:   Thu Jan 12 17:43:25 2017 +0000
+
+    * libtiff/tif_ojpeg.c: fix leak in OJPEGReadHeaderInfoSecTablesAcTable
+    when read fails.
+    Patch by Nicolás Peña.
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2659
+
+diff --git a/ChangeLog b/ChangeLog
+index 6e6f3b07..12e0370b 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,10 @@
++2017-01-12 Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_ojpeg.c: fix leak in OJPEGReadHeaderInfoSecTablesAcTable
++	when read fails.
++	Patch by Nicolás Peña.
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2659
++
+ 2017-01-11 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* libtiff/tif_luv.c, tif_lzw.c, tif_packbits.c: return 0 in Encode
+diff --git a/libtiff/tif_ojpeg.c b/libtiff/tif_ojpeg.c
+index f19e8fd0..b92f0ebd 100644
+--- a/libtiff/tif_ojpeg.c
++++ b/libtiff/tif_ojpeg.c
+@@ -1918,7 +1918,10 @@ OJPEGReadHeaderInfoSecTablesAcTable(TIFF* tif)
+ 				rb[sizeof(uint32)+5+n]=o[n];
+ 			p=(uint32)TIFFReadFile(tif,&(rb[sizeof(uint32)+21]),q);
+ 			if (p!=q)
++                        {
++                                _TIFFfree(rb);
+ 				return(0);
++                        }
+ 			sp->actable[m]=rb;
+ 			sp->sos_tda[m]=(sp->sos_tda[m]|m);
+ 		}

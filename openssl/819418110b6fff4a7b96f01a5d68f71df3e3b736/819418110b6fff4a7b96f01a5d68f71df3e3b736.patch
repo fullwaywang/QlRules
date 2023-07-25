@@ -1,0 +1,34 @@
+commit 819418110b6fff4a7b96f01a5d68f71df3e3b736
+Author: Matt Caswell <matt@openssl.org>
+Date:   Mon Mar 9 16:09:04 2015 +0000
+
+    Fix Seg fault in DTLSv1_listen
+    
+    The DTLSv1_listen function is intended to be stateless and processes
+    the initial ClientHello from many peers. It is common for user code to
+    loop over the call to DTLSv1_listen until a valid ClientHello is received
+    with an associated cookie. A defect in the implementation of DTLSv1_listen
+    means that state is preserved in the SSL object from one invokation to the
+    next that can lead to a segmentation fault. Erorrs processing the initial
+    ClientHello can trigger this scenario. An example of such an error could
+    be that a DTLS1.0 only client is attempting to connect to a DTLS1.2 only
+    server.
+    
+    CVE-2015-0207
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+
+diff --git a/ssl/d1_lib.c b/ssl/d1_lib.c
+index 1f1005421e..ee78921ba8 100644
+--- a/ssl/d1_lib.c
++++ b/ssl/d1_lib.c
+@@ -543,6 +543,9 @@ int dtls1_listen(SSL *s, struct sockaddr *client)
+ {
+     int ret;
+ 
++    /* Ensure there is no state left over from a previous invocation */
++    SSL_clear(s);
++
+     SSL_set_options(s, SSL_OP_COOKIE_EXCHANGE);
+     s->d1->listen = 1;
+ 

@@ -1,0 +1,21 @@
+commit c0fd449ec0870b050d350d6d844b1ea6dad4bc7d
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Mon May 25 09:42:02 2020 +0200
+
+    Fixed Out-of-bound read in glyph_cache_put
+    
+    CVE-2020-11098 thanks to @antonio-morales for finding this.
+
+diff --git a/libfreerdp/cache/glyph.c b/libfreerdp/cache/glyph.c
+index 9f5e4a301..5c41f912a 100644
+--- a/libfreerdp/cache/glyph.c
++++ b/libfreerdp/cache/glyph.c
+@@ -579,7 +579,7 @@ BOOL glyph_cache_put(rdpGlyphCache* glyphCache, UINT32 id, UINT32 index, rdpGlyp
+ 		return FALSE;
+ 	}
+ 
+-	if (index > glyphCache->glyphCache[id].number)
++	if (index >= glyphCache->glyphCache[id].number)
+ 	{
+ 		WLog_ERR(TAG, "invalid glyph cache index: %" PRIu32 " in cache id: %" PRIu32 "", index, id);
+ 		return FALSE;

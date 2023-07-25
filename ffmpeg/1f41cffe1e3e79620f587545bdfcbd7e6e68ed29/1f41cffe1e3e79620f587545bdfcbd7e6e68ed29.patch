@@ -1,0 +1,25 @@
+commit 1f41cffe1e3e79620f587545bdfcbd7e6e68ed29	1f41cffe1e3e79620f587545bdfcbd7e6e68ed29
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sun Nov 11 00:01:24 2012 +0100
+
+    mjpegdec: check SE.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/mjpegdec.c b/libavcodec/mjpegdec.c
+index 6b5266de58..0a71a6f5ab 100644
+--- a/libavcodec/mjpegdec.c
++++ b/libavcodec/mjpegdec.c
+@@ -1095,6 +1095,11 @@ static int mjpeg_decode_scan_progressive_ac(MJpegDecodeContext *s, int ss,
+     int last_scan = 0;
+     int16_t *quant_matrix = s->quant_matrixes[s->quant_index[c]];
+ 
++    if (se > 63) {
++        av_log(s->avctx, AV_LOG_ERROR, "SE %d is too large\n", se);
++        return AVERROR_INVALIDDATA;
++    }
++
+     if (!Al) {
+         s->coefs_finished[c] |= (1LL << (se + 1)) - (1LL << ss);
+         last_scan = !~s->coefs_finished[c];

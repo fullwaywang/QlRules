@@ -1,0 +1,24 @@
+commit 7edb984dd051b6919d7d8471c70499273f31b0fa	7edb984dd051b6919d7d8471c70499273f31b0fa
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Apr 30 20:05:31 2013 +0200
+
+    avutil/log: Fix context pointer used for get_category()
+    
+    Fixes calling a random pointer
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavutil/log.c b/libavutil/log.c
+index f29345b97a..15ff5f86bc 100644
+--- a/libavutil/log.c
++++ b/libavutil/log.c
+@@ -180,7 +180,7 @@ static void format_line(void *ptr, int level, const char *fmt, va_list vl,
+             if (parent && *parent) {
+                 snprintf(part[0], part_size, "[%s @ %p] ",
+                          (*parent)->item_name(parent), parent);
+-                if(type) type[0] = get_category(((uint8_t *) ptr) + avc->parent_log_context_offset);
++                if(type) type[0] = get_category(parent);
+             }
+         }
+         snprintf(part[1], part_size, "[%s @ %p] ",

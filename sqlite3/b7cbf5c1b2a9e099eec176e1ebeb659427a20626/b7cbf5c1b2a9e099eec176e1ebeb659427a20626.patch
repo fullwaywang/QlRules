@@ -1,0 +1,128 @@
+commit b7cbf5c1b2a9e099eec176e1ebeb659427a20626	b7cbf5c1b2a9e099eec176e1ebeb659427a20626
+Author: drh <drh@noemail.net>
+Date:   Mon Jun 15 13:51:34 2020 +0000
+
+    Fix a defect in the query-flattener optimization identified by
+    ticket [8f157e8010b22af0].
+    
+    FossilOrigin-Name: 10fa79d00f8091e5748c245f4cae5b5f499a5f8db20da741c130e05a21ede443
+
+diff --git a/manifest b/manifest
+index 748c6f0d4..573d0222f 100644
+--- a/manifest
++++ b/manifest
+@@ -1,12 +1,12 @@
+ B fd5abb1a7b5a55127d5c0d5ff448020d8bccab44e4f5afe1eb88fc19578af735
+-C Check-in\s[1d4f86201dab9a22]\schanged\sa\stestcase()\sto\san\sassert()\sbecause\swe\ndidn't\sknow\show\sto\sreach\sthat\scondition\sany\smore.\s\sBut\sYongHeng's\sfuzzer\nfound\sa\sway.\s\sSo\snow\swe\schange\sit\sback.\s\sTicket\s[9fb26d37cefaba40].
+-D 2020-06-14T13:40:13.692
++C Fix\sa\sdefect\sin\sthe\squery-flattener\soptimization\sidentified\sby\nticket\s[8f157e8010b22af0].
++D 2020-06-15T13:51:34.544
+ F ext/fts3/fts3.c acc51e4378dd772251b31ead0ccd19070fc1774f6f6a55b11e00cb885e0f34bc
+ F src/btree.c fabc215bd1ebab0e48108e95e0f50531da9883156b95888f479f6c696db032ad
+ F src/expr.c 36bb737d2ca78ee9bd4fde46cf1e51a37e7e1b263e55fccfaef32922a19e9524
+ F src/global.c 0409ae635839e0bef26a69b68be64126ab6cba62ac19bd7694f1652e591c4c17
+-F src/select.c 1a791ad41c35ec24217b8da877a4deb2a9e22a1dfae2bc46d68d9ad4e4bf8f40
+-F src/sqliteInt.h fe320867c4f48eeeca523062c5668508b3f9b88d65690d42610bd138a5fdb5c4
++F src/select.c 6ddd86a7272ff1f443bd9efcbb0f5ab590674d4c732e4cb8c3d5dd8e3a70cae6
++F src/sqliteInt.h abf448e9f839964086d5508ba795e948dbf36d773b6568cf4c830f6c7ad2110e
+ F src/test1.c e9f68f157f8fd027ee4c32c4b427f4eed274749bfb745427e2d954fa89d95ad3
+ F src/vdbe.c 2f5cdcd66be9bc1d1c6ca23b4a4ae003a5a36cf9830d9fa160efce66d9161c9d
+ F src/window.c 88a63e6948ea924b3cf9ad8aff5ea1fa53bebdb2f13340867205fda16ed0f19c
+@@ -15,9 +15,10 @@ F test/fts3corrupt4.test e77b06926348eb45b71569f9dc45e5b19c984ca1b1ef6671367f4ca
+ F test/fuzzdata8.db b87ae726c84c3f80d457642d7650724a76eb3d7b76258959d712cc4d926ddfc7
+ F test/istrue.test 06f92ea38750fa74df7dbbe6920205251c2310861fbbe23a3adfa918a2e2ba74
+ F test/select3.test c49fbb758903f3718e2de5aa4655eda4838131cbea24a86db908f8b6889aa68c
++F test/selectA.test 68de52409e45a3313d00b8461b48bef4fb729faf36ade9067a994eae55cc86f4
+ F test/whereG.test 9363b2a97d914cb1b81aff5069ef0cf2a071a67e2b604eac6fe9c0114017d9aa
+ F test/window1.test 9d7f4990e5b36d95af93b189da4aa75216c6690ce95cced3c8b6d3234be51c2c
+-P cc1fffdeddf422404170fa163ab80372ae58b444d7012b2c164021b221709b3e
+-R 0ef6a213a076036833f157fe6b031b0b
++P 90b1169d1b200d35a3f9f0ad2ae35a1b336bdd9b1ad0494ba80a382354c8d8b8
++R 7b2f74d8f4cf58d33d2119b338a7cd5f
+ U drh
+-Z 53f32837c1b7756aa8533c51e60a57b4
++Z 1c6c6f6f8bb99dca6da53b2db99f530c
+diff --git a/manifest.uuid b/manifest.uuid
+index 3d3f2d258..b9814cc0c 100644
+--- a/manifest.uuid
++++ b/manifest.uuid
+@@ -1 +1 @@
+-90b1169d1b200d35a3f9f0ad2ae35a1b336bdd9b1ad0494ba80a382354c8d8b8
+\ No newline at end of file
++10fa79d00f8091e5748c245f4cae5b5f499a5f8db20da741c130e05a21ede443
+\ No newline at end of file
+diff --git a/src/select.c b/src/select.c
+index ae41aaf81..cdc81fd1f 100644
+--- a/src/select.c
++++ b/src/select.c
+@@ -2702,9 +2702,7 @@ static int multiSelect(
+                           selectOpName(p->op)));
+         rc = sqlite3Select(pParse, p, &uniondest);
+         testcase( rc!=SQLITE_OK );
+-        /* Query flattening in sqlite3Select() might refill p->pOrderBy.
+-        ** Be sure to delete p->pOrderBy, therefore, to avoid a memory leak. */
+-        sqlite3ExprListDelete(db, p->pOrderBy);
++        assert( p->pOrderBy==0 );
+         pDelete = p->pPrior;
+         p->pPrior = pPrior;
+         p->pOrderBy = 0;
+@@ -4091,7 +4089,7 @@ static int flattenSubquery(
+     ** We look at every expression in the outer query and every place we see
+     ** "a" we substitute "x*3" and every place we see "b" we substitute "y+10".
+     */
+-    if( pSub->pOrderBy ){
++    if( pSub->pOrderBy && (pParent->selFlags & SF_NoopOrderBy)==0 ){
+       /* At this point, any non-zero iOrderByCol values indicate that the
+       ** ORDER BY column expression is identical to the iOrderByCol'th
+       ** expression returned by SELECT statement pSub. Since these values
+@@ -5791,6 +5789,7 @@ int sqlite3Select(
+     sqlite3ExprListDelete(db, p->pOrderBy);
+     p->pOrderBy = 0;
+     p->selFlags &= ~SF_Distinct;
++    p->selFlags |= SF_NoopOrderBy;
+   }
+   sqlite3SelectPrep(pParse, p, 0);
+   if( pParse->nErr || db->mallocFailed ){
+diff --git a/src/sqliteInt.h b/src/sqliteInt.h
+index 686096d4e..1afca88f6 100644
+--- a/src/sqliteInt.h
++++ b/src/sqliteInt.h
+@@ -3122,6 +3122,7 @@ struct Select {
+ #define SF_WhereBegin    0x0080000 /* Really a WhereBegin() call.  Debug Only */
+ #define SF_WinRewrite    0x0100000 /* Window function rewrite accomplished */
+ #define SF_View          0x0200000 /* SELECT statement is a view */
++#define SF_NoopOrderBy   0x0400000 /* ORDER BY is ignored for this query */
+ 
+ /*
+ ** The results of a SELECT can be distributed in several ways, as defined
+diff --git a/test/selectA.test b/test/selectA.test
+index 838e5f432..7ca0096b1 100644
+--- a/test/selectA.test
++++ b/test/selectA.test
+@@ -1446,5 +1446,26 @@ do_execsql_test 6.1 {
+   SELECT * FROM (SELECT a FROM t1 UNION SELECT b FROM t2) WHERE a=a;
+ } {12345}
+ 
++# 2020-06-15 ticket 8f157e8010b22af0
++#
++reset_db
++do_execsql_test 7.1 {
++  CREATE TABLE t1(c1);     INSERT INTO t1 VALUES(12),(123),(1234),(NULL),('abc');
++  CREATE TABLE t2(c2);     INSERT INTO t2 VALUES(44),(55),(123);
++  CREATE TABLE t3(c3,c4);  INSERT INTO t3 VALUES(66,1),(123,2),(77,3);
++  CREATE VIEW t4 AS SELECT c3 FROM t3;
++  CREATE VIEW t5 AS SELECT c3 FROM t3 ORDER BY c4;
++}
++do_execsql_test 7.2 {
++  SELECT * FROM t1, t2 WHERE c1=(SELECT 123 INTERSECT SELECT c2 FROM t4) AND c1=123;
++} {123 123}
++do_execsql_test 7.3 {
++  SELECT * FROM t1, t2 WHERE c1=(SELECT 123 INTERSECT SELECT c2 FROM t5) AND c1=123;
++} {123 123}
++do_execsql_test 7.4 {
++  CREATE TABLE a(b);
++  CREATE VIEW c(d) AS SELECT b FROM a ORDER BY b;
++  SELECT sum(d) OVER( PARTITION BY(SELECT 0 FROM c JOIN a WHERE b =(SELECT b INTERSECT SELECT d FROM c) AND b = 123)) FROM c;
++} {}
+ 
+ finish_test

@@ -1,0 +1,63 @@
+commit 5c68617d395f9d7b824f68475b24ce3e38d653a3
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Mar 13 20:12:25 2022 +0000
+
+    patch 8.2.4563: "z=" in Visual mode may go beyond the end of the line
+    
+    Problem:    "z=" in Visual mode may go beyond the end of the line.
+    Solution:   Adjust "badlen".
+
+diff --git a/src/spellsuggest.c b/src/spellsuggest.c
+index ba3aaf349..3be917f86 100644
+--- a/src/spellsuggest.c
++++ b/src/spellsuggest.c
+@@ -506,6 +506,10 @@ spell_suggest(int count)
+ 	    curwin->w_cursor.col = VIsual.col;
+ 	++badlen;
+ 	end_visual_mode();
++	// make sure we don't include the NUL at the end of the line
++	line = ml_get_curline();
++	if (badlen > STRLEN(line) - curwin->w_cursor.col)
++	    badlen = STRLEN(line) - curwin->w_cursor.col;
+     }
+     // Find the start of the badly spelled word.
+     else if (spell_move_to(curwin, FORWARD, TRUE, TRUE, NULL) == 0
+diff --git a/src/testdir/test_spell.vim b/src/testdir/test_spell.vim
+index e6f535be1..804c5dede 100644
+--- a/src/testdir/test_spell.vim
++++ b/src/testdir/test_spell.vim
+@@ -456,6 +456,21 @@ func Test_spellsuggest_timeout()
+   call assert_fails('set spellsuggest=timeout:--9', 'E474:')
+ endfunc
+ 
++func Test_spellsuggest_visual_end_of_line()
++  let enc_save = &encoding
++  set encoding=iso8859
++
++  " This was reading beyond the end of the line.
++  norm R00000000000
++  sil norm 0
++  sil! norm i00000)
++  sil! norm i00000)
++  call feedkeys("\<CR>")
++  norm z=
++
++  let &encoding = enc_save
++endfunc
++
+ func Test_spellinfo()
+   new
+   let runtime = substitute($VIMRUNTIME, '\\', '/', 'g')
+diff --git a/src/version.c b/src/version.c
+index 7ac37a41f..e5ff44165 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4563,
+ /**/
+     4562,
+ /**/

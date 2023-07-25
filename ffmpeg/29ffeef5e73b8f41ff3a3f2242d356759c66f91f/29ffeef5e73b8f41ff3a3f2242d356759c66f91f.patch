@@ -1,0 +1,42 @@
+commit 29ffeef5e73b8f41ff3a3f2242d356759c66f91f	29ffeef5e73b8f41ff3a3f2242d356759c66f91f
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Thu Oct 24 23:11:41 2013 +0200
+
+    avcodec/h264: do not trust last_pic_droppable when marking pictures as done
+    
+    This simplifies the code and fixes a deadlock
+    
+    Fixes Ticket2927
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/h264.c b/libavcodec/h264.c
+index 6d7ac58b75..66720571ab 100644
+--- a/libavcodec/h264.c
++++ b/libavcodec/h264.c
+@@ -3621,7 +3621,7 @@ static int decode_slice_header(H264Context *h, H264Context *h0)
+             assert(h0->cur_pic_ptr->reference != DELAYED_PIC_REF);
+ 
+             /* Mark old field/frame as completed */
+-            if (!last_pic_droppable && h0->cur_pic_ptr->tf.owner == h0->avctx) {
++            if (h0->cur_pic_ptr->tf.owner == h0->avctx) {
+                 ff_thread_report_progress(&h0->cur_pic_ptr->tf, INT_MAX,
+                                           last_pic_structure == PICT_BOTTOM_FIELD);
+             }
+@@ -3630,7 +3630,7 @@ static int decode_slice_header(H264Context *h, H264Context *h0)
+             if (!FIELD_PICTURE(h) || h->picture_structure == last_pic_structure) {
+                 /* Previous field is unmatched. Don't display it, but let it
+                  * remain for reference if marked as such. */
+-                if (!last_pic_droppable && last_pic_structure != PICT_FRAME) {
++                if (last_pic_structure != PICT_FRAME) {
+                     ff_thread_report_progress(&h0->cur_pic_ptr->tf, INT_MAX,
+                                               last_pic_structure == PICT_TOP_FIELD);
+                 }
+@@ -3640,7 +3640,7 @@ static int decode_slice_header(H264Context *h, H264Context *h0)
+                      * different frame_nums. Consider this field first in
+                      * pair. Throw away previous field except for reference
+                      * purposes. */
+-                    if (!last_pic_droppable && last_pic_structure != PICT_FRAME) {
++                    if (last_pic_structure != PICT_FRAME) {
+                         ff_thread_report_progress(&h0->cur_pic_ptr->tf, INT_MAX,
+                                                   last_pic_structure == PICT_TOP_FIELD);
+                     }

@@ -1,0 +1,34 @@
+commit 94df772485c92866ca417d92137747b2e3b0a917
+Author: Max Bruckner <max@maxbruckner.de>
+Date:   Sun Oct 2 18:56:53 2016 +0700
+
+    fix buffer overflow (#30)
+
+diff --git a/cJSON.c b/cJSON.c
+index cbd3a89..93a1bec 100644
+--- a/cJSON.c
++++ b/cJSON.c
+@@ -194,9 +194,20 @@ static const char *parse_string(cJSON *item,const char *str,const char **ep)
+ {
+ 	const char *ptr=str+1,*end_ptr=str+1;char *ptr2;char *out;int len=0;unsigned uc,uc2;
+ 	if (*str!='\"') {*ep=str;return 0;}	/* not a string! */
+-	
+-	while (*end_ptr!='\"' && *end_ptr && ++len) if (*end_ptr++ == '\\') end_ptr++;	/* Skip escaped quotes. */
+-	
++
++	while (*end_ptr!='\"' && *end_ptr && ++len)
++	{
++	    if (*end_ptr++ == '\\')
++	    {
++		if (*end_ptr == '\0')
++		{
++		    /* prevent buffer overflow when last input character is a backslash */
++		    return 0;
++		}
++		end_ptr++;	/* Skip escaped quotes. */
++	    }
++	}
++
+ 	out=(char*)cJSON_malloc(len+1);	/* This is how long we need for the string, roughly. */
+ 	if (!out) return 0;
+ 	item->valuestring=out; /* assign here so out will be deleted during cJSON_Delete() later */

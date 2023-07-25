@@ -1,0 +1,63 @@
+commit cef25028de5ff872c2e1f0a6c562eb3ea9ecbce4
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Sat Dec 8 18:44:11 2018 +0100
+
+    Fix uriParse*Ex* out-of-bounds read
+
+diff --git a/ChangeLog b/ChangeLog
+index 8a3f49c..1ab4552 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -4,6 +4,12 @@ NOTE: uriparser is looking for help with a few things:
+ 
+ 201x-xx-xx -- x.x.x
+ 
++  * Fixed:
++      Out-of-bounds read in uriParse*Ex* for incomplete URIs with IPv6
++      addresses with embedded IPv4 address, e.g. "//[::44.1";
++      mitigated if passed parameter <afterLast> points to readable memory
++      containing a '\0' byte.
++      Thanks to Joergen Ibsen for the report!
+   * Fixed: uriToStringCharsRequired* reported 1 more byte than actually needed
+       for IPv4 address URIs (GitHub #41); Thanks to @gyh007 for the patch!
+   * Fixed: Compilation with MinGW
+diff --git a/src/UriParse.c b/src/UriParse.c
+index f4bdda9..33ac891 100644
+--- a/src/UriParse.c
++++ b/src/UriParse.c
+@@ -692,6 +692,11 @@ static const URI_CHAR * URI_FUNC(ParseIPv6address2)(
+ 					return NULL;
+ 				}
+ 				first++;
++
++				if (first >= afterLast) {
++					URI_FUNC(StopSyntax)(state, first, memory);
++					return NULL;
++				}
+ 			}
+ 		} else {
+ 			/* Eat while no dot in sight */
+diff --git a/test/test.cpp b/test/test.cpp
+index 2ffbc82..8eabee6 100644
+--- a/test/test.cpp
++++ b/test/test.cpp
+@@ -242,6 +242,19 @@ TEST(UriSuite, TestIpSixFail) {
+ 		URI_TEST_IP_SIX_FAIL("g:0:0:0:0:0:0");
+ }
+ 
++TEST(UriSuite, TestIpSixOverread) {
++		UriUriA uri;
++		const char * errorPos;
++
++		// NOTE: This string is designed to not have a terminator
++		char uriText[2 + 3 + 2 + 1 + 1];
++		strncpy(uriText, "//[::44.1", sizeof(uriText));
++
++		EXPECT_EQ(uriParseSingleUriExA(&uri, uriText,
++				uriText + sizeof(uriText), &errorPos), URI_ERROR_SYNTAX);
++		EXPECT_EQ(errorPos, uriText + sizeof(uriText));
++}
++
+ TEST(UriSuite, TestUri) {
+ 		UriParserStateA stateA;
+ 		UriParserStateW stateW;

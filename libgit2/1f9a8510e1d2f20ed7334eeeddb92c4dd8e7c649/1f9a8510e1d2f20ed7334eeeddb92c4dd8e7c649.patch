@@ -1,0 +1,67 @@
+commit 1f9a8510e1d2f20ed7334eeeddb92c4dd8e7c649
+Author: Patrick Steinhardt <ps@pks.im>
+Date:   Thu Jul 19 13:00:42 2018 +0200
+
+    smart_pkt: fix potential OOB-read when processing ng packet
+    
+    OSS-fuzz has reported a potential out-of-bounds read when processing a
+    "ng" smart packet:
+    
+    ==1==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x6310000249c0 at pc 0x000000493a92 bp 0x7ffddc882cd0 sp 0x7ffddc882480
+            READ of size 65529 at 0x6310000249c0 thread T0
+            SCARINESS: 26 (multi-byte-read-heap-buffer-overflow)
+            #0 0x493a91 in __interceptor_strchr.part.35 /src/llvm/projects/compiler-rt/lib/sanitizer_common/sanitizer_common_interceptors.inc:673
+            #1 0x813960 in ng_pkt libgit2/src/transports/smart_pkt.c:320:14
+            #2 0x810f79 in git_pkt_parse_line libgit2/src/transports/smart_pkt.c:478:9
+            #3 0x82c3c9 in git_smart__store_refs libgit2/src/transports/smart_protocol.c:47:12
+            #4 0x6373a2 in git_smart__connect libgit2/src/transports/smart.c:251:15
+            #5 0x57688f in git_remote_connect libgit2/src/remote.c:708:15
+            #6 0x52e59b in LLVMFuzzerTestOneInput /src/download_refs_fuzzer.cc:145:9
+            #7 0x52ef3f in ExecuteFilesOnyByOne(int, char**) /src/libfuzzer/afl/afl_driver.cpp:301:5
+            #8 0x52f4ee in main /src/libfuzzer/afl/afl_driver.cpp:339:12
+            #9 0x7f6c910db82f in __libc_start_main /build/glibc-Cl5G7W/glibc-2.23/csu/libc-start.c:291
+            #10 0x41d518 in _start
+    
+    When parsing an "ng" packet, we keep track of both the current position
+    as well as the remaining length of the packet itself. But instead of
+    taking care not to exceed the length, we pass the current pointer's
+    position to `strchr`, which will search for a certain character until
+    hitting NUL. It is thus possible to create a crafted packet which
+    doesn't contain a NUL byte to trigger an out-of-bounds read.
+    
+    Fix the issue by instead using `memchr`, passing the remaining length as
+    restriction. Furthermore, verify that we actually have enough bytes left
+    to produce a match at all.
+    
+    OSS-Fuzz-Issue: 9406
+
+diff --git a/src/transports/smart_pkt.c b/src/transports/smart_pkt.c
+index a661dfe13..d10d6c68f 100644
+--- a/src/transports/smart_pkt.c
++++ b/src/transports/smart_pkt.c
+@@ -299,8 +299,11 @@ static int ng_pkt(git_pkt **out, const char *line, size_t len)
+ 	pkt->ref = NULL;
+ 	pkt->type = GIT_PKT_NG;
+ 
++	if (len < 3)
++		goto out_err;
+ 	line += 3; /* skip "ng " */
+-	if (!(ptr = strchr(line, ' ')))
++	len -= 3;
++	if (!(ptr = memchr(line, ' ', len)))
+ 		goto out_err;
+ 	len = ptr - line;
+ 
+@@ -311,8 +314,11 @@ static int ng_pkt(git_pkt **out, const char *line, size_t len)
+ 	memcpy(pkt->ref, line, len);
+ 	pkt->ref[len] = '\0';
+ 
++	if (len < 1)
++		goto out_err;
+ 	line = ptr + 1;
+-	if (!(ptr = strchr(line, '\n')))
++	len -= 1;
++	if (!(ptr = memchr(line, '\n', len)))
+ 		goto out_err;
+ 	len = ptr - line;
+ 

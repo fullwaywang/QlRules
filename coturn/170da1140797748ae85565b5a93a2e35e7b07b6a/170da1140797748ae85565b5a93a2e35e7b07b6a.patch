@@ -1,0 +1,30 @@
+commit 170da1140797748ae85565b5a93a2e35e7b07b6a
+Author: Mészáros Mihály <misi@majd.eu>
+Date:   Mon Jun 22 00:08:12 2020 +0200
+
+    init with zero any new or reused stun buffers
+
+diff --git a/src/apps/relay/ns_ioalib_engine_impl.c b/src/apps/relay/ns_ioalib_engine_impl.c
+index 1045c0c..6c8e797 100644
+--- a/src/apps/relay/ns_ioalib_engine_impl.c
++++ b/src/apps/relay/ns_ioalib_engine_impl.c
+@@ -293,10 +293,19 @@ static stun_buffer_list_elem *new_blist_elem(ioa_engine_handle e)
+ 
+ 	if(!ret) {
+ 	  ret = (stun_buffer_list_elem *)malloc(sizeof(stun_buffer_list_elem));
++	  /* init bzero below will solve all of these in one step
+ 	  ret->buf.len = 0;
+ 	  ret->buf.offset = 0;
+ 	  ret->buf.coffset = 0;
++	  */
+ 	  ret->next = NULL;
++	  if (!ret) {
++		TURN_LOG_FUNC(TURN_LOG_LEVEL_ERROR, "%s: Cannot allocate memory for STUN buffer!\n", __FUNCTION__);
++	  }
++	}
++
++	if(ret) {
++	  bzero(&ret->buf, sizeof(stun_buffer));
+ 	}
+ 
+ 	return ret;

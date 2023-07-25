@@ -1,0 +1,122 @@
+commit 0b664ba968437715819bfe4c7ada5679d16ebbc3
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Fri Nov 10 08:52:45 2017 +0100
+
+    wildcardmatch: fix heap buffer overflow in setcharset
+    
+    The code would previous read beyond the end of the pattern string if the
+    match pattern ends with an open bracket when the default pattern
+    matching function is used.
+    
+    Detected by OSS-Fuzz:
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=4161
+    
+    CVE-2017-8817
+    
+    Bug: https://curl.haxx.se/docs/adv_2017-ae72.html
+
+diff --git a/lib/curl_fnmatch.c b/lib/curl_fnmatch.c
+index da83393b4..8a1e106c4 100644
+--- a/lib/curl_fnmatch.c
++++ b/lib/curl_fnmatch.c
+@@ -133,6 +133,9 @@ static int setcharset(unsigned char **p, unsigned char *charset)
+   unsigned char c;
+   for(;;) {
+     c = **p;
++    if(!c)
++      return SETCHARSET_FAIL;
++
+     switch(state) {
+     case CURLFNM_SCHS_DEFAULT:
+       if(ISALNUM(c)) { /* ASCII value */
+@@ -196,9 +199,6 @@ static int setcharset(unsigned char **p, unsigned char *charset)
+         else
+           return SETCHARSET_FAIL;
+       }
+-      else if(c == '\0') {
+-        return SETCHARSET_FAIL;
+-      }
+       else {
+         charset[c] = 1;
+         (*p)++;
+@@ -274,9 +274,6 @@ static int setcharset(unsigned char **p, unsigned char *charset)
+       else if(c == ']') {
+         return SETCHARSET_OK;
+       }
+-      else if(c == '\0') {
+-        return SETCHARSET_FAIL;
+-      }
+       else if(ISPRINT(c)) {
+         charset[c] = 1;
+         (*p)++;
+diff --git a/tests/data/Makefile.inc b/tests/data/Makefile.inc
+index 2a2ca508a..8383d4c64 100644
+--- a/tests/data/Makefile.inc
++++ b/tests/data/Makefile.inc
+@@ -125,7 +125,7 @@ test1136 test1137 test1138 test1139 test1140 test1141 test1142 test1143 \
+ test1144 test1145 test1146 test1147 test1148 test1149 test1150 test1151 \
+ test1152 test1153 \
+ \
+-test1160 test1161 test1162 \
++test1160 test1161 test1162 test1163 \
+ test1200 test1201 test1202 test1203 test1204 test1205 test1206 test1207 \
+ test1208 test1209 test1210 test1211 test1212 test1213 test1214 test1215 \
+ test1216 test1217 test1218 test1219 \
+diff --git a/tests/data/test1163 b/tests/data/test1163
+new file mode 100644
+index 000000000..a109b511b
+--- /dev/null
++++ b/tests/data/test1163
+@@ -0,0 +1,52 @@
++<testcase>
++<info>
++<keywords>
++FTP
++RETR
++LIST
++wildcardmatch
++ftplistparser
++flaky
++</keywords>
++</info>
++
++#
++# Server-side
++<reply>
++<data>
++</data>
++</reply>
++
++# Client-side
++<client>
++<server>
++ftp
++</server>
++<tool>
++lib576
++</tool>
++<name>
++FTP wildcard with pattern ending with an open-bracket
++</name>
++<command>
++"ftp://%HOSTIP:%FTPPORT/fully_simulated/DOS/*[]["
++</command>
++</client>
++<verify>
++<protocol>
++USER anonymous
++PASS ftp@example.com
++PWD
++CWD fully_simulated
++CWD DOS
++EPSV
++TYPE A
++LIST
++QUIT
++</protocol>
++# 78 == CURLE_REMOTE_FILE_NOT_FOUND
++<errorcode>
++78
++</errorcode>
++</verify>
++</testcase>

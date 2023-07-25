@@ -1,0 +1,26 @@
+commit 7ac5067146613997bb38442cb022d7f41321a706
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Thu May 11 15:29:31 2017 +0200
+
+    avcodec/scpr: Check y in first line loop in decompress_i()
+    
+    Fixes: out of array access
+    Fixes: 1478/clusterfuzz-testcase-minimized-5285486908145664
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/scpr.c b/libavcodec/scpr.c
+index ba1f65f2e9..b87c047ab6 100644
+--- a/libavcodec/scpr.c
++++ b/libavcodec/scpr.c
+@@ -331,6 +331,9 @@ static int decompress_i(AVCodecContext *avctx, uint32_t *dst, int linesize)
+         clr = (b << 16) + (g << 8) + r;
+         k += run;
+         while (run-- > 0) {
++            if (y >= avctx->height)
++                return AVERROR_INVALIDDATA;
++
+             dst[y * linesize + x] = clr;
+             lx = x;
+             ly = y;

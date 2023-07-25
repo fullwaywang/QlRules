@@ -1,0 +1,28 @@
+commit 124eb202e70678539544f6268efc98131f19fa49
+Author: 孙浩 and 张洪亮(望初) <tony.sh and wangchu.zhl@alibaba-inc.com>
+Date:   Fri Aug 25 01:15:28 2017 +0200
+
+    avformat/rmdec: Fix DoS due to lack of eof check
+    
+    Fixes: loop.ivr
+    
+    Found-by: Xiaohei and Wangchu from Alibaba Security Team
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/rmdec.c b/libavformat/rmdec.c
+index 178eaea57d..d6d7d9cd84 100644
+--- a/libavformat/rmdec.c
++++ b/libavformat/rmdec.c
+@@ -1223,8 +1223,11 @@ static int ivr_read_header(AVFormatContext *s)
+             av_log(s, AV_LOG_DEBUG, "%s = '%s'\n", key, val);
+         } else if (type == 4) {
+             av_log(s, AV_LOG_DEBUG, "%s = '0x", key);
+-            for (j = 0; j < len; j++)
++            for (j = 0; j < len; j++) {
++                if (avio_feof(pb))
++                    return AVERROR_INVALIDDATA;
+                 av_log(s, AV_LOG_DEBUG, "%X", avio_r8(pb));
++            }
+             av_log(s, AV_LOG_DEBUG, "'\n");
+         } else if (len == 4 && type == 3 && !strncmp(key, "StreamCount", tlen)) {
+             nb_streams = value = avio_rb32(pb);

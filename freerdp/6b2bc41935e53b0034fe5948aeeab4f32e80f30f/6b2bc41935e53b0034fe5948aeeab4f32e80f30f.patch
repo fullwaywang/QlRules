@@ -1,0 +1,50 @@
+commit 6b2bc41935e53b0034fe5948aeeab4f32e80f30f
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Tue Mar 31 09:06:05 2020 +0200
+
+    Fix #6010: Check length in read_icon_info
+
+diff --git a/libfreerdp/core/window.c b/libfreerdp/core/window.c
+index b56fc1bc2..40a5ecc82 100644
+--- a/libfreerdp/core/window.c
++++ b/libfreerdp/core/window.c
+@@ -136,9 +136,6 @@ static BOOL update_read_icon_info(wStream* s, ICON_INFO* iconInfo)
+ 	Stream_Read_UINT16(s, iconInfo->cbBitsMask);  /* cbBitsMask (2 bytes) */
+ 	Stream_Read_UINT16(s, iconInfo->cbBitsColor); /* cbBitsColor (2 bytes) */
+ 
+-	if (Stream_GetRemainingLength(s) < iconInfo->cbBitsMask + iconInfo->cbBitsColor)
+-		return FALSE;
+-
+ 	/* bitsMask */
+ 	newBitMask = (BYTE*)realloc(iconInfo->bitsMask, iconInfo->cbBitsMask);
+ 
+@@ -150,6 +147,8 @@ static BOOL update_read_icon_info(wStream* s, ICON_INFO* iconInfo)
+ 	}
+ 
+ 	iconInfo->bitsMask = newBitMask;
++	if (Stream_GetRemainingLength(s) < iconInfo->cbBitsMask)
++		return FALSE;
+ 	Stream_Read(s, iconInfo->bitsMask, iconInfo->cbBitsMask);
+ 
+ 	/* colorTable */
+@@ -184,7 +183,11 @@ static BOOL update_read_icon_info(wStream* s, ICON_INFO* iconInfo)
+ 	}
+ 
+ 	if (iconInfo->colorTable)
++	{
++		if (Stream_GetRemainingLength(s) < iconInfo->cbColorTable)
++			return FALSE;
+ 		Stream_Read(s, iconInfo->colorTable, iconInfo->cbColorTable);
++	}
+ 
+ 	/* bitsColor */
+ 	newBitMask = (BYTE*)realloc(iconInfo->bitsColor, iconInfo->cbBitsColor);
+@@ -197,6 +200,8 @@ static BOOL update_read_icon_info(wStream* s, ICON_INFO* iconInfo)
+ 	}
+ 
+ 	iconInfo->bitsColor = newBitMask;
++	if (Stream_GetRemainingLength(s) < iconInfo->cbBitsColor)
++		return FALSE;
+ 	Stream_Read(s, iconInfo->bitsColor, iconInfo->cbBitsColor);
+ 	return TRUE;
+ }

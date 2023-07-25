@@ -1,0 +1,233 @@
+commit 0c3185e963d9f9dd0608214f7d732b84aa0888fe
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Nov 9 07:32:09 2020 -0800
+
+    In security-restricted operations, block enqueue of at-commit user code.
+    
+    Specifically, this blocks DECLARE ... WITH HOLD and firing of deferred
+    triggers within index expressions and materialized view queries.  An
+    attacker having permission to create non-temp objects in at least one
+    schema could execute arbitrary SQL functions under the identity of the
+    bootstrap superuser.  One can work around the vulnerability by disabling
+    autovacuum and not manually running ANALYZE, CLUSTER, REINDEX, CREATE
+    INDEX, VACUUM FULL, or REFRESH MATERIALIZED VIEW.  (Don't restore from
+    pg_dump, since it runs some of those commands.)  Plain VACUUM (without
+    FULL) is safe, and all commands are fine when a trusted user owns the
+    target object.  Performance may degrade quickly under this workaround,
+    however.  Back-patch to 9.5 (all supported versions).
+    
+    Reviewed by Robert Haas.  Reported by Etienne Stalmans.
+    
+    Security: CVE-2020-25695
+
+diff --git a/contrib/postgres_fdw/connection.c b/contrib/postgres_fdw/connection.c
+index 2f411cf2f7..1e324942ec 100644
+--- a/contrib/postgres_fdw/connection.c
++++ b/contrib/postgres_fdw/connection.c
+@@ -777,6 +777,10 @@ pgfdw_report_error(int elevel, PGresult *res, PGconn *conn,
+ 
+ /*
+  * pgfdw_xact_callback --- cleanup at main-transaction end.
++ *
++ * This runs just late enough that it must not enter user-defined code
++ * locally.  (Entering such code on the remote side is fine.  Its remote
++ * COMMIT TRANSACTION may run deferred triggers.)
+  */
+ static void
+ pgfdw_xact_callback(XactEvent event, void *arg)
+diff --git a/src/backend/access/transam/xact.c b/src/backend/access/transam/xact.c
+index af6afcebb1..03c553e7ea 100644
+--- a/src/backend/access/transam/xact.c
++++ b/src/backend/access/transam/xact.c
+@@ -2094,9 +2094,10 @@ CommitTransaction(void)
+ 
+ 	/*
+ 	 * Do pre-commit processing that involves calling user-defined code, such
+-	 * as triggers.  Since closing cursors could queue trigger actions,
+-	 * triggers could open cursors, etc, we have to keep looping until there's
+-	 * nothing left to do.
++	 * as triggers.  SECURITY_RESTRICTED_OPERATION contexts must not queue an
++	 * action that would run here, because that would bypass the sandbox.
++	 * Since closing cursors could queue trigger actions, triggers could open
++	 * cursors, etc, we have to keep looping until there's nothing left to do.
+ 	 */
+ 	for (;;)
+ 	{
+@@ -2114,9 +2115,6 @@ CommitTransaction(void)
+ 			break;
+ 	}
+ 
+-	CallXactCallbacks(is_parallel_worker ? XACT_EVENT_PARALLEL_PRE_COMMIT
+-					  : XACT_EVENT_PRE_COMMIT);
+-
+ 	/*
+ 	 * The remaining actions cannot call any user-defined code, so it's safe
+ 	 * to start shutting down within-transaction services.  But note that most
+@@ -2124,6 +2122,9 @@ CommitTransaction(void)
+ 	 * the transaction-abort path.
+ 	 */
+ 
++	CallXactCallbacks(is_parallel_worker ? XACT_EVENT_PARALLEL_PRE_COMMIT
++					  : XACT_EVENT_PRE_COMMIT);
++
+ 	/* If we might have parallel workers, clean them up now. */
+ 	if (IsInParallelMode())
+ 		AtEOXact_Parallel(true);
+diff --git a/src/backend/commands/portalcmds.c b/src/backend/commands/portalcmds.c
+index e4b7483e32..0b64204975 100644
+--- a/src/backend/commands/portalcmds.c
++++ b/src/backend/commands/portalcmds.c
+@@ -27,6 +27,7 @@
+ #include "commands/portalcmds.h"
+ #include "executor/executor.h"
+ #include "executor/tstoreReceiver.h"
++#include "miscadmin.h"
+ #include "rewrite/rewriteHandler.h"
+ #include "tcop/pquery.h"
+ #include "tcop/tcopprot.h"
+@@ -65,6 +66,10 @@ PerformCursorOpen(ParseState *pstate, DeclareCursorStmt *cstmt, ParamListInfo pa
+ 	 */
+ 	if (!(cstmt->options & CURSOR_OPT_HOLD))
+ 		RequireTransactionBlock(isTopLevel, "DECLARE CURSOR");
++	else if (InSecurityRestrictedOperation())
++		ereport(ERROR,
++				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
++				 errmsg("cannot create a cursor WITH HOLD within security-restricted operation")));
+ 
+ 	/*
+ 	 * Parse analysis was done already, but we still have to run the rule
+diff --git a/src/backend/commands/trigger.c b/src/backend/commands/trigger.c
+index 092ac1646d..e1f3472eca 100644
+--- a/src/backend/commands/trigger.c
++++ b/src/backend/commands/trigger.c
+@@ -4021,6 +4021,7 @@ afterTriggerMarkEvents(AfterTriggerEventList *events,
+ 					   bool immediate_only)
+ {
+ 	bool		found = false;
++	bool		deferred_found = false;
+ 	AfterTriggerEvent event;
+ 	AfterTriggerEventChunk *chunk;
+ 
+@@ -4056,6 +4057,7 @@ afterTriggerMarkEvents(AfterTriggerEventList *events,
+ 		 */
+ 		if (defer_it && move_list != NULL)
+ 		{
++			deferred_found = true;
+ 			/* add it to move_list */
+ 			afterTriggerAddEvent(move_list, event, evtshared);
+ 			/* mark original copy "done" so we don't do it again */
+@@ -4063,6 +4065,16 @@ afterTriggerMarkEvents(AfterTriggerEventList *events,
+ 		}
+ 	}
+ 
++	/*
++	 * We could allow deferred triggers if, before the end of the
++	 * security-restricted operation, we were to verify that a SET CONSTRAINTS
++	 * ... IMMEDIATE has fired all such triggers.  For now, don't bother.
++	 */
++	if (deferred_found && InSecurityRestrictedOperation())
++		ereport(ERROR,
++				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
++				 errmsg("cannot fire deferred trigger within security-restricted operation")));
++
+ 	return found;
+ }
+ 
+diff --git a/src/test/regress/expected/privileges.out b/src/test/regress/expected/privileges.out
+index 3ec22c20ea..0a2dd37ac0 100644
+--- a/src/test/regress/expected/privileges.out
++++ b/src/test/regress/expected/privileges.out
+@@ -1319,6 +1319,48 @@ SELECT has_table_privilege('regress_priv_user1', 'atest4', 'SELECT WITH GRANT OP
+  t
+ (1 row)
+ 
++-- security-restricted operations
++\c -
++CREATE ROLE regress_sro_user;
++SET SESSION AUTHORIZATION regress_sro_user;
++CREATE FUNCTION unwanted_grant() RETURNS void LANGUAGE sql AS
++	'GRANT regress_priv_group2 TO regress_sro_user';
++CREATE FUNCTION mv_action() RETURNS bool LANGUAGE sql AS
++	'DECLARE c CURSOR WITH HOLD FOR SELECT unwanted_grant(); SELECT true';
++-- REFRESH of this MV will queue a GRANT at end of transaction
++CREATE MATERIALIZED VIEW sro_mv AS SELECT mv_action() WITH NO DATA;
++REFRESH MATERIALIZED VIEW sro_mv;
++ERROR:  cannot create a cursor WITH HOLD within security-restricted operation
++CONTEXT:  SQL function "mv_action" statement 1
++\c -
++REFRESH MATERIALIZED VIEW sro_mv;
++ERROR:  cannot create a cursor WITH HOLD within security-restricted operation
++CONTEXT:  SQL function "mv_action" statement 1
++SET SESSION AUTHORIZATION regress_sro_user;
++-- INSERT to this table will queue a GRANT at end of transaction
++CREATE TABLE sro_trojan_table ();
++CREATE FUNCTION sro_trojan() RETURNS trigger LANGUAGE plpgsql AS
++	'BEGIN PERFORM unwanted_grant(); RETURN NULL; END';
++CREATE CONSTRAINT TRIGGER t AFTER INSERT ON sro_trojan_table
++    INITIALLY DEFERRED FOR EACH ROW EXECUTE PROCEDURE sro_trojan();
++-- Now, REFRESH will issue such an INSERT, queueing the GRANT
++CREATE OR REPLACE FUNCTION mv_action() RETURNS bool LANGUAGE sql AS
++	'INSERT INTO sro_trojan_table DEFAULT VALUES; SELECT true';
++REFRESH MATERIALIZED VIEW sro_mv;
++ERROR:  cannot fire deferred trigger within security-restricted operation
++CONTEXT:  SQL function "mv_action" statement 1
++\c -
++REFRESH MATERIALIZED VIEW sro_mv;
++ERROR:  cannot fire deferred trigger within security-restricted operation
++CONTEXT:  SQL function "mv_action" statement 1
++BEGIN; SET CONSTRAINTS ALL IMMEDIATE; REFRESH MATERIALIZED VIEW sro_mv; COMMIT;
++ERROR:  must have admin option on role "regress_priv_group2"
++CONTEXT:  SQL function "unwanted_grant" statement 1
++SQL statement "SELECT unwanted_grant()"
++PL/pgSQL function sro_trojan() line 1 at PERFORM
++SQL function "mv_action" statement 1
++DROP OWNED BY regress_sro_user;
++DROP ROLE regress_sro_user;
+ -- Admin options
+ SET SESSION AUTHORIZATION regress_priv_user4;
+ CREATE FUNCTION dogrant_ok() RETURNS void LANGUAGE sql SECURITY DEFINER AS
+diff --git a/src/test/regress/sql/privileges.sql b/src/test/regress/sql/privileges.sql
+index 3550f61587..e0c1a29c06 100644
+--- a/src/test/regress/sql/privileges.sql
++++ b/src/test/regress/sql/privileges.sql
+@@ -802,6 +802,40 @@ SELECT has_table_privilege('regress_priv_user3', 'atest4', 'SELECT'); -- false
+ SELECT has_table_privilege('regress_priv_user1', 'atest4', 'SELECT WITH GRANT OPTION'); -- true
+ 
+ 
++-- security-restricted operations
++\c -
++CREATE ROLE regress_sro_user;
++
++SET SESSION AUTHORIZATION regress_sro_user;
++CREATE FUNCTION unwanted_grant() RETURNS void LANGUAGE sql AS
++	'GRANT regress_priv_group2 TO regress_sro_user';
++CREATE FUNCTION mv_action() RETURNS bool LANGUAGE sql AS
++	'DECLARE c CURSOR WITH HOLD FOR SELECT unwanted_grant(); SELECT true';
++-- REFRESH of this MV will queue a GRANT at end of transaction
++CREATE MATERIALIZED VIEW sro_mv AS SELECT mv_action() WITH NO DATA;
++REFRESH MATERIALIZED VIEW sro_mv;
++\c -
++REFRESH MATERIALIZED VIEW sro_mv;
++
++SET SESSION AUTHORIZATION regress_sro_user;
++-- INSERT to this table will queue a GRANT at end of transaction
++CREATE TABLE sro_trojan_table ();
++CREATE FUNCTION sro_trojan() RETURNS trigger LANGUAGE plpgsql AS
++	'BEGIN PERFORM unwanted_grant(); RETURN NULL; END';
++CREATE CONSTRAINT TRIGGER t AFTER INSERT ON sro_trojan_table
++    INITIALLY DEFERRED FOR EACH ROW EXECUTE PROCEDURE sro_trojan();
++-- Now, REFRESH will issue such an INSERT, queueing the GRANT
++CREATE OR REPLACE FUNCTION mv_action() RETURNS bool LANGUAGE sql AS
++	'INSERT INTO sro_trojan_table DEFAULT VALUES; SELECT true';
++REFRESH MATERIALIZED VIEW sro_mv;
++\c -
++REFRESH MATERIALIZED VIEW sro_mv;
++BEGIN; SET CONSTRAINTS ALL IMMEDIATE; REFRESH MATERIALIZED VIEW sro_mv; COMMIT;
++
++DROP OWNED BY regress_sro_user;
++DROP ROLE regress_sro_user;
++
++
+ -- Admin options
+ 
+ SET SESSION AUTHORIZATION regress_priv_user4;

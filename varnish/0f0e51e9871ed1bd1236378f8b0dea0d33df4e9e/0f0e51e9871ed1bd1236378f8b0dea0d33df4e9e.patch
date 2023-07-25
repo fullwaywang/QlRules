@@ -1,0 +1,23 @@
+commit 0f0e51e9871ed1bd1236378f8b0dea0d33df4e9e
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Thu Aug 15 10:44:00 2019 +0200
+
+    Allow a NULL value in http_Proto
+    
+    The proto field is optional in HTTP, so it may not be set. Set the proto
+    to 0 also for a NULL value instead of segfaulting if it were NULL.
+
+diff --git a/bin/varnishd/cache/cache_http.c b/bin/varnishd/cache/cache_http.c
+index 5e3c92cd0..63d25799b 100644
+--- a/bin/varnishd/cache/cache_http.c
++++ b/bin/varnishd/cache/cache_http.c
+@@ -232,7 +232,8 @@ http_Proto(struct http *to)
+ 
+ 	fm = to->hd[HTTP_HDR_PROTO].b;
+ 
+-	if ((fm[0] == 'H' || fm[0] == 'h') &&
++	if (fm != NULL &&
++	    (fm[0] == 'H' || fm[0] == 'h') &&
+ 	    (fm[1] == 'T' || fm[1] == 't') &&
+ 	    (fm[2] == 'T' || fm[2] == 't') &&
+ 	    (fm[3] == 'P' || fm[3] == 'p') &&

@@ -1,0 +1,60 @@
+commit 2a585c85013be22f59f184d49612074fd9b115d7
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed May 25 15:15:38 2022 +0100
+
+    patch 8.2.5016: access before start of text with a put command
+    
+    Problem:    Access before start of text with a put command.
+    Solution:   Check the length is more than zero.
+
+diff --git a/src/register.c b/src/register.c
+index 5ebaa05db..d5a56ae0c 100644
+--- a/src/register.c
++++ b/src/register.c
+@@ -2219,9 +2219,12 @@ error:
+ 	    len = STRLEN(y_array[y_size - 1]);
+ 	    col = (colnr_T)len - lendiff;
+ 	    if (col > 1)
+-		curbuf->b_op_end.col = col - 1
+-				- mb_head_off(y_array[y_size - 1],
++	    {
++		curbuf->b_op_end.col = col - 1;
++		if (len > 0)
++		    curbuf->b_op_end.col -= mb_head_off(y_array[y_size - 1],
+ 						y_array[y_size - 1] + len - 1);
++	    }
+ 	    else
+ 		curbuf->b_op_end.col = 0;
+ 
+diff --git a/src/testdir/test_put.vim b/src/testdir/test_put.vim
+index 0fde02640..aa5aa2b99 100644
+--- a/src/testdir/test_put.vim
++++ b/src/testdir/test_put.vim
+@@ -210,5 +210,14 @@ func Test_multibyte_op_end_mark()
+   bwipe!
+ endfunc
+ 
++" this was putting a mark before the start of a line
++func Test_put_empty_register()
++  new
++  norm yy
++  norm [Pi00ggv)s0
++  sil! norm [P
++  bwipe!
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 4682108ff..250b73e7a 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5016,
+ /**/
+     5015,
+ /**/

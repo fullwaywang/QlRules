@@ -1,0 +1,44 @@
+commit 9b8512337d14c8ddf662fcb98b0135f225a1c489	9b8512337d14c8ddf662fcb98b0135f225a1c489
+Author: Daniel Veillard <veillard@redhat.com>
+Date:   Mon Feb 23 11:29:20 2015 +0800
+
+    Cleanup conditional section error handling
+    
+    For https://bugzilla.gnome.org/show_bug.cgi?id=744980
+    
+    The error handling of Conditional Section also need to be
+    straightened as the structure of the document can't be
+    guessed on a failure there and it's better to stop parsing
+    as further errors are likely to be irrelevant.
+
+diff --git a/parser.c b/parser.c
+index bbe97eb5..fe603aca 100644
+--- a/parser.c
++++ b/parser.c
+@@ -6770,6 +6770,8 @@ xmlParseConditionalSections(xmlParserCtxtPtr ctxt) {
+ 	SKIP_BLANKS;
+ 	if (RAW != '[') {
+ 	    xmlFatalErr(ctxt, XML_ERR_CONDSEC_INVALID, NULL);
++	    xmlStopParser(ctxt);
++	    return;
+ 	} else {
+ 	    if (ctxt->input->id != id) {
+ 		xmlValidityError(ctxt, XML_ERR_ENTITY_BOUNDARY,
+@@ -6830,6 +6832,8 @@ xmlParseConditionalSections(xmlParserCtxtPtr ctxt) {
+ 	SKIP_BLANKS;
+ 	if (RAW != '[') {
+ 	    xmlFatalErr(ctxt, XML_ERR_CONDSEC_INVALID, NULL);
++	    xmlStopParser(ctxt);
++	    return;
+ 	} else {
+ 	    if (ctxt->input->id != id) {
+ 		xmlValidityError(ctxt, XML_ERR_ENTITY_BOUNDARY,
+@@ -6885,6 +6889,8 @@ xmlParseConditionalSections(xmlParserCtxtPtr ctxt) {
+ 
+     } else {
+ 	xmlFatalErr(ctxt, XML_ERR_CONDSEC_INVALID_KEYWORD, NULL);
++	xmlStopParser(ctxt);
++	return;
+     }
+ 
+     if (RAW == 0)

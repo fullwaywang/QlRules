@@ -1,0 +1,24 @@
+commit 0137c24d60934f131b25506a88c9464e4dc827de
+Author: John Thacker <johnthacker@gmail.com>
+Date:   Tue May 25 08:18:22 2021 -0400
+
+    DVB-S2-BB: Prevent infinite loop
+    
+    Commit 4bf4ee88f0544727e7f89f3f288c6afd2f650a4c removed an else
+    statement that broke out of the BBFrame processing loop. Without
+    it, infinite loops might be possible if the GSE frames have bit errors
+    in the length field.
+
+diff --git a/epan/dissectors/packet-dvb-s2-bb.c b/epan/dissectors/packet-dvb-s2-bb.c
+index 2e8b0655a3..87435181f0 100644
+--- a/epan/dissectors/packet-dvb-s2-bb.c
++++ b/epan/dissectors/packet-dvb-s2-bb.c
+@@ -1257,6 +1257,8 @@ static int dissect_dvb_s2_bb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree
+                         bb_data_len -= sub_dissected;
+                         if (bb_data_len < DVB_S2_GSE_MINSIZE)
+                             bb_data_len = 0;
++                    } else {
++                        bb_data_len = 0;
+                     }
+                 }
+             }

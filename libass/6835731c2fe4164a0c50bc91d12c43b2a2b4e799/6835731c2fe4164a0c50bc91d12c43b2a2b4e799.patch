@@ -1,0 +1,51 @@
+commit 6835731c2fe4164a0c50bc91d12c43b2a2b4e799
+Author: Oleg Oshmyan <chortos@inbox.lv>
+Date:   Thu Jan 4 02:42:09 2018 +0200
+
+    parse_tags: don't recurse for nested \t()
+    
+    This fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=4892
+    (stack overflow on deeply nested \t()).
+    
+    This is possible because parentheses do not nest and the first ')'
+    terminates the whole tag. Thus something like \t(\t(\t(\t(\t() can be
+    read in a simple loop with no recursion required. Recursion is also
+    not required if the ')' is missing entirely and the outermost \t(...
+    never ends.
+    
+    See https://github.com/libass/libass/pull/296 for more backstory.
+
+diff --git a/Changelog b/Changelog
+index 22b9b9f..ba8f6f5 100644
+--- a/Changelog
++++ b/Changelog
+@@ -1,3 +1,6 @@
++libass (unreleased)
++ * Fix stack overflow on deeply nested \t tags
++
+ libass (0.14.0)
+  * Brand new, faster and better outline stroker (replaces FreeType stroker)
+  * Remove option to use the FreeType rasterizer
+diff --git a/libass/ass_parse.c b/libass/ass_parse.c
+index b20ef66..652ffa9 100644
+--- a/libass/ass_parse.c
++++ b/libass/ass_parse.c
+@@ -650,7 +650,17 @@ char *parse_tags(ASS_Renderer *render_priv, char *p, char *end, double pwr)
+                 k = pow(((double) (t - t1)) / delta_t, accel);
+             }
+             p = args[cnt].start;
+-            p = parse_tags(render_priv, p, args[cnt].end, k);    // maybe k*pwr ? no, specs forbid nested \t's
++            if (args[cnt].end < end) {
++                p = parse_tags(render_priv, p, args[cnt].end, k);
++            } else {
++                assert(q == end);
++                // No other tags can possibly follow this \t tag,
++                // so we don't need to restore pwr after parsing \t.
++                // The recursive call is now essentially a tail call,
++                // so optimize it away.
++                pwr = k;
++                q = p;
++            }
+         } else if (complex_tag("clip")) {
+             if (nargs == 4) {
+                 int x0, y0, x1, y1;

@@ -1,0 +1,24 @@
+commit 8c2ea3030af7b40a3c4275696fb5c76cdb80950a
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Feb 7 15:49:09 2017 +0100
+
+    avcodec/pictordec: Fix logic error
+    
+    Fixes: 559/clusterfuzz-testcase-6424225917173760
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/pictordec.c b/libavcodec/pictordec.c
+index ff6eb7f4fc..0cfc785832 100644
+--- a/libavcodec/pictordec.c
++++ b/libavcodec/pictordec.c
+@@ -142,7 +142,7 @@ static int decode_frame(AVCodecContext *avctx,
+ 
+     if (av_image_check_size(s->width, s->height, 0, avctx) < 0)
+         return -1;
+-    if (s->width != avctx->width && s->height != avctx->height) {
++    if (s->width != avctx->width || s->height != avctx->height) {
+         ret = ff_set_dimensions(avctx, s->width, s->height);
+         if (ret < 0)
+             return ret;

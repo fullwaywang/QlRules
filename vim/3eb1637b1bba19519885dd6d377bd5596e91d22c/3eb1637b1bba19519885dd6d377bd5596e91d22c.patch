@@ -1,0 +1,45 @@
+commit 3eb1637b1bba19519885dd6d377bd5596e91d22c
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Feb 26 18:11:36 2017 +0100
+
+    patch 8.0.0377: possible overflow when reading corrupted undo file
+    
+    Problem:    Possible overflow when reading corrupted undo file.
+    Solution:   Check if allocated size is not too big. (King)
+
+diff --git a/src/undo.c b/src/undo.c
+index b69f31872..ba7c0b83c 100644
+--- a/src/undo.c
++++ b/src/undo.c
+@@ -1787,7 +1787,7 @@ u_read_undo(char_u *name, char_u *hash, char_u *orig_name)
+     linenr_T	line_lnum;
+     colnr_T	line_colnr;
+     linenr_T	line_count;
+-    int		num_head = 0;
++    long	num_head = 0;
+     long	old_header_seq, new_header_seq, cur_header_seq;
+     long	seq_last, seq_cur;
+     long	last_save_nr = 0;
+@@ -1974,7 +1974,8 @@ u_read_undo(char_u *name, char_u *hash, char_u *orig_name)
+      * When there are no headers uhp_table is NULL. */
+     if (num_head > 0)
+     {
+-	uhp_table = (u_header_T **)U_ALLOC_LINE(
++	if (num_head < LONG_MAX / (long)sizeof(u_header_T *))
++	    uhp_table = (u_header_T **)U_ALLOC_LINE(
+ 					     num_head * sizeof(u_header_T *));
+ 	if (uhp_table == NULL)
+ 	    goto error;
+diff --git a/src/version.c b/src/version.c
+index 8d1454197..c79020b21 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -764,6 +764,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    377,
+ /**/
+     376,
+ /**/

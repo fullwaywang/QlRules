@@ -1,0 +1,232 @@
+commit 467395bfdf33f1ccf67ca388ffdcc927271544cb
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon May 10 10:44:38 2021 -0400
+
+    Prevent integer overflows in array subscripting calculations.
+    
+    While we were (mostly) careful about ensuring that the dimensions of
+    arrays aren't large enough to cause integer overflow, the lower bound
+    values were generally not checked.  This allows situations where
+    lower_bound + dimension overflows an integer.  It seems that that's
+    harmless so far as array reading is concerned, except that array
+    elements with subscripts notionally exceeding INT_MAX are inaccessible.
+    However, it confuses various array-assignment logic, resulting in a
+    potential for memory stomps.
+    
+    Fix by adding checks that array lower bounds aren't large enough to
+    cause lower_bound + dimension to overflow.  (Note: this results in
+    disallowing cases where the last subscript position would be exactly
+    INT_MAX.  In principle we could probably allow that, but there's a lot
+    of code that computes lower_bound + dimension and would need adjustment.
+    It seems doubtful that it's worth the trouble/risk to allow it.)
+    
+    Somewhat independently of that, array_set_element() was careless
+    about possible overflow when checking the subscript of a fixed-length
+    array, creating a different route to memory stomps.  Fix that too.
+    
+    Security: CVE-2021-32027
+
+diff --git a/src/backend/executor/execExprInterp.c b/src/backend/executor/execExprInterp.c
+index 56d28a51c6..f97ba96c12 100644
+--- a/src/backend/executor/execExprInterp.c
++++ b/src/backend/executor/execExprInterp.c
+@@ -2811,6 +2811,10 @@ ExecEvalArrayExpr(ExprState *state, ExprEvalStep *op)
+ 			lbs[i] = elem_lbs[i - 1];
+ 		}
+ 
++		/* check for subscript overflow */
++		(void) ArrayGetNItems(ndims, dims);
++		ArrayCheckBounds(ndims, dims, lbs);
++
+ 		if (havenulls)
+ 		{
+ 			dataoffset = ARR_OVERHEAD_WITHNULLS(ndims, nitems);
+diff --git a/src/backend/utils/adt/array_userfuncs.c b/src/backend/utils/adt/array_userfuncs.c
+index 9e18bc9cda..624483dc5d 100644
+--- a/src/backend/utils/adt/array_userfuncs.c
++++ b/src/backend/utils/adt/array_userfuncs.c
+@@ -411,6 +411,7 @@ array_cat(PG_FUNCTION_ARGS)
+ 
+ 	/* Do this mainly for overflow checking */
+ 	nitems = ArrayGetNItems(ndims, dims);
++	ArrayCheckBounds(ndims, dims, lbs);
+ 
+ 	/* build the result array */
+ 	ndatabytes = ndatabytes1 + ndatabytes2;
+diff --git a/src/backend/utils/adt/arrayfuncs.c b/src/backend/utils/adt/arrayfuncs.c
+index 43354cc31e..9b95207d1e 100644
+--- a/src/backend/utils/adt/arrayfuncs.c
++++ b/src/backend/utils/adt/arrayfuncs.c
+@@ -372,6 +372,8 @@ array_in(PG_FUNCTION_ARGS)
+ 
+ 	/* This checks for overflow of the array dimensions */
+ 	nitems = ArrayGetNItems(ndim, dim);
++	ArrayCheckBounds(ndim, dim, lBound);
++
+ 	/* Empty array? */
+ 	if (nitems == 0)
+ 		PG_RETURN_ARRAYTYPE_P(construct_empty_array(element_type));
+@@ -1321,24 +1323,11 @@ array_recv(PG_FUNCTION_ARGS)
+ 	{
+ 		dim[i] = pq_getmsgint(buf, 4);
+ 		lBound[i] = pq_getmsgint(buf, 4);
+-
+-		/*
+-		 * Check overflow of upper bound. (ArrayGetNItems() below checks that
+-		 * dim[i] >= 0)
+-		 */
+-		if (dim[i] != 0)
+-		{
+-			int			ub = lBound[i] + dim[i] - 1;
+-
+-			if (lBound[i] > ub)
+-				ereport(ERROR,
+-						(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+-						 errmsg("integer out of range")));
+-		}
+ 	}
+ 
+ 	/* This checks for overflow of array dimensions */
+ 	nitems = ArrayGetNItems(ndim, dim);
++	ArrayCheckBounds(ndim, dim, lBound);
+ 
+ 	/*
+ 	 * We arrange to look up info about element type, including its receive
+@@ -2243,7 +2232,7 @@ array_set_element(Datum arraydatum,
+ 					(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+ 					 errmsg("wrong number of array subscripts")));
+ 
+-		if (indx[0] < 0 || indx[0] * elmlen >= arraytyplen)
++		if (indx[0] < 0 || indx[0] >= arraytyplen / elmlen)
+ 			ereport(ERROR,
+ 					(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+ 					 errmsg("array subscript out of range")));
+@@ -2358,10 +2347,13 @@ array_set_element(Datum arraydatum,
+ 		}
+ 	}
+ 
++	/* This checks for overflow of the array dimensions */
++	newnitems = ArrayGetNItems(ndim, dim);
++	ArrayCheckBounds(ndim, dim, lb);
++
+ 	/*
+ 	 * Compute sizes of items and areas to copy
+ 	 */
+-	newnitems = ArrayGetNItems(ndim, dim);
+ 	if (newhasnulls)
+ 		overheadlen = ARR_OVERHEAD_WITHNULLS(ndim, newnitems);
+ 	else
+@@ -2616,6 +2608,13 @@ array_set_element_expanded(Datum arraydatum,
+ 		}
+ 	}
+ 
++	/* Check for overflow of the array dimensions */
++	if (dimschanged)
++	{
++		(void) ArrayGetNItems(ndim, dim);
++		ArrayCheckBounds(ndim, dim, lb);
++	}
++
+ 	/* Now we can calculate linear offset of target item in array */
+ 	offset = ArrayGetOffset(nSubscripts, dim, lb, indx);
+ 
+@@ -2934,6 +2933,7 @@ array_set_slice(Datum arraydatum,
+ 
+ 	/* Do this mainly to check for overflow */
+ 	nitems = ArrayGetNItems(ndim, dim);
++	ArrayCheckBounds(ndim, dim, lb);
+ 
+ 	/*
+ 	 * Make sure source array has enough entries.  Note we ignore the shape of
+@@ -3348,7 +3348,9 @@ construct_md_array(Datum *elems,
+ 				 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
+ 						ndims, MAXDIM)));
+ 
++	/* This checks for overflow of the array dimensions */
+ 	nelems = ArrayGetNItems(ndims, dims);
++	ArrayCheckBounds(ndims, dims, lbs);
+ 
+ 	/* if ndims <= 0 or any dims[i] == 0, return empty array */
+ 	if (nelems <= 0)
+@@ -5423,6 +5425,10 @@ makeArrayResultArr(ArrayBuildStateArr *astate,
+ 		int			dataoffset,
+ 					nbytes;
+ 
++		/* Check for overflow of the array dimensions */
++		(void) ArrayGetNItems(astate->ndims, astate->dims);
++		ArrayCheckBounds(astate->ndims, astate->dims, astate->lbs);
++
+ 		/* Compute required space */
+ 		nbytes = astate->nbytes;
+ 		if (astate->nullbitmap != NULL)
+@@ -5852,7 +5858,9 @@ array_fill_internal(ArrayType *dims, ArrayType *lbs,
+ 		lbsv = deflbs;
+ 	}
+ 
++	/* This checks for overflow of the array dimensions */
+ 	nitems = ArrayGetNItems(ndims, dimv);
++	ArrayCheckBounds(ndims, dimv, lbsv);
+ 
+ 	/* fast track for empty array */
+ 	if (nitems <= 0)
+diff --git a/src/backend/utils/adt/arrayutils.c b/src/backend/utils/adt/arrayutils.c
+index bc4360aaec..41c5f4a34d 100644
+--- a/src/backend/utils/adt/arrayutils.c
++++ b/src/backend/utils/adt/arrayutils.c
+@@ -16,6 +16,7 @@
+ #include "postgres.h"
+ 
+ #include "catalog/pg_type.h"
++#include "common/int.h"
+ #include "utils/array.h"
+ #include "utils/builtins.h"
+ #include "utils/memutils.h"
+@@ -111,6 +112,36 @@ ArrayGetNItems(int ndim, const int *dims)
+ 	return (int) ret;
+ }
+ 
++/*
++ * Verify sanity of proposed lower-bound values for an array
++ *
++ * The lower-bound values must not be so large as to cause overflow when
++ * calculating subscripts, e.g. lower bound 2147483640 with length 10
++ * must be disallowed.  We actually insist that dims[i] + lb[i] be
++ * computable without overflow, meaning that an array with last subscript
++ * equal to INT_MAX will be disallowed.
++ *
++ * It is assumed that the caller already called ArrayGetNItems, so that
++ * overflowed (negative) dims[] values have been eliminated.
++ */
++void
++ArrayCheckBounds(int ndim, const int *dims, const int *lb)
++{
++	int			i;
++
++	for (i = 0; i < ndim; i++)
++	{
++		/* PG_USED_FOR_ASSERTS_ONLY prevents variable-isn't-read warnings */
++		int32		sum PG_USED_FOR_ASSERTS_ONLY;
++
++		if (pg_add_s32_overflow(dims[i], lb[i], &sum))
++			ereport(ERROR,
++					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
++					 errmsg("array lower bound is too large: %d",
++							lb[i])));
++	}
++}
++
+ /*
+  * Compute ranges (sub-array dimensions) for an array slice
+  *
+diff --git a/src/include/utils/array.h b/src/include/utils/array.h
+index 2809dfee93..0dcc8851cc 100644
+--- a/src/include/utils/array.h
++++ b/src/include/utils/array.h
+@@ -438,6 +438,7 @@ extern void array_free_iterator(ArrayIterator iterator);
+ extern int	ArrayGetOffset(int n, const int *dim, const int *lb, const int *indx);
+ extern int	ArrayGetOffset0(int n, const int *tup, const int *scale);
+ extern int	ArrayGetNItems(int ndim, const int *dims);
++extern void ArrayCheckBounds(int ndim, const int *dims, const int *lb);
+ extern void mda_get_range(int n, int *span, const int *st, const int *endp);
+ extern void mda_get_prod(int n, const int *range, int *prod);
+ extern void mda_get_offset_values(int n, int *dist, const int *prod, const int *span);

@@ -1,0 +1,21 @@
+commit 389ecc365a7c61404ba078a72c3fa5a3cf1b4101
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Jul 21 07:28:50 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1221
+
+diff --git a/coders/mat.c b/coders/mat.c
+index 5858ff534..d3a2db86b 100644
+--- a/coders/mat.c
++++ b/coders/mat.c
+@@ -631,9 +631,9 @@ static Image *ReadMATImageV4(const ImageInfo *image_info,Image *image,
+   unsigned int
+     depth;
+ 
+-
+   quantum_info=(QuantumInfo *) NULL;
+   (void) SeekBlob(image,0,SEEK_SET);
++  status=MagickTrue;
+   while (EOFBlob(image) == MagickFalse)
+   {
+     /*

@@ -1,0 +1,97 @@
+commit 870219c58c0804bdc55419b2e455c06ac715a835
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Jan 26 14:14:43 2023 +0000
+
+    patch 9.0.1247: divide by zero with 'smoothscroll' set and a narrow window
+    
+    Problem:    Divide by zero with 'smoothscroll' set and a narrow window.
+    Solution:   Bail out when the window is too narrow.
+
+diff --git a/src/move.c b/src/move.c
+index d3648df8b..3c50d258c 100644
+--- a/src/move.c
++++ b/src/move.c
+@@ -1933,6 +1933,9 @@ adjust_skipcol(void)
+ 	return;
+ 
+     int	    width1 = curwin->w_width - curwin_col_off();
++    if (width1 <= 0)
++	return;  // no text will be displayed
++
+     int	    width2 = width1 + curwin_col_off2();
+     long    so = get_scrolloff_value();
+     int	    scrolloff_cols = so == 0 ? 0 : width1 + (so - 1) * width2;
+diff --git a/src/testdir/dumps/Test_smoothscroll_zero_1.dump b/src/testdir/dumps/Test_smoothscroll_zero_1.dump
+new file mode 100644
+index 000000000..5a99f571e
+--- /dev/null
++++ b/src/testdir/dumps/Test_smoothscroll_zero_1.dump
+@@ -0,0 +1,6 @@
++> +0&#ffffff0@59
++@60
++@60
++@60
++@60
++@60
+diff --git a/src/testdir/dumps/Test_smoothscroll_zero_2.dump b/src/testdir/dumps/Test_smoothscroll_zero_2.dump
+new file mode 100644
+index 000000000..1879381c5
+--- /dev/null
++++ b/src/testdir/dumps/Test_smoothscroll_zero_2.dump
+@@ -0,0 +1,6 @@
++|:+0&#ffffff0|s|i|l| |n|o|r|m| |^|W|^|N| @45
++> @59
++@60
++@60
++@60
++@60
+diff --git a/src/testdir/test_scroll_opt.vim b/src/testdir/test_scroll_opt.vim
+index 2fa91682d..58344f9a9 100644
+--- a/src/testdir/test_scroll_opt.vim
++++ b/src/testdir/test_scroll_opt.vim
+@@ -560,5 +560,32 @@ func Test_smoothscroll_mouse_pos()
+   let &ttymouse = save_ttymouse
+ endfunc
+ 
++" this was dividing by zero
++func Test_smoothscrol_zero_width()
++  CheckScreendump
++
++  let lines =<< trim END
++      winsize 0 0
++      vsplit
++      vsplit
++      vsplit
++      vsplit
++      vsplit
++      sil norm H
++      set wrap
++      set smoothscroll
++      set number
++  END
++  call writefile(lines, 'XSmoothScrollZero', 'D')
++  let buf = RunVimInTerminal('-u NONE -i NONE -n -m -X -Z -e -s -S XSmoothScrollZero', #{rows: 6, cols: 60, wait_for_ruler: 0})
++  call TermWait(buf, 3000)
++  call VerifyScreenDump(buf, 'Test_smoothscroll_zero_1', {})
++
++  call term_sendkeys(buf, ":sil norm \<C-V>\<C-W>\<C-V>\<C-N>\<CR>")
++  call VerifyScreenDump(buf, 'Test_smoothscroll_zero_2', {})
++
++  call StopVimInTerminal(buf)
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 12f444a8c..79f021b96 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1247,
+ /**/
+     1246,
+ /**/

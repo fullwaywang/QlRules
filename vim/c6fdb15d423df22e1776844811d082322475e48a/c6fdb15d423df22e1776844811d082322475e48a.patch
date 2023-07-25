@@ -1,0 +1,60 @@
+commit c6fdb15d423df22e1776844811d082322475e48a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jul 2 13:43:21 2022 +0100
+
+    patch 9.0.0025: accessing beyond allocated memory with the cmdline window
+    
+    Problem:    Accessing beyond allocated memory when using the cmdline window in
+                Ex mode.
+    Solution:   Use "*" instead of "'<,'>" for Visual mode.
+
+diff --git a/src/ex_docmd.c b/src/ex_docmd.c
+index 271e7e246..697337cad 100644
+--- a/src/ex_docmd.c
++++ b/src/ex_docmd.c
+@@ -3118,9 +3118,11 @@ parse_command_modifiers(
+ 		size_t len = STRLEN(cmd_start);
+ 
+ 		// Special case: empty command uses "+":
+-		//  "'<,'>mods" -> "mods'<,'>+
++		//  "'<,'>mods" -> "mods *+
++		//  Use "*" instead of "'<,'>" to avoid the command getting
++		//  longer, in case is was allocated.
+ 		mch_memmove(orig_cmd, cmd_start, len);
+-		STRCPY(orig_cmd + len, "'<,'>+");
++		STRCPY(orig_cmd + len, " *+");
+ 	    }
+ 	    else
+ 	    {
+diff --git a/src/testdir/test_cmdline.vim b/src/testdir/test_cmdline.vim
+index 368533698..f0498a146 100644
+--- a/src/testdir/test_cmdline.vim
++++ b/src/testdir/test_cmdline.vim
+@@ -2103,6 +2103,14 @@ func Test_cmdwin_insert_mode_close()
+   call assert_equal(1, winnr('$'))
+ endfunc
+ 
++func Test_cmdwin_ex_mode_with_modifier()
++  " this was accessing memory after allocated text in Ex mode
++  new
++  call setline(1, ['some', 'text', 'lines'])
++  silent! call feedkeys("gQnormal vq:atopleft\<C-V>\<CR>\<CR>", 'xt')
++  bwipe!
++endfunc
++
+ " test that ";" works to find a match at the start of the first line
+ func Test_zero_line_search()
+   new
+diff --git a/src/version.c b/src/version.c
+index e8d506c90..8c9325d94 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    25,
+ /**/
+     24,
+ /**/

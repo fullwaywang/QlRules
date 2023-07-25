@@ -1,0 +1,73 @@
+commit d1d8f6bacb489036d0fd479c9dd3c0102c988889
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Aug 14 21:28:32 2022 +0100
+
+    patch 9.0.0211: invalid memory access when compiling :lockvar
+    
+    Problem:    Invalid memory access when compiling :lockvar.
+    Solution:   Don't read past the end of the line.
+
+diff --git a/src/testdir/test_vim9_cmd.vim b/src/testdir/test_vim9_cmd.vim
+index fc1354e83..79f19f038 100644
+--- a/src/testdir/test_vim9_cmd.vim
++++ b/src/testdir/test_vim9_cmd.vim
+@@ -1737,6 +1737,15 @@ def Test_lockvar()
+       UnLockIt()
+   END
+   v9.CheckScriptFailure(lines, 'E46', 1)
++
++  lines =<< trim END
++      def _()
++        s:0([], s:0)
++        lockv
++      enddef
++      defcomp
++  END
++  v9.CheckScriptFailure(lines, 'E179', 2)
+ enddef
+ 
+ def Test_substitute_expr()
+diff --git a/src/version.c b/src/version.c
+index c58386b56..3f0bf5151 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    211,
+ /**/
+     210,
+ /**/
+diff --git a/src/vim9cmds.c b/src/vim9cmds.c
+index ad32c32ff..35a382138 100644
+--- a/src/vim9cmds.c
++++ b/src/vim9cmds.c
+@@ -188,10 +188,17 @@ compile_lock_unlock(
+     size_t	len;
+     char_u	*buf;
+     isntype_T	isn = ISN_EXEC;
++    char	*cmd = eap->cmdidx == CMD_lockvar ? "lockvar" : "unlockvar";
+ 
+     if (cctx->ctx_skip == SKIP_YES)
+ 	return OK;
+ 
++    if (*p == NUL)
++    {
++	semsg(_(e_argument_required_for_str), cmd);
++	return FAIL;
++    }
++
+     // Cannot use :lockvar and :unlockvar on local variables.
+     if (p[1] != ':')
+     {
+@@ -223,8 +230,6 @@ compile_lock_unlock(
+ 	ret = FAIL;
+     else
+     {
+-	char *cmd = eap->cmdidx == CMD_lockvar ? "lockvar" : "unlockvar";
+-
+ 	if (deep < 0)
+ 	    vim_snprintf((char *)buf, len, "%s! %s", cmd, p);
+ 	else

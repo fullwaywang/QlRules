@@ -1,0 +1,25 @@
+commit fbb14283450d3001403e7d9725566dd4fb2c3bb5
+Author: Dirk Lemstra <dirk@git.imagemagick.org>
+Date:   Tue May 2 08:34:04 2017 +0200
+
+    Fixed memory leak reported in #457.
+
+diff --git a/coders/icon.c b/coders/icon.c
+index ae6a1ed1a..5e854d0cb 100644
+--- a/coders/icon.c
++++ b/coders/icon.c
+@@ -455,8 +455,12 @@ static Image *ReadICONImage(const ImageInfo *image_info,
+             ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+           count=ReadBlob(image,(size_t) (4*image->colors),icon_colormap);
+           if (count != (ssize_t) (4*image->colors))
+-            ThrowReaderException(CorruptImageError,
+-              "InsufficientImageDataInFile");
++            {
++              icon_colormap=(unsigned char *) RelinquishMagickMemory(
++                icon_colormap);
++              ThrowReaderException(CorruptImageError,
++                "InsufficientImageDataInFile");
++            }
+           p=icon_colormap;
+           for (i=0; i < (ssize_t) image->colors; i++)
+           {

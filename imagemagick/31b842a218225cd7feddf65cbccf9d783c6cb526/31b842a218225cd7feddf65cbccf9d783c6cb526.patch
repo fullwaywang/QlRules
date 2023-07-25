@@ -1,0 +1,19 @@
+commit 31b842a218225cd7feddf65cbccf9d783c6cb526
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat May 6 13:20:18 2017 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/471
+
+diff --git a/coders/xwd.c b/coders/xwd.c
+index 702370337..59e770d35 100644
+--- a/coders/xwd.c
++++ b/coders/xwd.c
+@@ -322,6 +322,8 @@ static Image *ReadXWDImage(const ImageInfo *image_info,ExceptionInfo *exception)
+         color;
+ 
+       length=(size_t) header.ncolors;
++      if (length > ((~0UL)/sizeof(*colors)))
++        ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+       colors=(XColor *) AcquireQuantumMemory(length,sizeof(*colors));
+       if (colors == (XColor *) NULL)
+         {

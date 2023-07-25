@@ -1,0 +1,24 @@
+commit 83c7803f55b3231faeb93c1a634399a70fae9480	83c7803f55b3231faeb93c1a634399a70fae9480
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Apr 14 18:28:31 2012 +0200
+
+    lagarith: check count before writing zeros.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/lagarith.c b/libavcodec/lagarith.c
+index 22d427e159..7f47b75826 100644
+--- a/libavcodec/lagarith.c
++++ b/libavcodec/lagarith.c
+@@ -326,6 +326,10 @@ static int lag_decode_zero_run_line(LagarithContext *l, uint8_t *dst,
+ output_zeros:
+     if (l->zeros_rem) {
+         count = FFMIN(l->zeros_rem, width - i);
++        if(end - dst < count) {
++            av_log(l->avctx, AV_LOG_ERROR, "too many zeros remaining\n");
++            return AVERROR_INVALIDDATA;
++        }
+         memset(dst, 0, count);
+         l->zeros_rem -= count;
+         dst += count;

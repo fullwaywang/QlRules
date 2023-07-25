@@ -1,0 +1,48 @@
+commit e1c0cfaa419aa5d320540d5a1b3f8fd9b82ab7e5	e1c0cfaa419aa5d320540d5a1b3f8fd9b82ab7e5
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Oct 3 16:08:32 2014 +0200
+
+    avcodec/tiff: more completely check bpp/bppcount
+    
+    Fixes pixel format selection
+    Fixes out of array accesses
+    Fixes: asan_heap-oob_1766029_6_asan_heap-oob_20aa045_332_cov_1823216757_m2-d1d366d7965db766c19a66c7a2ccbb6b.tif
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/tiff.c b/libavcodec/tiff.c
+index 6e2096fd69..0870e31817 100644
+--- a/libavcodec/tiff.c
++++ b/libavcodec/tiff.c
+@@ -814,13 +814,13 @@ static int tiff_decode_tag(TiffContext *s, AVFrame *frame)
+         s->height = value;
+         break;
+     case TIFF_BPP:
+-        s->bppcount = count;
+-        if (count > 4) {
++        if (count > 4U) {
+             av_log(s->avctx, AV_LOG_ERROR,
+                    "This format is not supported (bpp=%d, %d components)\n",
+-                   s->bpp, count);
++                   value, count);
+             return AVERROR_INVALIDDATA;
+         }
++        s->bppcount = count;
+         if (count == 1)
+             s->bpp = value;
+         else {
+@@ -838,6 +838,13 @@ static int tiff_decode_tag(TiffContext *s, AVFrame *frame)
+                 s->bpp = -1;
+             }
+         }
++        if (s->bpp > 64U) {
++            av_log(s->avctx, AV_LOG_ERROR,
++                   "This format is not supported (bpp=%d, %d components)\n",
++                   s->bpp, count);
++            s->bpp = 0;
++            return AVERROR_INVALIDDATA;
++        }
+         break;
+     case TIFF_SAMPLES_PER_PIXEL:
+         if (count != 1) {

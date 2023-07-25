@@ -1,0 +1,35 @@
+commit 3e319db1107b08fc3be804b6d449143ec9aa0dec
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Tue Nov 27 12:23:31 2018 -0800
+
+    pvfs2: Add a pointer check.
+    
+    Make sure a pointer isn't NULL before trying to dereference it.
+    
+    Bug: 15280
+    Change-Id: If2686940a0347154d9a59f5e2141511e7e1f49a4
+    Reviewed-on: https://code.wireshark.org/review/30807
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+    Petri-Dish: Gerald Combs <gerald@wireshark.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit a8c93de0b0130ed5f4aab59338372783054898ea)
+    Reviewed-on: https://code.wireshark.org/review/30812
+
+diff --git a/epan/dissectors/packet-pvfs2.c b/epan/dissectors/packet-pvfs2.c
+index ce327e0949..7891d95f4c 100644
+--- a/epan/dissectors/packet-pvfs2.c
++++ b/epan/dissectors/packet-pvfs2.c
+@@ -2326,6 +2326,12 @@ dissect_pvfs2_getconfig_response(tvbuff_t *tvb, proto_tree *parent_tree,
+ 	/* Get pointer to server config data */
+ 	ptr = tvb_get_ptr(tvb, offset, total_config_bytes);
+ 
++	if (!ptr)
++	{
++		/* Not enough data. Bail out. */
++		return offset;
++	}
++
+ 	/* Check if all data is available */
+ 	length_remaining = tvb_captured_length_remaining(tvb, offset);
+ 

@@ -1,0 +1,25 @@
+commit b03b86f47b0d5a553137f081fadc482b4af1372d
+Author: Glenn Strauss <gstrauss@gluelogic.com>
+Date:   Thu Jan 28 23:30:39 2021 -0500
+
+    [core] fix merging large headers across mult reads (fixes #3059)
+    
+    (thx mitd)
+    
+    x-ref:
+      "Connections stuck in Close_Wait causing 100% cpu usage"
+      https://redmine.lighttpd.net/issues/3059
+
+diff --git a/src/connections.c b/src/connections.c
+index 7759771e..83baaac7 100644
+--- a/src/connections.c
++++ b/src/connections.c
+@@ -626,7 +626,7 @@ static chunk * connection_read_header_more(connection *con, chunkqueue *cq, chun
+ 
+     if (cq->first != cq->last && 0 != olen) {
+         const size_t clen = chunkqueue_length(cq);
+-        size_t block = (olen + (16384-1)) & (16384-1);
++        size_t block = (olen + (16384-1)) & ~(16384-1);
+         block += (block - olen > 1024 ? 0 : 16384);
+         chunkqueue_compact_mem(cq, block > clen ? clen : block);
+     }

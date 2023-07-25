@@ -1,0 +1,70 @@
+commit e0f9fbdfa61012101de7f4a8653ca5538c404a71
+Author: Nikita Popov <nikic@php.net>
+Date:   Wed Aug 10 14:46:38 2016 +0200
+
+    Bug #72663 - part 3
+    
+    When using the php_serialize session serialization handler, do
+    not use the result of the unserialization if it failed.
+
+diff --git a/ext/session/session.c b/ext/session/session.c
+index 48cd0f1bdf..85c7276913 100644
+--- a/ext/session/session.c
++++ b/ext/session/session.c
+@@ -905,12 +905,19 @@ PS_SERIALIZER_DECODE_FUNC(php_serialize) /* {{{ */
+ 	const char *endptr = val + vallen;
+ 	zval session_vars;
+ 	php_unserialize_data_t var_hash;
++	int result;
+ 	zend_string *var_name = zend_string_init("_SESSION", sizeof("_SESSION") - 1, 0);
+ 
+ 	ZVAL_NULL(&session_vars);
+ 	PHP_VAR_UNSERIALIZE_INIT(var_hash);
+-	php_var_unserialize(&session_vars, (const unsigned char **)&val, (const unsigned char *)endptr, &var_hash);
++	result = php_var_unserialize(
++		&session_vars, (const unsigned char **)&val, (const unsigned char *)endptr, &var_hash);
+ 	PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
++	if (!result) {
++		zval_ptr_dtor(&session_vars);
++		ZVAL_NULL(&session_vars);
++	}
++
+ 	if (!Z_ISUNDEF(PS(http_session_vars))) {
+ 		zval_ptr_dtor(&PS(http_session_vars));
+ 	}
+diff --git a/ext/standard/tests/serialize/bug72663_3.phpt b/ext/standard/tests/serialize/bug72663_3.phpt
+new file mode 100644
+index 0000000000..37d67706f2
+--- /dev/null
++++ b/ext/standard/tests/serialize/bug72663_3.phpt
+@@ -0,0 +1,17 @@
++--TEST--
++Bug #72663 (3): If unserialization fails, don't initialize the session with the result
++--SKIPIF--
++<?php if (!extension_loaded('session')) die('skip Session extension required'); ?>
++--INI--
++session.serialize_handler=php_serialize
++--FILE--
++<?php
++session_start();
++$sess = 'O:9:"Exception":2:{s:7:"'."\0".'*'."\0".'file";R:1;}';
++session_decode($sess);
++var_dump($_SESSION);
++?>
++--EXPECTF--
++Notice: session_decode(): Unexpected end of serialized data in %s on line %d
++array(0) {
++}
+diff --git a/ext/wddx/wddx.c b/ext/wddx/wddx.c
+index 08f9c4f37e..b8b905d550 100644
+--- a/ext/wddx/wddx.c
++++ b/ext/wddx/wddx.c
+@@ -1088,7 +1088,7 @@ int php_wddx_deserialize_ex(const char *value, size_t vallen, zval *return_value
+ 
+ 	if (stack.top == 1) {
+ 		wddx_stack_top(&stack, (void**)&ent);
+-		if (IS_UNDEF(ent->data)) {
++		if (Z_ISUNDEF(ent->data)) {
+ 			retval = FAILURE;
+ 		} else {
+ 			ZVAL_COPY(return_value, &ent->data);

@@ -1,0 +1,35 @@
+commit 83c9f495ffe70c7dd280b41fdfd4881485a3bc28
+Author: Hanno Becker <hanno.becker@arm.com>
+Date:   Mon Jun 26 13:52:14 2017 +0100
+
+    Prevent bounds check bypass through overflow in PSK identity parsing
+    
+    The check `if( *p + n > end )` in `ssl_parse_client_psk_identity` is
+    unsafe because `*p + n` might overflow, thus bypassing the check. As
+    `n` is a user-specified value up to 65K, this is relevant if the
+    library happens to be located in the last 65K of virtual memory.
+    
+    This commit replaces the check by a safe version.
+
+diff --git a/library/ssl_srv.c b/library/ssl_srv.c
+index f137c3dce..97d7a9e80 100644
+--- a/library/ssl_srv.c
++++ b/library/ssl_srv.c
+@@ -3436,7 +3436,7 @@ static int ssl_parse_client_psk_identity( mbedtls_ssl_context *ssl, unsigned cha
+     /*
+      * Receive client pre-shared key identity name
+      */
+-    if( *p + 2 > end )
++    if( end - *p < 2 )
+     {
+         MBEDTLS_SSL_DEBUG_MSG( 1, ( "bad client key exchange message" ) );
+         return( MBEDTLS_ERR_SSL_BAD_HS_CLIENT_KEY_EXCHANGE );
+@@ -3445,7 +3445,7 @@ static int ssl_parse_client_psk_identity( mbedtls_ssl_context *ssl, unsigned cha
+     n = ( (*p)[0] << 8 ) | (*p)[1];
+     *p += 2;
+ 
+-    if( n < 1 || n > 65535 || *p + n > end )
++    if( n < 1 || n > 65535 || n > (size_t) ( end - *p ) )
+     {
+         MBEDTLS_SSL_DEBUG_MSG( 1, ( "bad client key exchange message" ) );
+         return( MBEDTLS_ERR_SSL_BAD_HS_CLIENT_KEY_EXCHANGE );

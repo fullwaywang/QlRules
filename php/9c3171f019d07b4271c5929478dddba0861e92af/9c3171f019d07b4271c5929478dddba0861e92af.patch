@@ -1,0 +1,45 @@
+commit 9c3171f019d07b4271c5929478dddba0861e92af
+Author: Christoph M. Becker <cmbecker69@gmx.de>
+Date:   Tue Jul 14 17:04:24 2020 +0200
+
+    Fix #79797: Use of freed hash key in the phar_parse_zipfile function
+    
+    We must not use heap memory after we freed it.
+
+diff --git a/ext/phar/tests/bug79797.phar b/ext/phar/tests/bug79797.phar
+new file mode 100644
+index 0000000000..21d43d9eeb
+Binary files /dev/null and b/ext/phar/tests/bug79797.phar differ
+diff --git a/ext/phar/tests/bug79797.phpt b/ext/phar/tests/bug79797.phpt
+new file mode 100644
+index 0000000000..761e5379e0
+--- /dev/null
++++ b/ext/phar/tests/bug79797.phpt
+@@ -0,0 +1,14 @@
++--TEST--
++Bug #79797 (Use of freed hash key in the phar_parse_zipfile function)
++--SKIPIF--
++<?php
++if (!extension_loaded('phar')) die('skip phar extension not available');
++?>
++--INI--
++phar.cache_list={PWD}/bug79797.phar
++--FILE--
++<?php
++echo "done\n";
++?>
++--EXPECT--
++done
+diff --git a/ext/phar/zip.c b/ext/phar/zip.c
+index e086354b11..b241c0589b 100644
+--- a/ext/phar/zip.c
++++ b/ext/phar/zip.c
+@@ -712,7 +712,7 @@ foundit:
+ 			efree(actual_alias);
+ 		}
+ 
+-		zend_hash_str_add_ptr(&(PHAR_G(phar_alias_map)), actual_alias, mydata->alias_len, mydata);
++		zend_hash_str_add_ptr(&(PHAR_G(phar_alias_map)), mydata->alias, mydata->alias_len, mydata);
+ 	} else {
+ 		phar_archive_data *fd_ptr;
+ 

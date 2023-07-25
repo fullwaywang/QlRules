@@ -1,0 +1,93 @@
+commit 1540d334a04d874c2aa9d26b82dbbcd4bc5a78de
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Sep 7 15:20:26 2022 +0100
+
+    patch 9.0.0404: crash when passing invalid arguments to assert_fails()
+    
+    Problem:    Crash when passing invalid arguments to assert_fails().
+    Solution:   Check for NULL string.
+
+diff --git a/src/testdir/test_assert.vim b/src/testdir/test_assert.vim
+index 01e7718bb..5d4abaa8a 100644
+--- a/src/testdir/test_assert.vim
++++ b/src/testdir/test_assert.vim
+@@ -275,6 +275,21 @@ func Test_assert_fail_fails()
+   endtry
+   call assert_match("E1222: String or List required for argument 2", exp)
+ 
++  try
++    call assert_equal(0, assert_fails('xxx', [#{one: 1}]))
++  catch
++    let exp = v:exception
++  endtry
++  call assert_match("E731: Using a Dictionary as a String", exp)
++
++  let exp = ''
++  try
++    call assert_equal(0, assert_fails('xxx', ['E492', #{one: 1}]))
++  catch
++    let exp = v:exception
++  endtry
++  call assert_match("E731: Using a Dictionary as a String", exp)
++
+   try
+     call assert_equal(1, assert_fails('xxx', 'E492', '', 'burp'))
+   catch
+@@ -289,8 +304,8 @@ func Test_assert_fail_fails()
+   endtry
+   call assert_match("E1174: String required for argument 5", exp)
+ 
+-  call assert_equal(1, assert_fails('c0', ['', '\1']))
+-  call assert_match("Expected '\\\\\\\\1' but got 'E939: Positive count required: c0': c0", v:errors[0])
++  call assert_equal(1, assert_fails('c0', ['', '\(.\)\1']))
++  call assert_match("Expected '\\\\\\\\(.\\\\\\\\)\\\\\\\\1' but got 'E939: Positive count required: c0': c0", v:errors[0])
+   call remove(v:errors, 0)
+ endfunc
+ 
+diff --git a/src/testing.c b/src/testing.c
+index 8c682cf6b..fb5c9ab4c 100644
+--- a/src/testing.c
++++ b/src/testing.c
+@@ -616,6 +616,11 @@ f_assert_fails(typval_T *argvars, typval_T *rettv)
+     in_assert_fails = TRUE;
+ 
+     do_cmdline_cmd(cmd);
++
++    // reset here for any errors reported below
++    trylevel = save_trylevel;
++    suppress_errthrow = FALSE;
++
+     if (called_emsg == called_emsg_before)
+     {
+ 	prepare_assert_error(&ga);
+@@ -654,6 +659,8 @@ f_assert_fails(typval_T *argvars, typval_T *rettv)
+ 	    CHECK_LIST_MATERIALIZE(list);
+ 	    tv = &list->lv_first->li_tv;
+ 	    expected = tv_get_string_buf_chk(tv, buf);
++	    if (expected == NULL)
++		goto theend;
+ 	    if (!pattern_match(expected, actual, FALSE))
+ 	    {
+ 		error_found = TRUE;
+@@ -667,6 +674,8 @@ f_assert_fails(typval_T *argvars, typval_T *rettv)
+ 		{
+ 		    tv = &list->lv_u.mat.lv_last->li_tv;
+ 		    expected = tv_get_string_buf_chk(tv, buf);
++		    if (expected == NULL)
++			goto theend;
+ 		    if (!pattern_match(expected, actual, FALSE))
+ 		    {
+ 			error_found = TRUE;
+diff --git a/src/version.c b/src/version.c
+index db1a1dec5..36ce07ef9 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -703,6 +703,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    404,
+ /**/
+     403,
+ /**/

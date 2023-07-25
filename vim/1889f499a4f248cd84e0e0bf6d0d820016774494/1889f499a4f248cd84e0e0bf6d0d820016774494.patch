@@ -1,0 +1,78 @@
+commit 1889f499a4f248cd84e0e0bf6d0d820016774494
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Aug 16 19:34:44 2022 +0100
+
+    patch 9.0.0221: accessing freed memory if compiling nested function fails
+    
+    Problem:    Accessing freed memory if compiling nested function fails.
+    Solution:   Mess up the variable name so that it won't be found.
+
+diff --git a/src/testdir/test_vim9_func.vim b/src/testdir/test_vim9_func.vim
+index 5c7545784..fd7182d50 100644
+--- a/src/testdir/test_vim9_func.vim
++++ b/src/testdir/test_vim9_func.vim
+@@ -911,6 +911,18 @@ def Test_nested_function()
+   v9.CheckScriptFailure(lines, 'E1173: Text found after enddef: burp', 3)
+ enddef
+ 
++def Test_nested_function_fails()
++  var lines =<< trim END
++      def T()
++        def Func(g: string):string
++        enddef
++        Func()
++      enddef
++      silent! defcompile
++  END
++  v9.CheckScriptFailure(lines, 'E1069:')
++enddef
++
+ def Test_not_nested_function()
+   echo printf('%d',
+       function('len')('xxx'))
+diff --git a/src/version.c b/src/version.c
+index a6293e0cf..03d641fd7 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    221,
+ /**/
+     220,
+ /**/
+diff --git a/src/vim9compile.c b/src/vim9compile.c
+index 98fc84c58..d1e2c87fd 100644
+--- a/src/vim9compile.c
++++ b/src/vim9compile.c
+@@ -830,6 +830,7 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx, garray_T *lines_to_free)
+     int		r = FAIL;
+     compiletype_T   compile_type;
+     isn_T	*funcref_isn = NULL;
++    lvar_T	*lvar = NULL;
+ 
+     if (eap->forceit)
+     {
+@@ -936,9 +937,8 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx, garray_T *lines_to_free)
+     else
+     {
+ 	// Define a local variable for the function reference.
+-	lvar_T	*lvar = reserve_local(cctx, func_name, name_end - name_start,
++	lvar = reserve_local(cctx, func_name, name_end - name_start,
+ 						    TRUE, ufunc->uf_func_type);
+-
+ 	if (lvar == NULL)
+ 	    goto theend;
+ 	if (generate_FUNCREF(cctx, ufunc, &funcref_isn) == FAIL)
+@@ -957,6 +957,9 @@ compile_nested_function(exarg_T *eap, cctx_T *cctx, garray_T *lines_to_free)
+ 	    && compile_def_function(ufunc, TRUE, compile_type, cctx) == FAIL)
+     {
+ 	func_ptr_unref(ufunc);
++	if (lvar != NULL)
++	    // Now the local variable can't be used.
++	    *lvar->lv_name = '/';  // impossible value
+ 	goto theend;
+     }
+ 

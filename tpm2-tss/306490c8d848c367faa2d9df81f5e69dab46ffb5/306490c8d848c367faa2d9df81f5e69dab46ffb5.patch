@@ -1,0 +1,133 @@
+commit 306490c8d848c367faa2d9df81f5e69dab46ffb5
+Author: William Roberts <william.c.roberts@intel.com>
+Date:   Thu Jan 19 11:53:06 2023 -0600
+
+    tss2_rc: ensure layer number is in bounds
+    
+    The layer handler array was defined as 255, the max number of uint8,
+    which is the size of the layer field, however valid values are 0-255
+    allowing for 256 possibilities and thus the array was off by one and
+    needed to be sized to 256 entries. Update the size and add tests.
+    
+    Note: previous implementations incorrectly dropped bits on unknown error
+    output, ie TSS2_RC of 0xFFFFFF should yeild a string of 255:0xFFFFFF,
+    but earlier implementations returned 255:0xFFFF, dropping the middle
+    bits, this patch fixes that.
+    
+    Fixes: CVE-2023-22745
+    
+    Signed-off-by: William Roberts <william.c.roberts@intel.com>
+
+diff --git a/src/tss2-rc/tss2_rc.c b/src/tss2-rc/tss2_rc.c
+index e213d338..0f58e808 100644
+--- a/src/tss2-rc/tss2_rc.c
++++ b/src/tss2-rc/tss2_rc.c
+@@ -1,5 +1,8 @@
+ /* SPDX-License-Identifier: BSD-2-Clause */
+-
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++#include <assert.h>
+ #include <stdarg.h>
+ #include <stdbool.h>
+ #include <stdio.h>
+@@ -846,7 +849,7 @@ tss_err_handler (TSS2_RC rc)
+ static struct {
+     char name[TSS2_ERR_LAYER_NAME_MAX];
+     TSS2_RC_HANDLER handler;
+-} layer_handler[TPM2_ERROR_TSS2_RC_LAYER_COUNT] = {
++} layer_handler[TPM2_ERROR_TSS2_RC_LAYER_COUNT + 1] = {
+     ADD_HANDLER("tpm" , tpm2_ehandler),
+     ADD_NULL_HANDLER,                       /* layer 1  is unused */
+     ADD_NULL_HANDLER,                       /* layer 2  is unused */
+@@ -881,7 +884,7 @@ unknown_layer_handler(TSS2_RC rc)
+     static __thread char buf[32];
+ 
+     clearbuf(buf);
+-    catbuf(buf, "0x%X", tpm2_error_get(rc));
++    catbuf(buf, "0x%X", rc);
+ 
+     return buf;
+ }
+@@ -978,19 +981,27 @@ Tss2_RC_Decode(TSS2_RC rc)
+         catbuf(buf, "%u:", layer);
+     }
+ 
+-    handler = !handler ? unknown_layer_handler : handler;
+-
+     /*
+      * Handlers only need the error bits. This way they don't
+      * need to concern themselves with masking off the layer
+      * bits or anything else.
+      */
+-    UINT16 err_bits = tpm2_error_get(rc);
+-    const char *e = err_bits ? handler(err_bits) : "success";
+-    if (e) {
+-        catbuf(buf, "%s", e);
++    if (handler) {
++        UINT16 err_bits = tpm2_error_get(rc);
++        const char *e = err_bits ? handler(err_bits) : "success";
++        if (e) {
++            catbuf(buf, "%s", e);
++        } else {
++            catbuf(buf, "0x%X", err_bits);
++        }
+     } else {
+-        catbuf(buf, "0x%X", err_bits);
++        /*
++         * we don't want to drop any bits if we don't know what to do with it
++         * so drop the layer byte since we we already have that.
++         */
++        const char *e = unknown_layer_handler(rc >> 8);
++        assert(e);
++        catbuf(buf, "%s", e);
+     }
+ 
+     return buf;
+diff --git a/test/unit/test_tss2_rc.c b/test/unit/test_tss2_rc.c
+index 9d61572f..1bfedbfe 100644
+--- a/test/unit/test_tss2_rc.c
++++ b/test/unit/test_tss2_rc.c
+@@ -197,7 +197,7 @@ test_custom_handler(void **state)
+      * Test an unknown layer
+      */
+     e = Tss2_RC_Decode(rc);
+-    assert_string_equal(e, "1:0x2A");
++    assert_string_equal(e, "1:0x100");
+ }
+ 
+ static void
+@@ -407,6 +407,23 @@ test_info_str_null(void **state)
+     assert_null(m);
+ }
+ 
++static void
++test_all_FFs(void **state)
++{
++    (void) state;
++
++    const char *e = Tss2_RC_Decode(0xFFFFFFFF);
++    assert_string_equal(e, "255:0xFFFFFF");
++}
++
++static void
++test_all_FFs_set_handler(void **state)
++{
++    (void) state;
++    Tss2_RC_SetHandler(0xFF, "garbage", custom_err_handler);
++    Tss2_RC_SetHandler(0xFF, NULL, NULL);
++}
++
+ /* link required symbol, but tpm2_tool.c declares it AND main, which
+  * we have a main below for cmocka tests.
+  */
+@@ -449,6 +466,8 @@ main(int argc, char* argv[])
+             cmocka_unit_test(test_info_str_fmt0_warn),
+             cmocka_unit_test(test_info_str_fmt0_ff),
+             cmocka_unit_test(test_info_str_null),
++            cmocka_unit_test(test_all_FFs),
++            cmocka_unit_test(test_all_FFs_set_handler)
+     };
+ 
+     return cmocka_run_group_tests(tests, NULL, NULL);

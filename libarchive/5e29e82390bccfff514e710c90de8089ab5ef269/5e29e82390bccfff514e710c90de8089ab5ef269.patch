@@ -1,0 +1,28 @@
+commit 5e29e82390bccfff514e710c90de8089ab5ef269
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Sun Jun 19 15:58:33 2016 -0700
+
+    Issue 719:  Refuse to allocate a too-small PPMD7 context
+    
+    Other parts of the PPMD7 code assume that the dictionary is
+    at least UNIT_SIZE (12 bytes).  Enforce that assumption here
+    to avoid potential buffer under- and over-runs.
+    
+    This was pointed out in a review of the original fix for Issue 719.
+
+diff --git a/libarchive/archive_ppmd7.c b/libarchive/archive_ppmd7.c
+index fe0b0318..1aed922d 100644
+--- a/libarchive/archive_ppmd7.c
++++ b/libarchive/archive_ppmd7.c
+@@ -126,6 +126,11 @@ static Bool Ppmd7_Alloc(CPpmd7 *p, UInt32 size, ISzAlloc *alloc)
+ {
+   if (p->Base == 0 || p->Size != size)
+   {
++    /* RestartModel() below assumes that p->Size >= UNIT_SIZE
++       (see the calculation of m->MinContext). */
++    if (size < UNIT_SIZE) {
++      return False;
++    }
+     Ppmd7_Free(p, alloc);
+     p->AlignOffset =
+       #ifdef PPMD_32BIT

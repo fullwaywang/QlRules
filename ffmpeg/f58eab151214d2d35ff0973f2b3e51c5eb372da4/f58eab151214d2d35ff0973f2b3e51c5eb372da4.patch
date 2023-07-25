@@ -1,0 +1,30 @@
+commit f58eab151214d2d35ff0973f2b3e51c5eb372da4	f58eab151214d2d35ff0973f2b3e51c5eb372da4
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Jan 31 19:16:02 2014 +0100
+
+    avcodec/takdec: always check bits_per_raw_sample
+    
+    Fixes out of array access
+    Fixes: asan_heap-oob_19c7a94_6470_cov_1453611734_luckynight-partial.tak
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/takdec.c b/libavcodec/takdec.c
+index fcbe10ad3c..86ca3ac013 100644
+--- a/libavcodec/takdec.c
++++ b/libavcodec/takdec.c
+@@ -721,11 +721,9 @@ static int tak_decode_frame(AVCodecContext *avctx, void *data,
+         return AVERROR_INVALIDDATA;
+     }
+ 
+-    if (s->ti.bps != avctx->bits_per_raw_sample) {
+-        avctx->bits_per_raw_sample = s->ti.bps;
+-        if ((ret = set_bps_params(avctx)) < 0)
+-            return ret;
+-    }
++    avctx->bits_per_raw_sample = s->ti.bps;
++    if ((ret = set_bps_params(avctx)) < 0)
++        return ret;
+     if (s->ti.sample_rate != avctx->sample_rate) {
+         avctx->sample_rate = s->ti.sample_rate;
+         set_sample_rate_params(avctx);

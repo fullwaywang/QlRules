@@ -1,0 +1,23 @@
+commit ae1cf0be90396fb6c0be95829bf0d3eecbd2fd1c
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Thu Feb 11 11:22:54 2021 +0100
+
+    iasecc: Prevent stack buffer overflow when empty ACL is returned
+    
+    Thanks oss-fuzz
+    
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=30800
+
+diff --git a/src/libopensc/card-iasecc.c b/src/libopensc/card-iasecc.c
+index 166bc307..0eec6336 100644
+--- a/src/libopensc/card-iasecc.c
++++ b/src/libopensc/card-iasecc.c
+@@ -1171,7 +1171,7 @@ iasecc_process_fci(struct sc_card *card, struct sc_file *file,
+ 	else
+ 		acls = sc_asn1_find_tag(ctx, buf, buflen, IASECC_DOCP_TAG_ACLS_CONTACT, &taglen);
+ 
+-	if (!acls)   {
++	if (!acls || taglen < 7)   {
+ 		sc_log(ctx,
+ 		       "ACLs not found in data(%"SC_FORMAT_LEN_SIZE_T"u) %s",
+ 		       buflen, sc_dump_hex(buf, buflen));

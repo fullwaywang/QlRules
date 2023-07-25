@@ -1,0 +1,19 @@
+commit 30ccf9a0da1f47161b5935a95be854fe84e6c2a2
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Aug 27 08:38:57 2022 -0400
+
+    squash heap-buffer-overflow, PoC TIFF from Hardik
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 132008efb..a166bea17 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -1892,7 +1892,7 @@ static Image *ReadTIFFImage(const ImageInfo *image_info,
+         /*
+           Convert stripped TIFF image.
+         */
+-        extent=4*(samples_per_pixel+1)*TIFFStripSize(tiff);
++        extent=4*((image->depth+7)/8)*(samples_per_pixel+1)*TIFFStripSize(tiff);
+         strip_pixels=(unsigned char *) AcquireQuantumMemory(extent,
+           sizeof(*strip_pixels));
+         if (strip_pixels == (unsigned char *) NULL)

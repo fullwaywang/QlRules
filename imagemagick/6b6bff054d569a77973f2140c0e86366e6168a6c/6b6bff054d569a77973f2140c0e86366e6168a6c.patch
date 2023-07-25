@@ -1,0 +1,87 @@
+commit 6b6bff054d569a77973f2140c0e86366e6168a6c
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Thu Jul 5 14:29:46 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1199
+
+diff --git a/coders/cals.c b/coders/cals.c
+index 842cff4ac..bce23e821 100644
+--- a/coders/cals.c
++++ b/coders/cals.c
+@@ -257,7 +257,8 @@ static Image *ReadCALSImage(const ImageInfo *image_info,
+   if ((unique_file == -1) || (file == (FILE *) NULL))
+     ThrowImageException(FileOpenError,"UnableToCreateTemporaryFile");
+   while ((c=ReadBlobByte(image)) != EOF)
+-    (void) fputc(c,file);
++    if (fputc(c,file) != c)
++      break;
+   (void) fclose(file);
+   (void) CloseBlob(image);
+   image=DestroyImage(image);
+diff --git a/coders/dcm.c b/coders/dcm.c
+index 334fd2ec8..49fe55a19 100644
+--- a/coders/dcm.c
++++ b/coders/dcm.c
+@@ -3228,13 +3228,13 @@ static Image *ReadDCMImage(const ImageInfo *image_info,ExceptionInfo *exception)
+               (strncmp(implicit_vr,"SS",2) == 0) ||
+               (strncmp(implicit_vr,"US",2) == 0))
+             quantum=2;
+-          else 
++          else
+             if ((strncmp(implicit_vr,"FL",2) == 0) ||
+                 (strncmp(implicit_vr,"OF",2) == 0) ||
+                 (strncmp(implicit_vr,"SL",2) == 0) ||
+                 (strncmp(implicit_vr,"UL",2) == 0))
+               quantum=4;
+-            else 
++            else
+               if (strncmp(implicit_vr,"FD",2) == 0)
+                 quantum=8;
+               else
+@@ -3880,7 +3880,8 @@ static Image *ReadDCMImage(const ImageInfo *image_info,ExceptionInfo *exception)
+                   "UnexpectedEndOfFile",image->filename);
+                 break;
+               }
+-            (void) fputc(c,file);
++            if (fputc(c,file) != c)
++              break;
+           }
+           (void) fclose(file);
+           if (c == EOF)
+@@ -3934,7 +3935,7 @@ static Image *ReadDCMImage(const ImageInfo *image_info,ExceptionInfo *exception)
+         length=(size_t) (GetQuantumRange(info.depth)+1);
+         if (length > (size_t) GetBlobSize(image))
+           ThrowDCMException(CorruptImageError,"InsufficientImageDataInFile");
+-        if (info.scale != (Quantum *) NULL) 
++        if (info.scale != (Quantum *) NULL)
+           info.scale=(Quantum *) RelinquishMagickMemory(info.scale);
+         info.scale=(Quantum *) AcquireQuantumMemory(MagickMax(length,256),
+           sizeof(*info.scale));
+diff --git a/coders/pict.c b/coders/pict.c
+index 8aafadec2..35dadfeee 100644
+--- a/coders/pict.c
++++ b/coders/pict.c
+@@ -1472,7 +1472,8 @@ static Image *ReadPICTImage(const ImageInfo *image_info,
+               c=ReadBlobByte(image);
+               if (c == EOF)
+                 break;
+-              (void) fputc(c,file);
++              if (fputc(c,file) != c)
++                break;
+             }
+           }
+         (void) fclose(file);
+diff --git a/coders/pwp.c b/coders/pwp.c
+index e5ae5c880..cad425002 100644
+--- a/coders/pwp.c
++++ b/coders/pwp.c
+@@ -233,7 +233,8 @@ static Image *ReadPWPImage(const ImageInfo *image_info,ExceptionInfo *exception)
+       c=ReadBlobByte(pwp_image);
+       if (c == EOF)
+         break;
+-      (void) fputc(c,file);
++      if (fputc(c,file) != c)
++        break;
+     }
+     (void) fclose(file);
+     if (c == EOF)

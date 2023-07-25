@@ -1,0 +1,22 @@
+commit d1c95d2ce39560e251fdb14f4af91b04fd7b845c	d1c95d2ce39560e251fdb14f4af91b04fd7b845c
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Apr 13 22:52:16 2012 +0200
+
+    dfa: fix out of array write in decode_wdlt()
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/dfa.c b/libavcodec/dfa.c
+index d8516b2f50..13637d6a05 100644
+--- a/libavcodec/dfa.c
++++ b/libavcodec/dfa.c
+@@ -242,6 +242,8 @@ static int decode_wdlt(GetByteContext *gb, uint8_t *frame, int width, int height
+             frame    += delta;
+             segments = bytestream2_get_le16(gb);
+         }
++        if (frame_end <= frame)
++            return -1;
+         if (segments & 0x8000) {
+             frame[width - 1] = segments & 0xFF;
+             segments = bytestream2_get_le16(gb);

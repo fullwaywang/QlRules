@@ -1,0 +1,50 @@
+commit 806d037671e133bd28a7864248763f643967973a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Jan 25 20:45:16 2022 +0000
+
+    patch 8.2.4218: illegal memory access with bracketed paste in Ex mode
+    
+    Problem:    Illegal memory access with bracketed paste in Ex mode.
+    Solution:   Reserve space for the trailing NUL.
+
+diff --git a/src/edit.c b/src/edit.c
+index ee3caf0da..2b5301100 100644
+--- a/src/edit.c
++++ b/src/edit.c
+@@ -4452,7 +4452,8 @@ bracketed_paste(paste_mode_T mode, int drop, garray_T *gap)
+ 		    break;
+ 
+ 		case PASTE_EX:
+-		    if (gap != NULL && ga_grow(gap, idx) == OK)
++		    // add one for the NUL that is going to be appended
++		    if (gap != NULL && ga_grow(gap, idx + 1) == OK)
+ 		    {
+ 			mch_memmove((char *)gap->ga_data + gap->ga_len,
+ 							     buf, (size_t)idx);
+diff --git a/src/testdir/test_paste.vim b/src/testdir/test_paste.vim
+index c94fe7c35..5b8d8a0e3 100644
+--- a/src/testdir/test_paste.vim
++++ b/src/testdir/test_paste.vim
+@@ -90,6 +90,9 @@ func Test_paste_ex_mode()
+   unlet! foo
+   call feedkeys("Qlet foo=\"\<Esc>[200~foo\<CR>bar\<Esc>[201~\"\<CR>vi\<CR>", 'xt')
+   call assert_equal("foo\rbar", foo)
++
++  " pasting more than 40 bytes
++  exe "norm Q\<PasteStart>0000000000000000000000000000000000000000000000000000000000000000000000\<C-C>"
+ endfunc
+ 
+ func Test_paste_onechar()
+diff --git a/src/version.c b/src/version.c
+index 6685b554f..9dcf34928 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4218,
+ /**/
+     4217,
+ /**/

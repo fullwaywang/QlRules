@@ -1,0 +1,22 @@
+commit 08e754612019ed84d1db0d1fc4f5798248decd75
+Author: Grigori Goronzy <greg@chown.ath.cx>
+Date:   Tue Oct 4 02:47:36 2016 +0200
+
+    Fix blur coefficient calculation buffer overflow
+    
+    Found by fuzzer test case id:000082,sig:11,src:002579,op:havoc,rep:8.
+    Correctness should be checked, but this fixes the overflow for good.
+
+diff --git a/libass/ass_blur.c b/libass/ass_blur.c
+index 636ab1a..109c24d 100644
+--- a/libass/ass_blur.c
++++ b/libass/ass_blur.c
+@@ -744,7 +744,7 @@ static void calc_coeff(double mu[4], const int index[4], int prefilter, double r
+         (  17 -  126 * mul +  273 * mul2 -  164 * mul3) / 12096,
+     };
+ 
+-    double mat_freq[13];
++    double mat_freq[14];
+     memcpy(mat_freq, kernel, sizeof(kernel));
+     memset(mat_freq + 4, 0, sizeof(mat_freq) - sizeof(kernel));
+     int n = 6;

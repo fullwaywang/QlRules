@@ -1,0 +1,76 @@
+commit 91c2db7f2559be504211b283bc3a2c631d6f06d9
+Author: Marti Maria <info@littlecms.com>
+Date:   Tue Jun 25 16:09:16 2013 +0200
+
+    Non happy-path fixes
+
+diff --git a/ChangeLog b/ChangeLog
+index efdef95..6ef1303 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -120,6 +120,7 @@ Added support for VS2012
+ Added a simple project for cppcheck
+ Rendering intent used when creating the transform is now propagated to profile header in cmsTransform2Devicelink. This is because 7.2.15 in spec 4.3
+ Transform2Devicelink now keeps white point when guessing deviceclass is enabled
++Added some checks for non-happy path, mostly failing mallocs
+ 
+ -----------------------
+ 2.5 Maintenance release
+diff --git a/src/cmsnamed.c b/src/cmsnamed.c
+index a916e17..acfd1c8 100644
+--- a/src/cmsnamed.c
++++ b/src/cmsnamed.c
+@@ -517,8 +517,8 @@ cmsNAMEDCOLORLIST* CMSEXPORT cmsAllocNamedColorList(cmsContext ContextID, cmsUIn
+     while (v -> Allocated < n)
+         GrowNamedColorList(v);
+ 
+-    strncpy(v ->Prefix, Prefix, sizeof(v ->Prefix));
+-    strncpy(v ->Suffix, Suffix, sizeof(v ->Suffix));
++    strncpy(v ->Prefix, Prefix, sizeof(v ->Prefix)-1);
++    strncpy(v ->Suffix, Suffix, sizeof(v ->Suffix)-1);
+     v->Prefix[32] = v->Suffix[32] = 0;
+ 
+     v -> ColorantCount = ColorantCount;
+@@ -577,9 +577,7 @@ cmsBool  CMSEXPORT cmsAppendNamedColor(cmsNAMEDCOLORLIST* NamedColorList,
+ 
+     if (Name != NULL) {
+ 
+-        strncpy(NamedColorList ->List[NamedColorList ->nColors].Name, Name,
+-                    sizeof(NamedColorList ->List[NamedColorList ->nColors].Name));
+-
++        strncpy(NamedColorList ->List[NamedColorList ->nColors].Name, Name, cmsMAX_PATH-1);
+         NamedColorList ->List[NamedColorList ->nColors].Name[cmsMAX_PATH-1] = 0;
+ 
+     }
+@@ -735,6 +733,10 @@ cmsSEQ* CMSEXPORT cmsAllocProfileSequenceDescription(cmsContext ContextID, cmsUI
+     Seq -> seq      = (cmsPSEQDESC*) _cmsCalloc(ContextID, n, sizeof(cmsPSEQDESC));
+     Seq -> n        = n;
+ 
++    if (Seq -> seq == NULL) {
++        _cmsFree(ContextID, Seq);
++        return NULL;
++    }
+ 
+     for (i=0; i < n; i++) {
+         Seq -> seq[i].Manufacturer = NULL;
+diff --git a/src/cmsopt.c b/src/cmsopt.c
+index 7478e5e..4bdf0a7 100644
+--- a/src/cmsopt.c
++++ b/src/cmsopt.c
+@@ -1179,6 +1179,16 @@ Curves16Data* CurvesAlloc(cmsContext ContextID, int nCurves, int nElements, cmsT
+ 
+         c16->Curves[i] = _cmsCalloc(ContextID, nElements, sizeof(cmsUInt16Number));
+ 
++        if (c16->Curves[i] == NULL) {
++
++            for (j=0; j < i; j++) {
++                _cmsFree(ContextID, c16->Curves[j]);
++            }
++            _cmsFree(ContextID, c16->Curves);
++            _cmsFree(ContextID, c16);
++            return NULL;
++        }
++
+         if (nElements == 256) {
+ 
+             for (j=0; j < nElements; j++) {

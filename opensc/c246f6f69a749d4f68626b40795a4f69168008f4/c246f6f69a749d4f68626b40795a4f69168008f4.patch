@@ -1,0 +1,26 @@
+commit c246f6f69a749d4f68626b40795a4f69168008f4
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Wed Dec 4 15:54:43 2019 +0100
+
+    coolkey: Make sure the object ID is unique when filling list
+    
+    Thanks to oss-fuzz
+    
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=19208
+
+diff --git a/src/libopensc/card-coolkey.c b/src/libopensc/card-coolkey.c
+index d492d715..c95a5035 100644
+--- a/src/libopensc/card-coolkey.c
++++ b/src/libopensc/card-coolkey.c
+@@ -1945,6 +1945,11 @@ coolkey_add_object(coolkey_private_data_t *priv, unsigned long object_id, const
+ 	new_object.id = object_id;
+ 	new_object.length = object_length;
+ 
++	/* The object ID needs to be unique */
++	if (coolkey_find_object_by_id(&priv->objects_list, object_id) != NULL) {
++		return SC_ERROR_INTERNAL;
++	}
++
+ 	if (object_data) {
+ 		new_object.data = malloc(object_length + add_v1_record);
+ 		if (new_object.data == NULL) {

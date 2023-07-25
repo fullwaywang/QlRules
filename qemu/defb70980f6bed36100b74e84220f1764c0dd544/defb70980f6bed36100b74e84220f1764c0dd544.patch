@@ -1,0 +1,57 @@
+commit defb70980f6bed36100b74e84220f1764c0dd544
+Author: Christian A. Ehrhardt <lk@c--e.de>
+Date:   Mon Oct 24 17:42:33 2022 +0200
+
+    hw/acpi/erst.c: Fix memory handling issues
+    
+    - Fix memset argument order: The second argument is
+      the value, the length goes last.
+    - Fix an integer overflow reported by Alexander Bulekov.
+    
+    Both issues allow the guest to overrun the host buffer
+    allocated for the ERST memory device.
+    
+    Cc: Eric DeVolder <eric.devolder@oracle.com
+    Cc: Alexander Bulekov <alxndr@bu.edu>
+    Cc: qemu-stable@nongnu.org
+    Fixes: f7e26ffa590 ("ACPI ERST: support for ACPI ERST feature")
+    Tested-by: Alexander Bulekov <alxndr@bu.edu>
+    Signed-off-by: Christian A. Ehrhardt <lk@c--e.de>
+    Message-Id: <20221024154233.1043347-1-lk@c--e.de>
+    Fixes: https://gitlab.com/qemu-project/qemu/-/issues/1268
+    Reviewed-by: Alexander Bulekov <alxndr@bu.edu>
+    Reviewed-by: Eric DeVolder <eric.devolder@oracle.com>
+    Reviewed-by: Michael S. Tsirkin <mst@redhat.com>
+    Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+
+diff --git a/hw/acpi/erst.c b/hw/acpi/erst.c
+index df856b2669..aefcc03ad6 100644
+--- a/hw/acpi/erst.c
++++ b/hw/acpi/erst.c
+@@ -635,7 +635,7 @@ static unsigned read_erst_record(ERSTDeviceState *s)
+         if (record_length < UEFI_CPER_RECORD_MIN_SIZE) {
+             rc = STATUS_FAILED;
+         }
+-        if ((s->record_offset + record_length) > exchange_length) {
++        if (record_length > exchange_length - s->record_offset) {
+             rc = STATUS_FAILED;
+         }
+         /* If all is ok, copy the record to the exchange buffer */
+@@ -684,7 +684,7 @@ static unsigned write_erst_record(ERSTDeviceState *s)
+     if (record_length < UEFI_CPER_RECORD_MIN_SIZE) {
+         return STATUS_FAILED;
+     }
+-    if ((s->record_offset + record_length) > exchange_length) {
++    if (record_length > exchange_length - s->record_offset) {
+         return STATUS_FAILED;
+     }
+ 
+@@ -716,7 +716,7 @@ static unsigned write_erst_record(ERSTDeviceState *s)
+     if (nvram) {
+         /* Write the record into the slot */
+         memcpy(nvram, exchange, record_length);
+-        memset(nvram + record_length, exchange_length - record_length, 0xFF);
++        memset(nvram + record_length, 0xFF, exchange_length - record_length);
+         /* If a new record, increment the record_count */
+         if (!record_found) {
+             uint32_t record_count;

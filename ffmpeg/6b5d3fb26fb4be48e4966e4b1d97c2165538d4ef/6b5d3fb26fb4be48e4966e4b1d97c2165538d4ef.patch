@@ -1,0 +1,42 @@
+commit 6b5d3fb26fb4be48e4966e4b1d97c2165538d4ef
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Wed May 10 18:37:49 2017 +0200
+
+    avcodec/webp: Always set pix_fmt
+    
+    Fixes: out of array access
+    Fixes: 1434/clusterfuzz-testcase-minimized-6314998085189632
+    Fixes: 1435/clusterfuzz-testcase-minimized-6483783723253760
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Reviewed-by: "Ronald S. Bultje" <rsbultje@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/vp8.c b/libavcodec/vp8.c
+index fe7aa23491..5bf601a8ef 100644
+--- a/libavcodec/vp8.c
++++ b/libavcodec/vp8.c
+@@ -2550,6 +2550,8 @@ int vp78_decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
+     enum AVDiscard skip_thresh;
+     VP8Frame *av_uninit(curframe), *prev_frame;
+ 
++    av_assert0(avctx->pix_fmt == AV_PIX_FMT_YUVA420P || avctx->pix_fmt == AV_PIX_FMT_YUV420P);
++
+     if (is_vp7)
+         ret = vp7_decode_frame_header(s, avpkt->data, avpkt->size);
+     else
+diff --git a/libavcodec/webp.c b/libavcodec/webp.c
+index 16c3ae2662..e0cd72d03a 100644
+--- a/libavcodec/webp.c
++++ b/libavcodec/webp.c
+@@ -1334,9 +1334,8 @@ static int vp8_lossy_decode_frame(AVCodecContext *avctx, AVFrame *p,
+     if (!s->initialized) {
+         ff_vp8_decode_init(avctx);
+         s->initialized = 1;
+-        if (s->has_alpha)
+-            avctx->pix_fmt = AV_PIX_FMT_YUVA420P;
+     }
++    avctx->pix_fmt = s->has_alpha ? AV_PIX_FMT_YUVA420P : AV_PIX_FMT_YUV420P;
+     s->lossless = 0;
+ 
+     if (data_size > INT_MAX) {

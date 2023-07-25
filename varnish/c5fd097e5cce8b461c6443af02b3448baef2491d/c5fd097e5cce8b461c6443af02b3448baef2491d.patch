@@ -1,0 +1,68 @@
+commit c5fd097e5cce8b461c6443af02b3448baef2491d
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Thu Aug 4 10:59:33 2022 +0200
+
+    Do not call http_hdr_flags() on pseudo-headers
+    
+    In http_EstimateWS(), all headers are passed to the http_isfiltered()
+    function to calculate how many bytes is needed to serialize the entire
+    struct http. http_isfiltered() will check the headers for whether they are
+    going to be filtered out later and if so skip them.
+    
+    However http_isfiltered() would attempt to treat all elements of struct
+    http as regular headers with an implicit structure. That does not hold for
+    the first three pseudo-header entries, which would lead to asserts in
+    later steps.
+    
+    This patch skips the filter step for pseudo-headers.
+    
+    Fixes: #3830
+
+diff --git a/bin/varnishd/cache/cache_http.c b/bin/varnishd/cache/cache_http.c
+index ed15e07f9..d48c0bb36 100644
+--- a/bin/varnishd/cache/cache_http.c
++++ b/bin/varnishd/cache/cache_http.c
+@@ -1147,6 +1147,8 @@ http_isfiltered(const struct http *fm, unsigned u, unsigned how)
+ 
+ 	if (fm->hdf[u] & HDF_FILTER)
+ 		return (1);
++	if (u < HTTP_HDR_FIRST)
++		return (0);
+ 	e = strchr(fm->hd[u].b, ':');
+ 	if (e == NULL)
+ 		return (0);
+diff --git a/bin/varnishtest/tests/r03830.vtc b/bin/varnishtest/tests/r03830.vtc
+new file mode 100644
+index 000000000..515598192
+--- /dev/null
++++ b/bin/varnishtest/tests/r03830.vtc
+@@ -0,0 +1,29 @@
++varnishtest "3830: Do not call http_hdr_flags() on pseudo-headers"
++
++server s1 {
++	rxreq
++	txresp -reason ":x"
++
++	rxreq
++	txresp
++} -start
++
++varnish v1 -vcl+backend {
++	sub vcl_recv {
++		return (hash);
++	}
++} -start
++
++client c1 {
++	txreq
++	rxresp
++	expect resp.status == 200
++} -run
++
++client c2 {
++	txreq -url :x -method :x
++	rxresp
++	expect resp.status == 200
++} -run
++
++varnish v1 -vsl_catchup

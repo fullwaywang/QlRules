@@ -1,0 +1,997 @@
+commit 6214e2b2280462cbc3aa1986e350e167651b3905
+Author: Heikki Linnakangas <heikki.linnakangas@iki.fi>
+Date:   Mon Feb 8 11:01:51 2021 +0200
+
+    Fix permission checks on constraint violation errors on partitions.
+    
+    If a cross-partition UPDATE violates a constraint on the target partition,
+    and the columns in the new partition are in different physical order than
+    in the parent, the error message can reveal columns that the user does not
+    have SELECT permission on. A similar bug was fixed earlier in commit
+    804b6b6db4.
+    
+    The cause of the bug is that the callers of the
+    ExecBuildSlotValueDescription() function got confused when constructing
+    the list of modified columns. If the tuple was routed from a parent, we
+    converted the tuple to the parent's format, but the list of modified
+    columns was grabbed directly from the child's RTE entry.
+    
+    ExecUpdateLockMode() had a similar issue. That lead to confusion on which
+    columns are key columns, leading to wrong tuple lock being taken on tables
+    referenced by foreign keys, when a row is updated with INSERT ON CONFLICT
+    UPDATE. A new isolation test is added for that corner case.
+    
+    With this patch, the ri_RangeTableIndex field is no longer set for
+    partitions that don't have an entry in the range table. Previously, it was
+    set to the RTE entry of the parent relation, but that was confusing.
+    
+    NOTE: This modifies the ResultRelInfo struct, replacing the
+    ri_PartitionRoot field with ri_RootResultRelInfo. That's a bit risky to
+    backpatch, because it breaks any extensions accessing the field. The
+    change that ri_RangeTableIndex is not set for partitions could potentially
+    break extensions, too. The ResultRelInfos are visible to FDWs at least,
+    and this patch required small changes to postgres_fdw. Nevertheless, this
+    seem like the least bad option. I don't think these fields widely used in
+    extensions; I don't think there are FDWs out there that uses the FDW
+    "direct update" API, other than postgres_fdw. If there is, you will get a
+    compilation error, so hopefully it is caught quickly.
+    
+    Backpatch to 11, where support for both cross-partition UPDATEs, and unique
+    indexes on partitioned tables, were added.
+    
+    Reviewed-by: Amit Langote
+    Security: CVE-2021-3393
+
+diff --git a/contrib/postgres_fdw/postgres_fdw.c b/contrib/postgres_fdw/postgres_fdw.c
+index 0e977066a8..368997d9d1 100644
+--- a/contrib/postgres_fdw/postgres_fdw.c
++++ b/contrib/postgres_fdw/postgres_fdw.c
+@@ -2025,7 +2025,7 @@ postgresBeginForeignInsert(ModifyTableState *mtstate,
+ 	PgFdwModifyState *fmstate;
+ 	ModifyTable *plan = castNode(ModifyTable, mtstate->ps.plan);
+ 	EState	   *estate = mtstate->ps.state;
+-	Index		resultRelation = resultRelInfo->ri_RangeTableIndex;
++	Index		resultRelation;
+ 	Relation	rel = resultRelInfo->ri_RelationDesc;
+ 	RangeTblEntry *rte;
+ 	TupleDesc	tupdesc = RelationGetDescr(rel);
+@@ -2077,7 +2077,8 @@ postgresBeginForeignInsert(ModifyTableState *mtstate,
+ 	}
+ 
+ 	/*
+-	 * If the foreign table is a partition, we need to create a new RTE
++	 * If the foreign table is a partition that doesn't have a corresponding
++	 * RTE entry, we need to create a new RTE
+ 	 * describing the foreign table for use by deparseInsertSql and
+ 	 * create_foreign_modify() below, after first copying the parent's RTE and
+ 	 * modifying some fields to describe the foreign partition to work on.
+@@ -2085,9 +2086,11 @@ postgresBeginForeignInsert(ModifyTableState *mtstate,
+ 	 * correspond to this partition if it is one of the UPDATE subplan target
+ 	 * rels; in that case, we can just use the existing RTE as-is.
+ 	 */
+-	rte = exec_rt_fetch(resultRelation, estate);
+-	if (rte->relid != RelationGetRelid(rel))
++	if (resultRelInfo->ri_RangeTableIndex == 0)
+ 	{
++		ResultRelInfo *rootResultRelInfo = resultRelInfo->ri_RootResultRelInfo;
++
++		rte = exec_rt_fetch(rootResultRelInfo->ri_RangeTableIndex, estate);
+ 		rte = copyObject(rte);
+ 		rte->relid = RelationGetRelid(rel);
+ 		rte->relkind = RELKIND_FOREIGN_TABLE;
+@@ -2099,8 +2102,15 @@ postgresBeginForeignInsert(ModifyTableState *mtstate,
+ 		 * Vars contained in those expressions.
+ 		 */
+ 		if (plan && plan->operation == CMD_UPDATE &&
+-			resultRelation == plan->rootRelation)
++			rootResultRelInfo->ri_RangeTableIndex == plan->rootRelation)
+ 			resultRelation = mtstate->resultRelInfo[0].ri_RangeTableIndex;
++		else
++			resultRelation = rootResultRelInfo->ri_RangeTableIndex;
++	}
++	else
++	{
++		resultRelation = resultRelInfo->ri_RangeTableIndex;
++		rte = exec_rt_fetch(resultRelation, estate);
+ 	}
+ 
+ 	/* Construct the SQL command string. */
+diff --git a/src/backend/access/common/tupconvert.c b/src/backend/access/common/tupconvert.c
+index 4229c9bf76..e055df2f32 100644
+--- a/src/backend/access/common/tupconvert.c
++++ b/src/backend/access/common/tupconvert.c
+@@ -226,6 +226,57 @@ execute_attr_map_slot(AttrMap *attrMap,
+ 	return out_slot;
+ }
+ 
++/*
++ * Perform conversion of bitmap of columns according to the map.
++ *
++ * The input and output bitmaps are offset by
++ * FirstLowInvalidHeapAttributeNumber to accommodate system cols, like the
++ * column-bitmaps in RangeTblEntry.
++ */
++Bitmapset *
++execute_attr_map_cols(AttrMap *attrMap, Bitmapset *in_cols)
++{
++	Bitmapset *out_cols;
++	int			out_attnum;
++
++	/* fast path for the common trivial case */
++	if (in_cols == NULL)
++		return NULL;
++
++	/*
++	 * For each output column, check which input column it corresponds to.
++	 */
++	out_cols = NULL;
++
++	for (out_attnum = FirstLowInvalidHeapAttributeNumber;
++		 out_attnum <= attrMap->maplen;
++		 out_attnum++)
++	{
++		int			in_attnum;
++
++		if (out_attnum < 0)
++		{
++			/* System column. No mapping. */
++			in_attnum = out_attnum;
++		}
++		else if (out_attnum == 0)
++			continue;
++		else
++		{
++			/* normal user column */
++			in_attnum = attrMap->attnums[out_attnum - 1];
++
++			if (in_attnum == 0)
++				continue;
++		}
++
++		if (bms_is_member(in_attnum - FirstLowInvalidHeapAttributeNumber, in_cols))
++			out_cols = bms_add_member(out_cols, out_attnum - FirstLowInvalidHeapAttributeNumber);
++	}
++
++	return out_cols;
++}
++
+ /*
+  * Free a TupleConversionMap structure.
+  */
+diff --git a/src/backend/commands/copyfrom.c b/src/backend/commands/copyfrom.c
+index c39cc736ed..796ca7b3f7 100644
+--- a/src/backend/commands/copyfrom.c
++++ b/src/backend/commands/copyfrom.c
+@@ -666,6 +666,7 @@ CopyFrom(CopyFromState cstate)
+ 	mtstate->ps.state = estate;
+ 	mtstate->operation = CMD_INSERT;
+ 	mtstate->resultRelInfo = resultRelInfo;
++	mtstate->rootResultRelInfo = resultRelInfo;
+ 
+ 	if (resultRelInfo->ri_FdwRoutine != NULL &&
+ 		resultRelInfo->ri_FdwRoutine->BeginForeignInsert != NULL)
+diff --git a/src/backend/commands/explain.c b/src/backend/commands/explain.c
+index 5d7eb3574c..f80e379973 100644
+--- a/src/backend/commands/explain.c
++++ b/src/backend/commands/explain.c
+@@ -3694,7 +3694,7 @@ show_modifytable_info(ModifyTableState *mtstate, List *ancestors,
+ 	/* Should we explicitly label target relations? */
+ 	labeltargets = (mtstate->mt_nplans > 1 ||
+ 					(mtstate->mt_nplans == 1 &&
+-					 mtstate->resultRelInfo->ri_RangeTableIndex != node->nominalRelation));
++					 mtstate->resultRelInfo[0].ri_RangeTableIndex != node->nominalRelation));
+ 
+ 	if (labeltargets)
+ 		ExplainOpenGroup("Target Tables", "Target Tables", false, es);
+diff --git a/src/backend/commands/trigger.c b/src/backend/commands/trigger.c
+index 2d687f6dfb..8908847c6c 100644
+--- a/src/backend/commands/trigger.c
++++ b/src/backend/commands/trigger.c
+@@ -70,14 +70,6 @@ int			SessionReplicationRole = SESSION_REPLICATION_ROLE_ORIGIN;
+ /* How many levels deep into trigger execution are we? */
+ static int	MyTriggerDepth = 0;
+ 
+-/*
+- * The authoritative version of this macro is in executor/execMain.c.  Be sure
+- * to keep everything in sync.
+- */
+-#define GetAllUpdatedColumns(relinfo, estate) \
+-	(bms_union(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->updatedCols, \
+-			   exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->extraUpdatedCols))
+-
+ /* Local function prototypes */
+ static void SetTriggerFlags(TriggerDesc *trigdesc, Trigger *trigger);
+ static bool GetTupleForTrigger(EState *estate,
+@@ -2643,7 +2635,10 @@ ExecBSUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
+ 								   CMD_UPDATE))
+ 		return;
+ 
+-	updatedCols = GetAllUpdatedColumns(relinfo, estate);
++	/* statement-level triggers operate on the parent table */
++	Assert(relinfo->ri_RootResultRelInfo == NULL);
++
++	updatedCols = ExecGetAllUpdatedCols(relinfo, estate);
+ 
+ 	LocTriggerData.type = T_TriggerData;
+ 	LocTriggerData.tg_event = TRIGGER_EVENT_UPDATE |
+@@ -2684,10 +2679,13 @@ ExecASUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
+ {
+ 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
+ 
++	/* statement-level triggers operate on the parent table */
++	Assert(relinfo->ri_RootResultRelInfo == NULL);
++
+ 	if (trigdesc && trigdesc->trig_update_after_statement)
+ 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_UPDATE,
+ 							  false, NULL, NULL, NIL,
+-							  GetAllUpdatedColumns(relinfo, estate),
++							  ExecGetAllUpdatedCols(relinfo, estate),
+ 							  transition_capture);
+ }
+ 
+@@ -2757,7 +2755,7 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
+ 		TRIGGER_EVENT_ROW |
+ 		TRIGGER_EVENT_BEFORE;
+ 	LocTriggerData.tg_relation = relinfo->ri_RelationDesc;
+-	updatedCols = GetAllUpdatedColumns(relinfo, estate);
++	updatedCols = ExecGetAllUpdatedCols(relinfo, estate);
+ 	LocTriggerData.tg_updatedcols = updatedCols;
+ 	for (i = 0; i < trigdesc->numtriggers; i++)
+ 	{
+@@ -2858,7 +2856,7 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
+ 
+ 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_UPDATE,
+ 							  true, oldslot, newslot, recheckIndexes,
+-							  GetAllUpdatedColumns(relinfo, estate),
++							  ExecGetAllUpdatedCols(relinfo, estate),
+ 							  transition_capture);
+ 	}
+ }
+diff --git a/src/backend/executor/execIndexing.c b/src/backend/executor/execIndexing.c
+index 1f0fe145ce..afe7ce87d4 100644
+--- a/src/backend/executor/execIndexing.c
++++ b/src/backend/executor/execIndexing.c
+@@ -124,15 +124,6 @@ typedef enum
+ 	CEOUC_LIVELOCK_PREVENTING_WAIT
+ } CEOUC_WAIT_MODE;
+ 
+-/*
+- * The authoritative version of these macro are in executor/execMain.c.  Be
+- * sure to keep everything in sync.
+- */
+-#define GetUpdatedColumns(relinfo, estate) \
+-	(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->updatedCols)
+-#define GetExtraUpdatedColumns(relinfo, estate) \
+-	(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->extraUpdatedCols)
+-
+ static bool check_exclusion_or_unique_constraint(Relation heap, Relation index,
+ 												 IndexInfo *indexInfo,
+ 												 ItemPointer tupleid,
+@@ -944,8 +935,8 @@ static bool
+ index_unchanged_by_update(ResultRelInfo *resultRelInfo, EState *estate,
+ 						  IndexInfo *indexInfo, Relation indexRelation)
+ {
+-	Bitmapset  *updatedCols = GetUpdatedColumns(resultRelInfo, estate);
+-	Bitmapset  *extraUpdatedCols = GetExtraUpdatedColumns(resultRelInfo, estate);
++	Bitmapset  *updatedCols = ExecGetUpdatedCols(resultRelInfo, estate);
++	Bitmapset  *extraUpdatedCols = ExecGetExtraUpdatedCols(resultRelInfo, estate);
+ 	Bitmapset  *allUpdatedCols;
+ 	bool		hasexpression = false;
+ 	List	   *idxExprs;
+diff --git a/src/backend/executor/execMain.c b/src/backend/executor/execMain.c
+index f4dd47acc7..c74ce36ffb 100644
+--- a/src/backend/executor/execMain.c
++++ b/src/backend/executor/execMain.c
+@@ -100,20 +100,6 @@ static char *ExecBuildSlotValueDescription(Oid reloid,
+ 										   int maxfieldlen);
+ static void EvalPlanQualStart(EPQState *epqstate, Plan *planTree);
+ 
+-/*
+- * Note that variants of these macros exists in commands/trigger.c and in
+- * execIndexing.c.  There does not appear to be any good header to put it
+- * into, given the structures that it uses, so we let them be duplicated.  Be
+- * sure to keep everything in sync.
+- */
+-#define GetInsertedColumns(relinfo, estate) \
+-	(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->insertedCols)
+-#define GetUpdatedColumns(relinfo, estate) \
+-	(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->updatedCols)
+-#define GetAllUpdatedColumns(relinfo, estate) \
+-	(bms_union(exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->updatedCols, \
+-			   exec_rt_fetch((relinfo)->ri_RangeTableIndex, estate)->extraUpdatedCols))
+-
+ /* end of local decls */
+ 
+ 
+@@ -1196,7 +1182,7 @@ void
+ InitResultRelInfo(ResultRelInfo *resultRelInfo,
+ 				  Relation resultRelationDesc,
+ 				  Index resultRelationIndex,
+-				  Relation partition_root,
++				  ResultRelInfo *partition_root_rri,
+ 				  int instrument_options)
+ {
+ 	MemSet(resultRelInfo, 0, sizeof(ResultRelInfo));
+@@ -1242,7 +1228,7 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
+ 	resultRelInfo->ri_ReturningSlot = NULL;
+ 	resultRelInfo->ri_TrigOldSlot = NULL;
+ 	resultRelInfo->ri_TrigNewSlot = NULL;
+-	resultRelInfo->ri_PartitionRoot = partition_root;
++	resultRelInfo->ri_RootResultRelInfo = partition_root_rri;
+ 	resultRelInfo->ri_RootToPartitionMap = NULL;	/* set by
+ 													 * ExecInitRoutingInfo */
+ 	resultRelInfo->ri_PartitionTupleSlot = NULL;	/* ditto */
+@@ -1744,13 +1730,14 @@ ExecPartitionCheckEmitError(ResultRelInfo *resultRelInfo,
+ 	 * back to the root table's rowtype so that val_desc in the error message
+ 	 * matches the input tuple.
+ 	 */
+-	if (resultRelInfo->ri_PartitionRoot)
++	if (resultRelInfo->ri_RootResultRelInfo)
+ 	{
++		ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
+ 		TupleDesc	old_tupdesc;
+ 		AttrMap    *map;
+ 
+-		root_relid = RelationGetRelid(resultRelInfo->ri_PartitionRoot);
+-		tupdesc = RelationGetDescr(resultRelInfo->ri_PartitionRoot);
++		root_relid = RelationGetRelid(rootrel->ri_RelationDesc);
++		tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
+ 
+ 		old_tupdesc = RelationGetDescr(resultRelInfo->ri_RelationDesc);
+ 		/* a reverse map */
+@@ -1763,16 +1750,17 @@ ExecPartitionCheckEmitError(ResultRelInfo *resultRelInfo,
+ 		if (map != NULL)
+ 			slot = execute_attr_map_slot(map, slot,
+ 										 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
++		modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
++								 ExecGetUpdatedCols(rootrel, estate));
+ 	}
+ 	else
+ 	{
+ 		root_relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+ 		tupdesc = RelationGetDescr(resultRelInfo->ri_RelationDesc);
++		modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
++								 ExecGetUpdatedCols(resultRelInfo, estate));
+ 	}
+ 
+-	modifiedCols = bms_union(GetInsertedColumns(resultRelInfo, estate),
+-							 GetUpdatedColumns(resultRelInfo, estate));
+-
+ 	val_desc = ExecBuildSlotValueDescription(root_relid,
+ 											 slot,
+ 											 tupdesc,
+@@ -1805,8 +1793,6 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
+ 	TupleDesc	tupdesc = RelationGetDescr(rel);
+ 	TupleConstr *constr = tupdesc->constr;
+ 	Bitmapset  *modifiedCols;
+-	Bitmapset  *insertedCols;
+-	Bitmapset  *updatedCols;
+ 
+ 	Assert(constr);				/* we should not be called otherwise */
+ 
+@@ -1832,12 +1818,12 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
+ 				 * rowtype so that val_desc shown error message matches the
+ 				 * input tuple.
+ 				 */
+-				if (resultRelInfo->ri_PartitionRoot)
++				if (resultRelInfo->ri_RootResultRelInfo)
+ 				{
++					ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
+ 					AttrMap    *map;
+ 
+-					rel = resultRelInfo->ri_PartitionRoot;
+-					tupdesc = RelationGetDescr(rel);
++					tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
+ 					/* a reverse map */
+ 					map = build_attrmap_by_name_if_req(orig_tupdesc,
+ 													   tupdesc);
+@@ -1849,11 +1835,13 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
+ 					if (map != NULL)
+ 						slot = execute_attr_map_slot(map, slot,
+ 													 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
++					modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
++											 ExecGetUpdatedCols(rootrel, estate));
++					rel = rootrel->ri_RelationDesc;
+ 				}
+-
+-				insertedCols = GetInsertedColumns(resultRelInfo, estate);
+-				updatedCols = GetUpdatedColumns(resultRelInfo, estate);
+-				modifiedCols = bms_union(insertedCols, updatedCols);
++				else
++					modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
++											 ExecGetUpdatedCols(resultRelInfo, estate));
+ 				val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
+ 														 slot,
+ 														 tupdesc,
+@@ -1881,13 +1869,13 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
+ 			Relation	orig_rel = rel;
+ 
+ 			/* See the comment above. */
+-			if (resultRelInfo->ri_PartitionRoot)
++			if (resultRelInfo->ri_RootResultRelInfo)
+ 			{
++				ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
+ 				TupleDesc	old_tupdesc = RelationGetDescr(rel);
+ 				AttrMap    *map;
+ 
+-				rel = resultRelInfo->ri_PartitionRoot;
+-				tupdesc = RelationGetDescr(rel);
++				tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
+ 				/* a reverse map */
+ 				map = build_attrmap_by_name_if_req(old_tupdesc,
+ 												   tupdesc);
+@@ -1899,11 +1887,13 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
+ 				if (map != NULL)
+ 					slot = execute_attr_map_slot(map, slot,
+ 												 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
++				modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
++										 ExecGetUpdatedCols(rootrel, estate));
++				rel = rootrel->ri_RelationDesc;
+ 			}
+-
+-			insertedCols = GetInsertedColumns(resultRelInfo, estate);
+-			updatedCols = GetUpdatedColumns(resultRelInfo, estate);
+-			modifiedCols = bms_union(insertedCols, updatedCols);
++			else
++				modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
++										 ExecGetUpdatedCols(resultRelInfo, estate));
+ 			val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
+ 													 slot,
+ 													 tupdesc,
+@@ -1972,8 +1962,6 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
+ 		{
+ 			char	   *val_desc;
+ 			Bitmapset  *modifiedCols;
+-			Bitmapset  *insertedCols;
+-			Bitmapset  *updatedCols;
+ 
+ 			switch (wco->kind)
+ 			{
+@@ -1988,13 +1976,13 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
+ 					 */
+ 				case WCO_VIEW_CHECK:
+ 					/* See the comment in ExecConstraints(). */
+-					if (resultRelInfo->ri_PartitionRoot)
++					if (resultRelInfo->ri_RootResultRelInfo)
+ 					{
++						ResultRelInfo *rootrel = resultRelInfo->ri_RootResultRelInfo;
+ 						TupleDesc	old_tupdesc = RelationGetDescr(rel);
+ 						AttrMap    *map;
+ 
+-						rel = resultRelInfo->ri_PartitionRoot;
+-						tupdesc = RelationGetDescr(rel);
++						tupdesc = RelationGetDescr(rootrel->ri_RelationDesc);
+ 						/* a reverse map */
+ 						map = build_attrmap_by_name_if_req(old_tupdesc,
+ 														   tupdesc);
+@@ -2006,11 +1994,14 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
+ 						if (map != NULL)
+ 							slot = execute_attr_map_slot(map, slot,
+ 														 MakeTupleTableSlot(tupdesc, &TTSOpsVirtual));
+-					}
+ 
+-					insertedCols = GetInsertedColumns(resultRelInfo, estate);
+-					updatedCols = GetUpdatedColumns(resultRelInfo, estate);
+-					modifiedCols = bms_union(insertedCols, updatedCols);
++						modifiedCols = bms_union(ExecGetInsertedCols(rootrel, estate),
++												 ExecGetUpdatedCols(rootrel, estate));
++						rel = rootrel->ri_RelationDesc;
++					}
++					else
++						modifiedCols = bms_union(ExecGetInsertedCols(resultRelInfo, estate),
++												 ExecGetUpdatedCols(resultRelInfo, estate));
+ 					val_desc = ExecBuildSlotValueDescription(RelationGetRelid(rel),
+ 															 slot,
+ 															 tupdesc,
+@@ -2224,7 +2215,7 @@ ExecUpdateLockMode(EState *estate, ResultRelInfo *relinfo)
+ 	 * been modified, then we can use a weaker lock, allowing for better
+ 	 * concurrency.
+ 	 */
+-	updatedCols = GetAllUpdatedColumns(relinfo, estate);
++	updatedCols = ExecGetAllUpdatedCols(relinfo, estate);
+ 	keyCols = RelationGetIndexAttrBitmap(relinfo->ri_RelationDesc,
+ 										 INDEX_ATTR_BITMAP_KEY);
+ 
+diff --git a/src/backend/executor/execPartition.c b/src/backend/executor/execPartition.c
+index 746cd1e9d7..b9e4f2d80b 100644
+--- a/src/backend/executor/execPartition.c
++++ b/src/backend/executor/execPartition.c
+@@ -176,7 +176,8 @@ static void ExecInitRoutingInfo(ModifyTableState *mtstate,
+ 								int partidx);
+ static PartitionDispatch ExecInitPartitionDispatchInfo(EState *estate,
+ 													   PartitionTupleRouting *proute,
+-													   Oid partoid, PartitionDispatch parent_pd, int partidx);
++													   Oid partoid, PartitionDispatch parent_pd,
++													   int partidx, ResultRelInfo *rootResultRelInfo);
+ static void FormPartitionKeyDatum(PartitionDispatch pd,
+ 								  TupleTableSlot *slot,
+ 								  EState *estate,
+@@ -238,7 +239,7 @@ ExecSetupPartitionTupleRouting(EState *estate, ModifyTableState *mtstate,
+ 	 * partitioned table.
+ 	 */
+ 	ExecInitPartitionDispatchInfo(estate, proute, RelationGetRelid(rel),
+-								  NULL, 0);
++								  NULL, 0, NULL);
+ 
+ 	/*
+ 	 * If performing an UPDATE with tuple routing, we can reuse partition
+@@ -432,10 +433,11 @@ ExecFindPartition(ModifyTableState *mtstate,
+ 				 * Create the new PartitionDispatch.  We pass the current one
+ 				 * in as the parent PartitionDispatch
+ 				 */
+-				subdispatch = ExecInitPartitionDispatchInfo(mtstate->ps.state,
++				subdispatch = ExecInitPartitionDispatchInfo(estate,
+ 															proute,
+ 															partdesc->oids[partidx],
+-															dispatch, partidx);
++															dispatch, partidx,
++															mtstate->rootResultRelInfo);
+ 				Assert(dispatch->indexes[partidx] >= 0 &&
+ 					   dispatch->indexes[partidx] < proute->num_dispatch);
+ 
+@@ -547,7 +549,7 @@ ExecHashSubPlanResultRelsByOid(ModifyTableState *mtstate,
+ 		 * compatible with the root partitioned table's tuple descriptor. When
+ 		 * generating the per-subplan result rels, this was not set.
+ 		 */
+-		rri->ri_PartitionRoot = proute->partition_root;
++		rri->ri_RootResultRelInfo = mtstate->rootResultRelInfo;
+ 	}
+ }
+ 
+@@ -567,8 +569,8 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 					  int partidx)
+ {
+ 	ModifyTable *node = (ModifyTable *) mtstate->ps.plan;
+-	Relation	rootrel = rootResultRelInfo->ri_RelationDesc,
+-				partrel;
++	Relation	partrel;
++	int			firstVarno = mtstate->resultRelInfo[0].ri_RangeTableIndex;
+ 	Relation	firstResultRel = mtstate->resultRelInfo[0].ri_RelationDesc;
+ 	ResultRelInfo *leaf_part_rri;
+ 	MemoryContext oldcxt;
+@@ -582,8 +584,8 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 	leaf_part_rri = makeNode(ResultRelInfo);
+ 	InitResultRelInfo(leaf_part_rri,
+ 					  partrel,
+-					  node ? node->rootRelation : 1,
+-					  rootrel,
++					  0,
++					  rootResultRelInfo,
+ 					  estate->es_instrument);
+ 
+ 	/*
+@@ -617,7 +619,6 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 		List	   *wcoList;
+ 		List	   *wcoExprs = NIL;
+ 		ListCell   *ll;
+-		int			firstVarno = mtstate->resultRelInfo[0].ri_RangeTableIndex;
+ 
+ 		/*
+ 		 * In the case of INSERT on a partitioned table, there is only one
+@@ -681,7 +682,6 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 		TupleTableSlot *slot;
+ 		ExprContext *econtext;
+ 		List	   *returningList;
+-		int			firstVarno = mtstate->resultRelInfo[0].ri_RangeTableIndex;
+ 
+ 		/* See the comment above for WCO lists. */
+ 		Assert((node->operation == CMD_INSERT &&
+@@ -740,7 +740,6 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 	 */
+ 	if (node && node->onConflictAction != ONCONFLICT_NONE)
+ 	{
+-		int			firstVarno = mtstate->resultRelInfo[0].ri_RangeTableIndex;
+ 		TupleDesc	partrelDesc = RelationGetDescr(partrel);
+ 		ExprContext *econtext = mtstate->ps.ps_ExprContext;
+ 		ListCell   *lc;
+@@ -917,7 +916,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate, EState *estate,
+ 	if (mtstate->mt_transition_capture || mtstate->mt_oc_transition_capture)
+ 		leaf_part_rri->ri_ChildToRootMap =
+ 			convert_tuples_by_name(RelationGetDescr(leaf_part_rri->ri_RelationDesc),
+-								   RelationGetDescr(leaf_part_rri->ri_PartitionRoot));
++								   RelationGetDescr(rootResultRelInfo->ri_RelationDesc));
+ 
+ 	/*
+ 	 * Since we've just initialized this ResultRelInfo, it's not in any list
+@@ -951,6 +950,7 @@ ExecInitRoutingInfo(ModifyTableState *mtstate,
+ 					ResultRelInfo *partRelInfo,
+ 					int partidx)
+ {
++	ResultRelInfo *rootRelInfo = partRelInfo->ri_RootResultRelInfo;
+ 	MemoryContext oldcxt;
+ 	int			rri_index;
+ 
+@@ -961,7 +961,7 @@ ExecInitRoutingInfo(ModifyTableState *mtstate,
+ 	 * partition from the parent's type to the partition's.
+ 	 */
+ 	partRelInfo->ri_RootToPartitionMap =
+-		convert_tuples_by_name(RelationGetDescr(partRelInfo->ri_PartitionRoot),
++		convert_tuples_by_name(RelationGetDescr(rootRelInfo->ri_RelationDesc),
+ 							   RelationGetDescr(partRelInfo->ri_RelationDesc));
+ 
+ 	/*
+@@ -1055,7 +1055,8 @@ ExecInitRoutingInfo(ModifyTableState *mtstate,
+ static PartitionDispatch
+ ExecInitPartitionDispatchInfo(EState *estate,
+ 							  PartitionTupleRouting *proute, Oid partoid,
+-							  PartitionDispatch parent_pd, int partidx)
++							  PartitionDispatch parent_pd, int partidx,
++							  ResultRelInfo *rootResultRelInfo)
+ {
+ 	Relation	rel;
+ 	PartitionDesc partdesc;
+@@ -1153,7 +1154,7 @@ ExecInitPartitionDispatchInfo(EState *estate,
+ 	{
+ 		ResultRelInfo *rri = makeNode(ResultRelInfo);
+ 
+-		InitResultRelInfo(rri, rel, 1, proute->partition_root, 0);
++		InitResultRelInfo(rri, rel, 0, rootResultRelInfo, 0);
+ 		proute->nonleaf_partitions[dispatchidx] = rri;
+ 	}
+ 	else
+diff --git a/src/backend/executor/execUtils.c b/src/backend/executor/execUtils.c
+index d84fbaded9..c734283bfe 100644
+--- a/src/backend/executor/execUtils.c
++++ b/src/backend/executor/execUtils.c
+@@ -51,6 +51,7 @@
+ #include "access/tableam.h"
+ #include "access/transam.h"
+ #include "executor/executor.h"
++#include "executor/execPartition.h"
+ #include "jit/jit.h"
+ #include "mb/pg_wchar.h"
+ #include "miscadmin.h"
+@@ -1223,3 +1224,88 @@ ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo)
+ 
+ 	return relInfo->ri_ReturningSlot;
+ }
++
++/* Return a bitmap representing columns being inserted */
++Bitmapset *
++ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate)
++{
++	/*
++	 * The columns are stored in the range table entry. If this ResultRelInfo
++	 * doesn't have an entry in the range table (i.e. if it represents a
++	 * partition routing target), fetch the parent's RTE and map the columns
++	 * to the order they are in the partition.
++	 */
++	if (relinfo->ri_RangeTableIndex != 0)
++	{
++		RangeTblEntry *rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
++
++		return rte->insertedCols;
++	}
++	else
++	{
++		ResultRelInfo *rootRelInfo = relinfo->ri_RootResultRelInfo;
++		RangeTblEntry *rte = exec_rt_fetch(rootRelInfo->ri_RangeTableIndex, estate);
++
++		if (relinfo->ri_RootToPartitionMap != NULL)
++			return execute_attr_map_cols(relinfo->ri_RootToPartitionMap->attrMap,
++										 rte->insertedCols);
++		else
++			return rte->insertedCols;
++	}
++}
++
++/* Return a bitmap representing columns being updated */
++Bitmapset *
++ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate)
++{
++	/* see ExecGetInsertedCols() */
++	if (relinfo->ri_RangeTableIndex != 0)
++	{
++		RangeTblEntry *rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
++
++		return rte->updatedCols;
++	}
++	else
++	{
++		ResultRelInfo *rootRelInfo = relinfo->ri_RootResultRelInfo;
++		RangeTblEntry *rte = exec_rt_fetch(rootRelInfo->ri_RangeTableIndex, estate);
++
++		if (relinfo->ri_RootToPartitionMap != NULL)
++			return execute_attr_map_cols(relinfo->ri_RootToPartitionMap->attrMap,
++										 rte->updatedCols);
++		else
++			return rte->updatedCols;
++	}
++}
++
++/* Return a bitmap representing generated columns being updated */
++Bitmapset *
++ExecGetExtraUpdatedCols(ResultRelInfo *relinfo, EState *estate)
++{
++	/* see ExecGetInsertedCols() */
++	if (relinfo->ri_RangeTableIndex != 0)
++	{
++		RangeTblEntry *rte = exec_rt_fetch(relinfo->ri_RangeTableIndex, estate);
++
++		return rte->extraUpdatedCols;
++	}
++	else
++	{
++		ResultRelInfo *rootRelInfo = relinfo->ri_RootResultRelInfo;
++		RangeTblEntry *rte = exec_rt_fetch(rootRelInfo->ri_RangeTableIndex, estate);
++
++		if (relinfo->ri_RootToPartitionMap != NULL)
++			return execute_attr_map_cols(relinfo->ri_RootToPartitionMap->attrMap,
++										 rte->extraUpdatedCols);
++		else
++			return rte->extraUpdatedCols;
++	}
++}
++
++/* Return columns being updated, including generated columns */
++Bitmapset *
++ExecGetAllUpdatedCols(ResultRelInfo *relinfo, EState *estate)
++{
++	return bms_union(ExecGetUpdatedCols(relinfo, estate),
++					 ExecGetExtraUpdatedCols(relinfo, estate));
++}
+diff --git a/src/backend/executor/nodeModifyTable.c b/src/backend/executor/nodeModifyTable.c
+index 5d90337498..2993ba43e3 100644
+--- a/src/backend/executor/nodeModifyTable.c
++++ b/src/backend/executor/nodeModifyTable.c
+@@ -291,7 +291,7 @@ ExecComputeStoredGenerated(ResultRelInfo *resultRelInfo,
+ 				if (cmdtype == CMD_UPDATE &&
+ 					!(rel->trigdesc && rel->trigdesc->trig_update_before_row) &&
+ 					!bms_is_member(i + 1 - FirstLowInvalidHeapAttributeNumber,
+-								   exec_rt_fetch(resultRelInfo->ri_RangeTableIndex, estate)->extraUpdatedCols))
++								   ExecGetExtraUpdatedCols(resultRelInfo, estate)))
+ 				{
+ 					resultRelInfo->ri_GeneratedExprs[i] = NULL;
+ 					continue;
+@@ -565,7 +565,7 @@ ExecInsert(ModifyTableState *mtstate,
+ 		 * if there's no BR trigger defined on the partition.
+ 		 */
+ 		if (resultRelationDesc->rd_rel->relispartition &&
+-			(resultRelInfo->ri_PartitionRoot == NULL ||
++			(resultRelInfo->ri_RootResultRelInfo == NULL ||
+ 			 (resultRelInfo->ri_TrigDesc &&
+ 			  resultRelInfo->ri_TrigDesc->trig_insert_before_row)))
+ 			ExecPartitionCheck(resultRelInfo, slot, estate, true);
+diff --git a/src/include/access/tupconvert.h b/src/include/access/tupconvert.h
+index b25e28221e..a2cc4b3a6d 100644
+--- a/src/include/access/tupconvert.h
++++ b/src/include/access/tupconvert.h
+@@ -18,6 +18,7 @@
+ #include "access/htup.h"
+ #include "access/tupdesc.h"
+ #include "executor/tuptable.h"
++#include "nodes/bitmapset.h"
+ 
+ 
+ typedef struct TupleConversionMap
+@@ -43,6 +44,7 @@ extern HeapTuple execute_attr_map_tuple(HeapTuple tuple, TupleConversionMap *map
+ extern TupleTableSlot *execute_attr_map_slot(AttrMap *attrMap,
+ 											 TupleTableSlot *in_slot,
+ 											 TupleTableSlot *out_slot);
++extern Bitmapset *execute_attr_map_cols(AttrMap *attrMap, Bitmapset *inbitmap);
+ 
+ extern void free_conversion_map(TupleConversionMap *map);
+ 
+diff --git a/src/include/executor/executor.h b/src/include/executor/executor.h
+index 758c3ca097..071e363d54 100644
+--- a/src/include/executor/executor.h
++++ b/src/include/executor/executor.h
+@@ -191,7 +191,7 @@ extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation)
+ extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
+ 							  Relation resultRelationDesc,
+ 							  Index resultRelationIndex,
+-							  Relation partition_root,
++							  ResultRelInfo *partition_root_rri,
+ 							  int instrument_options);
+ extern ResultRelInfo *ExecGetTriggerResultRel(EState *estate, Oid relid);
+ extern void ExecConstraints(ResultRelInfo *resultRelInfo,
+@@ -574,6 +574,11 @@ extern TupleTableSlot *ExecGetTriggerOldSlot(EState *estate, ResultRelInfo *relI
+ extern TupleTableSlot *ExecGetTriggerNewSlot(EState *estate, ResultRelInfo *relInfo);
+ extern TupleTableSlot *ExecGetReturningSlot(EState *estate, ResultRelInfo *relInfo);
+ 
++extern Bitmapset *ExecGetInsertedCols(ResultRelInfo *relinfo, EState *estate);
++extern Bitmapset *ExecGetUpdatedCols(ResultRelInfo *relinfo, EState *estate);
++extern Bitmapset *ExecGetExtraUpdatedCols(ResultRelInfo *relinfo, EState *estate);
++extern Bitmapset *ExecGetAllUpdatedCols(ResultRelInfo *relinfo, EState *estate);
++
+ /*
+  * prototypes from functions in execIndexing.c
+  */
+diff --git a/src/include/nodes/execnodes.h b/src/include/nodes/execnodes.h
+index d65099c94a..b6a88ff76b 100644
+--- a/src/include/nodes/execnodes.h
++++ b/src/include/nodes/execnodes.h
+@@ -488,12 +488,16 @@ typedef struct ResultRelInfo
+ 	/*
+ 	 * Information needed by tuple routing target relations
+ 	 *
+-	 * PartitionRoot gives the target relation mentioned in the query.
++	 * RootResultRelInfo gives the target relation mentioned in the query, if
++	 * it's a partitioned table. It is not set if the target relation
++	 * mentioned in the query is an inherited table, nor when tuple routing is
++	 * not needed.
++	 *
+ 	 * RootToPartitionMap and PartitionTupleSlot, initialized by
+ 	 * ExecInitRoutingInfo, are non-NULL if partition has a different tuple
+ 	 * format than the root table.
+ 	 */
+-	Relation	ri_PartitionRoot;
++	struct ResultRelInfo *ri_RootResultRelInfo;
+ 	TupleConversionMap *ri_RootToPartitionMap;
+ 	TupleTableSlot *ri_PartitionTupleSlot;
+ 
+diff --git a/src/test/isolation/expected/tuplelock-partition.out b/src/test/isolation/expected/tuplelock-partition.out
+new file mode 100644
+index 0000000000..dd6d37c577
+--- /dev/null
++++ b/src/test/isolation/expected/tuplelock-partition.out
+@@ -0,0 +1,20 @@
++Parsed test spec with 2 sessions
++
++starting permutation: s1b s1update_nokey s2locktuple s1c
++step s1b: BEGIN;
++step s1update_nokey: INSERT INTO parttab (key, col1, col2) VALUES (1, 'a', 'b') ON CONFLICT (key) DO UPDATE SET col1 = 'x', col2 = 'y';
++step s2locktuple: SELECT * FROM parttab FOR KEY SHARE;
++col1           key            col2           
++
++a              1              b              
++step s1c: COMMIT;
++
++starting permutation: s1b s1update_key s2locktuple s1c
++step s1b: BEGIN;
++step s1update_key: INSERT INTO parttab (key, col1, col2) VALUES (1, 'a', 'b') ON CONFLICT (key) DO UPDATE SET key=1;
++step s2locktuple: SELECT * FROM parttab FOR KEY SHARE; <waiting ...>
++step s1c: COMMIT;
++step s2locktuple: <... completed>
++col1           key            col2           
++
++a              1              b              
+diff --git a/src/test/isolation/isolation_schedule b/src/test/isolation/isolation_schedule
+index f2e752c445..5d6b79e66e 100644
+--- a/src/test/isolation/isolation_schedule
++++ b/src/test/isolation/isolation_schedule
+@@ -54,6 +54,7 @@ test: propagate-lock-delete
+ test: tuplelock-conflict
+ test: tuplelock-update
+ test: tuplelock-upgrade-no-deadlock
++test: tuplelock-partition
+ test: freeze-the-dead
+ test: nowait
+ test: nowait-2
+diff --git a/src/test/isolation/specs/tuplelock-partition.spec b/src/test/isolation/specs/tuplelock-partition.spec
+new file mode 100644
+index 0000000000..9a585cb161
+--- /dev/null
++++ b/src/test/isolation/specs/tuplelock-partition.spec
+@@ -0,0 +1,32 @@
++# Test tuple locking on INSERT ON CONFLICT UPDATE on a partitioned table.
++
++setup
++{
++   DROP TABLE IF EXISTS parttab;
++   CREATE TABLE parttab (col1 text, key INTEGER PRIMARY KEY, col2 text) PARTITION BY LIST (key);
++   CREATE TABLE parttab1 (key INTEGER PRIMARY KEY, col1 text, col2 text);
++   CREATE TABLE parttab2 (key INTEGER PRIMARY KEY, col1 text, col2 text);
++   ALTER TABLE parttab ATTACH PARTITION parttab1 FOR VALUES IN (1);
++   ALTER TABLE parttab ATTACH PARTITION parttab2 FOR VALUES IN (2);
++   INSERT INTO parttab (key, col1, col2) VALUES (1, 'a', 'b');
++}
++
++teardown
++{
++   DROP TABLE parttab;
++}
++
++session "s1"
++step "s1b"               { BEGIN; }
++step "s1update_nokey"  { INSERT INTO parttab (key, col1, col2) VALUES (1, 'a', 'b') ON CONFLICT (key) DO UPDATE SET col1 = 'x', col2 = 'y'; }
++step "s1update_key"  { INSERT INTO parttab (key, col1, col2) VALUES (1, 'a', 'b') ON CONFLICT (key) DO UPDATE SET key=1; }
++step "s1c"               { COMMIT; }
++
++session "s2"
++step "s2locktuple"  { SELECT * FROM parttab FOR KEY SHARE; }
++
++# INSERT ON CONFLICT UPDATE, performs an UPDATE on non-key columns
++permutation "s1b" "s1update_nokey" "s2locktuple" "s1c"
++
++# INSERT ON CONFLICT UPDATE, performs an UPDATE on key column
++permutation "s1b" "s1update_key" "s2locktuple" "s1c"
+diff --git a/src/test/regress/expected/privileges.out b/src/test/regress/expected/privileges.out
+index ed98fa8376..c5bd4e75e3 100644
+--- a/src/test/regress/expected/privileges.out
++++ b/src/test/regress/expected/privileges.out
+@@ -618,6 +618,45 @@ ERROR:  new row for relation "t1" violates check constraint "t1_c3_check"
+ DETAIL:  Failing row contains (c1, c3) = (1, 10).
+ SET SESSION AUTHORIZATION regress_priv_user1;
+ DROP TABLE t1;
++-- check error reporting with column privs on a partitioned table
++CREATE TABLE errtst(a text, b text NOT NULL, c text, secret1 text, secret2 text) PARTITION BY LIST (a);
++CREATE TABLE errtst_part_1(secret2 text, c text, a text, b text NOT NULL, secret1 text);
++CREATE TABLE errtst_part_2(secret1 text, secret2 text, a text, c text, b text NOT NULL);
++ALTER TABLE errtst ATTACH PARTITION errtst_part_1 FOR VALUES IN ('aaa');
++ALTER TABLE errtst ATTACH PARTITION errtst_part_2 FOR VALUES IN ('aaaa');
++GRANT SELECT (a, b, c) ON TABLE errtst TO regress_priv_user2;
++GRANT UPDATE (a, b, c) ON TABLE errtst TO regress_priv_user2;
++GRANT INSERT (a, b, c) ON TABLE errtst TO regress_priv_user2;
++INSERT INTO errtst_part_1 (a, b, c, secret1, secret2)
++VALUES ('aaa', 'bbb', 'ccc', 'the body', 'is in the attic');
++SET SESSION AUTHORIZATION regress_priv_user2;
++-- Perform a few updates that violate the NOT NULL constraint. Make sure
++-- the error messages don't leak the secret fields.
++-- simple insert.
++INSERT INTO errtst (a, b) VALUES ('aaa', NULL);
++ERROR:  null value in column "b" of relation "errtst_part_1" violates not-null constraint
++DETAIL:  Failing row contains (a, b, c) = (aaa, null, null).
++-- simple update.
++UPDATE errtst SET b = NULL;
++ERROR:  null value in column "b" of relation "errtst_part_1" violates not-null constraint
++DETAIL:  Failing row contains (b) = (null).
++-- partitioning key is updated, doesn't move the row.
++UPDATE errtst SET a = 'aaa', b = NULL;
++ERROR:  null value in column "b" of relation "errtst_part_1" violates not-null constraint
++DETAIL:  Failing row contains (a, b, c) = (aaa, null, ccc).
++-- row is moved to another partition.
++UPDATE errtst SET a = 'aaaa', b = NULL;
++ERROR:  null value in column "b" of relation "errtst_part_2" violates not-null constraint
++DETAIL:  Failing row contains (a, b, c) = (aaaa, null, ccc).
++-- row is moved to another partition. This differs from the previous case in
++-- that the new partition is excluded by constraint exclusion, so its
++-- ResultRelInfo is not created at ExecInitModifyTable, but needs to be
++-- constructed on the fly when the updated tuple is routed to it.
++UPDATE errtst SET a = 'aaaa', b = NULL WHERE a = 'aaa';
++ERROR:  null value in column "b" of relation "errtst_part_2" violates not-null constraint
++DETAIL:  Failing row contains (a, b, c) = (aaaa, null, ccc).
++SET SESSION AUTHORIZATION regress_priv_user1;
++DROP TABLE errtst;
+ -- test column-level privileges when involved with DELETE
+ SET SESSION AUTHORIZATION regress_priv_user1;
+ ALTER TABLE atest6 ADD COLUMN three integer;
+diff --git a/src/test/regress/sql/privileges.sql b/src/test/regress/sql/privileges.sql
+index becbc19671..e437006e53 100644
+--- a/src/test/regress/sql/privileges.sql
++++ b/src/test/regress/sql/privileges.sql
+@@ -403,6 +403,44 @@ UPDATE t1 SET c3 = 10; -- fail, but see columns with SELECT rights, or being mod
+ SET SESSION AUTHORIZATION regress_priv_user1;
+ DROP TABLE t1;
+ 
++-- check error reporting with column privs on a partitioned table
++CREATE TABLE errtst(a text, b text NOT NULL, c text, secret1 text, secret2 text) PARTITION BY LIST (a);
++CREATE TABLE errtst_part_1(secret2 text, c text, a text, b text NOT NULL, secret1 text);
++CREATE TABLE errtst_part_2(secret1 text, secret2 text, a text, c text, b text NOT NULL);
++
++ALTER TABLE errtst ATTACH PARTITION errtst_part_1 FOR VALUES IN ('aaa');
++ALTER TABLE errtst ATTACH PARTITION errtst_part_2 FOR VALUES IN ('aaaa');
++
++GRANT SELECT (a, b, c) ON TABLE errtst TO regress_priv_user2;
++GRANT UPDATE (a, b, c) ON TABLE errtst TO regress_priv_user2;
++GRANT INSERT (a, b, c) ON TABLE errtst TO regress_priv_user2;
++
++INSERT INTO errtst_part_1 (a, b, c, secret1, secret2)
++VALUES ('aaa', 'bbb', 'ccc', 'the body', 'is in the attic');
++
++SET SESSION AUTHORIZATION regress_priv_user2;
++
++-- Perform a few updates that violate the NOT NULL constraint. Make sure
++-- the error messages don't leak the secret fields.
++
++-- simple insert.
++INSERT INTO errtst (a, b) VALUES ('aaa', NULL);
++-- simple update.
++UPDATE errtst SET b = NULL;
++-- partitioning key is updated, doesn't move the row.
++UPDATE errtst SET a = 'aaa', b = NULL;
++-- row is moved to another partition.
++UPDATE errtst SET a = 'aaaa', b = NULL;
++
++-- row is moved to another partition. This differs from the previous case in
++-- that the new partition is excluded by constraint exclusion, so its
++-- ResultRelInfo is not created at ExecInitModifyTable, but needs to be
++-- constructed on the fly when the updated tuple is routed to it.
++UPDATE errtst SET a = 'aaaa', b = NULL WHERE a = 'aaa';
++
++SET SESSION AUTHORIZATION regress_priv_user1;
++DROP TABLE errtst;
++
+ -- test column-level privileges when involved with DELETE
+ SET SESSION AUTHORIZATION regress_priv_user1;
+ ALTER TABLE atest6 ADD COLUMN three integer;

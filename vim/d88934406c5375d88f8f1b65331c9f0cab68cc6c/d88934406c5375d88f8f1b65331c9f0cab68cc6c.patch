@@ -1,0 +1,66 @@
+commit d88934406c5375d88f8f1b65331c9f0cab68cc6c
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri May 6 20:38:47 2022 +0100
+
+    patch 8.2.4895: buffer overflow with invalid command with composing chars
+    
+    Problem:    Buffer overflow with invalid command with composing chars.
+    Solution:   Check that the whole character fits in the buffer.
+
+diff --git a/src/ex_docmd.c b/src/ex_docmd.c
+index 26acc07e0..46f2b221b 100644
+--- a/src/ex_docmd.c
++++ b/src/ex_docmd.c
+@@ -3435,7 +3435,7 @@ append_command(char_u *cmd)
+ 
+     STRCAT(IObuff, ": ");
+     d = IObuff + STRLEN(IObuff);
+-    while (*s != NUL && d - IObuff < IOSIZE - 7)
++    while (*s != NUL && d - IObuff + 5 < IOSIZE)
+     {
+ 	if (enc_utf8 ? (s[0] == 0xc2 && s[1] == 0xa0) : *s == 0xa0)
+ 	{
+@@ -3443,6 +3443,8 @@ append_command(char_u *cmd)
+ 	    STRCPY(d, "<a0>");
+ 	    d += 4;
+ 	}
++	else if (d - IObuff + (*mb_ptr2len)(s) + 1 >= IOSIZE)
++	    break;
+ 	else
+ 	    MB_COPY_CHAR(s, d);
+     }
+diff --git a/src/testdir/test_cmdline.vim b/src/testdir/test_cmdline.vim
+index 8d556faf0..474638fb0 100644
+--- a/src/testdir/test_cmdline.vim
++++ b/src/testdir/test_cmdline.vim
+@@ -3353,6 +3353,17 @@ func Test_cmdline_complete_scriptnames()
+   set wildmenu&
+ endfunc
+ 
++" this was going over the end of IObuff
++func Test_report_error_with_composing()
++  let caught = 'no'
++  try
++    exe repeat('0', 987) .. "0\xdd\x80\xdd\x80\xdd\x80\xdd\x80"
++  catch /E492:/
++    let caught = 'yes'
++  endtry
++  call assert_equal('yes', caught)
++endfunc
++
+ " Test for expanding 2-letter and 3-letter :substitute command arguments.
+ " These commands don't accept an argument.
+ func Test_cmdline_complete_substitute_short()
+diff --git a/src/version.c b/src/version.c
+index 0857bcb7c..df306852f 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4895,
+ /**/
+     4894,
+ /**/

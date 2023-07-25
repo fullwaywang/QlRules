@@ -1,0 +1,58 @@
+commit 36343ae0fb7247e060abfd35fb8e4337b33abb4b
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Oct 15 19:04:05 2022 +0100
+
+    patch 9.0.0765: with a Visual block a put command column may go negative
+    
+    Problem:    With a Visual block a put command column may go negative.
+    Solution:   Check that the column does not become negative.
+
+diff --git a/src/register.c b/src/register.c
+index bede88b9a..21ed43699 100644
+--- a/src/register.c
++++ b/src/register.c
+@@ -1960,6 +1960,8 @@ do_put(
+ 	// adjust '] mark
+ 	curbuf->b_op_end.lnum = curwin->w_cursor.lnum - 1;
+ 	curbuf->b_op_end.col = bd.textcol + totlen - 1;
++	if (curbuf->b_op_end.col < 0)
++	    curbuf->b_op_end.col = 0;
+ 	curbuf->b_op_end.coladd = 0;
+ 	if (flags & PUT_CURSEND)
+ 	{
+diff --git a/src/testdir/test_visual.vim b/src/testdir/test_visual.vim
+index 66a44c52c..a7f8ec4d4 100644
+--- a/src/testdir/test_visual.vim
++++ b/src/testdir/test_visual.vim
+@@ -483,6 +483,18 @@ func Test_visual_block_put()
+   bw!
+ endfunc
+ 
++func Test_visual_block_put_invalid()
++  enew!
++  behave mswin
++  norm yy
++  norm v)Ps/^/	
++  " this was causing the column to become negative
++  silent norm ggv)P
++
++  bwipe!
++  behave xterm
++endfunc
++
+ " Visual modes (v V CTRL-V) followed by an operator; count; repeating
+ func Test_visual_mode_op()
+   new
+diff --git a/src/version.c b/src/version.c
+index dc5e40177..017b311fb 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    765,
+ /**/
+     764,
+ /**/

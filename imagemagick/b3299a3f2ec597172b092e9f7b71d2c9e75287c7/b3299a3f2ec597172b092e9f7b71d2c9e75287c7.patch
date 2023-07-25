@@ -1,0 +1,19 @@
+commit b3299a3f2ec597172b092e9f7b71d2c9e75287c7
+Author: Dirk Lemstra <dirk@git.imagemagick.org>
+Date:   Wed May 3 23:58:25 2017 +0200
+
+    Added extra check that was reported in #466.
+
+diff --git a/coders/icon.c b/coders/icon.c
+index 5e854d0cb..67883b166 100644
+--- a/coders/icon.c
++++ b/coders/icon.c
+@@ -432,7 +432,7 @@ static Image *ReadICONImage(const ImageInfo *image_info,
+         {
+           image->storage_class=PseudoClass;
+           image->colors=icon_info.number_colors;
+-          if (image->colors == 0)
++          if ((image->colors == 0) || (image->colors > 256))
+             image->colors=one << icon_info.bits_per_pixel;
+         }
+       if (image->storage_class == PseudoClass)

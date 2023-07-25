@@ -1,0 +1,83 @@
+commit 1719d12e51641cce5c77e259516649ba5ef6303c
+Author: DRC <information@libjpeg-turbo.org>
+Date:   Thu Jan 14 18:35:15 2021 -0600
+
+    cjpeg: Fix FPE when compressing 0-width GIF
+    
+    Fixes #493
+
+diff --git a/ChangeLog.md b/ChangeLog.md
+index 92bf27ea..61a9095e 100644
+--- a/ChangeLog.md
++++ b/ChangeLog.md
+@@ -15,6 +15,10 @@ block smoothing algorithm to read from uninitialized memory.
+ encoders to generate incorrect results when using the Clang compiler with
+ Visual Studio.
+ 
++4. Fixed a floating point exception that occurred when attempting to compress a
++specially-crafted malformed GIF image with a specified image width of 0 using
++cjpeg.
++
+ 
+ 2.0.90 (2.1 beta1)
+ ==================
+diff --git a/cderror.h b/cderror.h
+index a386b693..2844346e 100644
+--- a/cderror.h
++++ b/cderror.h
+@@ -1,9 +1,11 @@
+ /*
+  * cderror.h
+  *
++ * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1994-1997, Thomas G. Lane.
+  * Modified 2009-2017 by Guido Vollbeding.
+- * This file is part of the Independent JPEG Group's software.
++ * libjpeg-turbo Modifications:
++ * Copyright (C) 2021, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README.ijg
+  * file.
+  *
+@@ -60,6 +62,7 @@ JMESSAGE(JTRC_BMP_OS2_MAPPED, "%ux%u 8-bit colormapped OS2 BMP image")
+ JMESSAGE(JERR_GIF_BUG, "GIF output got confused")
+ JMESSAGE(JERR_GIF_CODESIZE, "Bogus GIF codesize %d")
+ JMESSAGE(JERR_GIF_COLORSPACE, "GIF output must be grayscale or RGB")
++JMESSAGE(JERR_GIF_EMPTY, "Empty GIF image")
+ JMESSAGE(JERR_GIF_IMAGENOTFOUND, "Too few images in GIF file")
+ JMESSAGE(JERR_GIF_NOT, "Not a GIF file")
+ JMESSAGE(JTRC_GIF, "%ux%ux%d GIF image")
+diff --git a/rdgif.c b/rdgif.c
+index e1ea56cd..8a379fe6 100644
+--- a/rdgif.c
++++ b/rdgif.c
+@@ -1,9 +1,11 @@
+ /*
+  * rdgif.c
+  *
++ * This file was part of the Independent JPEG Group's software:
+  * Copyright (C) 1991-1997, Thomas G. Lane.
+  * Modified 2019 by Guido Vollbeding.
+- * This file is part of the Independent JPEG Group's software.
++ * libjpeg-turbo Modifications:
++ * Copyright (C) 2021, D. R. Commander.
+  * For conditions of distribution and use, see the accompanying README.ijg
+  * file.
+  *
+@@ -404,6 +406,8 @@ start_input_gif(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     ERREXIT(cinfo, JERR_INPUT_EOF);
+   width = LM_to_uint(hdrbuf, 0);
+   height = LM_to_uint(hdrbuf, 2);
++  if (width == 0 || height == 0)
++    ERREXIT(cinfo, JERR_GIF_EMPTY);
+   /* we ignore the color resolution, sort flag, and background color index */
+   aspectRatio = UCH(hdrbuf[6]);
+   if (aspectRatio != 0 && aspectRatio != 49)
+@@ -446,6 +450,8 @@ start_input_gif(j_compress_ptr cinfo, cjpeg_source_ptr sinfo)
+     /* we ignore top/left position info, also sort flag */
+     width = LM_to_uint(hdrbuf, 4);
+     height = LM_to_uint(hdrbuf, 6);
++    if (width == 0 || height == 0)
++      ERREXIT(cinfo, JERR_GIF_EMPTY);
+     source->is_interlaced = (BitSet(hdrbuf[8], INTERLACE) != 0);
+ 
+     /* Read local colormap if header indicates it is present */

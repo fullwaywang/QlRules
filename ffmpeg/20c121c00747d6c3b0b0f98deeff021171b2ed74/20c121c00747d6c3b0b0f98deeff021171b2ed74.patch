@@ -1,0 +1,29 @@
+commit 20c121c00747d6c3b0b0f98deeff021171b2ed74	20c121c00747d6c3b0b0f98deeff021171b2ed74
+Author: Clément Bœsch <ubitux@gmail.com>
+Date:   Sun Dec 30 06:53:48 2012 +0100
+
+    lavc/ass_split: check for NULL pointer in ff_ass_split_override_codes().
+    
+    This is consistent with the other ff_ass_split_* functions.
+    
+    It also fixes a crash when trying to split a dialog with text=NULL
+    (which seems to happen when the text of the dialog is empty); basically,
+    this commit fixes crashes when trying to encode an empty text subtitle
+    dialog (see subrip and mov_text encoders).
+    
+    Fixes Ticket2048.
+    (cherry picked from commit c83002a4f8042ccfa0688a9a18e8fa0369c1fda8)
+
+diff --git a/libavcodec/ass_split.c b/libavcodec/ass_split.c
+index 7ee48b4a5c..dc38341e14 100644
+--- a/libavcodec/ass_split.c
++++ b/libavcodec/ass_split.c
+@@ -368,7 +368,7 @@ int ff_ass_split_override_codes(const ASSCodesCallbacks *callbacks, void *priv,
+     char new_line[2];
+     int text_len = 0;
+ 
+-    while (*buf) {
++    while (buf && *buf) {
+         if (text && callbacks->text &&
+             (sscanf(buf, "\\%1[nN]", new_line) == 1 ||
+              !strncmp(buf, "{\\", 2))) {

@@ -1,0 +1,26 @@
+commit 2d453188c2303da641dafb048dc1806790526dfd
+Author: Matt Wolenetz <wolenetz@google.com>
+Date:   Wed Dec 14 15:26:19 2016 -0800
+
+    lavf/mov.c: Avoid heap allocation wrap in mov_read_uuid
+    
+    Core of patch is from paul@paulmehta.com
+    Reference https://crbug.com/643951
+    
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+    Check value reduced as the code does not support values beyond INT_MAX
+    Also the check is moved to a more common place and before integer truncation
+
+diff --git a/libavformat/mov.c b/libavformat/mov.c
+index 8c54539c5f..ca49786ea2 100644
+--- a/libavformat/mov.c
++++ b/libavformat/mov.c
+@@ -4789,7 +4789,7 @@ static int mov_read_uuid(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+         0x88, 0x14, 0x58, 0x7a, 0x02, 0x52, 0x1f, 0xdd,
+     };
+ 
+-    if (atom.size < sizeof(uuid) || atom.size == INT64_MAX)
++    if (atom.size < sizeof(uuid) || atom.size >= FFMIN(INT_MAX, SIZE_MAX))
+         return AVERROR_INVALIDDATA;
+ 
+     if (c->fc->nb_streams < 1)

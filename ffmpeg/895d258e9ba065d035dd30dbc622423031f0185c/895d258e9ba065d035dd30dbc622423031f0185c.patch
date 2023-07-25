@@ -1,0 +1,34 @@
+commit 895d258e9ba065d035dd30dbc622423031f0185c	895d258e9ba065d035dd30dbc622423031f0185c
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Nov 18 17:48:31 2011 +0100
+
+    qdm2dec: fix buffer overflow.
+    Fixes NGS00144
+    
+    Thanks to Phillip for suggestions to improve the patch.
+    Found-by: Phillip Langlois
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/qdm2.c b/libavcodec/qdm2.c
+index a057c1e0b4..e2eb0eacb8 100644
+--- a/libavcodec/qdm2.c
++++ b/libavcodec/qdm2.c
+@@ -170,7 +170,7 @@ typedef struct {
+     /// I/O data
+     const uint8_t *compressed_data;
+     int compressed_size;
+-    float output_buffer[QDM2_MAX_FRAME_SIZE * 2];
++    float output_buffer[QDM2_MAX_FRAME_SIZE * MPA_MAX_CHANNELS * 2];
+ 
+     /// Synthesis filter
+     MPADSPContext mpadsp;
+@@ -1896,6 +1896,9 @@ static int qdm2_decode (QDM2Context *q, const uint8_t *in, int16_t *out)
+     int ch, i;
+     const int frame_size = (q->frame_size * q->channels);
+ 
++    if((unsigned)frame_size > FF_ARRAY_ELEMS(q->output_buffer)/2)
++        return -1;
++
+     /* select input buffer */
+     q->compressed_data = in;
+     q->compressed_size = q->checksum_size;

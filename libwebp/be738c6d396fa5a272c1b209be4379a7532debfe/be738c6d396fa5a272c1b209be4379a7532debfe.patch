@@ -1,0 +1,69 @@
+commit be738c6d396fa5a272c1b209be4379a7532debfe
+Author: James Zern <jzern@google.com>
+Date:   Thu Jun 21 01:13:36 2018 +0000
+
+    muxread,ChunkVerifyAndAssign: validate chunk_size
+    
+    before accounting for padding which might overflow if chunk_size is >
+    MAX_CHUNK_PAYLOAD.
+    
+    BUG=webp:387,webp:388
+    
+    Change-Id: I3985b8817ed4faaec0629102c5333c228a0e9c98
+
+diff --git a/src/mux/muxi.h b/src/mux/muxi.h
+index 6b57eea3..14fd6e24 100644
+--- a/src/mux/muxi.h
++++ b/src/mux/muxi.h
+@@ -14,6 +14,7 @@
+ #ifndef WEBP_MUX_MUXI_H_
+ #define WEBP_MUX_MUXI_H_
+ 
++#include <assert.h>
+ #include <stdlib.h>
+ #include "src/dec/vp8i_dec.h"
+ #include "src/dec/vp8li_dec.h"
+@@ -143,13 +144,13 @@ void ChunkListDelete(WebPChunk** const chunk_list);
+ 
+ // Returns size of the chunk including chunk header and padding byte (if any).
+ static WEBP_INLINE size_t SizeWithPadding(size_t chunk_size) {
++  assert(chunk_size <= MAX_CHUNK_PAYLOAD);
+   return CHUNK_HEADER_SIZE + ((chunk_size + 1) & ~1U);
+ }
+ 
+ // Size of a chunk including header and padding.
+ static WEBP_INLINE size_t ChunkDiskSize(const WebPChunk* chunk) {
+   const size_t data_size = chunk->data_.size;
+-  assert(data_size < MAX_CHUNK_PAYLOAD);
+   return SizeWithPadding(data_size);
+ }
+ 
+diff --git a/src/mux/muxread.c b/src/mux/muxread.c
+index eb5070b1..ef50dae5 100644
+--- a/src/mux/muxread.c
++++ b/src/mux/muxread.c
+@@ -59,6 +59,7 @@ static WebPMuxError ChunkVerifyAndAssign(WebPChunk* chunk,
+   // Sanity checks.
+   if (data_size < CHUNK_HEADER_SIZE) return WEBP_MUX_NOT_ENOUGH_DATA;
+   chunk_size = GetLE32(data + TAG_SIZE);
++  if (chunk_size > MAX_CHUNK_PAYLOAD) return WEBP_MUX_BAD_DATA;
+ 
+   {
+     const size_t chunk_disk_size = SizeWithPadding(chunk_size);
+@@ -203,9 +204,14 @@ WebPMux* WebPMuxCreateInternal(const WebPData* bitstream, int copy_data,
+     goto Err;  // First chunk should be VP8, VP8L or VP8X.
+   }
+ 
+-  riff_size = SizeWithPadding(GetLE32(data + TAG_SIZE));
++  riff_size = GetLE32(data + TAG_SIZE);
++  if (riff_size > MAX_CHUNK_PAYLOAD) goto Err;
++
++  // Note this padding is historical and differs from demux.c which does not
++  // pad the file size.
++  riff_size = SizeWithPadding(riff_size);
+   if (riff_size < CHUNK_HEADER_SIZE) goto Err;
+-  if (riff_size > MAX_CHUNK_PAYLOAD || riff_size > size) goto Err;
++  if (riff_size > size) goto Err;
+   // There's no point in reading past the end of the RIFF chunk.
+   if (size > riff_size + CHUNK_HEADER_SIZE) {
+     size = riff_size + CHUNK_HEADER_SIZE;

@@ -1,0 +1,27 @@
+commit 1d479300cbe0522c233b7d51148aea2b29bd29ad
+Author: James Almer <jamrial@gmail.com>
+Date:   Fri Oct 18 20:53:10 2019 -0300
+
+    avformat/nutenc: don't allocate a dynamic AVIOContext if no index is going to be written
+    
+    Fixes ticket #8295
+    
+    Signed-off-by: James Almer <jamrial@gmail.com>
+
+diff --git a/libavformat/nutenc.c b/libavformat/nutenc.c
+index e9a3bb49db..4d10e70e9e 100644
+--- a/libavformat/nutenc.c
++++ b/libavformat/nutenc.c
+@@ -1170,8 +1170,11 @@ static int nut_write_trailer(AVFormatContext *s)
+     while (nut->header_count < 3)
+         write_headers(s, bc);
+ 
++    if (!nut->sp_count)
++        return 0;
++
+     ret = avio_open_dyn_buf(&dyn_bc);
+-    if (ret >= 0 && nut->sp_count) {
++    if (ret >= 0) {
+         av_assert1(nut->write_index); // sp_count should be 0 if no index is going to be written
+         write_index(nut, dyn_bc);
+         put_packet(nut, bc, dyn_bc, 1, INDEX_STARTCODE);

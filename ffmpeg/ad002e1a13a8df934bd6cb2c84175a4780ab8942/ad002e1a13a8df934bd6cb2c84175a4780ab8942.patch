@@ -1,0 +1,26 @@
+commit ad002e1a13a8df934bd6cb2c84175a4780ab8942	ad002e1a13a8df934bd6cb2c84175a4780ab8942
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue May 7 21:04:33 2013 +0200
+
+    avcodec/cdgraphics: check buffer size before use
+    
+    Fixes out of array accesses
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/cdgraphics.c b/libavcodec/cdgraphics.c
+index d22e9f6e73..ed2edfe450 100644
+--- a/libavcodec/cdgraphics.c
++++ b/libavcodec/cdgraphics.c
+@@ -289,7 +289,9 @@ static int cdg_decode_frame(AVCodecContext *avctx,
+     inst    = bytestream_get_byte(&buf);
+     inst    &= CDG_MASK;
+     buf += 2;  /// skipping 2 unneeded bytes
+-    bytestream_get_buffer(&buf, cdg_data, buf_size - CDG_HEADER_SIZE);
++
++    if (buf_size > CDG_HEADER_SIZE)
++        bytestream_get_buffer(&buf, cdg_data, buf_size - CDG_HEADER_SIZE);
+ 
+     if ((command & CDG_MASK) == CDG_COMMAND) {
+         switch (inst) {

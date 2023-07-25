@@ -1,0 +1,52 @@
+commit b9e717367c395490149495cf375911b5d9de889e
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jul 23 06:53:08 2022 +0100
+
+    patch 9.0.0060: accessing uninitialized memory when completing long line
+    
+    Problem:    Accessing uninitialized memory when completing long line.
+    Solution:   Terminate string with NUL.
+
+diff --git a/src/insexpand.c b/src/insexpand.c
+index b49a631a6..c505158a1 100644
+--- a/src/insexpand.c
++++ b/src/insexpand.c
+@@ -642,6 +642,7 @@ ins_compl_infercase_gettext(
+ 	    // growarray.  Add the character in the next round.
+ 	    if (ga_grow(&gap, IOSIZE) == FAIL)
+ 		return (char_u *)"[failed]";
++	    *p = NUL;
+ 	    STRCPY(gap.ga_data, IObuff);
+ 	    gap.ga_len = (int)STRLEN(IObuff);
+ 	}
+diff --git a/src/testdir/test_ins_complete.vim b/src/testdir/test_ins_complete.vim
+index 2be6d0602..7bebc5d8a 100644
+--- a/src/testdir/test_ins_complete.vim
++++ b/src/testdir/test_ins_complete.vim
+@@ -2108,6 +2108,13 @@ func Test_infercase_very_long_line()
+   exe "normal 2Go\<C-X>\<C-L>\<Esc>"
+   call assert_equal(longLine, getline(3))
+ 
++  " check that the too long text is NUL terminated
++  %del
++  norm o
++  norm 1987ax
++  exec "norm ox\<C-X>\<C-L>"
++  call assert_equal(repeat('x', 1987), getline(3))
++
+   bwipe!
+   set noic noinfercase
+ endfunc
+diff --git a/src/version.c b/src/version.c
+index b57ab6985..b6e61f50e 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    60,
+ /**/
+     59,
+ /**/

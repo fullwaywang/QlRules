@@ -1,0 +1,20 @@
+commit 26061aac4ec75e7a4469a9aab9a424716223e5c4
+Author: Wang Junjie <zhunkibatu@gmail.com>
+Date:   Thu Jan 19 14:59:14 2017 +0100
+
+    bplist: Check for invalid offset_size in bplist trailer
+
+diff --git a/src/bplist.c b/src/bplist.c
+index 881c2c8..4a00683 100644
+--- a/src/bplist.c
++++ b/src/bplist.c
+@@ -733,6 +733,9 @@ PLIST_API void plist_from_bin(const char *plist_bin, uint32_t length, plist_t *
+     if (num_objects == 0)
+         return;
+ 
++    if (offset_size == 0)
++        return;
++
+     if (root_object >= num_objects)
+         return;
+ 

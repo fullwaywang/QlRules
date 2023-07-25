@@ -1,0 +1,53 @@
+commit 00d5e9e9fb377f52ab7696f25c1dbc011ef0244d
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Mon Apr 1 13:32:49 2019 -0700
+
+    IEEE 802.11: Fix an infinite loop.
+    
+    In dissect_compressed_beamforming_and_cqi, break out of a loop if our
+    bit offset doesn't advance.
+    
+    Bug: 15553
+    Change-Id: I6212be4c08c42ef1969c1302e85a8e08f1d7547f
+    Reviewed-on: https://code.wireshark.org/review/32679
+    Petri-Dish: Gerald Combs <gerald@wireshark.org>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/epan/dissectors/packet-ieee80211.c b/epan/dissectors/packet-ieee80211.c
+index 20da3af31f..5f526007a5 100644
+--- a/epan/dissectors/packet-ieee80211.c
++++ b/epan/dissectors/packet-ieee80211.c
+@@ -12306,7 +12306,7 @@ static const int *he_mimo_control_headers[] = {
+  * Handle compressed beamforming matrices and CQI
+  */
+ static guint
+-dissect_compressed_beamforming_and_cqi(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo _U_, int offset)
++dissect_compressed_beamforming_and_cqi(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset)
+ {
+   int byte_count = 0;
+   guint64 mimo_cntl = tvb_get_letoh40(tvb, offset);
+@@ -12384,8 +12384,14 @@ dissect_compressed_beamforming_and_cqi(proto_tree *tree, tvbuff_t *tvb, packet_i
+   scidx = SCIDX_END_SENTINAL;
+   while ((scidx = next_he_scidx(scidx, bw, grouping, feedback,
+           ru_start_index, ru_end_index)) != (int)SCIDX_END_SENTINAL) {
++    int prev_bit_offset = bit_offset;
+     bit_offset = dissect_he_feedback_matrix(feedback_tree, tvb, offset,
+                         bit_offset, scidx, nr, nc, phi_bits, psi_bits);
++    if (bit_offset <= prev_bit_offset) {
++      expert_add_info(pinfo, tree, &ei_ieee80211_bad_length);
++      break;
++    }
++
+     offset = bit_offset / 8;
+   }
+ 
+@@ -13665,7 +13671,7 @@ dissect_hs20_indication(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree,
+ }
+ 
+ static int
+-dissect_owe_transition_mode(tvbuff_t *tvb, packet_info *pinfo _U_, proto_tree *tree, void* data _U_)
++dissect_owe_transition_mode(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data _U_)
+ {
+   guint8 ssid_len;
+ 

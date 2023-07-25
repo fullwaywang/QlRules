@@ -1,0 +1,32 @@
+commit 8e20499629b6bcf868d0072c7011e590b5c2294d
+Author: Andy Polyakov <appro@openssl.org>
+Date:   Thu Jan 19 00:17:30 2017 +0100
+
+    crypto/evp: harden RC4_MD5 cipher.
+    
+    Originally a crash in 32-bit build was reported CHACHA20-POLY1305
+    cipher. The crash is triggered by truncated packet and is result
+    of excessive hashing to the edge of accessible memory (or bogus
+    MAC value is produced if x86 MD5 assembly module is involved). Since
+    hash operation is read-only it is not considered to be exploitable
+    beyond a DoS condition.
+    
+    Thanks to Robert Święcki for report.
+    
+    CVE-2017-3731
+    
+    Reviewed-by: Rich Salz <rsalz@openssl.org>
+
+diff --git a/crypto/evp/e_rc4_hmac_md5.c b/crypto/evp/e_rc4_hmac_md5.c
+index 828ed64415..8ab18c1413 100644
+--- a/crypto/evp/e_rc4_hmac_md5.c
++++ b/crypto/evp/e_rc4_hmac_md5.c
+@@ -219,6 +219,8 @@ static int rc4_hmac_md5_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg,
+             len = p[arg - 2] << 8 | p[arg - 1];
+ 
+             if (!EVP_CIPHER_CTX_encrypting(ctx)) {
++                if (len < MD5_DIGEST_LENGTH)
++                    return -1;
+                 len -= MD5_DIGEST_LENGTH;
+                 p[arg - 2] = len >> 8;
+                 p[arg - 1] = len;

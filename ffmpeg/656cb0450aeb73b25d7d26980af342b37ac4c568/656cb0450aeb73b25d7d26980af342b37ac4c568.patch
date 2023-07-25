@@ -1,0 +1,33 @@
+commit 656cb0450aeb73b25d7d26980af342b37ac4c568
+Author: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+Date:   Tue Feb 15 17:58:08 2022 +0800
+
+    avcodec/vp3: Add missing check for av_malloc
+    
+    Since the av_malloc() may fail and return NULL pointer,
+    it is needed that the 's->edge_emu_buffer' should be checked
+    whether the new allocation is success.
+    
+    Fixes: d14723861b ("VP3: fix decoding of videos with stride > 2048")
+    Reviewed-by: Peter Ross <pross@xvid.org>
+    Signed-off-by: Jiasheng Jiang <jiasheng@iscas.ac.cn>
+
+diff --git a/libavcodec/vp3.c b/libavcodec/vp3.c
+index e9ab54d736..e2418eb6fa 100644
+--- a/libavcodec/vp3.c
++++ b/libavcodec/vp3.c
+@@ -2679,8 +2679,13 @@ static int vp3_decode_frame(AVCodecContext *avctx,
+                                         AV_GET_BUFFER_FLAG_REF)) < 0)
+         goto error;
+ 
+-    if (!s->edge_emu_buffer)
++    if (!s->edge_emu_buffer) {
+         s->edge_emu_buffer = av_malloc(9 * FFABS(s->current_frame.f->linesize[0]));
++        if (!s->edge_emu_buffer) {
++            ret = AVERROR(ENOMEM);
++            goto error;
++        }
++    }
+ 
+     if (s->keyframe) {
+         if (!s->theora) {

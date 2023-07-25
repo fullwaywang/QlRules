@@ -1,0 +1,39 @@
+commit e178af5a586ea023622d460779fdcabbbfac0908
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jun 25 19:54:09 2022 +0100
+
+    patch 8.2.5160: accessing invalid memory after changing terminal size
+    
+    Problem:    Accessing invalid memory after changing terminal size.
+    Solution:   Adjust cmdline_row and msg_row to the value of Rows.
+
+diff --git a/src/term.c b/src/term.c
+index c1440d850..b36583114 100644
+--- a/src/term.c
++++ b/src/term.c
+@@ -3366,6 +3366,12 @@ check_shellsize(void)
+     if (Rows < min_rows())	// need room for one window and command line
+ 	Rows = min_rows();
+     limit_screen_size();
++
++    // make sure these values are not invalid
++    if (cmdline_row >= Rows)
++	cmdline_row = Rows - 1;
++    if (msg_row >= Rows)
++	msg_row = Rows - 1;
+ }
+ 
+ /*
+diff --git a/src/version.c b/src/version.c
+index e0a9768de..acf84d1d2 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5160,
+ /**/
+     5159,
+ /**/

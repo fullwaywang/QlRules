@@ -1,0 +1,22 @@
+commit 397f62c0a838e15d667ef50e27d5d011d2c79c04
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Sat Jul 29 19:13:49 2017 +0200
+
+    Fix write heap buffer overflow in opj_mqc_byteout(). Discovered by Ke Liu of Tencent's Xuanwu LAB (#835)
+
+diff --git a/src/lib/openjp2/tcd.c b/src/lib/openjp2/tcd.c
+index 56779852..08c5a765 100644
+--- a/src/lib/openjp2/tcd.c
++++ b/src/lib/openjp2/tcd.c
+@@ -1182,8 +1182,9 @@ static OPJ_BOOL opj_tcd_code_block_enc_allocate_data(opj_tcd_cblk_enc_t *
+ {
+     OPJ_UINT32 l_data_size;
+ 
+-    l_data_size = (OPJ_UINT32)((p_code_block->x1 - p_code_block->x0) *
+-                               (p_code_block->y1 - p_code_block->y0) * (OPJ_INT32)sizeof(OPJ_UINT32));
++    /* The +1 is needed for https://github.com/uclouvain/openjpeg/issues/835 */
++    l_data_size = 1 + (OPJ_UINT32)((p_code_block->x1 - p_code_block->x0) *
++                                   (p_code_block->y1 - p_code_block->y0) * (OPJ_INT32)sizeof(OPJ_UINT32));
+ 
+     if (l_data_size > p_code_block->data_size) {
+         if (p_code_block->data) {

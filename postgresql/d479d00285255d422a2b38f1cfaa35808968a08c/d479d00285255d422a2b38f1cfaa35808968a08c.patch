@@ -1,0 +1,209 @@
+commit d479d00285255d422a2b38f1cfaa35808968a08c
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Thu Apr 22 17:30:42 2021 -0400
+
+    Don't crash on reference to an un-available system column.
+    
+    Adopt a more consistent policy about what slot-type-specific
+    getsysattr functions should do when system attributes are not
+    available.  To wit, they should all throw the same user-oriented
+    error, rather than variously crashing or emitting developer-oriented
+    messages.
+    
+    This closes a identifiable problem in commits a71cfc56b and
+    3fb93103a (in v13 and v12), so back-patch into those branches,
+    along with a test case to try to ensure we don't break it again.
+    It is not known that any of the former crash cases are reachable
+    in HEAD, but this seems like a good safety improvement in any case.
+    
+    Discussion: https://postgr.es/m/141051591267657@mail.yandex.ru
+
+diff --git a/src/backend/executor/execTuples.c b/src/backend/executor/execTuples.c
+index 73c35df9c9..f447802843 100644
+--- a/src/backend/executor/execTuples.c
++++ b/src/backend/executor/execTuples.c
+@@ -122,9 +122,8 @@ tts_virtual_clear(TupleTableSlot *slot)
+ }
+ 
+ /*
+- * Attribute values are readily available in tts_values and tts_isnull array
+- * in a VirtualTupleTableSlot. So there should be no need to call either of the
+- * following two functions.
++ * VirtualTupleTableSlots always have fully populated tts_values and
++ * tts_isnull arrays.  So this function should never be called.
+  */
+ static void
+ tts_virtual_getsomeattrs(TupleTableSlot *slot, int natts)
+@@ -132,10 +131,19 @@ tts_virtual_getsomeattrs(TupleTableSlot *slot, int natts)
+ 	elog(ERROR, "getsomeattrs is not required to be called on a virtual tuple table slot");
+ }
+ 
++/*
++ * VirtualTupleTableSlots never provide system attributes (except those
++ * handled generically, such as tableoid).  We generally shouldn't get
++ * here, but provide a user-friendly message if we do.
++ */
+ static Datum
+ tts_virtual_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
+ {
+-	elog(ERROR, "virtual tuple table slot does not have system attributes");
++	Assert(!TTS_EMPTY(slot));
++
++	ereport(ERROR,
++			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
++			 errmsg("cannot retrieve a system column in this context")));
+ 
+ 	return 0;					/* silence compiler warnings */
+ }
+@@ -335,6 +343,15 @@ tts_heap_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
+ 
+ 	Assert(!TTS_EMPTY(slot));
+ 
++	/*
++	 * In some code paths it's possible to get here with a non-materialized
++	 * slot, in which case we can't retrieve system columns.
++	 */
++	if (!hslot->tuple)
++		ereport(ERROR,
++				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
++				 errmsg("cannot retrieve a system column in this context")));
++
+ 	return heap_getsysattr(hslot->tuple, attnum,
+ 						   slot->tts_tupleDescriptor, isnull);
+ }
+@@ -497,7 +514,11 @@ tts_minimal_getsomeattrs(TupleTableSlot *slot, int natts)
+ static Datum
+ tts_minimal_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
+ {
+-	elog(ERROR, "minimal tuple table slot does not have system attributes");
++	Assert(!TTS_EMPTY(slot));
++
++	ereport(ERROR,
++			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
++			 errmsg("cannot retrieve a system column in this context")));
+ 
+ 	return 0;					/* silence compiler warnings */
+ }
+@@ -681,6 +702,15 @@ tts_buffer_heap_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
+ 
+ 	Assert(!TTS_EMPTY(slot));
+ 
++	/*
++	 * In some code paths it's possible to get here with a non-materialized
++	 * slot, in which case we can't retrieve system columns.
++	 */
++	if (!bslot->base.tuple)
++		ereport(ERROR,
++				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
++				 errmsg("cannot retrieve a system column in this context")));
++
+ 	return heap_getsysattr(bslot->base.tuple, attnum,
+ 						   slot->tts_tupleDescriptor, isnull);
+ }
+diff --git a/src/test/regress/expected/update.out b/src/test/regress/expected/update.out
+index ad91e5aedb..bbf6705b65 100644
+--- a/src/test/regress/expected/update.out
++++ b/src/test/regress/expected/update.out
+@@ -795,6 +795,59 @@ DETAIL:  Failing row contains (a, 10).
+ -- ok
+ UPDATE list_default set a = 'x' WHERE a = 'd';
+ DROP TABLE list_parted;
++-- Test retrieval of system columns with non-consistent partition row types.
++-- This is only partially supported, as seen in the results.
++create table utrtest (a int, b text) partition by list (a);
++create table utr1 (a int check (a in (1)), q text, b text);
++create table utr2 (a int check (a in (2)), b text);
++alter table utr1 drop column q;
++alter table utrtest attach partition utr1 for values in (1);
++alter table utrtest attach partition utr2 for values in (2);
++insert into utrtest values (1, 'foo')
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
++ a |  b  | tableoid | xmin_ok 
++---+-----+----------+---------
++ 1 | foo | utr1     | t
++(1 row)
++
++insert into utrtest values (2, 'bar')
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
++ERROR:  cannot retrieve a system column in this context
++insert into utrtest values (2, 'bar')
++  returning *, tableoid::regclass;
++ a |  b  | tableoid 
++---+-----+----------
++ 2 | bar | utr2
++(1 row)
++
++update utrtest set b = b || b from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
++ a |   b    | x | tableoid | xmin_ok 
++---+--------+---+----------+---------
++ 1 | foofoo | 1 | utr1     | t
++ 2 | barbar | 2 | utr2     | t
++(2 rows)
++
++update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
++ERROR:  cannot retrieve a system column in this context
++update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass;
++ a |   b    | x | tableoid 
++---+--------+---+----------
++ 2 | foofoo | 1 | utr2
++ 1 | barbar | 2 | utr1
++(2 rows)
++
++delete from utrtest
++  returning *, tableoid::regclass, xmax = pg_current_xact_id()::xid as xmax_ok;
++ a |   b    | tableoid | xmax_ok 
++---+--------+----------+---------
++ 1 | barbar | utr1     | t
++ 2 | foofoo | utr2     | t
++(2 rows)
++
++drop table utrtest;
+ --------------
+ -- Some more update-partition-key test scenarios below. This time use list
+ -- partitions.
+diff --git a/src/test/regress/sql/update.sql b/src/test/regress/sql/update.sql
+index 8c558a7bc7..d0bc8e9228 100644
+--- a/src/test/regress/sql/update.sql
++++ b/src/test/regress/sql/update.sql
+@@ -502,6 +502,38 @@ UPDATE list_default set a = 'x' WHERE a = 'd';
+ 
+ DROP TABLE list_parted;
+ 
++-- Test retrieval of system columns with non-consistent partition row types.
++-- This is only partially supported, as seen in the results.
++
++create table utrtest (a int, b text) partition by list (a);
++create table utr1 (a int check (a in (1)), q text, b text);
++create table utr2 (a int check (a in (2)), b text);
++alter table utr1 drop column q;
++alter table utrtest attach partition utr1 for values in (1);
++alter table utrtest attach partition utr2 for values in (2);
++
++insert into utrtest values (1, 'foo')
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
++insert into utrtest values (2, 'bar')
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
++insert into utrtest values (2, 'bar')
++  returning *, tableoid::regclass;
++
++update utrtest set b = b || b from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;
++
++update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass, xmin = pg_current_xact_id()::xid as xmin_ok;  -- fails
++
++update utrtest set a = 3 - a from (values (1), (2)) s(x) where a = s.x
++  returning *, tableoid::regclass;
++
++delete from utrtest
++  returning *, tableoid::regclass, xmax = pg_current_xact_id()::xid as xmax_ok;
++
++drop table utrtest;
++
++
+ --------------
+ -- Some more update-partition-key test scenarios below. This time use list
+ -- partitions.

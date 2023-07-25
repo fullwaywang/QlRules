@@ -1,0 +1,57 @@
+commit ec3997a59a93cbc13a3cba22dfe0b4c4710a8f65
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Thu Aug 15 12:54:50 2019 +0200
+
+    Fix HTTP header line continuation in http1_dissect_hdrs
+    
+    When clearing the [CR]LF in a line continuation, we would continue
+    replacing any [CR|LF|HT|SP] characters up until the end of the buffer,
+    possibly overwriting later [CR]LFs. Fix this by only unconditionally
+    overwrite one [CR]LF, and then only replace [HT|SP] with SP to keep with
+    previous behaviour.
+    
+    Update r00494.vtc to include multiple line continuations to make sure they
+    are parsed.
+
+diff --git a/bin/varnishd/http1/cache_http1_proto.c b/bin/varnishd/http1/cache_http1_proto.c
+index 7f34e19be..61563b8ea 100644
+--- a/bin/varnishd/http1/cache_http1_proto.c
++++ b/bin/varnishd/http1/cache_http1_proto.c
+@@ -145,7 +145,9 @@ http1_dissect_hdrs(struct http *hp, char *p, struct http_conn *htc,
+ 				break;
+ 
+ 			/* Clear line continuation LWS to spaces */
+-			while (q < htc->rxbuf_e && vct_islws(*q))
++			while (q < r)
++				*q++ = ' ';
++			while (q < htc->rxbuf_e && vct_issp(*q))
+ 				*q++ = ' ';
+ 		}
+ 
+diff --git a/bin/varnishtest/tests/r00494.vtc b/bin/varnishtest/tests/r00494.vtc
+index cb0bbe8d7..e0db8a4bf 100644
+--- a/bin/varnishtest/tests/r00494.vtc
++++ b/bin/varnishtest/tests/r00494.vtc
+@@ -6,6 +6,11 @@ server s1 {
+ 	rxreq
+ 	txresp -hdr {Foo: bar,
+ 	barf: fail} -body "xxx"
++
++	rxreq
++	txresp -hdr {Foo: bar,
++ 	
++	barf: fail} -body "xxx"
+ } -start
+ 
+ varnish v1 -vcl+backend {
+@@ -21,4 +26,10 @@ client c1 {
+ 	expect resp.http.bar == "bar,  barf: fail"
+ 	expect resp.http.barf == <undef>
+ 	expect resp.http.foo == <undef>
++
++	txreq -url /2
++	rxresp
++	expect resp.http.bar == "bar,     barf: fail"
++	expect resp.http.barf == <undef>
++	expect resp.http.foo == <undef>
+ } -run

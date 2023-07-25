@@ -1,0 +1,21 @@
+commit d4d6b7b0355f3597cad3b8d12911790c73b5f96d
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Sat Oct 19 09:50:53 2019 +0200
+
+    avfilter/vf_datascope: fix heap buffer overflow
+    
+    Fixes #8309
+
+diff --git a/libavfilter/vf_datascope.c b/libavfilter/vf_datascope.c
+index c9039a60f6..83f90f07ba 100644
+--- a/libavfilter/vf_datascope.c
++++ b/libavfilter/vf_datascope.c
+@@ -973,7 +973,7 @@ static int oscilloscope_filter_frame(AVFilterLink *inlink, AVFrame *frame)
+                        frame->width, frame->height,
+                        s->ox, s->oy, s->width, s->height + 20 * s->statistics);
+ 
+-    if (s->grid) {
++    if (s->grid && outlink->h >= 10) {
+         ff_fill_rectangle(&s->draw, &s->gray, frame->data, frame->linesize,
+                           s->ox, s->oy, s->width - 1, 1);
+ 

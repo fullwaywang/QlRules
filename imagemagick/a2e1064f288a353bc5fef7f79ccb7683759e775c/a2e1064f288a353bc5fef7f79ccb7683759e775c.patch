@@ -1,0 +1,20 @@
+commit a2e1064f288a353bc5fef7f79ccb7683759e775c
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sat Jan 30 09:51:24 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/104
+
+diff --git a/coders/xcf.c b/coders/xcf.c
+index 0fdc54656..b8075bb68 100644
+--- a/coders/xcf.c
++++ b/coders/xcf.c
+@@ -347,7 +347,8 @@ static MagickBooleanType load_tile(Image *image,Image *tile_image,
+     *xcfdata,
+     *xcfodata;
+ 
+-  xcfdata=(XCFPixelInfo *) AcquireQuantumMemory(data_length,sizeof(*xcfdata));
++  xcfdata=(XCFPixelInfo *) AcquireQuantumMemory(MagickMax(data_length,
++    tile_image->columns*tile_image->rows),sizeof(*xcfdata));
+   if (xcfdata == (XCFPixelInfo *) NULL)
+     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+       image->filename);

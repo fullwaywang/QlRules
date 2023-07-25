@@ -1,0 +1,325 @@
+commit 27835b5476642d6a4eeb06e32095d29daeb9c585
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Thu Apr 22 11:46:41 2021 -0400
+
+    Fix bugs in RETURNING in cross-partition UPDATE cases.
+    
+    If the source and destination partitions don't have identical
+    rowtypes (for example, one has dropped columns the other lacks),
+    then the planSlot contents will be different because of that.
+    If the query has a RETURNING list that tries to return resjunk
+    columns out of the planSlot, that is columns from tables that
+    were joined to the target table, we'd get errors or wrong answers.
+    That's because we used the RETURNING list generated for the
+    destination partition, which expects a planSlot matching that
+    partition's subplan.
+    
+    The most practical fix seems to be to convert the updated destination
+    tuple back to the source partition's rowtype, and then apply the
+    RETURNING list generated for the source partition.  This avoids making
+    fragile assumptions about whether the per-subpartition subplans
+    generated all the resjunk columns in the same order.
+    
+    This has been broken since v11 introduced cross-partition UPDATE.
+    The lack of field complaints shows that non-identical partitions
+    aren't a common case; therefore, don't stress too hard about
+    making the conversion efficient.
+    
+    There's no such bug in HEAD, because commit 86dc90056 got rid of
+    per-target-relation variance in the contents of the planSlot.
+    Hence, patch v11-v13 only.
+    
+    Amit Langote and Etsuro Fujita, small changes by me
+    
+    Discussion: https://postgr.es/m/CA+HiwqE_UK1jTSNrjb8mpTdivzd3dum6mK--xqKq0Y9VmfwWQA@mail.gmail.com
+
+diff --git a/src/backend/executor/nodeModifyTable.c b/src/backend/executor/nodeModifyTable.c
+index a0fd6c15d2..aa74f27e15 100644
+--- a/src/backend/executor/nodeModifyTable.c
++++ b/src/backend/executor/nodeModifyTable.c
+@@ -146,21 +146,26 @@ ExecCheckPlanOutput(Relation resultRel, List *targetList)
+ /*
+  * ExecProcessReturning --- evaluate a RETURNING list
+  *
+- * resultRelInfo: current result rel
++ * projectReturning: the projection to evaluate
++ * resultRelOid: result relation's OID
+  * tupleSlot: slot holding tuple actually inserted/updated/deleted
+  * planSlot: slot holding tuple returned by top subplan node
+  *
++ * In cross-partition UPDATE cases, projectReturning and planSlot are as
++ * for the source partition, and tupleSlot must conform to that.  But
++ * resultRelOid is for the destination partition.
++ *
+  * Note: If tupleSlot is NULL, the FDW should have already provided econtext's
+  * scan tuple.
+  *
+  * Returns a slot holding the result tuple
+  */
+ static TupleTableSlot *
+-ExecProcessReturning(ResultRelInfo *resultRelInfo,
++ExecProcessReturning(ProjectionInfo *projectReturning,
++					 Oid resultRelOid,
+ 					 TupleTableSlot *tupleSlot,
+ 					 TupleTableSlot *planSlot)
+ {
+-	ProjectionInfo *projectReturning = resultRelInfo->ri_projectReturning;
+ 	ExprContext *econtext = projectReturning->pi_exprContext;
+ 
+ 	/*
+@@ -177,12 +182,13 @@ ExecProcessReturning(ResultRelInfo *resultRelInfo,
+ 		HeapTuple	tuple;
+ 
+ 		/*
+-		 * RETURNING expressions might reference the tableoid column, so
+-		 * initialize t_tableOid before evaluating them.
++		 * RETURNING expressions might reference the tableoid column, so be
++		 * sure we expose the desired OID, ie that of the real target
++		 * relation.
+ 		 */
+ 		Assert(!TupIsNull(econtext->ecxt_scantuple));
+ 		tuple = ExecMaterializeSlot(econtext->ecxt_scantuple);
+-		tuple->t_tableOid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
++		tuple->t_tableOid = resultRelOid;
+ 	}
+ 	econtext->ecxt_outertuple = planSlot;
+ 
+@@ -256,6 +262,16 @@ ExecCheckTIDVisible(EState *estate,
+  *		For INSERT, we have to insert the tuple into the target relation
+  *		and insert appropriate tuples into the index relations.
+  *
++ *		slot contains the new tuple value to be stored.
++ *		planSlot is the output of the ModifyTable's subplan; we use it
++ *		to access "junk" columns that are not going to be stored.
++ *		In a cross-partition UPDATE, srcSlot is the slot that held the
++ *		updated tuple for the source relation; otherwise it's NULL.
++ *
++ *		returningRelInfo is the resultRelInfo for the source relation of a
++ *		cross-partition UPDATE; otherwise it's the current result relation.
++ *		We use it to process RETURNING lists, for reasons explained below.
++ *
+  *		Returns RETURNING result if any, otherwise NULL.
+  * ----------------------------------------------------------------
+  */
+@@ -263,6 +279,8 @@ static TupleTableSlot *
+ ExecInsert(ModifyTableState *mtstate,
+ 		   TupleTableSlot *slot,
+ 		   TupleTableSlot *planSlot,
++		   TupleTableSlot *srcSlot,
++		   ResultRelInfo *returningRelInfo,
+ 		   EState *estate,
+ 		   bool canSetTag)
+ {
+@@ -590,8 +608,66 @@ ExecInsert(ModifyTableState *mtstate,
+ 		ExecWithCheckOptions(WCO_VIEW_CHECK, resultRelInfo, slot, estate);
+ 
+ 	/* Process RETURNING if present */
+-	if (resultRelInfo->ri_projectReturning)
+-		result = ExecProcessReturning(resultRelInfo, slot, planSlot);
++	if (returningRelInfo->ri_projectReturning)
++	{
++		/*
++		 * In a cross-partition UPDATE with RETURNING, we have to use the
++		 * source partition's RETURNING list, because that matches the output
++		 * of the planSlot, while the destination partition might have
++		 * different resjunk columns.  This means we have to map the
++		 * destination tuple back to the source's format so we can apply that
++		 * RETURNING list.  This is expensive, but it should be an uncommon
++		 * corner case, so we won't spend much effort on making it fast.
++		 *
++		 * We assume that we can use srcSlot to hold the re-converted tuple.
++		 * Note that in the common case where the child partitions both match
++		 * the root's format, previous optimizations will have resulted in
++		 * slot and srcSlot being identical, cueing us that there's nothing to
++		 * do here.
++		 */
++		if (returningRelInfo != resultRelInfo && slot != srcSlot)
++		{
++			Relation	srcRelationDesc = returningRelInfo->ri_RelationDesc;
++			TupleConversionMap *map;
++
++			map = convert_tuples_by_name(RelationGetDescr(resultRelationDesc),
++										 RelationGetDescr(srcRelationDesc),
++										 gettext_noop("could not convert row type"));
++			if (map)
++			{
++				HeapTuple	origTuple = ExecMaterializeSlot(slot);
++				HeapTuple	newTuple;
++
++				newTuple = do_convert_tuple(origTuple, map);
++
++				/* do_convert_tuple doesn't copy system columns, so do that */
++				newTuple->t_self = newTuple->t_data->t_ctid =
++					origTuple->t_self;
++				newTuple->t_tableOid = origTuple->t_tableOid;
++
++				HeapTupleHeaderSetXmin(newTuple->t_data,
++									   HeapTupleHeaderGetRawXmin(origTuple->t_data));
++				HeapTupleHeaderSetCmin(newTuple->t_data,
++									   HeapTupleHeaderGetRawCommandId(origTuple->t_data));
++				HeapTupleHeaderSetXmax(newTuple->t_data,
++									   InvalidTransactionId);
++
++				if (RelationGetDescr(resultRelationDesc)->tdhasoid)
++				{
++					Assert(RelationGetDescr(srcRelationDesc)->tdhasoid);
++					HeapTupleSetOid(newTuple, HeapTupleGetOid(origTuple));
++				}
++
++				slot = ExecStoreTuple(newTuple, srcSlot, InvalidBuffer, true);
++
++				free_conversion_map(map);
++			}
++		}
++
++		result = ExecProcessReturning(returningRelInfo->ri_projectReturning,
++									  RelationGetRelid(resultRelationDesc),
++									  slot, planSlot);
++	}
+ 
+ 	return result;
+ }
+@@ -891,7 +967,9 @@ ldelete:;
+ 			ExecStoreTuple(&deltuple, slot, InvalidBuffer, false);
+ 		}
+ 
+-		rslot = ExecProcessReturning(resultRelInfo, slot, planSlot);
++		rslot = ExecProcessReturning(resultRelInfo->ri_projectReturning,
++									 RelationGetRelid(resultRelationDesc),
++									 slot, planSlot);
+ 
+ 		/*
+ 		 * Before releasing the target tuple again, make sure rslot has a
+@@ -1068,6 +1146,7 @@ lreplace:;
+ 		{
+ 			bool		tuple_deleted;
+ 			TupleTableSlot *ret_slot;
++			TupleTableSlot *orig_slot = slot;
+ 			TupleTableSlot *epqslot = NULL;
+ 			PartitionTupleRouting *proute = mtstate->mt_partition_tuple_routing;
+ 			int			map_index;
+@@ -1175,6 +1254,7 @@ lreplace:;
+ 										   mtstate->rootResultRelInfo, slot);
+ 
+ 			ret_slot = ExecInsert(mtstate, slot, planSlot,
++								  orig_slot, resultRelInfo,
+ 								  estate, canSetTag);
+ 
+ 			/* Revert ExecPrepareTupleRouting's node change. */
+@@ -1334,7 +1414,9 @@ lreplace:;
+ 
+ 	/* Process RETURNING if present */
+ 	if (resultRelInfo->ri_projectReturning)
+-		return ExecProcessReturning(resultRelInfo, slot, planSlot);
++		return ExecProcessReturning(resultRelInfo->ri_projectReturning,
++									RelationGetRelid(resultRelationDesc),
++									slot, planSlot);
+ 
+ 	return NULL;
+ }
+@@ -2067,7 +2149,9 @@ ExecModifyTable(PlanState *pstate)
+ 			 * ExecProcessReturning by IterateDirectModify, so no need to
+ 			 * provide it here.
+ 			 */
+-			slot = ExecProcessReturning(resultRelInfo, NULL, planSlot);
++			slot = ExecProcessReturning(resultRelInfo->ri_projectReturning,
++										RelationGetRelid(resultRelInfo->ri_RelationDesc),
++										NULL, planSlot);
+ 
+ 			estate->es_result_relation_info = saved_resultRelInfo;
+ 			return slot;
+@@ -2157,6 +2241,7 @@ ExecModifyTable(PlanState *pstate)
+ 					slot = ExecPrepareTupleRouting(node, estate, proute,
+ 												   resultRelInfo, slot);
+ 				slot = ExecInsert(node, slot, planSlot,
++								  NULL, estate->es_result_relation_info,
+ 								  estate, node->canSetTag);
+ 				/* Revert ExecPrepareTupleRouting's state change. */
+ 				if (proute)
+diff --git a/src/test/regress/expected/update.out b/src/test/regress/expected/update.out
+index 2083345c8e..c35c0dd9f8 100644
+--- a/src/test/regress/expected/update.out
++++ b/src/test/regress/expected/update.out
+@@ -424,6 +424,46 @@ UPDATE range_parted set c = 95 WHERE a = 'b' and b > 10 and c > 100 returning (r
+  part_c_1_100   | b | 17 |  95 | 19 | 
+ (6 rows)
+ 
++-- The following tests computing RETURNING when the source and the destination
++-- partitions of a UPDATE row movement operation have different tuple
++-- descriptors, which has been shown to be problematic in the cases where the
++-- RETURNING targetlist contains non-target relation attributes that are
++-- computed by referring to the source partition plan's output tuple.  Also,
++-- a trigger on the destination relation may change the tuple, which must be
++-- reflected in the RETURNING output, so we test that too.
++CREATE TABLE part_c_1_c_20 (LIKE range_parted);
++ALTER TABLE part_c_1_c_20 DROP a, DROP b, ADD a text, ADD b bigint;
++ALTER TABLE range_parted ATTACH PARTITION part_c_1_c_20 FOR VALUES FROM ('c', 1) TO ('c', 20);
++CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN NEW.e := 'in trigfunc()'; RETURN NEW; END; $$;
++CREATE TRIGGER trig BEFORE INSERT ON part_c_1_c_20 FOR EACH ROW EXECUTE FUNCTION trigfunc();
++UPDATE range_parted r set a = 'c' FROM (VALUES ('a', 1), ('a', 10), ('b', 12)) s(x, y) WHERE s.x = r.a AND s.y = r.b RETURNING tableoid::regclass, *;
++   tableoid    | a | b  |  c  | d |       e       | x | y  
++---------------+---+----+-----+---+---------------+---+----
++ part_c_1_c_20 | c |  1 |   1 | 1 | in trigfunc() | a |  1
++ part_c_1_c_20 | c | 10 | 200 | 1 | in trigfunc() | a | 10
++ part_c_1_c_20 | c | 12 |  96 | 1 | in trigfunc() | b | 12
++(3 rows)
++
++DROP TRIGGER trig ON part_c_1_c_20;
++DROP FUNCTION trigfunc;
++:init_range_parted;
++CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN RETURN NULL; END; $$;
++CREATE TRIGGER trig BEFORE INSERT ON part_c_1_c_20 FOR EACH ROW EXECUTE FUNCTION trigfunc();
++UPDATE range_parted r set a = 'c' FROM (VALUES ('a', 1), ('a', 10), ('b', 12)) s(x, y) WHERE s.x = r.a AND s.y = r.b RETURNING tableoid::regclass, *;
++ tableoid | a | b | c | d | e | x | y 
++----------+---+---+---+---+---+---+---
++(0 rows)
++
++:show_data;
++   partname   | a | b  |  c  | d  | e 
++--------------+---+----+-----+----+---
++ part_c_1_100 | b | 13 |  97 |  2 | 
++ part_d_15_20 | b | 15 | 105 | 16 | 
++ part_d_15_20 | b | 17 | 105 | 19 | 
++(3 rows)
++
++DROP TABLE part_c_1_c_20;
++DROP FUNCTION trigfunc;
+ -- Transition tables with update row movement
+ :init_range_parted;
+ CREATE FUNCTION trans_updatetrigfunc() RETURNS trigger LANGUAGE plpgsql AS
+diff --git a/src/test/regress/sql/update.sql b/src/test/regress/sql/update.sql
+index 8754ccb7b0..e6a61ace5b 100644
+--- a/src/test/regress/sql/update.sql
++++ b/src/test/regress/sql/update.sql
+@@ -223,6 +223,31 @@ DROP VIEW upview;
+ UPDATE range_parted set c = 95 WHERE a = 'b' and b > 10 and c > 100 returning (range_parted), *;
+ :show_data;
+ 
++-- The following tests computing RETURNING when the source and the destination
++-- partitions of a UPDATE row movement operation have different tuple
++-- descriptors, which has been shown to be problematic in the cases where the
++-- RETURNING targetlist contains non-target relation attributes that are
++-- computed by referring to the source partition plan's output tuple.  Also,
++-- a trigger on the destination relation may change the tuple, which must be
++-- reflected in the RETURNING output, so we test that too.
++CREATE TABLE part_c_1_c_20 (LIKE range_parted);
++ALTER TABLE part_c_1_c_20 DROP a, DROP b, ADD a text, ADD b bigint;
++ALTER TABLE range_parted ATTACH PARTITION part_c_1_c_20 FOR VALUES FROM ('c', 1) TO ('c', 20);
++CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN NEW.e := 'in trigfunc()'; RETURN NEW; END; $$;
++CREATE TRIGGER trig BEFORE INSERT ON part_c_1_c_20 FOR EACH ROW EXECUTE FUNCTION trigfunc();
++UPDATE range_parted r set a = 'c' FROM (VALUES ('a', 1), ('a', 10), ('b', 12)) s(x, y) WHERE s.x = r.a AND s.y = r.b RETURNING tableoid::regclass, *;
++
++DROP TRIGGER trig ON part_c_1_c_20;
++DROP FUNCTION trigfunc;
++
++:init_range_parted;
++CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN RETURN NULL; END; $$;
++CREATE TRIGGER trig BEFORE INSERT ON part_c_1_c_20 FOR EACH ROW EXECUTE FUNCTION trigfunc();
++UPDATE range_parted r set a = 'c' FROM (VALUES ('a', 1), ('a', 10), ('b', 12)) s(x, y) WHERE s.x = r.a AND s.y = r.b RETURNING tableoid::regclass, *;
++:show_data;
++
++DROP TABLE part_c_1_c_20;
++DROP FUNCTION trigfunc;
+ 
+ -- Transition tables with update row movement
+ :init_range_parted;

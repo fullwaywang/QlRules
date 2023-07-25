@@ -1,0 +1,33 @@
+commit df91aa034b82b77a3c4e01791f4a2b2ff6c82066
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Nov 14 02:36:22 2015 +0100
+
+    avcodec/ivi: Check image dimensions
+    
+    Fixes integer overflow
+    Fixes: 1e32c6c591d940337c20b197ec1c4d3d/asan_heap-oob_4a52e5_8946_0bb0d9e863def56005e49f1d89bdc94d.avi
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/ivi.c b/libavcodec/ivi.c
+index 4525ff494c..eab42bb535 100644
+--- a/libavcodec/ivi.c
++++ b/libavcodec/ivi.c
+@@ -30,6 +30,7 @@
+ 
+ #define BITSTREAM_READER_LE
+ #include "libavutil/attributes.h"
++#include "libavutil/imgutils.h"
+ #include "libavutil/timer.h"
+ #include "avcodec.h"
+ #include "get_bits.h"
+@@ -310,7 +311,7 @@ av_cold int ff_ivi_init_planes(IVIPlaneDesc *planes, const IVIPicConfig *cfg,
+ 
+     ivi_free_buffers(planes);
+ 
+-    if (cfg->pic_width < 1 || cfg->pic_height < 1 ||
++    if (av_image_check_size(cfg->pic_width, cfg->pic_height, 0, NULL) < 0 ||
+         cfg->luma_bands < 1 || cfg->chroma_bands < 1)
+         return AVERROR_INVALIDDATA;
+ 

@@ -1,0 +1,40 @@
+commit fc43974d34318c834fbf78570ca1a3764ed8c7d7
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Mon May 16 14:00:14 2016 -0400
+
+    Ensure image extent does not exceed maximum
+
+diff --git a/coders/wpg.c b/coders/wpg.c
+index b6ba8d79f..0dfdc47f0 100644
+--- a/coders/wpg.c
++++ b/coders/wpg.c
+@@ -1112,6 +1112,9 @@ static Image *ReadWPGImage(const ImageInfo *image_info,
+               bpp=BitmapHeader2.Depth;
+ 
+             UnpackRaster:      
++              status=SetImageExtent(image,image->columns,image->rows,exception);
++              if (status == MagickFalse)
++                break;
+               if ((image->colors == 0) && (bpp != 24))
+                 {
+                   image->colors=one << bpp;
+@@ -1305,6 +1308,9 @@ static Image *ReadWPGImage(const ImageInfo *image_info,
+                 }
+               image->columns=Bitmap2Header1.Width;
+               image->rows=Bitmap2Header1.Height;
++              status=SetImageExtent(image,image->columns,image->rows,exception);
++              if (status == MagickFalse)
++                break;
+ 
+               if ((image->colors == 0) && (bpp != 24))
+                 {
+@@ -1423,9 +1429,6 @@ static Image *ReadWPGImage(const ImageInfo *image_info,
+          ThrowReaderException(CoderError,"DataEncodingSchemeIsNotSupported");
+       }
+    }
+-  status=SetImageExtent(image,image->columns,image->rows,exception);
+-  if (status == MagickFalse)
+-    return(DestroyImageList(image));
+ 
+  Finish:
+   (void) CloseBlob(image);

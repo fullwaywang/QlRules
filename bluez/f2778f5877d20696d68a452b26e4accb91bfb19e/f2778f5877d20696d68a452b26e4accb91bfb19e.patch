@@ -1,0 +1,113 @@
+commit f2778f5877d20696d68a452b26e4accb91bfb19e
+Author: Luiz Augusto von Dentz <luiz.von.dentz@intel.com>
+Date:   Wed Mar 11 11:43:21 2020 -0700
+
+    input: Add LEAutoSecurity setting to input.conf
+    
+    LEAutoSecurity can be used to enable/disable automatic upgrades of
+    security for LE devices, by default it is enabled so existing devices
+    that did not require security and were not bonded will automatically
+    upgrade the security.
+    
+    Note: Platforms disabling this setting would require users to manually
+    bond the device which may require changes to the user interface to
+    always force bonding for input devices as APIs such as Device.Connect
+    will no longer work which maybe perceived as a regression.
+
+diff --git a/profiles/input/device.h b/profiles/input/device.h
+index 3044db673..5a077f92a 100644
+--- a/profiles/input/device.h
++++ b/profiles/input/device.h
+@@ -30,6 +30,7 @@ struct input_conn;
+ void input_set_idle_timeout(int timeout);
+ void input_enable_userspace_hid(bool state);
+ void input_set_classic_bonded_only(bool state);
++void input_set_auto_sec(bool state);
+ 
+ int input_device_register(struct btd_service *service);
+ void input_device_unregister(struct btd_service *service);
+diff --git a/profiles/input/hog.c b/profiles/input/hog.c
+index f0226ebbd..327a1d1c3 100644
+--- a/profiles/input/hog.c
++++ b/profiles/input/hog.c
+@@ -53,6 +53,7 @@
+ #include "src/shared/gatt-client.h"
+ #include "src/plugin.h"
+ 
++#include "device.h"
+ #include "suspend.h"
+ #include "attrib/att.h"
+ #include "attrib/gattrib.h"
+@@ -67,8 +68,14 @@ struct hog_device {
+ };
+ 
+ static gboolean suspend_supported = FALSE;
++static bool auto_sec = true;
+ static struct queue *devices = NULL;
+ 
++void input_set_auto_sec(bool state)
++{
++	auto_sec = state;
++}
++
+ static void hog_device_accept(struct hog_device *dev, struct gatt_db *db)
+ {
+ 	char name[248];
+@@ -192,11 +199,13 @@ static int hog_accept(struct btd_service *service)
+ 	if (!device_is_bonded(device, btd_device_get_bdaddr_type(device))) {
+ 		struct bt_gatt_client *client;
+ 
++		if (!auto_sec)
++			return -ECONNREFUSED;
++
+ 		client = btd_device_get_gatt_client(device);
+ 		if (!bt_gatt_client_set_security(client,
+-						BT_ATT_SECURITY_MEDIUM)) {
++						BT_ATT_SECURITY_MEDIUM))
+ 			return -ECONNREFUSED;
+-		}
+ 	}
+ 
+ 	/* TODO: Replace GAttrib with bt_gatt_client */
+diff --git a/profiles/input/input.conf b/profiles/input/input.conf
+index 166aff4a4..4c70bc561 100644
+--- a/profiles/input/input.conf
++++ b/profiles/input/input.conf
+@@ -19,3 +19,8 @@
+ # pairing/encryption.
+ # Defaults to false to maximize device compatibility.
+ #ClassicBondedOnly=true
++
++# LE upgrade security
++# Enables upgrades of security automatically if required.
++# Defaults to true to maximize device compatibility.
++#LEAutoSecurity=true
+diff --git a/profiles/input/manager.c b/profiles/input/manager.c
+index 5cd27b839..bf4acb4ed 100644
+--- a/profiles/input/manager.c
++++ b/profiles/input/manager.c
+@@ -96,7 +96,7 @@ static int input_init(void)
+ 	config = load_config_file(CONFIGDIR "/input.conf");
+ 	if (config) {
+ 		int idle_timeout;
+-		gboolean uhid_enabled, classic_bonded_only;
++		gboolean uhid_enabled, classic_bonded_only, auto_sec;
+ 
+ 		idle_timeout = g_key_file_get_integer(config, "General",
+ 							"IdleTimeout", &err);
+@@ -125,6 +125,15 @@ static int input_init(void)
+ 		} else
+ 			g_clear_error(&err);
+ 
++		auto_sec = g_key_file_get_boolean(config, "General",
++						"LEAutoSecurity", &err);
++		if (!err) {
++			DBG("input.conf: LEAutoSecurity=%s",
++					auto_sec ? "true" : "false");
++			input_set_auto_sec(auto_sec);
++		} else
++			g_clear_error(&err);
++
+ 	}
+ 
+ 	btd_profile_register(&input_profile);

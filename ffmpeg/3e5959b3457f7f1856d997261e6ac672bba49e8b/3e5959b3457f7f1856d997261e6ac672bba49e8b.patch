@@ -1,0 +1,26 @@
+commit 3e5959b3457f7f1856d997261e6ac672bba49e8b
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Oct 24 22:21:48 2020 +0200
+
+    avcodec/exr: Check ymin vs. h
+    
+    Fixes: out of array access
+    Fixes: 26532/clusterfuzz-testcase-minimized-ffmpeg_AV_CODEC_ID_EXR_fuzzer-5613925708857344
+    Fixes: 27443/clusterfuzz-testcase-minimized-ffmpeg_AV_CODEC_ID_EXR_fuzzer-5631239813595136
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/projects/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/exr.c b/libavcodec/exr.c
+index e907c5c464..8b701d1cd2 100644
+--- a/libavcodec/exr.c
++++ b/libavcodec/exr.c
+@@ -1830,7 +1830,7 @@ static int decode_frame(AVCodecContext *avctx, void *data,
+     // Zero out the start if ymin is not 0
+     for (i = 0; i < planes; i++) {
+         ptr = picture->data[i];
+-        for (y = 0; y < s->ymin; y++) {
++        for (y = 0; y < FFMIN(s->ymin, s->h); y++) {
+             memset(ptr, 0, out_line_size);
+             ptr += picture->linesize[i];
+         }

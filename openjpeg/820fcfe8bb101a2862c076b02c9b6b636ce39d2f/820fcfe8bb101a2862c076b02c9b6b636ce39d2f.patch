@@ -1,0 +1,93 @@
+commit 820fcfe8bb101a2862c076b02c9b6b636ce39d2f
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Thu Jul 27 19:34:54 2017 +0200
+
+    opj_j2k_update_image_data / opj_tcd_update_tile_data: fix unaligned load/store (#895)
+    
+    When components don't have the same width, unaligned load/store are possible.
+    
+    Fixes openjeg-crashes-2017-07-27/id:000000,sig:11,src:001342,op:flip4,pos:162.jp2 of #895
+
+diff --git a/src/lib/openjp2/j2k.c b/src/lib/openjp2/j2k.c
+index 8bd77f43..9ed8c044 100644
+--- a/src/lib/openjp2/j2k.c
++++ b/src/lib/openjp2/j2k.c
+@@ -8951,7 +8951,10 @@ static OPJ_BOOL opj_j2k_update_image_data(opj_tcd_t * p_tcd, OPJ_BYTE * p_data,
+             if (l_img_comp_src->sgnd) {
+                 for (j = 0; j < l_height_dest; ++j) {
+                     for (k = 0; k < l_width_dest; ++k) {
+-                        *(l_dest_ptr++) = *(l_src_ptr++);
++                        OPJ_INT16 val;
++                        memcpy(&val, l_src_ptr, sizeof(val));
++                        l_src_ptr ++;
++                        *(l_dest_ptr++) = val;
+                     }
+ 
+                     l_dest_ptr += l_line_offset_dest;
+@@ -8960,7 +8963,10 @@ static OPJ_BOOL opj_j2k_update_image_data(opj_tcd_t * p_tcd, OPJ_BYTE * p_data,
+             } else {
+                 for (j = 0; j < l_height_dest; ++j) {
+                     for (k = 0; k < l_width_dest; ++k) {
+-                        *(l_dest_ptr++) = (*(l_src_ptr++)) & 0xffff;
++                        OPJ_INT16 val;
++                        memcpy(&val, l_src_ptr, sizeof(val));
++                        l_src_ptr ++;
++                        *(l_dest_ptr++) = val & 0xffff;
+                     }
+ 
+                     l_dest_ptr += l_line_offset_dest;
+@@ -8977,12 +8983,9 @@ static OPJ_BOOL opj_j2k_update_image_data(opj_tcd_t * p_tcd, OPJ_BYTE * p_data,
+             l_src_ptr += l_start_offset_src;
+ 
+             for (j = 0; j < l_height_dest; ++j) {
+-                for (k = 0; k < l_width_dest; ++k) {
+-                    *(l_dest_ptr++) = (*(l_src_ptr++));
+-                }
+-
+-                l_dest_ptr += l_line_offset_dest;
+-                l_src_ptr += l_line_offset_src ;
++                memcpy(l_dest_ptr, l_src_ptr, l_width_dest * sizeof(OPJ_INT32));
++                l_dest_ptr += l_width_dest + l_line_offset_dest;
++                l_src_ptr += l_width_dest + l_line_offset_src ;
+             }
+ 
+             l_src_ptr += l_end_offset_src;
+diff --git a/src/lib/openjp2/tcd.c b/src/lib/openjp2/tcd.c
+index 7ae0fa37..a6921464 100644
+--- a/src/lib/openjp2/tcd.c
++++ b/src/lib/openjp2/tcd.c
+@@ -1523,14 +1523,18 @@ OPJ_BOOL opj_tcd_update_tile_data(opj_tcd_t *p_tcd,
+             if (l_img_comp->sgnd) {
+                 for (j = 0; j < l_height; ++j) {
+                     for (k = 0; k < l_width; ++k) {
+-                        *(l_dest_ptr++) = (OPJ_INT16)(*(l_src_ptr++));
++                        OPJ_INT16 val = (OPJ_INT16)(*(l_src_ptr++));
++                        memcpy(l_dest_ptr, &val, sizeof(val));
++                        l_dest_ptr ++;
+                     }
+                     l_src_ptr += l_stride;
+                 }
+             } else {
+                 for (j = 0; j < l_height; ++j) {
+                     for (k = 0; k < l_width; ++k) {
+-                        *(l_dest_ptr++) = (OPJ_INT16)((*(l_src_ptr++)) & 0xffff);
++                        OPJ_INT16 val = (OPJ_INT16)((*(l_src_ptr++)) & 0xffff);
++                        memcpy(l_dest_ptr, &val, sizeof(val));
++                        l_dest_ptr ++;
+                     }
+                     l_src_ptr += l_stride;
+                 }
+@@ -1544,10 +1548,9 @@ OPJ_BOOL opj_tcd_update_tile_data(opj_tcd_t *p_tcd,
+             OPJ_INT32 * l_src_ptr = l_tilec->data;
+ 
+             for (j = 0; j < l_height; ++j) {
+-                for (k = 0; k < l_width; ++k) {
+-                    *(l_dest_ptr++) = (*(l_src_ptr++));
+-                }
+-                l_src_ptr += l_stride;
++                memcpy(l_dest_ptr, l_src_ptr, l_width * sizeof(OPJ_INT32));
++                l_dest_ptr += l_width;
++                l_src_ptr += l_width + l_stride;
+             }
+ 
+             p_dest = (OPJ_BYTE*) l_dest_ptr;

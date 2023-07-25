@@ -1,0 +1,54 @@
+commit b3332a182f8ba33a34542e4a0370f38b914ccf7d
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Mon May 28 21:19:08 2018 +0200
+
+    avcodec/idctdsp: Transmit studio_profile to init instead of using AVCodecContext profile
+    
+    These 2 fields are not always the same, it is simpler to always use the same field
+    for detecting studio profile
+    
+    Fixes: null pointer dereference
+    Fixes: ffmpeg_crash_3.avi
+    
+    Found-by: Thuan Pham <thuanpv@comp.nus.edu.sg>, Marcel Böhme, Andrew Santosa and Alexandru RazvanCaciulescu with AFLSmart
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/idctdsp.c b/libavcodec/idctdsp.c
+index 662033bd78..954066a5e3 100644
+--- a/libavcodec/idctdsp.c
++++ b/libavcodec/idctdsp.c
+@@ -258,7 +258,7 @@ av_cold void ff_idctdsp_init(IDCTDSPContext *c, AVCodecContext *avctx)
+         if (avctx->bits_per_raw_sample == 10 || avctx->bits_per_raw_sample == 9) {
+             /* 10-bit MPEG-4 Simple Studio Profile requires a higher precision IDCT
+                However, it only uses idct_put */
+-            if (avctx->codec_id == AV_CODEC_ID_MPEG4 && avctx->profile == FF_PROFILE_MPEG4_SIMPLE_STUDIO)
++            if (c->mpeg4_studio_profile)
+                 c->idct_put              = ff_simple_idct_put_int32_10bit;
+             else {
+                 c->idct_put              = ff_simple_idct_put_int16_10bit;
+diff --git a/libavcodec/idctdsp.h b/libavcodec/idctdsp.h
+index 26221f6a9d..ca21a31a02 100644
+--- a/libavcodec/idctdsp.h
++++ b/libavcodec/idctdsp.h
+@@ -95,6 +95,8 @@ typedef struct IDCTDSPContext {
+      */
+     uint8_t idct_permutation[64];
+     enum idct_permutation_type perm_type;
++
++    int mpeg4_studio_profile;
+ } IDCTDSPContext;
+ 
+ void ff_put_pixels_clamped_c(const int16_t *block, uint8_t *av_restrict pixels,
+diff --git a/libavcodec/mpegvideo.c b/libavcodec/mpegvideo.c
+index 45ea0f09e9..f75c0fd9b3 100644
+--- a/libavcodec/mpegvideo.c
++++ b/libavcodec/mpegvideo.c
+@@ -329,6 +329,8 @@ static av_cold int dct_init(MpegEncContext *s)
+ 
+ av_cold void ff_mpv_idct_init(MpegEncContext *s)
+ {
++    if (s->codec_id == AV_CODEC_ID_MPEG4)
++        s->idsp.mpeg4_studio_profile = s->studio_profile;
+     ff_idctdsp_init(&s->idsp, s->avctx);
+ 
+     /* load & permutate scantables

@@ -1,0 +1,117 @@
+commit 79481367a457951aabd9501b510fd7e3eb29c3d8
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Jun 27 20:15:10 2022 +0100
+
+    patch 8.2.5169: nested :source may use NULL pointer
+    
+    Problem:    Nested :source may use NULL pointer.
+    Solution:   Do not use the NULL pointer.
+
+diff --git a/src/eval.c b/src/eval.c
+index dce78f7f0..42b883e9b 100644
+--- a/src/eval.c
++++ b/src/eval.c
+@@ -2387,27 +2387,32 @@ eval0_retarg(
+ 
+     p = skipwhite(arg);
+     ret = eval1(&p, rettv, evalarg);
+-    expr_end = p;
+-    p = skipwhite(p);
+ 
+-    // In Vim9 script a command block is not split at NL characters for
+-    // commands using an expression argument.  Skip over a '#' comment to check
+-    // for a following NL.  Require white space before the '#'.
+-    if (in_vim9script() && p > expr_end && retarg == NULL)
+-	while (*p == '#')
+-	{
+-	    char_u *nl = vim_strchr(p, NL);
++    if (ret != FAIL)
++    {
++	expr_end = p;
++	p = skipwhite(p);
+ 
+-	    if (nl == NULL)
+-		break;
+-	    p = skipwhite(nl + 1);
+-	    if (eap != NULL && *p != NUL)
+-		eap->nextcmd = p;
+-	    check_for_end = FALSE;
+-	}
++	// In Vim9 script a command block is not split at NL characters for
++	// commands using an expression argument.  Skip over a '#' comment to
++	// check for a following NL.  Require white space before the '#'.
++	if (in_vim9script() && p > expr_end && retarg == NULL)
++	    while (*p == '#')
++	    {
++		char_u *nl = vim_strchr(p, NL);
++
++		if (nl == NULL)
++		    break;
++		p = skipwhite(nl + 1);
++		if (eap != NULL && *p != NUL)
++		    eap->nextcmd = p;
++		check_for_end = FALSE;
++	    }
++
++	if (check_for_end)
++	    end_error = !ends_excmd2(arg, p);
++    }
+ 
+-    if (ret != FAIL && check_for_end)
+-	end_error = !ends_excmd2(arg, p);
+     if (ret == FAIL || end_error)
+     {
+ 	if (ret != FAIL)
+@@ -2433,7 +2438,8 @@ eval0_retarg(
+ 	// Some of the expression may not have been consumed.  Do not check for
+ 	// a next command to avoid more errors, unless "|" is following, which
+ 	// could only be a command separator.
+-	if (eap != NULL && skipwhite(p)[0] == '|' && skipwhite(p)[1] != '|')
++	if (eap != NULL && p != NULL
++			  &&  skipwhite(p)[0] == '|' && skipwhite(p)[1] != '|')
+ 	    eap->nextcmd = check_nextcmd(p);
+ 	return FAIL;
+     }
+diff --git a/src/testdir/test_vimscript.vim b/src/testdir/test_vimscript.vim
+index c9f58c239..07dc59d15 100644
+--- a/src/testdir/test_vimscript.vim
++++ b/src/testdir/test_vimscript.vim
+@@ -7528,6 +7528,25 @@ func Test_for_over_string()
+   call assert_equal('', res)
+ endfunc
+ 
++" Test for deeply nested :source command  {{{1
++func Test_deeply_nested_source()
++  let lines =<< trim END
++
++      so
++      sil 0scr
++      delete
++      so
++      0
++  END
++  call writefile(["vim9 silent! @0 \n/"] + lines, 'Xnested.vim')
++
++  " this must not crash
++  let cmd = GetVimCommand() .. " -e -s -S Xnested.vim -c qa!"
++  call system(cmd)
++
++  call delete('Xnested.vim')
++endfunc
++
+ "-------------------------------------------------------------------------------
+ " Modelines								    {{{1
+ " vim: ts=8 sw=2 sts=2 expandtab tw=80 fdm=marker
+diff --git a/src/version.c b/src/version.c
+index 5ac1cb93d..4a7e83f9c 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5169,
+ /**/
+     5168,
+ /**/

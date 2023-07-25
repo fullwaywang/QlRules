@@ -1,0 +1,24 @@
+commit 31be461c6b659312100c47be6ddd5f0f569290f6
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Thu Apr 16 13:26:46 2015 +0200
+
+    ConnectionExists: for NTLM re-use, require credentials to match
+    
+    CVE-2015-3143
+    
+    Bug: http://curl.haxx.se/docs/adv_20150422A.html
+    Reported-by: Paras Sethia
+
+diff --git a/lib/url.c b/lib/url.c
+index 018bb8876..ee3d176d9 100644
+--- a/lib/url.c
++++ b/lib/url.c
+@@ -3209,7 +3209,7 @@ ConnectionExists(struct SessionHandle *data,
+       }
+ 
+       if((!(needle->handler->flags & PROTOPT_CREDSPERREQUEST)) ||
+-         wantNTLMhttp) {
++         (wantNTLMhttp || check->ntlm.state != NTLMSTATE_NONE)) {
+         /* This protocol requires credentials per connection or is HTTP+NTLM,
+            so verify that we're using the same name and password as well */
+         if(!strequal(needle->user, check->user) ||

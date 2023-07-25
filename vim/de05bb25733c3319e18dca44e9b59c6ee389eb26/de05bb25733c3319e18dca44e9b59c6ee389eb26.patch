@@ -1,0 +1,69 @@
+commit de05bb25733c3319e18dca44e9b59c6ee389eb26
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Jan 13 13:08:14 2022 +0000
+
+    patch 8.2.4074: going over the end of NameBuff
+    
+    Problem:    Going over the end of NameBuff.
+    Solution:   Check length when appending a space.
+
+diff --git a/src/drawscreen.c b/src/drawscreen.c
+index 28a207295..453ca91c3 100644
+--- a/src/drawscreen.c
++++ b/src/drawscreen.c
+@@ -462,12 +462,13 @@ win_redr_status(win_T *wp, int ignore_pum UNUSED)
+ 	p = NameBuff;
+ 	len = (int)STRLEN(p);
+ 
+-	if (bt_help(wp->w_buffer)
++	if ((bt_help(wp->w_buffer)
+ #ifdef FEAT_QUICKFIX
+-		|| wp->w_p_pvw
++		    || wp->w_p_pvw
+ #endif
+-		|| bufIsChanged(wp->w_buffer)
+-		|| wp->w_buffer->b_p_ro)
++		    || bufIsChanged(wp->w_buffer)
++		    || wp->w_buffer->b_p_ro)
++		&& len < MAXPATHL - 1)
+ 	    *(p + len++) = ' ';
+ 	if (bt_help(wp->w_buffer))
+ 	{
+diff --git a/src/testdir/test_edit.vim b/src/testdir/test_edit.vim
+index e83d67250..63226466e 100644
+--- a/src/testdir/test_edit.vim
++++ b/src/testdir/test_edit.vim
+@@ -2103,5 +2103,20 @@ func Test_edit_CTRL_hat()
+   bwipe!
+ endfunc
+ 
++" Weird long file name was going over the end of NameBuff
++func Test_edit_overlong_file_name()
++  CheckUnix
++
++  file 0000000000000000000000000000
++  file %%%%%%%%%%%%%%%%%%%%%%%%%%
++  file %%%%%%
++  set readonly
++  set ls=2 
++
++  redraw!
++  set noreadonly ls&
++  bwipe!
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 1b37a5d50..1f4a03162 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4074,
+ /**/
+     4073,
+ /**/

@@ -1,0 +1,150 @@
+commit 7d60bf30effc4c88f17f3d58ecaa72479f16d4be
+Author: Vincent Bernat <vincent@bernat.ch>
+Date:   Tue Mar 16 17:36:35 2021 +0100
+
+    protocols: fix more memory leak when decoding multiple TLVs
+    
+    In a8d3c90feca5, some memory leaks were fixed when a TLV is present
+    multiple times. There were other occurrences in LLDP, CDP and EDP
+    handling. We ensure we free before overwriting with the new TLVs.
+    
+    Fix #436
+
+diff --git a/NEWS b/NEWS
+index dc995ab..1bc423b 100644
+--- a/NEWS
++++ b/NEWS
+@@ -1,6 +1,8 @@
+ lldpd (1.0.9)
+   * Fix:
+     + Do not use interface alias if we set it ourselves.
++    + More memory leak fixes on duplicate TLVs in LLDP, CDP and EDP
++      (related to CVE-2020-27827).
+   * Changes:
+     + Display port status with "show interfaces".
+     + Do not display "age" and "via" when using "show interfaces".
+diff --git a/src/daemon/protocols/cdp.c b/src/daemon/protocols/cdp.c
+index 31b4cce..7e99919 100644
+--- a/src/daemon/protocols/cdp.c
++++ b/src/daemon/protocols/cdp.c
+@@ -440,13 +440,15 @@ cdp_decode(struct lldpd *cfg, char *frame, int s,
+ 		}
+ 		switch (tlv_type) {
+ 		case CDP_TLV_CHASSIS:
++			free(chassis->c_name);
+ 			if ((chassis->c_name = (char *)calloc(1, tlv_len + 1)) == NULL) {
+ 				log_warn("cdp", "unable to allocate memory for chassis name");
+ 				goto malformed;
+ 			}
+ 			PEEK_BYTES(chassis->c_name, tlv_len);
+ 			chassis->c_id_subtype = LLDP_CHASSISID_SUBTYPE_LOCAL;
+-			if ((chassis->c_id =  (char *)malloc(tlv_len)) == NULL) {
++			free(chassis->c_id);
++			if ((chassis->c_id = (char *)malloc(tlv_len)) == NULL) {
+ 				log_warn("cdp", "unable to allocate memory for chassis ID");
+ 				goto malformed;
+ 			}
+@@ -514,12 +516,14 @@ cdp_decode(struct lldpd *cfg, char *frame, int s,
+ 				log_warn("cdp", "too short port description received");
+ 				goto malformed;
+ 			}
++			free(port->p_descr);
+ 			if ((port->p_descr = (char *)calloc(1, tlv_len + 1)) == NULL) {
+ 				log_warn("cdp", "unable to allocate memory for port description");
+ 				goto malformed;
+ 			}
+ 			PEEK_BYTES(port->p_descr, tlv_len);
+ 			port->p_id_subtype = LLDP_PORTID_SUBTYPE_IFNAME;
++			free(port->p_id);
+ 			if ((port->p_id =  (char *)calloc(1, tlv_len)) == NULL) {
+ 				log_warn("cdp", "unable to allocate memory for port ID");
+ 				goto malformed;
+diff --git a/src/daemon/protocols/edp.c b/src/daemon/protocols/edp.c
+index 8d91475..0c9b05c 100644
+--- a/src/daemon/protocols/edp.c
++++ b/src/daemon/protocols/edp.c
+@@ -379,6 +379,7 @@ edp_decode(struct lldpd *cfg, char *frame, int s,
+ 			}
+ 			break;
+ 		case EDP_TLV_DISPLAY:
++			free(chassis->c_name);
+ 			if ((chassis->c_name = (char *)calloc(1, tlv_len + 1)) == NULL) {
+ 				log_warn("edp", "unable to allocate memory for chassis "
+ 				    "name");
+diff --git a/src/daemon/protocols/lldp.c b/src/daemon/protocols/lldp.c
+index f1e6465..6701441 100644
+--- a/src/daemon/protocols/lldp.c
++++ b/src/daemon/protocols/lldp.c
+@@ -816,15 +816,23 @@ lldp_decode(struct lldpd *cfg, char *frame, int s,
+ 				goto malformed;
+ 			}
+ 			PEEK_BYTES(b, tlv_size);
+-			if (tlv_type == LLDP_TLV_PORT_DESCR) {
++			switch (tlv_type) {
++			case LLDP_TLV_PORT_DESCR:
+ 				free(port->p_descr);
+ 				port->p_descr = b;
+-			} else if (tlv_type == LLDP_TLV_SYSTEM_NAME) {
++				break;
++			case LLDP_TLV_SYSTEM_NAME:
+ 				free(chassis->c_name);
+ 				chassis->c_name = b;
+-			} else {
++				break;
++			case LLDP_TLV_SYSTEM_DESCR:
+ 				free(chassis->c_descr);
+ 				chassis->c_descr = b;
++				break;
++			default:
++				/* unreachable */
++				free(b);
++				break;
+ 			}
+ 			break;
+ 		case LLDP_TLV_SYSTEM_CAP:
+@@ -1107,6 +1115,7 @@ lldp_decode(struct lldpd *cfg, char *frame, int s,
+ 						    hardware->h_ifname);
+ 						break;
+ 					}
++					free(port->p_med_location[loctype - 1].data);
+ 					if ((port->p_med_location[loctype - 1].data =
+ 						(char*)malloc(tlv_size - 5)) == NULL) {
+ 						log_warn("lldp", "unable to allocate memory "
+@@ -1207,26 +1216,37 @@ lldp_decode(struct lldpd *cfg, char *frame, int s,
+ 					}
+ 					switch (tlv_subtype) {
+ 					case LLDP_TLV_MED_IV_HW:
++						free(chassis->c_med_hw);
+ 						chassis->c_med_hw = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_FW:
++						free(chassis->c_med_fw);
+ 						chassis->c_med_fw = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_SW:
++						free(chassis->c_med_sw);
+ 						chassis->c_med_sw = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_SN:
++						free(chassis->c_med_sn);
+ 						chassis->c_med_sn = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_MANUF:
++						free(chassis->c_med_manuf);
+ 						chassis->c_med_manuf = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_MODEL:
++						free(chassis->c_med_model);
+ 						chassis->c_med_model = b;
+ 						break;
+ 					case LLDP_TLV_MED_IV_ASSET:
++						free(chassis->c_med_asset);
+ 						chassis->c_med_asset = b;
+ 						break;
++					default:
++						/* unreachable */
++						free(b);
++						break;
+ 					}
+ 					port->p_med_cap_enabled |=
+ 					    LLDP_MED_CAP_IV;

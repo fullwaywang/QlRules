@@ -1,0 +1,73 @@
+commit 6456fae9ba8e72c74b2c0c499eaf09974604ff30
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Tue Feb 22 13:37:31 2022 +0000
+
+    patch 8.2.4440: crash with specific regexp pattern and string
+    
+    Problem:    Crash with specific regexp pattern and string.
+    Solution:   Stop at the start of the string.
+
+diff --git a/src/regexp_bt.c b/src/regexp_bt.c
+index 5f5e58f83..4082f59d3 100644
+--- a/src/regexp_bt.c
++++ b/src/regexp_bt.c
+@@ -4615,6 +4615,11 @@ regmatch(
+ 			    if (rex.input == rex.line)
+ 			    {
+ 				// backup to last char of previous line
++				if (rex.lnum == 0)
++				{
++				    status = RA_NOMATCH;
++				    break;
++				}
+ 				--rex.lnum;
+ 				rex.line = reg_getline(rex.lnum);
+ 				// Just in case regrepeat() didn't count
+diff --git a/src/testdir/test_regexp_utf8.vim b/src/testdir/test_regexp_utf8.vim
+index 674eee571..9f5b28816 100644
+--- a/src/testdir/test_regexp_utf8.vim
++++ b/src/testdir/test_regexp_utf8.vim
+@@ -508,7 +508,6 @@ endfunc
+ " Check that [[:upper:]] matches for automatic engine
+ func Test_match_char_class_upper()
+   new
+-  let _engine=&regexpengine
+ 
+   " Test 1: [[:upper:]]\{2,\}
+   set regexpengine=0
+@@ -549,7 +548,7 @@ func Test_match_char_class_upper()
+   call assert_equal(4, searchcount().total, 'TEST 3 lower')
+ 
+   " clean up
+-  let &regexpengine=_engine
++  set regexpengine=0
+   bwipe!
+ endfunc
+ 
+@@ -561,4 +560,13 @@ func Test_match_invalid_byte()
+   call delete('Xinvalid')
+ endfunc
+ 
++func Test_match_too_complicated()
++  set regexpengine=1
++  exe "vsplit \xeb\xdb\x99"
++  silent! buf \&\zs*\zs*0
++  bwipe!
++  set regexpengine=0
++endfunc
++
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 23f45b5c1..809b03f3e 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4440,
+ /**/
+     4439,
+ /**/

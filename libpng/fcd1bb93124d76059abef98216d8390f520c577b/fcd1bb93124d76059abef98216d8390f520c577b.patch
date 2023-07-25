@@ -1,0 +1,80 @@
+commit fcd1bb93124d76059abef98216d8390f520c577b
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Sat Aug 5 15:08:40 2017 -0500
+
+    [libpng16] Removed unused chunk_name parameter from png_check_chunk_length().
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index 26284628a..12283b79a 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -84,6 +84,7 @@ Version 1.6.32beta11 [August 5, 2017]
+   Added "eXIf" to "chunks_to_ignore[]" in png_set_keep_unknown_chunks().
+   Added huge_IDAT.png and empty_ancillary_chunks.png to testpngs/crashers.
+   Make pngtest --strict, --relax, --xfail options imply -m (multiple).
++  Removed unused chunk_name parameter from png_check_chunk_length().
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index 21d90d21e..fd610fae7 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -5967,6 +5967,7 @@ Version 1.6.32beta11 [August 5, 2017]
+   Added "eXIf" to "chunks_to_ignore[]" in png_set_keep_unknown_chunks().
+   Added huge_IDAT.png and empty_ancillary_chunks.png to testpngs/crashers.
+   Make pngtest --strict, --relax, --xfail options imply -m (multiple).
++  Removed unused chunk_name parameter from png_check_chunk_length().
+ 
+ Send comments/corrections/commendations to png-mng-implement at lists.sf.net
+ (subscription required; visit
+diff --git a/pngpread.c b/pngpread.c
+index b1f242c9c..b2d7d3b6f 100644
+--- a/pngpread.c
++++ b/pngpread.c
+@@ -190,8 +190,7 @@ png_push_read_chunk(png_structrp png_ptr, png_inforp info_ptr)
+       png_crc_read(png_ptr, chunk_tag, 4);
+       png_ptr->chunk_name = PNG_CHUNK_FROM_STRING(chunk_tag);
+       png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+-      png_check_chunk_length(png_ptr, png_ptr->chunk_name,
+-          png_ptr->push_length);
++      png_check_chunk_length(png_ptr, png_ptr->push_length);
+       png_ptr->mode |= PNG_HAVE_CHUNK_HEADER;
+    }
+ 
+diff --git a/pngpriv.h b/pngpriv.h
+index fc222bde1..245217f2c 100644
+--- a/pngpriv.h
++++ b/pngpriv.h
+@@ -1531,7 +1531,7 @@ PNG_INTERNAL_FUNCTION(void,png_check_chunk_name,(png_structrp png_ptr,
+     png_uint_32 chunk_name),PNG_EMPTY);
+ 
+ PNG_INTERNAL_FUNCTION(void,png_check_chunk_length,(png_structrp png_ptr,
+-    png_uint_32 chunk_name, png_uint_32 chunk_length),PNG_EMPTY);
++    png_uint_32 chunk_length),PNG_EMPTY);
+ 
+ PNG_INTERNAL_FUNCTION(void,png_handle_unknown,(png_structrp png_ptr,
+     png_inforp info_ptr, png_uint_32 length, int keep),PNG_EMPTY);
+diff --git a/pngrutil.c b/pngrutil.c
+index b744a51d9..afdd2f0c3 100644
+--- a/pngrutil.c
++++ b/pngrutil.c
+@@ -182,7 +182,7 @@ png_read_chunk_header(png_structrp png_ptr)
+    png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+ 
+    /* Check for too-large chunk length */
+-   png_check_chunk_length(png_ptr, png_ptr->chunk_name, length);
++   png_check_chunk_length(png_ptr, length);
+ 
+ #ifdef PNG_IO_STATE_SUPPORTED
+    png_ptr->io_state = PNG_IO_READING | PNG_IO_CHUNK_DATA;
+@@ -3105,8 +3105,7 @@ png_check_chunk_name(png_structrp png_ptr, png_uint_32 chunk_name)
+ }
+ 
+ void /* PRIVATE */
+-png_check_chunk_length(png_structrp png_ptr, png_uint_32 chunk_name,
+-   png_uint_32 length)
++png_check_chunk_length(png_structrp png_ptr, png_uint_32 length)
+ {
+    png_alloc_size_t limit = PNG_UINT_31_MAX;
+ 

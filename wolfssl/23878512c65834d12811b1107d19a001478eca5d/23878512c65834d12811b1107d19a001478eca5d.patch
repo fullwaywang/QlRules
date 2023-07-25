@@ -1,0 +1,96 @@
+commit 23878512c65834d12811b1107d19a001478eca5d
+Author: Sean Parkinson <sean@wolfssl.com>
+Date:   Wed Nov 27 10:47:03 2019 +1000
+
+    Change signature generation to verify by default
+
+diff --git a/wolfcrypt/src/signature.c b/wolfcrypt/src/signature.c
+index 57d327570..9256eb290 100644
+--- a/wolfcrypt/src/signature.c
++++ b/wolfcrypt/src/signature.c
+@@ -319,6 +319,16 @@ int wc_SignatureGenerateHash(
+     const byte* hash_data, word32 hash_len,
+     byte* sig, word32 *sig_len,
+     const void* key, word32 key_len, WC_RNG* rng)
++{
++    return wc_SignatureGenerateHash_ex(hash_type, sig_type, hash_data, hash_len,
++        sig, sig_len, key, key_len, rng, 1);
++}
++
++int wc_SignatureGenerateHash_ex(
++    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
++    const byte* hash_data, word32 hash_len,
++    byte* sig, word32 *sig_len,
++    const void* key, word32 key_len, WC_RNG* rng, int verify)
+ {
+     int ret;
+ 
+@@ -393,6 +403,11 @@ int wc_SignatureGenerateHash(
+             break;
+     }
+ 
++    if (ret == 0 && verify) {
++        ret = wc_SignatureVerifyHash(hash_type, sig_type, hash_data, hash_len,
++            sig, *sig_len, key, key_len);
++    }
++
+     return ret;
+ }
+ 
+@@ -401,6 +416,16 @@ int wc_SignatureGenerate(
+     const byte* data, word32 data_len,
+     byte* sig, word32 *sig_len,
+     const void* key, word32 key_len, WC_RNG* rng)
++{
++    return wc_SignatureGenerate_ex(hash_type, sig_type, data, data_len, sig,
++        sig_len, key, key_len, rng, 1);
++}
++
++int wc_SignatureGenerate_ex(
++    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
++    const byte* data, word32 data_len,
++    byte* sig, word32 *sig_len,
++    const void* key, word32 key_len, WC_RNG* rng, int verify)
+ {
+     int ret;
+     word32 hash_len, hash_enc_len;
+@@ -467,6 +492,11 @@ int wc_SignatureGenerate(
+         }
+     }
+ 
++    if (ret == 0 && verify) {
++        ret = wc_SignatureVerifyHash(hash_type, sig_type, hash_data,
++            hash_enc_len, sig, *sig_len, key, key_len);
++    }
++
+ #ifdef WOLFSSL_SMALL_STACK
+     XFREE(hash_data, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+ #endif
+diff --git a/wolfssl/wolfcrypt/signature.h b/wolfssl/wolfcrypt/signature.h
+index a0cc4ea5a..fe3b6a8e1 100644
+--- a/wolfssl/wolfcrypt/signature.h
++++ b/wolfssl/wolfcrypt/signature.h
+@@ -62,12 +62,23 @@ WOLFSSL_API int wc_SignatureGenerateHash(
+     const byte* hash_data, word32 hash_len,
+     byte* sig, word32 *sig_len,
+     const void* key, word32 key_len, WC_RNG* rng);
++WOLFSSL_API int wc_SignatureGenerateHash_ex(
++    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
++    const byte* hash_data, word32 hash_len,
++    byte* sig, word32 *sig_len,
++    const void* key, word32 key_len, WC_RNG* rng, int verify);
+ WOLFSSL_API int wc_SignatureGenerate(
+     enum wc_HashType hash_type, enum wc_SignatureType sig_type,
+     const byte* data, word32 data_len,
+     byte* sig, word32 *sig_len,
+     const void* key, word32 key_len,
+     WC_RNG* rng);
++WOLFSSL_API int wc_SignatureGenerate_ex(
++    enum wc_HashType hash_type, enum wc_SignatureType sig_type,
++    const byte* data, word32 data_len,
++    byte* sig, word32 *sig_len,
++    const void* key, word32 key_len,
++    WC_RNG* rng, int verify);
+ 
+ #ifdef __cplusplus
+     } /* extern "C" */

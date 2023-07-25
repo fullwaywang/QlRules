@@ -1,0 +1,24 @@
+commit aa54e0b59200a994d50a346b5d7ac818ebcf2d4b
+Author: Grigori Goronzy <greg@chown.ath.cx>
+Date:   Tue Oct 4 02:35:26 2016 +0200
+
+    shaper: fix reallocation
+    
+    Update the variable that tracks the allocated size. This potentially
+    improves performance and avoid some side effects, which lead to
+    undefined behavior in some cases.
+    
+    Fixes fuzzer test case id:000051,sig:11,sync:fuzzer3,src:004221.
+
+diff --git a/libass/ass_shaper.c b/libass/ass_shaper.c
+index 2707b23..5f24c5a 100644
+--- a/libass/ass_shaper.c
++++ b/libass/ass_shaper.c
+@@ -100,6 +100,7 @@ static bool check_allocations(ASS_Shaper *shaper, size_t new_size)
+             !ASS_REALLOC_ARRAY(shaper->emblevels, new_size) ||
+             !ASS_REALLOC_ARRAY(shaper->cmap, new_size))
+             return false;
++        shaper->n_glyphs = new_size;
+     }
+     return true;
+ }

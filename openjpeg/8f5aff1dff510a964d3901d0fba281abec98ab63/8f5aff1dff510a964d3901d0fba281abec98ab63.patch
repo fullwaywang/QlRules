@@ -1,0 +1,70 @@
+commit 8f5aff1dff510a964d3901d0fba281abec98ab63
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Fri Dec 4 20:45:25 2020 +0100
+
+    pi.c: avoid out of bounds access with POC (fixes #1302)
+
+diff --git a/src/lib/openjp2/pi.c b/src/lib/openjp2/pi.c
+index d62b8d74..4f7dd50f 100644
+--- a/src/lib/openjp2/pi.c
++++ b/src/lib/openjp2/pi.c
+@@ -240,6 +240,13 @@ static OPJ_BOOL opj_pi_next_lrcp(opj_pi_iterator_t * pi)
+     opj_pi_resolution_t *res = NULL;
+     OPJ_UINT32 index = 0;
+ 
++    if (pi->poc.compno0 >= pi->numcomps ||
++            pi->poc.compno1 >= pi->numcomps + 1) {
++        opj_event_msg(pi->manager, EVT_ERROR,
++                      "opj_pi_next_lrcp(): invalid compno0/compno1\n");
++        return OPJ_FALSE;
++    }
++
+     if (!pi->first) {
+         comp = &pi->comps[pi->compno];
+         res = &comp->resolutions[pi->resno];
+@@ -293,6 +300,13 @@ static OPJ_BOOL opj_pi_next_rlcp(opj_pi_iterator_t * pi)
+     opj_pi_resolution_t *res = NULL;
+     OPJ_UINT32 index = 0;
+ 
++    if (pi->poc.compno0 >= pi->numcomps ||
++            pi->poc.compno1 >= pi->numcomps + 1) {
++        opj_event_msg(pi->manager, EVT_ERROR,
++                      "opj_pi_next_rlcp(): invalid compno0/compno1\n");
++        return OPJ_FALSE;
++    }
++
+     if (!pi->first) {
+         comp = &pi->comps[pi->compno];
+         res = &comp->resolutions[pi->resno];
+@@ -339,6 +353,13 @@ static OPJ_BOOL opj_pi_next_rpcl(opj_pi_iterator_t * pi)
+     opj_pi_resolution_t *res = NULL;
+     OPJ_UINT32 index = 0;
+ 
++    if (pi->poc.compno0 >= pi->numcomps ||
++            pi->poc.compno1 >= pi->numcomps + 1) {
++        opj_event_msg(pi->manager, EVT_ERROR,
++                      "opj_pi_next_rpcl(): invalid compno0/compno1\n");
++        return OPJ_FALSE;
++    }
++
+     if (!pi->first) {
+         goto LABEL_SKIP;
+     } else {
+@@ -474,7 +495,7 @@ static OPJ_BOOL opj_pi_next_pcrl(opj_pi_iterator_t * pi)
+     if (pi->poc.compno0 >= pi->numcomps ||
+             pi->poc.compno1 >= pi->numcomps + 1) {
+         opj_event_msg(pi->manager, EVT_ERROR,
+-                      "opj_pi_next_pcrl(): invalid compno0/compno1");
++                      "opj_pi_next_pcrl(): invalid compno0/compno1\n");
+         return OPJ_FALSE;
+     }
+ 
+@@ -612,7 +633,7 @@ static OPJ_BOOL opj_pi_next_cprl(opj_pi_iterator_t * pi)
+     if (pi->poc.compno0 >= pi->numcomps ||
+             pi->poc.compno1 >= pi->numcomps + 1) {
+         opj_event_msg(pi->manager, EVT_ERROR,
+-                      "opj_pi_next_cprl(): invalid compno0/compno1");
++                      "opj_pi_next_cprl(): invalid compno0/compno1\n");
+         return OPJ_FALSE;
+     }
+ 

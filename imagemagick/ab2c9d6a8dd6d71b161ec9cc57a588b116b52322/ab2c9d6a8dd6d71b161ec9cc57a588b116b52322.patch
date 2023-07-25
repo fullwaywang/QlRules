@@ -1,0 +1,19 @@
+commit ab2c9d6a8dd6d71b161ec9cc57a588b116b52322
+Author: Dirk Lemstra <dirk@git.imagemagick.org>
+Date:   Mon Nov 21 20:53:03 2016 +0100
+
+    Lowered max map_length to prevent an overflow (#271).
+
+diff --git a/coders/rle.c b/coders/rle.c
+index 05a65ec22..49638a4b8 100644
+--- a/coders/rle.c
++++ b/coders/rle.c
+@@ -224,7 +224,7 @@ static Image *ReadRLEImage(const ImageInfo *image_info,ExceptionInfo *exception)
+     bits_per_pixel=(size_t) ReadBlobByte(image);
+     number_colormaps=(size_t) ReadBlobByte(image);
+     map_length=(unsigned char) ReadBlobByte(image);
+-    if (map_length >= 32)
++    if (map_length >= 22)
+       ThrowReaderException(CorruptImageError,"ImproperImageHeader");
+     one=1;
+     map_length=one << map_length;

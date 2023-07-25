@@ -1,0 +1,22 @@
+commit d6cd14059b257318f176c0ba3ee0a348826a9ef8
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Tue May 19 07:48:07 2020 +0200
+
+    Fixed GHSL-2020-101 missing NULL check
+    
+    (cherry picked from commit b207dbba35c505bbc3ad5aadc10b34980c6b7e8e)
+
+diff --git a/libfreerdp/core/security.c b/libfreerdp/core/security.c
+index bce1855c4..e6571c36d 100644
+--- a/libfreerdp/core/security.c
++++ b/libfreerdp/core/security.c
+@@ -816,6 +816,9 @@ BOOL security_fips_decrypt(BYTE* data, size_t length, rdpRdp* rdp)
+ {
+ 	size_t olen;
+ 
++	if (!rdp || !rdp->fips_decrypt)
++		return FALSE;
++
+ 	if (!winpr_Cipher_Update(rdp->fips_decrypt, data, length, data, &olen))
+ 		return FALSE;
+ 

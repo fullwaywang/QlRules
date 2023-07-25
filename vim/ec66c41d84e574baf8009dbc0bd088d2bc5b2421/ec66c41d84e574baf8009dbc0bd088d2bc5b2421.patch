@@ -1,0 +1,60 @@
+commit ec66c41d84e574baf8009dbc0bd088d2bc5b2421
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri Oct 11 21:19:13 2019 +0200
+
+    patch 8.1.2136: using freed memory with autocmd from fuzzer
+    
+    Problem:    using freed memory with autocmd from fuzzer. (Dhiraj Mishra,
+                Dominique Pelle)
+    Solution:   Avoid using "wp" after autocommands. (closes #5041)
+
+diff --git a/src/testdir/test_autocmd.vim b/src/testdir/test_autocmd.vim
+index fe77bf578..1e53fe463 100644
+--- a/src/testdir/test_autocmd.vim
++++ b/src/testdir/test_autocmd.vim
+@@ -2288,3 +2288,11 @@ func Test_autocmd_CmdWinEnter()
+   call StopVimInTerminal(buf)
+   call delete(filename)
+ endfunc
++
++func Test_autocmd_was_using_freed_memory()
++  pedit xx
++  n x
++  au WinEnter * quit
++  split
++  au! WinEnter
++endfunc
+diff --git a/src/version.c b/src/version.c
+index f22db5547..46bd1b19c 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -753,6 +753,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    2136,
+ /**/
+     2135,
+ /**/
+diff --git a/src/window.c b/src/window.c
+index 0fda9f05c..fb8a5a7ed 100644
+--- a/src/window.c
++++ b/src/window.c
+@@ -4641,6 +4641,7 @@ win_enter_ext(
+ #ifdef FEAT_JOB_CHANNEL
+     entering_window(curwin);
+ #endif
++    // Careful: autocommands may close the window and make "wp" invalid
+     if (trigger_new_autocmds)
+ 	apply_autocmds(EVENT_WINNEW, NULL, NULL, FALSE, curbuf);
+     if (trigger_enter_autocmds)
+@@ -4655,7 +4656,7 @@ win_enter_ext(
+ #endif
+     curwin->w_redr_status = TRUE;
+ #ifdef FEAT_TERMINAL
+-    if (bt_terminal(wp->w_buffer))
++    if (bt_terminal(curwin->w_buffer))
+ 	// terminal is likely in another mode
+ 	redraw_mode = TRUE;
+ #endif

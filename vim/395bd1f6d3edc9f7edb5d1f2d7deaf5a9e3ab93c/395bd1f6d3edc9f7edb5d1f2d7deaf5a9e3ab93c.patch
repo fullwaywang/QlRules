@@ -1,0 +1,72 @@
+commit 395bd1f6d3edc9f7edb5d1f2d7deaf5a9e3ab93c
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat May 14 21:29:44 2022 +0100
+
+    patch 8.2.4956: reading past end of line with "gf" in Visual block mode
+    
+    Problem:    Reading past end of line with "gf" in Visual block mode.
+    Solution:   Do not include the NUL in the length.
+
+diff --git a/src/normal.c b/src/normal.c
+index 1baf68a14..bc3e29e1a 100644
+--- a/src/normal.c
++++ b/src/normal.c
+@@ -3671,9 +3671,16 @@ get_visual_text(
+ 	}
+ 	if (**pp == NUL)
+ 	    *lenp = 0;
+-	if (has_mbyte && *lenp > 0)
+-	    // Correct the length to include all bytes of the last character.
+-	    *lenp += (*mb_ptr2len)(*pp + (*lenp - 1)) - 1;
++	if (*lenp > 0)
++	{
++	    if (has_mbyte)
++		// Correct the length to include all bytes of the last
++		// character.
++		*lenp += (*mb_ptr2len)(*pp + (*lenp - 1)) - 1;
++	    else if ((*pp)[*lenp - 1] == NUL)
++		// Do not include a trailing NUL.
++		*lenp -= 1;
++	}
+     }
+     reset_VIsual_and_resel();
+     return OK;
+diff --git a/src/testdir/test_gf.vim b/src/testdir/test_gf.vim
+index 3602ba010..1b3b13981 100644
+--- a/src/testdir/test_gf.vim
++++ b/src/testdir/test_gf.vim
+@@ -138,6 +138,21 @@ func Test_gf_visual()
+   call assert_equal('Xtest_gf_visual', bufname('%'))
+   call assert_equal(3, getcurpos()[1])
+ 
++  " do not include the NUL at the end 
++  call writefile(['x'], 'X')
++  let save_enc = &enc
++  for enc in ['latin1', 'utf-8']
++    exe "set enc=" .. enc
++    new
++    call setline(1, 'X')
++    set nomodified
++    exe "normal \<C-V>$gf"
++    call assert_equal('X', bufname())
++    bwipe!
++  endfor
++  let &enc = save_enc
++  call delete('X')
++
+   " line number in visual area is used for file name
+   if has('unix')
+     bwipe!
+diff --git a/src/version.c b/src/version.c
+index 62e2b0af6..821f3680e 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4956,
+ /**/
+     4955,
+ /**/

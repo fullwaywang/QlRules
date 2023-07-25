@@ -1,0 +1,20 @@
+commit 16aeb9282f6b3877aa8365c461ba8d3d1338adae
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Fri Jul 28 21:39:30 2017 +0200
+
+    Fix null pointer dereference in opj_j2k_add_mct() (#895)
+    
+    Fixes openjeg-crashes-2017-07-27/issue879-poc1.j2k of #895
+
+diff --git a/src/lib/openjp2/j2k.c b/src/lib/openjp2/j2k.c
+index 89f2b45f..b192f04f 100644
+--- a/src/lib/openjp2/j2k.c
++++ b/src/lib/openjp2/j2k.c
+@@ -5584,6 +5584,7 @@ static OPJ_BOOL opj_j2k_read_mct(opj_j2k_t *p_j2k,
+     if (l_mct_data->m_data) {
+         opj_free(l_mct_data->m_data);
+         l_mct_data->m_data = 00;
++        l_mct_data->m_data_size = 0;
+     }
+ 
+     l_mct_data->m_index = l_indix;

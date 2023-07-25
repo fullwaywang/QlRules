@@ -1,0 +1,22 @@
+commit 98a2cceae0dceccbfe54051167c2c80be1f13c3f
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Wed Jul 4 14:17:07 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1192
+
+diff --git a/coders/mpc.c b/coders/mpc.c
+index 1a32695ab..3dd5cbec5 100644
+--- a/coders/mpc.c
++++ b/coders/mpc.c
+@@ -1470,7 +1470,11 @@ static MagickBooleanType WriteMPCImage(const ImageInfo *image_info,Image *image,
+           switch (depth)
+           {
+             default:
++            {
++              colormap=(unsigned char *) RelinquishMagickMemory(colormap);
+               ThrowWriterException(CorruptImageError,"ImageDepthNotSupported");
++              break;
++            }
+             case 32:
+             {
+               unsigned int

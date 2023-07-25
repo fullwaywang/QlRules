@@ -1,0 +1,69 @@
+commit 909a8cfc7bca9b2e6707425bdb74da997e8fa499
+Author: DRC <information@libjpeg-turbo.org>
+Date:   Tue Jun 12 16:08:26 2018 -0500
+
+    Fix CVE-2018-11813
+    
+    Refer to change log for details.
+    
+    Fixes #242
+
+diff --git a/ChangeLog.md b/ChangeLog.md
+index 57bcf1d2..14aeee82 100644
+--- a/ChangeLog.md
++++ b/ChangeLog.md
+@@ -11,6 +11,20 @@ an image was passed to `tjDecompressHeader3()`, `tjTransform()`,
+ `tjDecompressToYUVPlanes()`, `tjDecompressToYUV2()`, or the equivalent Java
+ methods.
+ 
++2. Fixed an issue (CVE-2018-11813) whereby a specially-crafted malformed input
++file (specifically, a file with a valid Targa header but incomplete pixel data)
++would cause cjpeg to generate a JPEG file that was potentially thousands of
++times larger than the input file.  The Targa reader in cjpeg was not properly
++detecting that the end of the input file had been reached prematurely, so after
++all valid pixels had been read from the input, the reader injected dummy pixels
++with values of 255 into the JPEG compressor until the number of pixels
++specified in the Targa header had been compressed.  The Targa reader in cjpeg
++now behaves like the PPM reader and aborts compression if the end of the input
++file is reached prematurely.  Because this issue only affected cjpeg and not
++the underlying library, and because it did not involve any out-of-bounds reads
++or other exploitable behaviors, it was not believed to represent a security
++threat.
++
+ 
+ 1.5.90 (2.0 beta1)
+ ==================
+diff --git a/rdtarga.c b/rdtarga.c
+index ecb42193..e0c6947b 100644
+--- a/rdtarga.c
++++ b/rdtarga.c
+@@ -126,11 +126,10 @@ METHODDEF(void)
+ read_non_rle_pixel(tga_source_ptr sinfo)
+ /* Read one Targa pixel from the input file; no RLE expansion */
+ {
+-  register FILE *infile = sinfo->pub.input_file;
+   register int i;
+ 
+   for (i = 0; i < sinfo->pixel_size; i++) {
+-    sinfo->tga_pixel[i] = (U_CHAR)getc(infile);
++    sinfo->tga_pixel[i] = (U_CHAR)read_byte(sinfo);
+   }
+ }
+ 
+@@ -139,7 +138,6 @@ METHODDEF(void)
+ read_rle_pixel(tga_source_ptr sinfo)
+ /* Read one Targa pixel from the input file, expanding RLE data as needed */
+ {
+-  register FILE *infile = sinfo->pub.input_file;
+   register int i;
+ 
+   /* Duplicate previously read pixel? */
+@@ -161,7 +159,7 @@ read_rle_pixel(tga_source_ptr sinfo)
+ 
+   /* Read next pixel */
+   for (i = 0; i < sinfo->pixel_size; i++) {
+-    sinfo->tga_pixel[i] = (U_CHAR)getc(infile);
++    sinfo->tga_pixel[i] = (U_CHAR)read_byte(sinfo);
+   }
+ }
+ 

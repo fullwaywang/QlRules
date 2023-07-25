@@ -1,41 +1,32 @@
+/**
+ * @name openssl-43e6a58d4991a451daf4891ff05a48735df871ac-dsa_sign_setup
+ * @id cpp/openssl/43e6a58d4991a451daf4891ff05a48735df871ac/dsa-sign-setup
+ * @description openssl-43e6a58d4991a451daf4891ff05a48735df871ac-crypto/dsa/dsa_ossl.c-dsa_sign_setup CVE-2018-0734
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Parameter vdsa, Variable vq_bits) {
+predicate func_0(Function func) {
 	exists(AddExpr target_0 |
-		target_0.getType().hasName("unsigned long")
-		and target_0.getLeftOperand().(FunctionCall).getTarget().hasName("BN_num_bits")
-		and target_0.getLeftOperand().(FunctionCall).getType().hasName("int")
-		and target_0.getLeftOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="q"
-		and target_0.getLeftOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getType().hasName("BIGNUM *")
-		and target_0.getLeftOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdsa
-		and target_0.getRightOperand().(MulExpr).getType().hasName("unsigned long")
-		and target_0.getRightOperand().(MulExpr).getValue()="128"
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getType().hasName("unsigned long")
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getValue()="8"
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getExprOperand().(ArrayExpr).getType().hasName("unsigned long")
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getExprOperand().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="d"
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getExprOperand().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="q"
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getExprOperand().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdsa
-		and target_0.getRightOperand().(MulExpr).getLeftOperand().(SizeofExprOperator).getExprOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
-		and target_0.getRightOperand().(MulExpr).getRightOperand().(Literal).getValue()="16"
-		and target_0.getParent().(AssignExpr).getLValue().(VariableAccess).getTarget()=vq_bits)
+		target_0.getAnOperand() instanceof FunctionCall
+		and target_0.getAnOperand().(MulExpr).getValue()="128"
+		and target_0.getParent().(AssignExpr).getRValue() = target_0
+		and target_0.getEnclosingFunction() = func)
 }
 
-predicate func_1(Parameter vdsa) {
-	exists(FunctionCall target_1 |
+predicate func_1(Parameter vdsa_253, FunctionCall target_1) {
 		target_1.getTarget().hasName("BN_num_bits")
-		and target_1.getType().hasName("int")
 		and target_1.getArgument(0).(PointerFieldAccess).getTarget().getName()="q"
-		and target_1.getArgument(0).(PointerFieldAccess).getType().hasName("BIGNUM *")
-		and target_1.getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdsa)
+		and target_1.getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdsa_253
 }
 
-from Function func, Parameter vdsa, Variable vq_bits
+from Function func, Parameter vdsa_253, FunctionCall target_1
 where
-not func_0(vdsa, vq_bits)
-and func_1(vdsa)
-and vdsa.getType().hasName("DSA *")
-and vq_bits.getType().hasName("int")
-and vdsa.getParentScope+() = func
-and vq_bits.getParentScope+() = func
-select func, vdsa, vq_bits
+not func_0(func)
+and func_1(vdsa_253, target_1)
+and vdsa_253.getType().hasName("DSA *")
+and vdsa_253.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

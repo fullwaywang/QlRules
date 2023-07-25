@@ -1,0 +1,23 @@
+commit cdd5df8189ff1537f7abe8defe971f80602cc2d2	cdd5df8189ff1537f7abe8defe971f80602cc2d2
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Mon Sep 2 04:32:23 2013 +0200
+
+    avfilter/vf_fps: make sure the fifo is not empty before using it
+    
+    Fixes Ticket2905
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavfilter/vf_fps.c b/libavfilter/vf_fps.c
+index 4eb3663b1a..06ebdfadce 100644
+--- a/libavfilter/vf_fps.c
++++ b/libavfilter/vf_fps.c
+@@ -205,7 +205,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *buf)
+     }
+ 
+     /* now wait for the next timestamp */
+-    if (buf->pts == AV_NOPTS_VALUE) {
++    if (buf->pts == AV_NOPTS_VALUE || av_fifo_size(s->fifo) <= 0) {
+         return write_to_fifo(s->fifo, buf);
+     }
+ 

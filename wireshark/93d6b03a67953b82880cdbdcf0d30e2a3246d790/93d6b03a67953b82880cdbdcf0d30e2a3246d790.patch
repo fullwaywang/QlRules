@@ -1,0 +1,63 @@
+commit 93d6b03a67953b82880cdbdcf0d30e2a3246d790
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Fri Feb 7 11:17:35 2020 -0800
+
+    WiMax DLMAP: Add a length check.
+    
+    Make sure we have enough data for a CRC.
+    
+    Bug: 16368
+    Change-Id: I03a2532061a5cf5e28cb65c83dd4ab90654d1679
+    Reviewed-on: https://code.wireshark.org/review/36051
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+
+diff --git a/plugins/epan/wimax/.editorconfig b/plugins/epan/wimax/.editorconfig
+new file mode 100644
+index 0000000000..541cd9d3df
+--- /dev/null
++++ b/plugins/epan/wimax/.editorconfig
+@@ -0,0 +1,10 @@
++#
++# Editor configuration
++#
++# https://editorconfig.org/
++#
++
++[msg_dlmap.[ch]]
++indent_style = tab
++indent_size = tab
++
+diff --git a/plugins/epan/wimax/msg_dlmap.c b/plugins/epan/wimax/msg_dlmap.c
+index 05f871420b..c2cdf54f5e 100644
+--- a/plugins/epan/wimax/msg_dlmap.c
++++ b/plugins/epan/wimax/msg_dlmap.c
+@@ -593,6 +593,7 @@ static int hf_dlmap_reduced_aas_spid = -1;
+ static expert_field ei_dlmap_not_implemented = EI_INIT;
+ static expert_field ei_crc16 = EI_INIT;
+ static expert_field ei_mac_header_compress_dlmap_crc = EI_INIT;
++static expert_field ei_mac_header_invalid_length = EI_INIT;
+ 
+ /* Copied and renamed from proto.c because global value_strings don't work for plugins */
+ static const value_string plugin_proto_checksum_vals[] = {
+@@ -2383,7 +2384,12 @@ gint wimax_decode_dlmapc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *base_tre
+ 
+ 	/* CRC is always appended */
+ 	/* check the length */
+-	if (MIN(tvb_len, tvb_reported_length(tvb)) >= mac_len)
++	if (mac_len <= sizeof(mac_crc))
++	{
++		expert_add_info_format(pinfo, ti, &ei_mac_header_invalid_length,
++		"Invalid length: %d.", mac_len);
++	}
++	else if (MIN(tvb_len, tvb_reported_length(tvb)) >= mac_len)
+ 	{
+ 		/* calculate the CRC */
+ 		calculated_crc = wimax_mac_calc_crc32(tvb_get_ptr(tvb, 0, mac_len - (int)sizeof(mac_crc)), mac_len - (int)sizeof(mac_crc));
+@@ -3436,6 +3442,7 @@ void proto_register_mac_mgmt_msg_dlmap(void)
+ 		{ &ei_dlmap_not_implemented, { "wmx.dlmap.not_implemented", PI_UNDECODED, PI_WARN, "Not implemented", EXPFILL }},
+ 		{ &ei_crc16, { "wmx.dlmap.bad_checksum", PI_CHECKSUM, PI_ERROR, "Bad checksum", EXPFILL }},
+ 		{ &ei_mac_header_compress_dlmap_crc, { "wmx.compress_dlmap.bad_checksum", PI_CHECKSUM, PI_ERROR, "Bad checksum", EXPFILL }},
++		{ &ei_mac_header_invalid_length, { "wmx.compress_dlmap.invalid_length", PI_MALFORMED, PI_ERROR, "Invalid length", EXPFILL }},
+ 	};
+ 
+ 	expert_module_t* expert_mac_mgmt_msg_dlmap;

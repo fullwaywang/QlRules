@@ -1,0 +1,38 @@
+commit 9097577b49b7fdcf45d30975976dd93808ccc0c4
+Author: Roger A. Light <roger@atchoo.org>
+Date:   Sun Dec 9 09:45:14 2018 +0000
+
+    Fix acl_file being ignore for default listener if with per_listener_settings
+    
+    Close #1073. Thanks to Jef Driesen.
+    
+    Bug: https://github.com/eclipse/mosquitto/issues/1073
+
+diff --git a/ChangeLog.txt b/ChangeLog.txt
+index c3a6c60a..6287bce2 100644
+--- a/ChangeLog.txt
++++ b/ChangeLog.txt
+@@ -1,6 +1,11 @@
+ 1.5.5 - 201812xx
+ ================
+ 
++Security:
++- If `per_listener_settings` is set to true, then the `acl_file` setting was
++  ignored for the "default listener" only. This has been fixed. This does not
++  affect any listeners defined with the `listener` option. Closes #1073.
++
+ Broker:
+ - Add `socket_domain` option to allow listeners to disable IPv6 support.
+   This is required to work around a problem in libwebsockets that means
+diff --git a/src/conf.c b/src/conf.c
+index 67e172b0..87294680 100644
+--- a/src/conf.c
++++ b/src/conf.c
+@@ -497,6 +497,7 @@ int config__parse_args(struct mosquitto_db *db, struct mosquitto__config *config
+ 		config->listeners[config->listener_count-1].use_identity_as_username = config->default_listener.use_identity_as_username;
+ 		config->listeners[config->listener_count-1].use_subject_as_username = config->default_listener.use_subject_as_username;
+ #endif
++		config->listeners[config->listener_count-1].security_options.acl_file = config->default_listener.security_options.acl_file;
+ 		config->listeners[config->listener_count-1].security_options.password_file = config->default_listener.security_options.password_file;
+ 		config->listeners[config->listener_count-1].security_options.psk_file = config->default_listener.security_options.psk_file;
+ 		config->listeners[config->listener_count-1].security_options.auth_plugin_configs = config->default_listener.security_options.auth_plugin_configs;

@@ -1,0 +1,104 @@
+commit 28e24125541545483093819efae9bca603441951
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon Nov 8 11:01:43 2021 -0500
+
+    Reject extraneous data after SSL or GSS encryption handshake.
+    
+    The server collects up to a bufferload of data whenever it reads data
+    from the client socket.  When SSL or GSS encryption is requested
+    during startup, any additional data received with the initial
+    request message remained in the buffer, and would be treated as
+    already-decrypted data once the encryption handshake completed.
+    Thus, a man-in-the-middle with the ability to inject data into the
+    TCP connection could stuff some cleartext data into the start of
+    a supposedly encryption-protected database session.
+    
+    This could be abused to send faked SQL commands to the server,
+    although that would only work if the server did not demand any
+    authentication data.  (However, a server relying on SSL certificate
+    authentication might well not do so.)
+    
+    To fix, throw a protocol-violation error if the internal buffer
+    is not empty after the encryption handshake.
+    
+    Our thanks to Jacob Champion for reporting this problem.
+    
+    Security: CVE-2021-23214
+
+diff --git a/src/backend/libpq/pqcomm.c b/src/backend/libpq/pqcomm.c
+index 89a5f901aa..44782f2d88 100644
+--- a/src/backend/libpq/pqcomm.c
++++ b/src/backend/libpq/pqcomm.c
+@@ -1141,6 +1141,18 @@ pq_discardbytes(size_t len)
+ 	return 0;
+ }
+ 
++/* --------------------------------
++ *		pq_buffer_has_data		- is any buffered data available to read?
++ *
++ * This will *not* attempt to read more data.
++ * --------------------------------
++ */
++bool
++pq_buffer_has_data(void)
++{
++	return (PqRecvPointer < PqRecvLength);
++}
++
+ 
+ /* --------------------------------
+  *		pq_startmsgread - begin reading a message from the client.
+diff --git a/src/backend/postmaster/postmaster.c b/src/backend/postmaster/postmaster.c
+index e2a76ba055..db797c040b 100644
+--- a/src/backend/postmaster/postmaster.c
++++ b/src/backend/postmaster/postmaster.c
+@@ -2110,6 +2110,18 @@ retry1:
+ 			return STATUS_ERROR;
+ #endif
+ 
++		/*
++		 * At this point we should have no data already buffered.  If we do,
++		 * it was received before we performed the SSL handshake, so it wasn't
++		 * encrypted and indeed may have been injected by a man-in-the-middle.
++		 * We report this case to the client.
++		 */
++		if (pq_buffer_has_data())
++			ereport(FATAL,
++					(errcode(ERRCODE_PROTOCOL_VIOLATION),
++					 errmsg("received unencrypted data after SSL request"),
++					 errdetail("This could be either a client-software bug or evidence of an attempted man-in-the-middle attack.")));
++
+ 		/*
+ 		 * regular startup packet, cancel, etc packet should follow, but not
+ 		 * another SSL negotiation request, and a GSS request should only
+@@ -2142,6 +2154,18 @@ retry1:
+ 			return STATUS_ERROR;
+ #endif
+ 
++		/*
++		 * At this point we should have no data already buffered.  If we do,
++		 * it was received before we performed the GSS handshake, so it wasn't
++		 * encrypted and indeed may have been injected by a man-in-the-middle.
++		 * We report this case to the client.
++		 */
++		if (pq_buffer_has_data())
++			ereport(FATAL,
++					(errcode(ERRCODE_PROTOCOL_VIOLATION),
++					 errmsg("received unencrypted data after GSSAPI encryption request"),
++					 errdetail("This could be either a client-software bug or evidence of an attempted man-in-the-middle attack.")));
++
+ 		/*
+ 		 * regular startup packet, cancel, etc packet should follow, but not
+ 		 * another GSS negotiation request, and an SSL request should only
+diff --git a/src/include/libpq/libpq.h b/src/include/libpq/libpq.h
+index 6c51b2f20f..6b67a2a318 100644
+--- a/src/include/libpq/libpq.h
++++ b/src/include/libpq/libpq.h
+@@ -79,6 +79,7 @@ extern int	pq_getmessage(StringInfo s, int maxlen);
+ extern int	pq_getbyte(void);
+ extern int	pq_peekbyte(void);
+ extern int	pq_getbyte_if_available(unsigned char *c);
++extern bool pq_buffer_has_data(void);
+ extern int	pq_putmessage_v2(char msgtype, const char *s, size_t len);
+ extern bool pq_check_connection(void);
+ 

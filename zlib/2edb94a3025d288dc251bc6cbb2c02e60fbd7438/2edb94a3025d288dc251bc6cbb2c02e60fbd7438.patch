@@ -1,0 +1,19 @@
+commit 2edb94a3025d288dc251bc6cbb2c02e60fbd7438
+Author: Mark Adler <madler@alumni.caltech.edu>
+Date:   Tue Oct 11 18:38:20 2016 -0700
+
+    Avoid casting an out-of-range value to long.
+
+diff --git a/inflate.c b/inflate.c
+index 9ee84d0..2f3fcc9 100644
+--- a/inflate.c
++++ b/inflate.c
+@@ -1526,7 +1526,7 @@ z_streamp strm;
+     struct inflate_state FAR *state;
+ 
+     if (strm == Z_NULL || strm->state == Z_NULL)
+-        return (long)(((unsigned long)0 - 1) << 16);
++        return -(1L << 16);
+     state = (struct inflate_state FAR *)strm->state;
+     return (long)(((unsigned long)((long)state->back)) << 16) +
+         (state->mode == COPY ? state->length :

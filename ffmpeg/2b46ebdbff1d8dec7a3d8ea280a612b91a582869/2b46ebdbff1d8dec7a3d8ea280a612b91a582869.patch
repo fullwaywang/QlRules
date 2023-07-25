@@ -1,0 +1,26 @@
+commit 2b46ebdbff1d8dec7a3d8ea280a612b91a582869
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Jul 3 21:01:23 2018 +0200
+
+    avformat/asfdec_o: Check size_bmp more fully
+    
+    Fixes: integer overflow and out of array access
+    Fixes: asfo-crash-46080c4341572a7137a162331af77f6ded45cbd7
+    
+    Found-by: Paul Ch <paulcher@icloud.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/asfdec_o.c b/libavformat/asfdec_o.c
+index 5122e33c78..b4b2698368 100644
+--- a/libavformat/asfdec_o.c
++++ b/libavformat/asfdec_o.c
+@@ -706,7 +706,8 @@ static int parse_video_info(AVIOContext *pb, AVStream *st)
+     st->codecpar->codec_id  = ff_codec_get_id(ff_codec_bmp_tags, tag);
+     size_bmp = FFMAX(size_asf, size_bmp);
+ 
+-    if (size_bmp > BMP_HEADER_SIZE) {
++    if (size_bmp > BMP_HEADER_SIZE &&
++        size_bmp < INT_MAX - AV_INPUT_BUFFER_PADDING_SIZE) {
+         int ret;
+         st->codecpar->extradata_size  = size_bmp - BMP_HEADER_SIZE;
+         if (!(st->codecpar->extradata = av_malloc(st->codecpar->extradata_size +

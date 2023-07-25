@@ -1,0 +1,22 @@
+commit 0332cad015fdf7fac7e5c6863484f18a554e0fcf
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Tue Apr 21 10:23:04 2020 +0200
+
+    Fixed oob read in update_recv
+    
+    properly use update_type_to_string to print update type.
+    Thanks to hac425 CVE-2020-11019
+
+diff --git a/libfreerdp/core/update.c b/libfreerdp/core/update.c
+index 47e2a949e..aac58819f 100644
+--- a/libfreerdp/core/update.c
++++ b/libfreerdp/core/update.c
+@@ -774,7 +774,7 @@ BOOL update_recv(rdpUpdate* update, wStream* s)
+ 	}
+ 
+ 	Stream_Read_UINT16(s, updateType); /* updateType (2 bytes) */
+-	WLog_Print(update->log, WLOG_TRACE, "%s Update Data PDU", UPDATE_TYPE_STRINGS[updateType]);
++	WLog_Print(update->log, WLOG_TRACE, "%s Update Data PDU", update_type_to_string(updateType));
+ 
+ 	if (!update_begin_paint(update))
+ 		goto fail;

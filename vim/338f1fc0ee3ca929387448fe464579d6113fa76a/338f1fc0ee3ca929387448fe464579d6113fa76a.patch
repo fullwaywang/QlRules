@@ -1,0 +1,147 @@
+commit 338f1fc0ee3ca929387448fe464579d6113fa76a
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu May 26 15:56:23 2022 +0100
+
+    patch 8.2.5023: substitute overwrites allocated buffer
+    
+    Problem:    Substitute overwrites allocated buffer.
+    Solution:   Disallow undo when in a substitute command.
+
+diff --git a/src/normal.c b/src/normal.c
+index bc3e29e1a..53c50dc8b 100644
+--- a/src/normal.c
++++ b/src/normal.c
+@@ -183,6 +183,22 @@ find_command(int cmdchar)
+     return idx;
+ }
+ 
++/*
++ * If currently editing a cmdline or text is locked: beep and give an error
++ * message, return TRUE.
++ */
++    static int
++check_text_locked(oparg_T *oap)
++{
++    if (text_locked())
++    {
++	clearopbeep(oap);
++	text_locked_msg();
++	return TRUE;
++    }
++    return FALSE;
++}
++
+ /*
+  * Handle the count before a normal command and set cap->count0.
+  */
+@@ -802,14 +818,9 @@ normal_cmd(
+ 	goto normal_end;
+     }
+ 
+-    if (text_locked() && (nv_cmds[idx].cmd_flags & NV_NCW))
+-    {
+-	// This command is not allowed while editing a cmdline: beep.
+-	clearopbeep(oap);
+-	text_locked_msg();
+-	goto normal_end;
+-    }
+-    if ((nv_cmds[idx].cmd_flags & NV_NCW) && curbuf_locked())
++    if ((nv_cmds[idx].cmd_flags & NV_NCW)
++				&& (check_text_locked(oap) || curbuf_locked()))
++	// this command is not allowed now
+ 	goto normal_end;
+ 
+     // In Visual/Select mode, a few keys are handled in a special way.
+@@ -4049,12 +4060,8 @@ nv_gotofile(cmdarg_T *cap)
+     char_u	*ptr;
+     linenr_T	lnum = -1;
+ 
+-    if (text_locked())
+-    {
+-	clearopbeep(cap->oap);
+-	text_locked_msg();
++    if (check_text_locked(cap->oap))
+ 	return;
+-    }
+     if (curbuf_locked())
+     {
+ 	clearop(cap->oap);
+@@ -6182,14 +6189,7 @@ nv_g_cmd(cmdarg_T *cap)
+ 
+     // "gQ": improved Ex mode
+     case 'Q':
+-	if (text_locked())
+-	{
+-	    clearopbeep(cap->oap);
+-	    text_locked_msg();
+-	    break;
+-	}
+-
+-	if (!checkclearopq(oap))
++	if (!check_text_locked(cap->oap) && !checkclearopq(oap))
+ 	    do_exmode(TRUE);
+ 	break;
+ 
+diff --git a/src/testdir/test_substitute.vim b/src/testdir/test_substitute.vim
+index a1c324ed8..c8df09f4e 100644
+--- a/src/testdir/test_substitute.vim
++++ b/src/testdir/test_substitute.vim
+@@ -1013,6 +1013,28 @@ func Test_sub_change_window()
+   delfunc Repl
+ endfunc
+ 
++" This was undoign a change in between computing the length and using it.
++func Do_Test_sub_undo_change()
++  new
++  norm o0000000000000000000000000000000000000000000000000000
++  silent! s/\%')/\=Repl()
++  bwipe!
++endfunc
++
++func Test_sub_undo_change()
++  func Repl()
++    silent! norm g-
++  endfunc
++  call Do_Test_sub_undo_change()
++
++  func! Repl()
++    silent earlier
++  endfunc
++  call Do_Test_sub_undo_change()
++
++  delfunc Repl
++endfunc
++
+ " Test for the 2-letter and 3-letter :substitute commands
+ func Test_substitute_short_cmd()
+   new
+diff --git a/src/undo.c b/src/undo.c
+index cac09f0f5..81cc28e8b 100644
+--- a/src/undo.c
++++ b/src/undo.c
+@@ -2327,6 +2327,12 @@ undo_time(
+     int		    above = FALSE;
+     int		    did_undo = TRUE;
+ 
++    if (text_locked())
++    {
++	text_locked_msg();
++	return;
++    }
++
+     // First make sure the current undoable change is synced.
+     if (curbuf->b_u_synced == FALSE)
+ 	u_sync(TRUE);
+diff --git a/src/version.c b/src/version.c
+index 9751865c7..cd6c33162 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5023,
+ /**/
+     5022,
+ /**/

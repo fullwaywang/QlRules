@@ -1,0 +1,35 @@
+commit 98afac7a7cefdca0d2c4917dd8066a59f7088265
+Author: Jeff King <peff@peff.net>
+Date:   Mon Sep 24 04:32:15 2018 -0400
+
+    submodule--helper: use "--" to signal end of clone options
+    
+    When we clone a submodule, we call "git clone $url $path".
+    But there's nothing to say that those components can't begin
+    with a dash themselves, confusing git-clone into thinking
+    they're options. Let's pass "--" to make it clear what we
+    expect.
+    
+    There's no test here, because it's actually quite hard to
+    make these names work, even with "git clone" parsing them
+    correctly. And we're going to restrict these cases even
+    further in future commits. So we'll leave off testing until
+    then; this is just the minimal fix to prevent us from doing
+    something stupid with a badly formed entry.
+    
+    Reported-by: joernchen <joernchen@phenoelit.de>
+    Signed-off-by: Jeff King <peff@peff.net>
+    Signed-off-by: Junio C Hamano <gitster@pobox.com>
+
+diff --git a/builtin/submodule--helper.c b/builtin/submodule--helper.c
+index e8ccddd3b1..676cfed770 100644
+--- a/builtin/submodule--helper.c
++++ b/builtin/submodule--helper.c
+@@ -510,6 +510,7 @@ static int clone_submodule(const char *path, const char *gitdir, const char *url
+ 	if (gitdir && *gitdir)
+ 		argv_array_pushl(&cp.args, "--separate-git-dir", gitdir, NULL);
+ 
++	argv_array_push(&cp.args, "--");
+ 	argv_array_push(&cp.args, url);
+ 	argv_array_push(&cp.args, path);
+ 

@@ -1,0 +1,29 @@
+commit 6713ca45e7757297381f4b4cdb9cf5e624a9ad36
+Author: Christos Zoulas <christos@zoulas.com>
+Date:   Wed Jun 3 18:01:20 2015 +0000
+
+    PR/454: Fix memory corruption when the continuation level jumps by more than
+    20 in a single step.
+
+diff --git a/src/funcs.c b/src/funcs.c
+index 7ce431e5..b7160cc7 100644
+--- a/src/funcs.c
++++ b/src/funcs.c
+@@ -27,7 +27,7 @@
+ #include "file.h"
+ 
+ #ifndef	lint
+-FILE_RCSID("@(#)$File: funcs.c,v 1.80 2015/01/02 21:29:39 christos Exp $")
++FILE_RCSID("@(#)$File: funcs.c,v 1.81 2015/05/28 19:26:59 christos Exp $")
+ #endif	/* lint */
+ 
+ #include "magic.h"
+@@ -416,7 +416,7 @@ file_check_mem(struct magic_set *ms, unsigned int level)
+ 	size_t len;
+ 
+ 	if (level >= ms->c.len) {
+-		len = (ms->c.len += 20) * sizeof(*ms->c.li);
++		len = (ms->c.len = 20 + level) * sizeof(*ms->c.li);
+ 		ms->c.li = CAST(struct level_info *, (ms->c.li == NULL) ?
+ 		    malloc(len) :
+ 		    realloc(ms->c.li, len));

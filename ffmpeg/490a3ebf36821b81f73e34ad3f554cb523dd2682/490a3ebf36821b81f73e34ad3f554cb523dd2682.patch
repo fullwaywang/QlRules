@@ -1,0 +1,36 @@
+commit 490a3ebf36821b81f73e34ad3f554cb523dd2682	490a3ebf36821b81f73e34ad3f554cb523dd2682
+Author: Xiaohan Wang <xhwang@chromium.org>
+Date:   Thu Nov 6 12:59:54 2014 -0800
+
+    matroskadec: Fix read-after-free in matroska_read_seek()
+    
+    In matroska_read_seek(), |tracks| is assigned at the begining of the
+    function. However, functions like matroska_parse_cues() could reallocate
+    the tracks and invalidate |tracks|.
+    
+    This assigns |tracks| only before using it, so that it will not get
+    invalidated elsewhere.
+    
+    Bug-Id: chromium/427266
+
+diff --git a/libavformat/matroskadec.c b/libavformat/matroskadec.c
+index a83589a4a0..50585a3710 100644
+--- a/libavformat/matroskadec.c
++++ b/libavformat/matroskadec.c
+@@ -2541,7 +2541,7 @@ static int matroska_read_seek(AVFormatContext *s, int stream_index,
+                               int64_t timestamp, int flags)
+ {
+     MatroskaDemuxContext *matroska = s->priv_data;
+-    MatroskaTrack *tracks = matroska->tracks.elem;
++    MatroskaTrack *tracks = NULL;
+     AVStream *st = s->streams[stream_index];
+     int i, index, index_sub, index_min;
+ 
+@@ -2571,6 +2571,7 @@ static int matroska_read_seek(AVFormatContext *s, int stream_index,
+         return 0;
+ 
+     index_min = index;
++    tracks = matroska->tracks.elem;
+     for (i = 0; i < matroska->tracks.nb_elem; i++) {
+         tracks[i].audio.pkt_cnt        = 0;
+         tracks[i].audio.sub_packet_cnt = 0;

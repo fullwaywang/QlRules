@@ -1,0 +1,65 @@
+commit 3ac1d97a1d9353490493d30088256360435f7731
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Jan 4 17:17:54 2023 +0000
+
+    patch 9.0.1145: invalid memory access with recursive substitute expression
+    
+    Problem:    Invalid memory access with recursive substitute expression.
+    Solution:   Check the return value of vim_regsub().
+
+diff --git a/src/eval.c b/src/eval.c
+index 2fbd867ab..9ca805061 100644
+--- a/src/eval.c
++++ b/src/eval.c
+@@ -7312,6 +7312,11 @@ do_string_sub(
+ 	     * - The text after the match.
+ 	     */
+ 	    sublen = vim_regsub(&regmatch, sub, expr, tail, 0, REGSUB_MAGIC);
++	    if (sublen <= 0)
++	    {
++		ga_clear(&ga);
++		break;
++	    }
+ 	    if (ga_grow(&ga, (int)((end - tail) + sublen -
+ 			    (regmatch.endp[0] - regmatch.startp[0]))) == FAIL)
+ 	    {
+diff --git a/src/testdir/test_substitute.vim b/src/testdir/test_substitute.vim
+index 251322337..4268aab03 100644
+--- a/src/testdir/test_substitute.vim
++++ b/src/testdir/test_substitute.vim
+@@ -1115,6 +1115,22 @@ func Test_sub_expr_goto_other_file()
+   bwipe!
+ endfunc
+ 
++func Test_recursive_expr_substitute()
++  " this was reading invalid memory
++  let lines =<< trim END
++      func Repl(g, n)
++        s
++        r%:s000
++      endfunc
++      next 0
++      let caught = 0
++      s/\%')/\=Repl(0, 0)
++      qall!
++  END
++  call writefile(lines, 'XexprSubst', 'D')
++  call RunVim([], [], '--clean -S XexprSubst')
++endfunc
++
+ " Test for the 2-letter and 3-letter :substitute commands
+ func Test_substitute_short_cmd()
+   new
+diff --git a/src/version.c b/src/version.c
+index 6e652c697..9c38fd91c 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1145,
+ /**/
+     1144,
+ /**/

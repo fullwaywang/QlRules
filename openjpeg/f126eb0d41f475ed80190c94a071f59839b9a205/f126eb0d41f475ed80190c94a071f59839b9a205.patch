@@ -1,0 +1,26 @@
+commit f126eb0d41f475ed80190c94a071f59839b9a205
+Author: Antonin Descampe <antonin@gmail.com>
+Date:   Mon Oct 6 21:05:27 2014 +0000
+
+    [trunk] added box length inconsistency check
+    
+    Update issue 364
+    
+    issue364-38.patch applied. Thanks Matthieu.
+
+diff --git a/src/lib/openjp2/jp2.c b/src/lib/openjp2/jp2.c
+index d408d8e4..c77bfaae 100644
+--- a/src/lib/openjp2/jp2.c
++++ b/src/lib/openjp2/jp2.c
+@@ -2282,7 +2282,10 @@ OPJ_BOOL opj_jp2_read_boxhdr_char(   opj_jp2_box_t *box,
+ 		opj_event_msg(p_manager, EVT_ERROR, "Cannot handle box of undefined sizes\n");
+ 		return OPJ_FALSE;
+ 	}
+-
++	if (box->length < *p_number_bytes_read) {
++		opj_event_msg(p_manager, EVT_ERROR, "Box length is inconsistent.\n");
++		return OPJ_FALSE;
++	}
+ 	return OPJ_TRUE;
+ }
+ 

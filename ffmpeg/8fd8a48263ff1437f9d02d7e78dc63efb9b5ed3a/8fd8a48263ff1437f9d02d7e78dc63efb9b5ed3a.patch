@@ -1,0 +1,47 @@
+commit 8fd8a48263ff1437f9d02d7e78dc63efb9b5ed3a	8fd8a48263ff1437f9d02d7e78dc63efb9b5ed3a
+Author: Alex Converse <alex.converse@gmail.com>
+Date:   Thu Jan 26 17:21:46 2012 -0800
+
+    nsvdec: Be more careful with av_malloc().
+    
+    Check results for av_malloc() and fix an overflow in one call.
+    
+    Related to CVE-2011-3940.
+    
+    Based in part on work from Michael Niedermayer.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+
+diff --git a/libavformat/nsvdec.c b/libavformat/nsvdec.c
+index aa114db097..7e32e439ea 100644
+--- a/libavformat/nsvdec.c
++++ b/libavformat/nsvdec.c
+@@ -314,7 +314,9 @@ static int nsv_parse_NSVf_header(AVFormatContext *s)
+         char *token, *value;
+         char quote;
+ 
+-        p = strings = av_mallocz(strings_size + 1);
++        p = strings = av_mallocz((size_t)strings_size + 1);
++        if (!p)
++            return AVERROR(ENOMEM);
+         endp = strings + strings_size;
+         avio_read(pb, strings, strings_size);
+         while (p < endp) {
+@@ -349,6 +351,8 @@ static int nsv_parse_NSVf_header(AVFormatContext *s)
+         if((unsigned)table_entries_used >= UINT_MAX / sizeof(uint32_t))
+             return -1;
+         nsv->nsvs_file_offset = av_malloc((unsigned)table_entries_used * sizeof(uint32_t));
++        if (!nsv->nsvs_file_offset)
++            return AVERROR(ENOMEM);
+ 
+         for(i=0;i<table_entries_used;i++)
+             nsv->nsvs_file_offset[i] = avio_rl32(pb) + size;
+@@ -356,6 +360,8 @@ static int nsv_parse_NSVf_header(AVFormatContext *s)
+         if(table_entries > table_entries_used &&
+            avio_rl32(pb) == MKTAG('T','O','C','2')) {
+             nsv->nsvs_timestamps = av_malloc((unsigned)table_entries_used*sizeof(uint32_t));
++            if (!nsv->nsvs_timestamps)
++                return AVERROR(ENOMEM);
+             for(i=0;i<table_entries_used;i++) {
+                 nsv->nsvs_timestamps[i] = avio_rl32(pb);
+             }

@@ -1,0 +1,37 @@
+commit 8fb4a770075628d6441fb17a1e435100e2f3b1a2	8fb4a770075628d6441fb17a1e435100e2f3b1a2
+Author: Hugh Davenport <hugh@allthethings.co.nz>
+Date:   Fri Nov 20 17:16:06 2015 +0800
+
+    CVE-2015-8242 Buffer overead with HTML parser in push mode
+    
+    For https://bugzilla.gnome.org/show_bug.cgi?id=756372
+    Error in the code pointing to the codepoint in the stack for the
+    current char value instead of the pointer in the input that the SAX
+    callback expects
+    Reported and fixed by Hugh Davenport
+
+diff --git a/HTMLparser.c b/HTMLparser.c
+index bdf78071..b7291972 100644
+--- a/HTMLparser.c
++++ b/HTMLparser.c
+@@ -5735,17 +5735,17 @@ htmlParseTryOrFinish(htmlParserCtxtPtr ctxt, int terminate) {
+ 				if (ctxt->keepBlanks) {
+ 				    if (ctxt->sax->characters != NULL)
+ 					ctxt->sax->characters(
+-						ctxt->userData, &cur, 1);
++						ctxt->userData, &in->cur[0], 1);
+ 				} else {
+ 				    if (ctxt->sax->ignorableWhitespace != NULL)
+ 					ctxt->sax->ignorableWhitespace(
+-						ctxt->userData, &cur, 1);
++						ctxt->userData, &in->cur[0], 1);
+ 				}
+ 			    } else {
+ 				htmlCheckParagraph(ctxt);
+ 				if (ctxt->sax->characters != NULL)
+ 				    ctxt->sax->characters(
+-					    ctxt->userData, &cur, 1);
++					    ctxt->userData, &in->cur[0], 1);
+ 			    }
+ 			}
+ 			ctxt->token = 0;

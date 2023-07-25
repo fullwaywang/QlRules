@@ -1,0 +1,56 @@
+commit c3f47077a7756de5929094569421a95aa66f2022
+Author: Gert Doering <gert@greenie.muc.de>
+Date:   Tue Jun 13 22:08:32 2017 +0200
+
+    Fix remotely-triggerable ASSERT() on malformed IPv6 packet.
+    
+    Correct sanity checks on IPv6 packet length in mss_fixup_ipv6(),
+    and change the ASSERT() check in mss_fixup_dowork() into a simple
+    "return" (= the TCP header will simply not be inspected further).
+    
+    CVE-2017-7508 has been assigned due to the serious nature of the
+    bug: it can be used to remotely shutdown an openvpn server or
+    client, if IPv6 and --mssfix are enabled and the IPv6 networks used
+    inside the VPN are known.
+    
+    Found by Guido Vranken <guidovranken@gmail.com>.
+    
+    v2: style changes
+    
+    CVE: 2017-7508
+    Signed-off-by: Gert Doering <gert@greenie.muc.de>
+    Acked-by: Steffan Karger <steffan.karger@fox-it.com>
+    Message-Id: <20170613200832.15027-1-gert@greenie.muc.de>
+    URL: https://www.mail-archive.com/search?l=mid&q=20170613200832.15027-1-gert@greenie.muc.de
+    Signed-off-by: Gert Doering <gert@greenie.muc.de>
+
+diff --git a/src/openvpn/mss.c b/src/openvpn/mss.c
+index 7c596d78..c36e0046 100644
+--- a/src/openvpn/mss.c
++++ b/src/openvpn/mss.c
+@@ -119,8 +119,12 @@ mss_fixup_ipv6(struct buffer *buf, int maxmss)
+         return;
+     }
+ 
++    /* skip IPv6 header (40 bytes),
++     * verify remainder is large enough to contain a full TCP header
++     */
+     newbuf = *buf;
+-    if (buf_advance( &newbuf, 40 ) )
++    if (buf_advance( &newbuf, 40 )
++        && BLEN(&newbuf) >= (int) sizeof(struct openvpn_tcphdr))
+     {
+         struct openvpn_tcphdr *tc = (struct openvpn_tcphdr *) BPTR(&newbuf);
+         if (tc->flags & OPENVPN_TCPH_SYN_MASK)
+@@ -144,7 +148,10 @@ mss_fixup_dowork(struct buffer *buf, uint16_t maxmss)
+     int accumulate;
+     struct openvpn_tcphdr *tc;
+ 
+-    ASSERT(BLEN(buf) >= (int) sizeof(struct openvpn_tcphdr));
++    if (BLEN(buf) < (int) sizeof(struct openvpn_tcphdr))
++    {
++	return;
++    }
+ 
+     verify_align_4(buf);
+     tc = (struct openvpn_tcphdr *) BPTR(buf);

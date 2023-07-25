@@ -1,0 +1,42 @@
+commit 971bed6ab4b27014eb23085e8176917e1a096fd5
+Author: Niels Möller <nisse@lysator.liu.se>
+Date:   Sat Mar 13 17:26:37 2021 +0100
+
+    Use ecc_mod_mul_canonical for point comparison.
+    
+    * eddsa-verify.c (equal_h): Use ecc_mod_mul_canonical.
+    
+    (cherry picked from commit 5b7608fde3a6d2ab82bffb35db1e4e330927c906)
+
+diff --git a/ChangeLog b/ChangeLog
+index 5cc5c188..2a9217a6 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,7 @@
++2021-03-13  Niels Möller  <nisse@lysator.liu.se>
++
++	* eddsa-verify.c (equal_h): Use ecc_mod_mul_canonical.
++
+ 2021-03-11  Niels Möller  <nisse@lysator.liu.se>
+ 
+ 	* ecc-mod-arith.c (ecc_mod_mul_canonical, ecc_mod_sqr_canonical):
+diff --git a/eddsa-verify.c b/eddsa-verify.c
+index de68f240..10d075ee 100644
+--- a/eddsa-verify.c
++++ b/eddsa-verify.c
+@@ -53,13 +53,8 @@ equal_h (const struct ecc_modulo *p,
+ #define t0 scratch
+ #define t1 (scratch + p->size)
+ 
+-  ecc_mod_mul (p, t0, x1, z2, t0);
+-  if (mpn_cmp (t0, p->m, p->size) >= 0)
+-    mpn_sub_n (t0, t0, p->m, p->size);
+-
+-  ecc_mod_mul (p, t1, x2, z1, t1);
+-  if (mpn_cmp (t1, p->m, p->size) >= 0)
+-    mpn_sub_n (t1, t1, p->m, p->size);
++  ecc_mod_mul_canonical (p, t0, x1, z2, t0);
++  ecc_mod_mul_canonical (p, t1, x2, z1, t1);
+ 
+   return mpn_cmp (t0, t1, p->size) == 0;
+ 

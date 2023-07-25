@@ -1,0 +1,61 @@
+commit 67dad2715ba73376995294d188ffb4242ce7fb0a
+Author: Willy Tarreau <w@1wt.eu>
+Date:   Wed Jun 12 22:27:44 2013 +0200
+
+    BUG/CRITICAL: fix a possible crash when using negative header occurrences
+    
+    When a config makes use of hdr_ip(x-forwarded-for,-1) or any such thing
+    involving a negative occurrence count, the header is still parsed in the
+    order it appears, and an array of up to MAX_HDR_HISTORY entries is created.
+    When more entries are used, the entries simply wrap and continue this way.
+    
+    A problem happens when the incoming header field count exactly divides
+    MAX_HDR_HISTORY, because the computation removes the number of requested
+    occurrences from the count, but does not care about the risk of wrapping
+    with a negative number. Thus we can dereference the array with a negative
+    number and randomly crash the process.
+    
+    The bug is located in http_get_hdr() in haproxy 1.5, and get_ip_from_hdr2()
+    in haproxy 1.4. It affects configurations making use of one of the following
+    functions with a negative <value> occurence number :
+    
+       - hdr_ip(<name>, <value>)  (in 1.4)
+       - hdr_*(<name>, <value>)   (in 1.5)
+    
+    It also affects "source" statements involving "hdr_ip(<name>)" since that
+    statement implicitly uses -1 for <value> :
+    
+       - source 0.0.0.0 usesrc hdr_ip(<name>)
+    
+    A workaround consists in rejecting dangerous requests early using
+    hdr_cnt(<name>), which is available both in 1.4 and 1.5 :
+    
+       block if { hdr_cnt(<name>) ge 10 }
+    
+    This bug has been present since the introduction of the negative offset
+    count in 1.4.4 via commit bce70882. It has been reported by David Torgerson
+    who offered some debugging traces showing where the crash happened, thus
+    making it significantly easier to find the bug!
+    
+    CVE-2013-2175 was assigned to this bug.
+    
+    This fix must absolutely be backported to 1.4.
+
+diff --git a/src/proto_http.c b/src/proto_http.c
+index 771e7c0e9..9068050a5 100644
+--- a/src/proto_http.c
++++ b/src/proto_http.c
+@@ -8163,9 +8163,11 @@ unsigned int http_get_hdr(const struct http_msg *msg, const char *hname, int hle
+ 	if (-occ > found)
+ 		return 0;
+ 	/* OK now we have the last occurrence in [hist_ptr-1], and we need to
+-	 * find occurrence -occ, so we have to check [hist_ptr+occ].
++	 * find occurrence -occ. 0 <= hist_ptr < MAX_HDR_HISTORY, and we have
++	 * -10 <= occ <= -1. So we have to check [hist_ptr%MAX_HDR_HISTORY+occ]
++	 * to remain in the 0..9 range.
+ 	 */
+-	hist_ptr += occ;
++	hist_ptr += occ + MAX_HDR_HISTORY;
+ 	if (hist_ptr >= MAX_HDR_HISTORY)
+ 		hist_ptr -= MAX_HDR_HISTORY;
+ 	*vptr = ptr_hist[hist_ptr];

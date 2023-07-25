@@ -1,0 +1,127 @@
+commit 0681cff1ad36b3ef8ec242f59b5a6c4234ccfb88
+Author: James Zern <jzern@google.com>
+Date:   Tue Jul 24 21:36:50 2018 -0700
+
+    vp9: fix OOB read in decoder_peek_si_internal
+    
+    Profile 1 or 3 bitstreams may require 11 bytes for the header in the
+    intra-only case.
+    
+    Additionally add a check on the bit reader's error handler callback to
+    ensure it's non-NULL before calling to avoid future regressions.
+    
+    This has existed since at least (pre-1.4.0):
+    09bf1d61c Changes hdr for profiles > 1 for intraonly frames
+    
+    BUG=webm:1543
+    
+    Change-Id: I23901e6e3a219170e8ea9efecc42af0be2e5c378
+
+diff --git a/test/decode_api_test.cc b/test/decode_api_test.cc
+index 4167cf3e0..d4b67ccdb 100644
+--- a/test/decode_api_test.cc
++++ b/test/decode_api_test.cc
+@@ -138,8 +138,30 @@ TEST(DecodeAPI, Vp9InvalidDecode) {
+   EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
+ }
+ 
+-TEST(DecodeAPI, Vp9PeekSI) {
++void TestPeekInfo(const uint8_t *const data, uint32_t data_sz,
++                  uint32_t peek_size) {
+   const vpx_codec_iface_t *const codec = &vpx_codec_vp9_dx_algo;
++  // Verify behavior of vpx_codec_decode. vpx_codec_decode doesn't even get
++  // to decoder_peek_si_internal on frames of size < 8.
++  if (data_sz >= 8) {
++    vpx_codec_ctx_t dec;
++    EXPECT_EQ(VPX_CODEC_OK, vpx_codec_dec_init(&dec, codec, NULL, 0));
++    EXPECT_EQ((data_sz < peek_size) ? VPX_CODEC_UNSUP_BITSTREAM
++                                    : VPX_CODEC_CORRUPT_FRAME,
++              vpx_codec_decode(&dec, data, data_sz, NULL, 0));
++    vpx_codec_iter_t iter = NULL;
++    EXPECT_EQ(NULL, vpx_codec_get_frame(&dec, &iter));
++    EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
++  }
++
++  // Verify behavior of vpx_codec_peek_stream_info.
++  vpx_codec_stream_info_t si;
++  si.sz = sizeof(si);
++  EXPECT_EQ((data_sz < peek_size) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_OK,
++            vpx_codec_peek_stream_info(codec, data, data_sz, &si));
++}
++
++TEST(DecodeAPI, Vp9PeekStreamInfo) {
+   // The first 9 bytes are valid and the rest of the bytes are made up. Until
+   // size 10, this should return VPX_CODEC_UNSUP_BITSTREAM and after that it
+   // should return VPX_CODEC_CORRUPT_FRAME.
+@@ -150,24 +172,18 @@ TEST(DecodeAPI, Vp9PeekSI) {
+   };
+ 
+   for (uint32_t data_sz = 1; data_sz <= 32; ++data_sz) {
+-    // Verify behavior of vpx_codec_decode. vpx_codec_decode doesn't even get
+-    // to decoder_peek_si_internal on frames of size < 8.
+-    if (data_sz >= 8) {
+-      vpx_codec_ctx_t dec;
+-      EXPECT_EQ(VPX_CODEC_OK, vpx_codec_dec_init(&dec, codec, NULL, 0));
+-      EXPECT_EQ(
+-          (data_sz < 10) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_CORRUPT_FRAME,
+-          vpx_codec_decode(&dec, data, data_sz, NULL, 0));
+-      vpx_codec_iter_t iter = NULL;
+-      EXPECT_EQ(NULL, vpx_codec_get_frame(&dec, &iter));
+-      EXPECT_EQ(VPX_CODEC_OK, vpx_codec_destroy(&dec));
+-    }
++    TestPeekInfo(data, data_sz, 10);
++  }
++}
++
++TEST(DecodeAPI, Vp9PeekStreamInfoTruncated) {
++  // This profile 1 header requires 10.25 bytes, ensure
++  // vpx_codec_peek_stream_info doesn't over read.
++  const uint8_t profile1_data[10] = { 0xa4, 0xe9, 0x30, 0x68, 0x53,
++                                      0xe9, 0x30, 0x68, 0x53, 0x04 };
+ 
+-    // Verify behavior of vpx_codec_peek_stream_info.
+-    vpx_codec_stream_info_t si;
+-    si.sz = sizeof(si);
+-    EXPECT_EQ((data_sz < 10) ? VPX_CODEC_UNSUP_BITSTREAM : VPX_CODEC_OK,
+-              vpx_codec_peek_stream_info(codec, data, data_sz, &si));
++  for (uint32_t data_sz = 1; data_sz <= 10; ++data_sz) {
++    TestPeekInfo(profile1_data, data_sz, 11);
+   }
+ }
+ #endif  // CONFIG_VP9_DECODER
+diff --git a/vp9/vp9_dx_iface.c b/vp9/vp9_dx_iface.c
+index ea3200fa5..7f45ab28f 100644
+--- a/vp9/vp9_dx_iface.c
++++ b/vp9/vp9_dx_iface.c
+@@ -97,7 +97,7 @@ static vpx_codec_err_t decoder_peek_si_internal(
+     const uint8_t *data, unsigned int data_sz, vpx_codec_stream_info_t *si,
+     int *is_intra_only, vpx_decrypt_cb decrypt_cb, void *decrypt_state) {
+   int intra_only_flag = 0;
+-  uint8_t clear_buffer[10];
++  uint8_t clear_buffer[11];
+ 
+   if (data + data_sz <= data) return VPX_CODEC_INVALID_PARAM;
+ 
+@@ -158,6 +158,9 @@ static vpx_codec_err_t decoder_peek_si_internal(
+         if (profile > PROFILE_0) {
+           if (!parse_bitdepth_colorspace_sampling(profile, &rb))
+             return VPX_CODEC_UNSUP_BITSTREAM;
++          // The colorspace info may cause vp9_read_frame_size() to need 11
++          // bytes.
++          if (data_sz < 11) return VPX_CODEC_UNSUP_BITSTREAM;
+         }
+         rb.bit_offset += REF_FRAMES;  // refresh_frame_flags
+         vp9_read_frame_size(&rb, (int *)&si->w, (int *)&si->h);
+diff --git a/vpx_dsp/bitreader_buffer.c b/vpx_dsp/bitreader_buffer.c
+index 3e16bfa38..f59f1f7cb 100644
+--- a/vpx_dsp/bitreader_buffer.c
++++ b/vpx_dsp/bitreader_buffer.c
+@@ -23,7 +23,7 @@ int vpx_rb_read_bit(struct vpx_read_bit_buffer *rb) {
+     rb->bit_offset = off + 1;
+     return bit;
+   } else {
+-    rb->error_handler(rb->error_handler_data);
++    if (rb->error_handler != NULL) rb->error_handler(rb->error_handler_data);
+     return 0;
+   }
+ }

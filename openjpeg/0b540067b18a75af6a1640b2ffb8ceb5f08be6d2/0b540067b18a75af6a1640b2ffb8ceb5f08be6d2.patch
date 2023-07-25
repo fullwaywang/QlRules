@@ -1,0 +1,22 @@
+commit 0b540067b18a75af6a1640b2ffb8ceb5f08be6d2
+Author: Antonin Descampe <antonin@gmail.com>
+Date:   Wed Oct 15 08:48:19 2014 +0000
+
+    [trunk] add a check for illegal SCod value (fixes issue 400)
+
+diff --git a/src/lib/openjp2/j2k.c b/src/lib/openjp2/j2k.c
+index a0fa82a4..4324c733 100644
+--- a/src/lib/openjp2/j2k.c
++++ b/src/lib/openjp2/j2k.c
+@@ -2415,6 +2415,11 @@ static OPJ_BOOL opj_j2k_read_cod (  opj_j2k_t *p_j2k,
+ 
+         opj_read_bytes(p_header_data,&l_tcp->csty,1);           /* Scod */
+         ++p_header_data;
++        /* Make sure we know how to decode this */
++        if ((l_tcp->csty & ~(OPJ_UINT32)(J2K_CP_CSTY_PRT | J2K_CP_CSTY_SOP | J2K_CP_CSTY_EPH)) != 0U) {
++                opj_event_msg(p_manager, EVT_ERROR, "Unknown Scod value in COD marker\n");
++                return OPJ_FALSE;
++        }
+         opj_read_bytes(p_header_data,&l_tmp,1);                         /* SGcod (A) */
+         ++p_header_data;
+         l_tcp->prg = (OPJ_PROG_ORDER) l_tmp;

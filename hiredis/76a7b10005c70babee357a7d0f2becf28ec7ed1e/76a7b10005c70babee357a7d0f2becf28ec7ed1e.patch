@@ -1,0 +1,48 @@
+commit 76a7b10005c70babee357a7d0f2becf28ec7ed1e
+Author: Yossi Gottlieb <yossigo@gmail.com>
+Date:   Tue Jul 13 15:16:14 2021 -0700
+
+    Fix for integer/buffer overflow CVE-2021-32765
+    
+    This fix prevents hiredis from trying to allocate more than `SIZE_MAX`
+    bytes, which would result in a buffer overrun.
+    
+    [Full Details](https://github.com/redis/hiredis/security/advisories/GHSA-hfm9-39pp-55p2)
+
+diff --git a/hiredis.c b/hiredis.c
+index a7fbf48..ab0e398 100644
+--- a/hiredis.c
++++ b/hiredis.c
+@@ -174,6 +174,7 @@ static void *createArrayObject(const redisReadTask *task, size_t elements) {
+         return NULL;
+ 
+     if (elements > 0) {
++        if (SIZE_MAX / sizeof(redisReply*) < elements) return NULL;  /* Don't overflow */
+         r->element = hi_calloc(elements,sizeof(redisReply*));
+         if (r->element == NULL) {
+             freeReplyObject(r);
+diff --git a/test.c b/test.c
+index c0eeca7..397f564 100644
+--- a/test.c
++++ b/test.c
+@@ -493,6 +493,20 @@ static void test_reply_reader(void) {
+     freeReplyObject(reply);
+     redisReaderFree(reader);
+ 
++    test("Multi-bulk never overflows regardless of maxelements: ");
++    size_t bad_mbulk_len = (SIZE_MAX / sizeof(void *)) + 3;
++    char bad_mbulk_reply[100];
++    snprintf(bad_mbulk_reply, sizeof(bad_mbulk_reply), "*%llu\r\n+asdf\r\n",
++        (unsigned long long) bad_mbulk_len);
++
++    reader = redisReaderCreate();
++    reader->maxelements = 0;    /* Don't rely on default limit */
++    redisReaderFeed(reader, bad_mbulk_reply, strlen(bad_mbulk_reply));
++    ret = redisReaderGetReply(reader,&reply);
++    test_cond(ret == REDIS_ERR && strcasecmp(reader->errstr, "Out of memory") == 0);
++    freeReplyObject(reply);
++    redisReaderFree(reader);
++
+ #if LLONG_MAX > SIZE_MAX
+     test("Set error when array > SIZE_MAX: ");
+     reader = redisReaderCreate();

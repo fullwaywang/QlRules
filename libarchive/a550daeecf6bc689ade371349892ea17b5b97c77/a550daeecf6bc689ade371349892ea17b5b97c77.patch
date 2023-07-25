@@ -1,0 +1,25 @@
+commit a550daeecf6bc689ade371349892ea17b5b97c77
+Author: mfont <mfont@worldsensing.com>
+Date:   Fri Jun 10 16:54:43 2016 +0200
+
+    Fix libarchive/archive_read_support_format_mtree.c:1388:11: error: array subscript is above array bounds
+
+diff --git a/libarchive/archive_read_support_format_mtree.c b/libarchive/archive_read_support_format_mtree.c
+index 3efcc378..8c3be9a2 100644
+--- a/libarchive/archive_read_support_format_mtree.c
++++ b/libarchive/archive_read_support_format_mtree.c
+@@ -1385,12 +1385,12 @@ parse_device(dev_t *pdev, struct archive *a, char *val)
+ 				    "Missing number");
+ 				return ARCHIVE_WARN;
+ 			}
+-			numbers[argc++] = (unsigned long)mtree_atol(&p);
+-			if (argc > MAX_PACK_ARGS) {
++			if (argc >= MAX_PACK_ARGS) {
+ 				archive_set_error(a, ARCHIVE_ERRNO_FILE_FORMAT,
+ 				    "Too many arguments");
+ 				return ARCHIVE_WARN;
+ 			}
++			numbers[argc++] = (unsigned long)mtree_atol(&p);
+ 		}
+ 		if (argc < 2) {
+ 			archive_set_error(a, ARCHIVE_ERRNO_FILE_FORMAT,

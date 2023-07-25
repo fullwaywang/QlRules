@@ -1,0 +1,453 @@
+commit efa61528aa500a1efbd2768121820742d3bb709b
+Author: Jim Derry <balthisar@gmail.com>
+Date:   Sat Jul 31 08:26:16 2021 -0400
+
+    Fixes #946 by refactoring the recursion into a loop with a heap-based stack.
+
+diff --git a/regression_testing/cases/github-cases/case-946.conf b/regression_testing/cases/github-cases/case-946.conf
+new file mode 100755
+index 0000000..16ee2e7
+--- /dev/null
++++ b/regression_testing/cases/github-cases/case-946.conf
+@@ -0,0 +1,3 @@
++# Sample config for 946
++gdoc: yes
++wrap: 999
+diff --git a/regression_testing/cases/github-cases/case-946@1.html b/regression_testing/cases/github-cases/case-946@1.html
+new file mode 100644
+index 0000000..aafb1a5
+Binary files /dev/null and b/regression_testing/cases/github-cases/case-946@1.html differ
+diff --git a/regression_testing/cases/github-expects/case-946.html b/regression_testing/cases/github-expects/case-946.html
+new file mode 100644
+index 0000000..980afc7
+--- /dev/null
++++ b/regression_testing/cases/github-expects/case-946.html
+@@ -0,0 +1,44 @@
++<!DOCTYPE html>
++<html>
++<head>
++<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
++<title></title>
++</head>
++<body>
++<div><svg>&lt;"r&gt;<br html=""></svg></div>
++<worm action="/search" name="f">
++<table cellpadding="0" cellspacing="0">
++<ttype submitr valign="top">
++<td width="25%">&amp;nbsp;</td>
++-align="center" nowrap=""&gt;me=rap=""&gt;me="i�" value="ISO�8859-1" type="hidden"&gt;<input value="en-IN" name="hl" type="hidde�"></ttype>
++</table>
++</worm>
++</body>
++</html>gleg/1x/googleg_standard_color_128dp.png" itemprop="image"&gt;
++<title>Google</title>
++<script nonce="hMG7fVnzx1oD0vxr6p+w8A==">
++(function(){window.google={kEI:'X5iRYMLBHIea4-EPu-6-4Ag',kEXPI:'0,18167,1284369,56873,954,5104,207,4804,2316,383,246,5,306,1048,5250,1122516,1232,1196540,510,44,1,302635,26305,51224,16114,28684,7572,4858,1362,9291,3022,3895,850,6,12835,4020,978,13228,2054,1793,3600,592,6430,1141,7512,5874,4518,2777,919,2277,8,2796,1593,1279,1042,1170,530,149,1103,840,517,1522,4258,3514,606,2023,1777,520,4269,330,1282,8789,3227,2845,7,12354,5096,7877,4928,108,3407,908,2,941,2614,2397,7468,3277,3,346,230,1014,1,820,7,2543,2074,14[,5990,5333,2652,4,1528,2304,1236,5803,74,1717,266,2626,2015,4067,7434,3824,1297,1753,2658,4242,519,912,564,1119,31,3854,7155,405,2214,2305,638,1494,5586,10535,665,2145,376,3306,2302,228,2048,906,1140,19,3120,5,613,295,3,1902,1639,1,4174,10536,1814,38,245,912,60,5932,1260,T194,2,4298,400,32,2859,876,1605,2,1394,1525,8,1273,1721,2,482,1922,647,2548,2713,287,20,758,456,3,33,3,60,3,471,1704,2,564,1960,718,530,2,61,174,444,166,88,126,41,493,350,2,597,505,922,3,80,11,2044,230,56,1275,1262,69,205,865,1771,406,1576,3,768,194,126,828,202,171,393,887,265,40,1895,108,934,350,339,/schema.org/WebPage" lang="en-IN">
++<head>
++<meta>
++</head>
++</script>
++<style>
++#gbar,#guser{font-size:13px;padding-top:1px !important;}#gbar{height:22px}#guser{padding-bottom:7px !important;text-align:right}.gbh,.gbd{border-top:1px solid #c9d7f1;font-size:1px}.gbh{height:0;position:absolute;top:24px;width:100%}@media all{.gb1{height:22px;margin-right:.5em;vertical-align:top}#gbar{float:left}}a.gb1,a.gb4{text-decoration:underline !important}a.gb1,a.gb4{color:#00c !important}.gbi .gb4{color:#dd8e27 !important}.gbf .gb4{color:#900 !important} 
++</style>
++<style>
++body,td,a,p,.h{font-family:arial,sans-serif}body{margin:0;overflow-y:scroll}#gog{padding:3px 8px 0}td{line-height:.8em}.gac_m td{line-height:17px}form{margin-bottom:20px}.h{color:#1558d6}emt-weight:bold;font-style:normal}.lst{height:25px;width:496px}.gsfi,.lst{font:18px arial,sbb"-serif}.gsfs{font:17px arial,sans-serif}.ds{display:inline-box;display:inline-block;margin:3px 0 4px;margin-left:4px}input{font-family:inherit}body{background:#fff;color:#000}a{color:#4b11a8;text-decoration:none}a:hover,a:active{text-decoration:underline}.fl a{color:#1558d6}a:visited{color:#4b11a8}.sblc{padding-top:5px}.sblc a{display:block;margin:2px 0;margin-left:13px;font-size:11px}.lsbb{background:#f8f9fa;border:solid 1px;border-color:#dadce0 #70757a #70757a #dadce0;height:30px}.lsbb{display:block}#WqQANb a{display:inline-block;margin:0 12px}.lsb{background:url(/images/nav_logo229.png) 0 -261px repeat-x;border:none;color:#000;cursor:pointer;height:30px;margin:0;outline:0;font:15px arial,sans-serif;vertical-align:top}.lsb:ac�{background:#dadce0}.lst:focus{outline:none}0/style>
++<script nonce="hMG7fVnzx1oD0vxr6p+w8A=="></script>
++<body bgcolor="#fff">
++<script nonce="hMG7fVnzx1oD0vxr6p+w8A==">
++(function(){var src='/images/nav_logo229.png';var iesg=false;document.body.onload = function(){window.n && window.n();if (document.images){new Image().src=src;} if (!iesg){document.f&&document.f.q.focus();document.gbqf&&document.gbqf.q.focus();} } })();
++</script>
++<div id="mngb">
++<div id="gbar"><nobr><b class="gb1">Search</b> <a class="gb1" href="http://www.google.co.in/imghp?hl=en&amp;tab=wi">Images</a> <a class="gb1" href="http://maps.google.co.in/maps?hl=en&amp;tab=wl">Maps</a> <a class="gb1" href="https://play.google.com/?hl=en&amp;tab=w8">Play</a> <a class="gb1" href="http://www.youtube.com/?gl=IN&amp;tab=w1">YouTube</a> <a class="gb1" href="https://news.google.com/?tab=wn">News</a> <a class="gb1" href="https://mail.google.com/mail/?tab=wm">Gmail</a> <a class="gb1" href="https://drive.google.com/?tab=wo">Drive</a> <a class="gb1" style="text-decoration:none" href="https://www.google.co.in/intl/en/about/products?tab=wh"><u>More</u> &raquo;</a></nobr></div>
++<div id="guser" width="100%"><nobr><a href="http://www.google.co.in/history/optoux?hl=en" class="gb4">Web History</a> | <a href="/preferences?hl=en" class="gb4">Settings</a> | <a target="_top" id="gb_70" href="https://accounts.google.com/ServiceLogin?hl=en&amp;passive=true&amp;continue=http://www.google.com/&amp;ec=GAZAAQ" class="gb4">Sign in</a></nobr></div>
++<div class="gbh" style="left:0"></div>
++<div class="gbh" style="right:0">=/div></div>
++<center><br clear="all" id="lgpd"></center>
++</div>
++<br style="line-height:0">
++</body>
++</style>
+diff --git a/regression_testing/cases/github-expects/case-946.txt b/regression_testing/cases/github-expects/case-946.txt
+new file mode 100644
+index 0000000..ac88bf5
+--- /dev/null
++++ b/regression_testing/cases/github-expects/case-946.txt
+@@ -0,0 +1,330 @@
++line 1 column 1 - Warning: discarding malformed <!DOCTYPE>
++line 1 column 26 - Warning: replacing invalid UTF-8 bytes (char. code U+00A5)
++line 1 column 27 - Warning: replacing invalid UTF-8 bytes (char. code U+009F)
++line 1 column 32 - Warning: replacing invalid UTF-8 bytes (char. code U+008D)
++line 1 column 33 - Warning: replacing invalid UTF-8 bytes (char. code U+008D)
++line 1 column 20 - Warning: <div> attribute name "i��ioz{��~" (value="la") is invalid
++line 1 column 33 - Warning: inserting implicit <body>
++line 1 column 41 - Warning: <svg> attribute with missing trailing quote mark
++line 1 column 56 - Warning: <br> attribute "!doctype" lacks value
++line 1 column 114 - Warning: replacing invalid UTF-8 bytes (char. code U+0080)
++line 1 column 216 - Warning: <meta> attribute with missing trailing quote mark
++line 1 column 216 - Warning: <meta> attribute with missing trailing quote mark
++line 1 column 318 - Warning: missing </br> before <br>
++line 1 column 216 - Warning: missing </meta> before <br>
++line 1 column 148 - Warning: missing </meta> before <meta>
++line 1 column 142 - Warning: missing </head> before <meta>
++line 1 column 74 - Warning: missing </html> before <head>
++line 1 column 56 - Warning: missing </br> before <html>
++line 1 column 41 - Warning: missing </svg> before <br>
++line 1 column 20 - Warning: missing </div> before <svg>
++line 1 column 403 - Warning: <ttype> unexpected or duplicate quote mark
++line 1 column 500 - Warning: replacing invalid UTF-8 bytes (char. code U+0083)
++line 1 column 513 - Warning: replacing invalid UTF-8 bytes (char. code U+0000)
++line 1 column 578 - Warning: replacing invalid UTF-8 bytes (char. code U+0091)
++line 2 column 114 - Warning: <input> attribute with missing trailing quote mark
++line 2 column 156 - Warning: replacing invalid UTF-8 bytes (char. code U+0080)
++line 2 column 168 - Warning: replacing invalid UTF-8 bytes (char. code U+008D)
++line 2 column 169 - Warning: replacing invalid UTF-8 bytes (char. code U+008D)
++line 2 column 25 - Warning: missing </input> before <input>
++line 1 column 581 - Warning: missing </input> before <input>
++line 1 column 536 - Warning: missing </input> before <input>
++line 1 column 403 - Warning: missing </ttype> before <input>
++line 1 column 364 - Warning: missing </table> before <ttype>
++line 1 column 332 - Warning: missing </worm> before <table>
++line 1 column 33 - Warning: missing </body> before <worm>
++line 1 column 1 - Warning: missing </html> before <body>
++line 2 column 193 - Warning: replacing invalid UTF-8 bytes (char. code U+0091)
++line 2 column 177 - Warning: discarding unexpected </html>
++line 2 column 1448 - Warning: <meta> attribute "conten/body" lacks value
++line 2 column 1466 - Warning: discarding unexpected </html>
++line 2 column 1515 - Warning: <meta> attribute with missing trailing quote mark
++line 2 column 1596 - Warning: discarding unexpected </title6>
++line 2 column 1709 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 2 column 2542 - Warning: replacing invalid UTF-8 bytes (char. code U+00B5)
++line 2 column 2909 - Warning: replacing invalid UTF-8 bytes (char. code U+0005)
++line 4 column 49 - Warning: unescaped & or unknown entity "&ei"
++line 4 column 61 - Warning: unescaped & or unknown entity "&ei"
++line 4 column 86 - Warning: unescaped & or unknown entity "&lei"
++line 4 column 110 - Warning: unescaped & or unknown entity "&lei"
++line 4 column 129 - Warning: unescaped & or unknown entity "&window._cshid"
++line 4 column 144 - Warning: unescaped & or unknown entity "&-1"
++line 4 column 159 - Warning: unescaped & or unknown entity "&cshid"
++line 4 column 184 - Warning: unescaped & or unknown entity "&cshid"
++line 4 column 240 - Warning: unescaped & or unknown entity "&ct"
++line 4 column 246 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 4 column 247 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 4 column 249 - Warning: unescaped & or unknown entity "&cad"
++line 4 column 261 - Warning: unescaped & or unknown entity "&zx"
++line 4 column 346 - Warning: unescaped & or unknown entity "&google.ml"
++line 4 column 619 - Warning: replacing invalid UTF-8 bytes (char. code U+001D)
++line 4 column 619 - Warning: <area> attribute "(a)*a;l" lacks value
++line 4 column 632 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 4 column 633 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 4 column 619 - Warning: <area> attribute "h(ao��widte" lacks value
++line 4 column 619 - Warning: <area> attribute name "h[e]};a.src" (value="c}};google.logUrl=m;}).call(thi);(function(){") is invalid
++line 5 column 25 - Warning: replacing invalid UTF-8 bytes (char. code U+0010)
++line 4 column 619 - Info: value for attribute "google.y" missing quote marks
++line 4 column 619 - Info: value for attribute "c" missing quote marks
++line 4 column 619 - Info: value for attribute "c" missing quote marks
++line 4 column 619 - Warning: <area> attribute "document.documentelement.addeventlistener("submit",function(b){var" lacks value
++line 4 column 619 - Warning: <area> attribute name "a;if(a" (value="b.target){var") is invalid
++line 6 column 184 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 6 column 185 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 6 column 186 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 6 column 187 - Warning: replacing invalid UTF-8 bytes (char. code U+008D)
++line 4 column 619 - Info: value for attribute "c" missing quote marks
++line 6 column 321 - Warning: unescaped & or unknown entity "&a"
++line 4 column 619 - Warning: <area> attribute name "ion())},!0);document.documentelement.addeventlistener("click",function(b){var0a;a:{for(a" (value="b.target;a&&a!=document.documentElement;a=a.parentElement)if("A"==a.tagName){a="1"==a.getAttribute("data-nohref");break") is invalid
++line 6 column 439 - Warning: unescaped & or unknown entity "&b.preventDefault"
++line 4 column 619 - Warning: <area> missing '>' for end of tag
++line 4 column 619 - Warning: <area> attribute name "a}a" (value="!1}a&&b.preventDefault()},!0);}).call(this);") is invalid
++line 4 column 619 - Warning: <area> dropping value "a.id;else{do" for repeated attribute "c"
++line 4 column 619 - Warning: <area> dropping value "Math.random();while(google.y[c])}google.y[c]=[a,b];return!1};google.sx=f64,1960,718,530,2,61,174,44unction(a){google.sy.push(a)};google.lm=[];google.plm=function(a){google.lm.push.apply(google.lm,a)};google.lq=[];google.load=function(a,b,c){google.lq.push([[a],b,c])};google.loadAll=function(a,b){google.lq.push([a,b])};google.bx=!1;google.lx=function(){};}).call(this);google.f={};(function(){" for repeated attribute "c"
++line 2 column 1583 - Warning: missing </title> before <area>
++line 2 column 1515 - Warning: missing </meta> before <title>
++line 2 column 1448 - Warning: missing </meta> before <meta>
++line 2 column 1442 - Warning: missing </head> before <meta>
++line 2 column 275 - Warning: missing </script> before <head>
++line 7 column 1034 - Warning: replacing invalid UTF-8 bytes (char. code U+00BC)
++line 7 column 1137 - Warning: discarding unexpected </head>
++line 8 column 23 - Warning: unescaped & or unknown entity "&document.f.q.focus"
++line 8 column 59 - Warning: unescaped & or unknown entity "&document.gbqf.q.focus"
++line 10 column 30 - Info: value for attribute "id" missing quote marks
++line 10 column 49 - Info: value for attribute "class" missing quote marks
++line 10 column 73 - Info: value for attribute "class" missing quote marks
++line 10 column 127 - Warning: unescaped & or unknown entity "&tab"
++line 10 column 147 - Info: value for attribute "class" missing quote marks
++line 10 column 201 - Warning: unescaped & or unknown entity "&tab"
++line 10 column 219 - Info: value for attribute "class" missing quote marks
++line 10 column 268 - Warning: unescaped & or unknown entity "&tab"
++line 10 column 286 - Info: value for attribute "class" missing quote marks
++line 10 column 334 - Warning: unescaped & or unknown entity "&tab"
++line 10 column 355 - Info: value for attribute "class" missing quote marks
++line 10 column 416 - Info: value for attribute "class" missing quote marks
++line 10 column 483 - Info: value for attribute "class" missing quote marks
++line 10 column 546 - Info: value for attribute "class" missing quote marks
++line 10 column 686 - Info: value for attribute "id" missing quote marks
++line 10 column 686 - Info: value for attribute "width" missing quote marks
++line 10 column 717 - Info: value for attribute "id" missing quote marks
++line 10 column 717 - Info: value for attribute "class" missing quote marks
++line 10 column 747 - Info: value for attribute "id" missing quote marks
++line 10 column 747 - Info: value for attribute "class" missing quote marks
++line 10 column 777 - Info: value for attribute "id" missing quote marks
++line 10 column 797 - Info: value for attribute "class" missing quote marks
++line 10 column 880 - Info: value for attribute "class" missing quote marks
++line 10 column 935 - Info: value for attribute "target" missing quote marks
++line 10 column 935 - Info: value for attribute "id" missing quote marks
++line 10 column 1011 - Warning: unescaped & or unknown entity "&passive"
++line 10 column 1024 - Warning: unescaped & or unknown entity "&continue"
++line 10 column 1056 - Warning: unescaped & or unknown entity "&ec"
++line 10 column 935 - Info: value for attribute "class" missing quote marks
++line 10 column 1102 - Info: value for attribute "class" missing quote marks
++line 10 column 1102 - Info: value for attribute "style" missing quote marks
++line 10 column 1136 - Info: value for attribute "class" missing quote marks
++line 10 column 1136 - Info: value for attribute "style" missing quote marks
++line 10 column 1391 - Warning: missing </br> before <br>
++line 10 column 1225 - Warning: missing </img> before <br>
++line 10 column 1211 - Warning: missing </div> before <img>
++line 10 column 1493 - Info: value for attribute "width" missing quote marks
++line 10 column 1753 - Warning: missing </dlv> before <input>
++line 10 column 1721 - Warning: missing </input> before <dlv>
++line 10 column 1689 - Warning: missing </input> before <input>
++line 10 column 1643 - Warning: missing </input> before <input>
++line 10 column 1598 - Warning: missing </input> before <input>
++line 10 column 1548 - Warning: missing </input> before <input>
++line 10 column 1519 - Warning: missing </td> before <input>
++line 10 column 1476 - Warning: missing </tr> before <td>
++line 10 column 1437 - Warning: missing </table> before <tr>
++line 10 column 1405 - Warning: missing </form> before <table>
++line 10 column 1185 - Warning: missing </br> before <form>
++line 10 column 1177 - Warning: missing </center> before <br>
++line 10 column 15 - Warning: missing </div> before <center>
++line 10 column 2025 - Warning: missing </span> before <input>
++line 10 column 2161 - Warning: missing </input> before <input>
++line 10 column 2142 - Warning: missing </span> before <input>
++line 11 column 149 - Warning: discarding unexpected </td>
++line 11 column 155 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 11 column 156 - Warning: replacing invalid UTF-8 bytes (char. code U+00FF)
++line 11 column 277 - Warning: discarding unexpected </td>
++line 11 column 282 - Warning: discarding unexpected </tr>
++line 11 column 287 - Warning: discarding unexpected </table>
++line 12 column 25 - Warning: unescaped & or unknown entity "&document.getElementById"
++line 1 column 20 - Warning: missing </div>
++line 1 column 20 - Warning: missing </div>
++line 1 column 33 - Warning: inserting missing 'title' element
++line 4 column 619 - Warning: <area> lacks "alt" attribute
++line 4 column 619 - Warning: <area> lacks "href" attribute
++line 10 column 1225 - Warning: <img> lacks "alt" attribute
++line 10 column 1225 - Warning: <img> lacks "src" attribute
++line 10 column 717 - Warning: trimming empty <span>
++line 10 column 747 - Warning: trimming empty <span>
++line 10 column 777 - Warning: trimming empty <span>
++line 10 column 1177 - Warning: <center> element removed from HTML5
++line 1 column 56 - Warning: <br> proprietary attribute "html"
++line 1 column 74 - Warning: <html> proprietary attribute "itemscope"
++line 1 column 74 - Warning: <html> proprietary attribute "itemtype"
++line 1 column 74 - Warning: <html> proprietary attribute "lang"
++line 1 column 148 - Warning: <meta> proprietary attribute "content"
++line 1 column 148 - Warning: <meta> proprietary attribute "http-equiv"
++line 1 column 216 - Warning: <meta> proprietary attribute "content"
++line 1 column 216 - Warning: <meta> proprietary attribute "style"
++line 1 column 364 - Warning: <table> proprietary attribute "cellpadding"
++line 1 column 364 - Warning: <table> proprietary attribute "cellspacing"
++line 1 column 432 - Warning: <td> proprietary attribute "width"
++line 1 column 536 - Warning: <input> proprietary attribute "value"
++line 1 column 536 - Warning: <input> proprietary attribute "name"
++line 1 column 536 - Warning: <input> proprietary attribute "type"
++line 1 column 581 - Warning: <input> proprietary attribute "name"
++line 1 column 581 - Warning: <input> proprietary attribute "tg"
++line 1 column 581 - Warning: <input> proprietary attribute "ype"
++line 1 column 581 - Warning: <input> proprietary attribute "value"
++line 2 column 25 - Warning: <input> proprietary attribute "name"
++line 2 column 25 - Warning: <input> proprietary attribute "type"
++line 2 column 275 - Warning: <script> proprietary attribute "nonce"
++line 2 column 1515 - Warning: <meta> proprietary attribute "itemprop"
++line 4 column 619 - Warning: <area> proprietary attribute "google.y"
++line 4 column 619 - Warning: <area> proprietary attribute "c"
++line 7 column 1087 - Warning: <script> proprietary attribute "nonce"
++line 7 column 1144 - Warning: <body> proprietary attribute "bgcolor"
++line 7 column 1165 - Warning: <script> proprietary attribute "nonce"
++line 10 column 15 - Warning: <div> proprietary attribute "id"
++line 10 column 30 - Warning: <div> proprietary attribute "id"
++line 10 column 43 - Warning: <nobr> is not approved by W3C
++line 10 column 49 - Warning: <b> proprietary attribute "class"
++line 10 column 73 - Warning: <a> proprietary attribute "class"
++line 10 column 73 - Warning: <a> proprietary attribute "href"
++line 10 column 147 - Warning: <a> proprietary attribute "class"
++line 10 column 147 - Warning: <a> proprietary attribute "href"
++line 10 column 219 - Warning: <a> proprietary attribute "class"
++line 10 column 219 - Warning: <a> proprietary attribute "href"
++line 10 column 286 - Warning: <a> proprietary attribute "class"
++line 10 column 286 - Warning: <a> proprietary attribute "href"
++line 10 column 355 - Warning: <a> proprietary attribute "class"
++line 10 column 355 - Warning: <a> proprietary attribute "href"
++line 10 column 416 - Warning: <a> proprietary attribute "class"
++line 10 column 416 - Warning: <a> proprietary attribute "href"
++line 10 column 483 - Warning: <a> proprietary attribute "class"
++line 10 column 483 - Warning: <a> proprietary attribute "href"
++line 10 column 546 - Warning: <a> proprietary attribute "class"
++line 10 column 546 - Warning: <a> proprietary attribute "style"
++line 10 column 546 - Warning: <a> proprietary attribute "href"
++line 10 column 686 - Warning: <div> proprietary attribute "id"
++line 10 column 686 - Warning: <div> proprietary attribute "width"
++line 10 column 711 - Warning: <nobr> is not approved by W3C
++line 10 column 797 - Warning: <a> proprietary attribute "href"
++line 10 column 797 - Warning: <a> proprietary attribute "class"
++line 10 column 880 - Warning: <a> proprietary attribute "href"
++line 10 column 880 - Warning: <a> proprietary attribute "class"
++line 10 column 935 - Warning: <a> proprietary attribute "target"
++line 10 column 935 - Warning: <a> proprietary attribute "id"
++line 10 column 935 - Warning: <a> proprietary attribute "href"
++line 10 column 935 - Warning: <a> proprietary attribute "class"
++line 10 column 1102 - Warning: <div> proprietary attribute "class"
++line 10 column 1102 - Warning: <div> proprietary attribute "style"
++line 10 column 1136 - Warning: <div> proprietary attribute "class"
++line 10 column 1136 - Warning: <div> proprietary attribute "style"
++line 10 column 1185 - Warning: <br> proprietary attribute "clear"
++line 10 column 1185 - Warning: <br> proprietary attribute "id"
++line 10 column 1211 - Warning: <div> proprietary attribute "id"
++line 10 column 1225 - Warning: <img> proprietary attribute "alt"
++line 10 column 1225 - Warning: <img> proprietary attribute "height"
++line 10 column 1225 - Warning: <img> proprietary attribute "src"
++line 10 column 1225 - Warning: <img> proprietary attribute "style"
++line 10 column 1225 - Warning: <img> proprietary attribute "width"
++line 10 column 1225 - Warning: <img> proprietary attribute "id"
++line 10 column 1405 - Warning: <form> proprietary attribute "action"
++line 10 column 1405 - Warning: <form> proprietary attribute "name"
++line 10 column 1437 - Warning: <table> proprietary attribute "cellpadding"
++line 10 column 1437 - Warning: <table> proprietary attribute "cellspacing"
++line 10 column 1476 - Warning: <tr> proprietary attribute "valign"
++line 10 column 1493 - Warning: <td> proprietary attribute "width"
++line 10 column 1519 - Warning: <td> proprietary attribute "align"
++line 10 column 1519 - Warning: <td> proprietary attribute "nowrap"
++line 10 column 1548 - Warning: <input> proprietary attribute "name"
++line 10 column 1548 - Warning: <input> proprietary attribute "value"
++line 10 column 1548 - Warning: <input> proprietary attribute "type"
++line 10 column 1598 - Warning: <input> proprietary attribute "value"
++line 10 column 1598 - Warning: <input> proprietary attribute "name"
++line 10 column 1598 - Warning: <input> proprietary attribute "type"
++line 10 column 1643 - Warning: <input> proprietary attribute "name"
++line 10 column 1643 - Warning: <input> proprietary attribute "type"
++line 10 column 1643 - Warning: <input> proprietary attribute "value"
++line 10 column 1689 - Warning: <input> proprietary attribute "name"
++line 10 column 1689 - Warning: <input> proprietary attribute "type"
++line 10 column 1721 - Warning: <input> proprietary attribute "name"
++line 10 column 1721 - Warning: <input> proprietary attribute "type"
++line 10 column 1802 - Warning: <input> proprietary attribute "class"
++line 10 column 1802 - Warning: <input> proprietary attribute "style"
++line 10 column 1802 - Warning: <input> proprietary attribute "autocomplete"
++line 10 column 1802 - Warning: <input> proprietary attribute "value"
++line 10 column 1802 - Warning: <input> proprietary attribute "title"
++line 10 column 1802 - Warning: <input> proprietary attribute "maxlength"
++line 10 column 1802 - Warning: <input> proprietary attribute "name"
++line 10 column 1802 - Warning: <input> proprietary attribute "size"
++line 10 column 1982 - Warning: <br> proprietary attribute "style"
++line 10 column 2008 - Warning: <span> proprietary attribute "class"
++line 10 column 2025 - Warning: <span> proprietary attribute "class"
++line 10 column 2044 - Warning: <input> proprietary attribute "class"
++line 10 column 2044 - Warning: <input> proprietary attribute "value"
++line 10 column 2044 - Warning: <input> proprietary attribute "name"
++line 10 column 2044 - Warning: <input> proprietary attribute "type"
++line 10 column 2125 - Warning: <span> proprietary attribute "class"
++line 10 column 2142 - Warning: <span> proprietary attribute "class"
++line 10 column 2161 - Warning: <input> proprietary attribute "class"
++line 10 column 2161 - Warning: <input> proprietary attribute "lue"
++line 10 column 2161 - Warning: <input> proprietary attribute "name"
++line 10 column 2161 - Warning: <input> proprietary attribute "type"
++line 10 column 2229 - Warning: <script> proprietary attribute "nonce"
++line 11 column 47 - Warning: <input> proprietary attribute "value"
++line 11 column 47 - Warning: <input> proprietary attribute "name"
++line 11 column 47 - Warning: <input> proprietary attribute "type"
++line 11 column 207 - Warning: <a> proprietary attribute "href"
++line 11 column 295 - Warning: <input> proprietary attribute "id"
++line 11 column 295 - Warning: <input> proprietary attribute "name"
++line 11 column 295 - Warning: <input> proprietary attribute "type"
++line 11 column 295 - Warning: <input> proprietary attribute "value"
++line 11 column 346 - Warning: <script> proprietary attribute "nonce"
++Info: Document content looks like HTML5
++Tidy found 256 warnings and 0 errors!
++
++Character codes for UTF-8 must be in the range: U+0000 to U+10FFFF.
++The definition of UTF-8 in Annex D of ISO/IEC 10646-1:2000 also
++allows for the use of five- and six-byte sequences to encode
++characters that are outside the range of the Unicode character set;
++those five- and six-byte sequences are illegal for the use of
++UTF-8 as a transformation of Unicode characters. ISO/IEC 10646
++does not allow mapping of unpaired surrogates, nor U+FFFE and U+FFFF
++(but it does allow other noncharacters). For more information please refer to
++https://home.unicode.org/ and https://www.cl.cam.ac.uk/~mgk25/unicode.html
++
++The alt attribute should be used to give a short description
++of an image; longer descriptions should be given with the
++longdesc attribute which takes a URL linked to the description.
++These measures are needed for people using non-graphical browsers.
++
++For hypertext links defined using a client-side image map, you
++need to use the alt attribute to provide a textual description
++of the link for people using non-graphical browsers.
++
++For further advice on how to make your pages accessible
++see https://www.w3.org/WAI/GL.
++You are recommended to use CSS to control line wrapping.
++Use "white-space: nowrap" to inhibit wrapping in place
++of inserting <NOBR>...</NOBR> into the markup.
++
++One or more empty elements were present in the source document but
++dropped on output. If these elements are necessary or you don't want
++this behavior, then consider setting the option "drop-empty-elements"
++to no.
++
++About HTML Tidy: https://github.com/htacg/tidy-html5
++Bug reports and comments: https://github.com/htacg/tidy-html5/issues
++Official mailing list: https://lists.w3.org/Archives/Public/public-htacg/
++Latest HTML specification: https://html.spec.whatwg.org/multipage/
++Validate your HTML documents: https://validator.w3.org/nu/
++Lobby your company to join the W3C: https://www.w3.org/Consortium
++
++Do you speak a language other than English, or a different variant of 
++English? Consider helping us to localize HTML Tidy. For details please see 
++https://github.com/htacg/tidy-html5/blob/master/README/LOCALIZE.md
+diff --git a/src/gdoc.c b/src/gdoc.c
+index 50cd9bc..8f5f8ff 100644
+--- a/src/gdoc.c
++++ b/src/gdoc.c
+@@ -96,14 +96,15 @@ static void DiscardContainer( TidyDocImpl* doc, Node *element, Node **pnode)
+ 
+ static void CleanNode( TidyDocImpl* doc, Node *node )
+ {
++    Stack *stack = TY_(newStack)(doc, 16);
+     Node *child, *next;
+ 
+-    if (node->content)
++    if ( (child = node->content) )
+     {
+-        for (child = node->content; child != NULL; child = next)
++        while (child)
+         {
+             next = child->next;
+-
++            
+             if (TY_(nodeIsElement)(child))
+             {
+                 if (nodeIsSTYLE(child))
+@@ -131,10 +132,14 @@ static void CleanNode( TidyDocImpl* doc, Node *node )
+                     if (child->attributes)
+                         TY_(DropAttrByName)( doc, child, "class" );
+ 
+-                    CleanNode(doc, child);
++                    TY_(push)(stack,next);
++                    child = child->content;
++                    continue;
+                 }
+             }
++            child = next ? next : TY_(pop)(stack);
+         }
++        TY_(freeStack)(stack);
+     }
+ }
+ 
+diff --git a/version.txt b/version.txt
+index 3ff913e..76a976e 100644
+--- a/version.txt
++++ b/version.txt
+@@ -1,2 +1,2 @@
+-5.9.7
+-2021.07.30
++5.9.8
++2021.07.31

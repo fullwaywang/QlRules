@@ -1,0 +1,32 @@
+commit c898431ca5ef2a997fe9388b650f658fb60783e5	c898431ca5ef2a997fe9388b650f658fb60783e5
+Author: Alex Converse <alex.converse@gmail.com>
+Date:   Thu Jan 26 17:23:09 2012 -0800
+
+    nsvdec: Propagate errors
+    
+    Related to CVE-2011-3940.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+
+diff --git a/libavformat/nsvdec.c b/libavformat/nsvdec.c
+index 7e32e439ea..2ad8cb3a8b 100644
+--- a/libavformat/nsvdec.c
++++ b/libavformat/nsvdec.c
+@@ -532,11 +532,16 @@ static int nsv_read_header(AVFormatContext *s)
+     for (i = 0; i < NSV_MAX_RESYNC_TRIES; i++) {
+         if (nsv_resync(s) < 0)
+             return -1;
+-        if (nsv->state == NSV_FOUND_NSVF)
++        if (nsv->state == NSV_FOUND_NSVF) {
+             err = nsv_parse_NSVf_header(s);
++            if (err < 0)
++                return err;
++        }
+             /* we need the first NSVs also... */
+         if (nsv->state == NSV_FOUND_NSVS) {
+             err = nsv_parse_NSVs_header(s);
++            if (err < 0)
++                return err;
+             break; /* we just want the first one */
+         }
+     }

@@ -1,0 +1,26 @@
+commit 9d3032b960ae03066c008d6e6774f68b17a1d69d	9d3032b960ae03066c008d6e6774f68b17a1d69d
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Mar 24 01:39:13 2012 +0100
+
+    alsdec: check opt_order.
+    
+    Fixes out of array write in quant_cof
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/alsdec.c b/libavcodec/alsdec.c
+index 63e58ff55a..a9b04b8569 100644
+--- a/libavcodec/alsdec.c
++++ b/libavcodec/alsdec.c
+@@ -663,6 +663,10 @@ static int read_var_block_data(ALSDecContext *ctx, ALSBlockData *bd)
+             int opt_order_length = av_ceil_log2(av_clip((bd->block_length >> 3) - 1,
+                                                 2, sconf->max_order + 1));
+             *bd->opt_order       = get_bits(gb, opt_order_length);
++            if (*bd->opt_order > sconf->max_order) {
++                av_log(avctx, AV_LOG_ERROR, "Order too large\n");
++                return -1;
++            }
+         } else {
+             *bd->opt_order = sconf->max_order;
+         }

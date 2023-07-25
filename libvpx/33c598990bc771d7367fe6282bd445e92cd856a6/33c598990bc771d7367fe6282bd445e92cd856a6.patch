@@ -1,0 +1,32 @@
+commit 33c598990bc771d7367fe6282bd445e92cd856a6
+Author: Jerome Jiang <jianj@google.com>
+Date:   Mon Oct 9 19:33:03 2017 -0700
+
+    Fix alignment in vpx_image without external allocation.
+    
+    This restores behaviors prior to
+    <40c8fde Fix image width alignment. Enable ImageSizeSetting test.>.
+    
+    BUG=b/64710201
+    
+    Change-Id: I559557afe80d5ff5ea6ac24021561715068e7786
+
+diff --git a/vpx/src/vpx_image.c b/vpx/src/vpx_image.c
+index ebd3d7f74..af7c529a7 100644
+--- a/vpx/src/vpx_image.c
++++ b/vpx/src/vpx_image.c
+@@ -112,10 +112,10 @@ static vpx_image_t *img_alloc_helper(vpx_image_t *img, vpx_img_fmt_t fmt,
+   if (!img_data) {
+     uint64_t alloc_size;
+     /* Calculate storage sizes given the chroma subsampling */
+-    align = xcs ? (1 << xcs) - 1 : 1;
+-    w = (d_w + align - 1) & ~(align - 1);
+-    align = ycs ? (1 << ycs) - 1 : 1;
+-    h = (d_h + align - 1) & ~(align - 1);
++    align = (1 << xcs) - 1;
++    w = (d_w + align) & ~align;
++    align = (1 << ycs) - 1;
++    h = (d_h + align) & ~align;
+ 
+     s = (fmt & VPX_IMG_FMT_PLANAR) ? w : bps * w / 8;
+     s = (s + stride_align - 1) & ~(stride_align - 1);

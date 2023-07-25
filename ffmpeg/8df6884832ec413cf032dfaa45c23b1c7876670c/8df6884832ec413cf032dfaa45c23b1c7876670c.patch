@@ -1,0 +1,26 @@
+commit 8df6884832ec413cf032dfaa45c23b1c7876670c
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sun Jul 21 00:08:55 2019 +0200
+
+    avcodec/utils: Check close before calling it
+    
+    Fixes: NULL pointer dereference
+    Fixes: 15733/clusterfuzz-testcase-minimized-ffmpeg_AV_CODEC_ID_IDF_fuzzer-5658616977162240
+    
+    Reviewed-by: Paul B Mahol <onemda@gmail.com>
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/projects/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/utils.c b/libavcodec/utils.c
+index 9ff9628f7f..66c68d1cf5 100644
+--- a/libavcodec/utils.c
++++ b/libavcodec/utils.c
+@@ -1024,7 +1024,7 @@ end:
+ 
+     return ret;
+ free_and_end:
+-    if (avctx->codec &&
++    if (avctx->codec && avctx->codec->close &&
+         (codec_init_ok ||
+          (avctx->codec->caps_internal & FF_CODEC_CAP_INIT_CLEANUP)))
+         avctx->codec->close(avctx);

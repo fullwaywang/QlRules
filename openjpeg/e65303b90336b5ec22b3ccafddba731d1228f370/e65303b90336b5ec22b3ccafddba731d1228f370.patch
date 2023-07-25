@@ -1,0 +1,38 @@
+commit e65303b90336b5ec22b3ccafddba731d1228f370
+Author: Antonin Descampe <antonin@gmail.com>
+Date:   Tue Oct 21 12:35:16 2014 +0000
+
+    [trunk] added check on JP2_IHDR box (fixes issue 364)
+
+diff --git a/src/lib/openjp2/jp2.c b/src/lib/openjp2/jp2.c
+index 94226903..b6ecba66 100644
+--- a/src/lib/openjp2/jp2.c
++++ b/src/lib/openjp2/jp2.c
+@@ -2170,6 +2170,7 @@ static OPJ_BOOL opj_jp2_read_jp2h(  opj_jp2_t *jp2,
+ 	OPJ_UINT32 l_box_size=0, l_current_data_size = 0;
+ 	opj_jp2_box_t box;
+ 	const opj_jp2_header_handler_t * l_current_handler;
++	OPJ_BOOL l_has_ihdr = 0;
+ 
+ 	/* preconditions */
+ 	assert(p_header_data != 00);
+@@ -2210,10 +2211,19 @@ static OPJ_BOOL opj_jp2_read_jp2h(  opj_jp2_t *jp2,
+ 			jp2->jp2_img_state |= JP2_IMG_STATE_UNKNOWN;
+ 		}
+ 
++		if (box.type == JP2_IHDR) {
++			l_has_ihdr = 1;
++		}
++
+ 		p_header_data += l_current_data_size;
+ 		p_header_size -= box.length;
+ 	}
+ 
++	if (l_has_ihdr == 0) {
++		opj_event_msg(p_manager, EVT_ERROR, "Stream error while reading JP2 Header box: no 'ihdr' box.\n");
++		return OPJ_FALSE;
++	}
++
+ 	jp2->jp2_state |= JP2_STATE_HEADER;
+ 
+ 	return OPJ_TRUE;

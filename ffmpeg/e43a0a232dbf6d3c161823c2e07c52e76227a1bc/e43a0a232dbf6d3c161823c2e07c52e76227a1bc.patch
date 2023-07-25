@@ -1,0 +1,178 @@
+commit e43a0a232dbf6d3c161823c2e07c52e76227a1bc	e43a0a232dbf6d3c161823c2e07c52e76227a1bc
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Aug 3 18:54:43 2013 +0200
+
+    avfilter: fix plane validity checks
+    
+    Fixes out of array accesses
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavfilter/vf_boxblur.c b/libavfilter/vf_boxblur.c
+index 8a59890452..bf4c42e674 100644
+--- a/libavfilter/vf_boxblur.c
++++ b/libavfilter/vf_boxblur.c
+@@ -313,13 +313,13 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+     }
+     av_frame_copy_props(out, in);
+ 
+-    for (plane = 0; in->data[plane] && plane < 4; plane++)
++    for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++)
+         hblur(out->data[plane], out->linesize[plane],
+               in ->data[plane], in ->linesize[plane],
+               w[plane], h[plane], s->radius[plane], s->power[plane],
+               s->temp);
+ 
+-    for (plane = 0; in->data[plane] && plane < 4; plane++)
++    for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++)
+         vblur(out->data[plane], out->linesize[plane],
+               out->data[plane], out->linesize[plane],
+               w[plane], h[plane], s->radius[plane], s->power[plane],
+diff --git a/libavfilter/vf_delogo.c b/libavfilter/vf_delogo.c
+index 45a29cf00c..971e98670a 100644
+--- a/libavfilter/vf_delogo.c
++++ b/libavfilter/vf_delogo.c
+@@ -237,7 +237,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+     if (!sar.num)
+         sar.num = sar.den = 1;
+ 
+-    for (plane = 0; plane < 4 && in->data[plane]; plane++) {
++    for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++) {
+         int hsub = plane == 1 || plane == 2 ? hsub0 : 0;
+         int vsub = plane == 1 || plane == 2 ? vsub0 : 0;
+ 
+diff --git a/libavfilter/vf_fieldmatch.c b/libavfilter/vf_fieldmatch.c
+index 3a6f806a8b..89c4909a3d 100644
+--- a/libavfilter/vf_fieldmatch.c
++++ b/libavfilter/vf_fieldmatch.c
+@@ -608,7 +608,7 @@ static void copy_fields(const FieldMatchContext *fm, AVFrame *dst,
+                         const AVFrame *src, int field)
+ {
+     int plane;
+-    for (plane = 0; plane < 4 && src->data[plane]; plane++)
++    for (plane = 0; plane < 4 && src->data[plane] && src->linesize[plane]; plane++)
+         av_image_copy_plane(dst->data[plane] + field*dst->linesize[plane], dst->linesize[plane] << 1,
+                             src->data[plane] + field*src->linesize[plane], src->linesize[plane] << 1,
+                             get_width(fm, src, plane), get_height(fm, src, plane) / 2);
+diff --git a/libavfilter/vf_fieldorder.c b/libavfilter/vf_fieldorder.c
+index 3a19500c13..7ff88418b4 100644
+--- a/libavfilter/vf_fieldorder.c
++++ b/libavfilter/vf_fieldorder.c
+@@ -106,7 +106,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *frame)
+             "picture will move %s one line\n",
+             s->dst_tff ? "up" : "down");
+     h = frame->height;
+-    for (plane = 0; plane < 4 && frame->data[plane]; plane++) {
++    for (plane = 0; plane < 4 && frame->data[plane] && frame->linesize[plane]; plane++) {
+         line_step = frame->linesize[plane];
+         line_size = s->line_size[plane];
+         data = frame->data[plane];
+diff --git a/libavfilter/vf_gradfun.c b/libavfilter/vf_gradfun.c
+index e615e1e592..b2e700742f 100644
+--- a/libavfilter/vf_gradfun.c
++++ b/libavfilter/vf_gradfun.c
+@@ -199,7 +199,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+         av_frame_copy_props(out, in);
+     }
+ 
+-    for (p = 0; p < 4 && in->data[p]; p++) {
++    for (p = 0; p < 4 && in->data[p] && in->linesize[p]; p++) {
+         int w = inlink->w;
+         int h = inlink->h;
+         int r = s->radius;
+diff --git a/libavfilter/vf_hflip.c b/libavfilter/vf_hflip.c
+index 7fc135fdfc..0a9bc2cc66 100644
+--- a/libavfilter/vf_hflip.c
++++ b/libavfilter/vf_hflip.c
+@@ -90,7 +90,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+     if (av_pix_fmt_desc_get(inlink->format)->flags & AV_PIX_FMT_FLAG_PAL)
+         memcpy(out->data[1], in->data[1], AVPALETTE_SIZE);
+ 
+-    for (plane = 0; plane < 4 && in->data[plane]; plane++) {
++    for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++) {
+         const int width  = (plane == 1 || plane == 2) ? FF_CEIL_RSHIFT(inlink->w, s->hsub) : inlink->w;
+         const int height = (plane == 1 || plane == 2) ? FF_CEIL_RSHIFT(inlink->h, s->vsub) : inlink->h;
+         step = s->max_step[plane];
+diff --git a/libavfilter/vf_kerndeint.c b/libavfilter/vf_kerndeint.c
+index 5f99d88c2b..5f81525527 100644
+--- a/libavfilter/vf_kerndeint.c
++++ b/libavfilter/vf_kerndeint.c
+@@ -150,7 +150,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *inpic)
+     av_frame_copy_props(outpic, inpic);
+     outpic->interlaced_frame = 0;
+ 
+-    for (plane = 0; inpic->data[plane] && plane < 4; plane++) {
++    for (plane = 0; plane < 4 && inpic->data[plane] && inpic->linesize[plane]; plane++) {
+         h = plane == 0 ? inlink->h : FF_CEIL_RSHIFT(inlink->h, kerndeint->vsub);
+         bwidth = kerndeint->tmp_bwidth[plane];
+ 
+diff --git a/libavfilter/vf_lut.c b/libavfilter/vf_lut.c
+index 68320d0b41..d2fd4a14bf 100644
+--- a/libavfilter/vf_lut.c
++++ b/libavfilter/vf_lut.c
+@@ -304,7 +304,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+         }
+     } else {
+         /* planar */
+-        for (plane = 0; plane < 4 && in->data[plane]; plane++) {
++        for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++) {
+             int vsub = plane == 1 || plane == 2 ? s->vsub : 0;
+             int hsub = plane == 1 || plane == 2 ? s->hsub : 0;
+             int h = FF_CEIL_RSHIFT(inlink->h, vsub);
+diff --git a/libavfilter/vf_pad.c b/libavfilter/vf_pad.c
+index 2e9aa56968..023ef7f863 100644
+--- a/libavfilter/vf_pad.c
++++ b/libavfilter/vf_pad.c
+@@ -214,7 +214,7 @@ static AVFrame *get_video_buffer(AVFilterLink *inlink, int w, int h)
+     frame->width  = w;
+     frame->height = h;
+ 
+-    for (plane = 0; plane < 4 && frame->data[plane]; plane++) {
++    for (plane = 0; plane < 4 && frame->data[plane] && frame->linesize[plane]; plane++) {
+         int hsub = s->draw.hsub[plane];
+         int vsub = s->draw.vsub[plane];
+         frame->data[plane] += (s->x >> hsub) * s->draw.pixelstep[plane] +
+@@ -311,7 +311,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+         int i;
+ 
+         out = in;
+-        for (i = 0; i < 4 && out->data[i]; i++) {
++        for (i = 0; i < 4 && out->data[i] && out->linesize[i]; i++) {
+             int hsub = s->draw.hsub[i];
+             int vsub = s->draw.vsub[i];
+             out->data[i] -= (s->x >> hsub) * s->draw.pixelstep[i] +
+diff --git a/libavfilter/vf_showinfo.c b/libavfilter/vf_showinfo.c
+index 336a870b17..82becc40f4 100644
+--- a/libavfilter/vf_showinfo.c
++++ b/libavfilter/vf_showinfo.c
+@@ -38,7 +38,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *frame)
+     uint32_t plane_checksum[4] = {0}, checksum = 0;
+     int i, plane, vsub = desc->log2_chroma_h;
+ 
+-    for (plane = 0; plane < 4 && frame->data[plane]; plane++) {
++    for (plane = 0; plane < 4 && frame->data[plane] && frame->linesize[plane]; plane++) {
+         int64_t linesize = av_image_get_linesize(frame->format, frame->width, plane);
+         uint8_t *data = frame->data[plane];
+         int h = plane == 1 || plane == 2 ? FF_CEIL_RSHIFT(inlink->h, vsub) : inlink->h;
+@@ -68,7 +68,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *frame)
+            av_get_picture_type_char(frame->pict_type),
+            checksum, plane_checksum[0]);
+ 
+-    for (plane = 1; plane < 4 && frame->data[plane]; plane++)
++    for (plane = 1; plane < 4 && frame->data[plane] && frame->linesize[plane]; plane++)
+         av_log(ctx, AV_LOG_INFO, " %08X", plane_checksum[plane]);
+     av_log(ctx, AV_LOG_INFO, "]\n");
+ 
+diff --git a/libavfilter/vf_vignette.c b/libavfilter/vf_vignette.c
+index 181999327a..b5fed65511 100644
+--- a/libavfilter/vf_vignette.c
++++ b/libavfilter/vf_vignette.c
+@@ -239,7 +239,7 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *in)
+     } else {
+         int plane;
+ 
+-        for (plane = 0; plane < 4 && in->data[plane]; plane++) {
++        for (plane = 0; plane < 4 && in->data[plane] && in->linesize[plane]; plane++) {
+             uint8_t       *dst = out->data[plane];
+             const uint8_t *src = in ->data[plane];
+             const float *fmap = s->fmap;

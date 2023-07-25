@@ -1,0 +1,34 @@
+commit 1add23375658e9163e5493ee19de7c9f7a9b483b
+Author: Michael Sweet <michael.r.sweet@gmail.com>
+Date:   Wed Dec 14 09:44:55 2016 -0500
+
+    Tweak the PDL priority (Issue #4932)
+
+diff --git a/CHANGES.txt b/CHANGES.txt
+index 21ce4f98d..ba44aaa11 100644
+--- a/CHANGES.txt
++++ b/CHANGES.txt
+@@ -5,7 +5,7 @@ CHANGES IN CUPS V2.2.2
+ 
+ 	- Fixed some issues with the Zebra ZPL printer driver (Issue #4898)
+ 	- Fixed some issues with IPP Everywhere printer support (Issue #4893,
+-	  Issue #4909, Issue #4916, Issue #4921, Issue #4933)
++	  Issue #4909, Issue #4916, Issue #4921, Issue #4932, Issue #4933)
+ 	- The cups-lpd program did not catch all legacy usage of ISO-8859-1
+           (Issue #4899)
+         - Fixed builds on systems without a working poll() implementation
+diff --git a/cups/ppd-cache.c b/cups/ppd-cache.c
+index c035fbecb..582041bcd 100644
+--- a/cups/ppd-cache.c
++++ b/cups/ppd-cache.c
+@@ -3110,6 +3110,10 @@ _ppdCreateFromIPP(char   *buffer,	/* I - Filename buffer */
+ 
+       if (!_cups_strcasecmp(format, "application/pdf"))
+         cupsFilePuts(fp, "*cupsFilter2: \"application/vnd.cups-pdf application/pdf 10 -\"\n");
++      else if (!_cups_strcasecmp(format, "image/jpeg") || !_cups_strcasecmp(format, "image/png"))
++        cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 0 -\"\n", format, format);
++      else if (!_cups_strcasecmp(format, "image/pwg-raster") || !_cups_strcasecmp(format, "image/urf"))
++        cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 100 -\"\n", format, format);
+       else if (_cups_strcasecmp(format, "application/octet-stream") && _cups_strcasecmp(format, "application/postscript") && _cups_strncasecmp(format, "application/vnd.", 16) && _cups_strncasecmp(format, "image/vnd.", 10) && _cups_strcasecmp(format, "image/tiff") && _cups_strncasecmp(format, "text/", 5))
+         cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 10 -\"\n", format, format);
+     }

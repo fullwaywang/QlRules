@@ -1,0 +1,592 @@
+commit b7d1f32ff6588be99844c140ec1aacb6e44f4b84
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon May 10 11:02:29 2021 -0400
+
+    Fix mishandling of resjunk columns in ON CONFLICT ... UPDATE tlists.
+    
+    It's unusual to have any resjunk columns in an ON CONFLICT ... UPDATE
+    list, but it can happen when MULTIEXPR_SUBLINK SubPlans are present.
+    If it happens, the ON CONFLICT UPDATE code path would end up storing
+    tuples that include the values of the extra resjunk columns.  That's
+    fairly harmless in the short run, but if new columns are added to
+    the table then the values would become accessible, possibly leading
+    to malfunctions if they don't match the datatypes of the new columns.
+    
+    This had escaped notice through a confluence of missing sanity checks,
+    including
+    
+    * There's no cross-check that a tuple presented to heap_insert or
+    heap_update matches the table rowtype.  While it's difficult to
+    check that fully at reasonable cost, we can easily add assertions
+    that there aren't too many columns.
+    
+    * The output-column-assignment cases in execExprInterp.c lacked
+    any sanity checks on the output column numbers, which seems like
+    an oversight considering there are plenty of assertion checks on
+    input column numbers.  Add assertions there too.
+    
+    * We failed to apply nodeModifyTable's ExecCheckPlanOutput() to
+    the ON CONFLICT UPDATE tlist.  That wouldn't have caught this
+    specific error, since that function is chartered to ignore resjunk
+    columns; but it sure seems like a bad omission now that we've seen
+    this bug.
+    
+    In HEAD, the right way to fix this is to make the processing of
+    ON CONFLICT UPDATE tlists work the same as regular UPDATE tlists
+    now do, that is don't add "SET x = x" entries, and use
+    ExecBuildUpdateProjection to evaluate the tlist and combine it with
+    old values of the not-set columns.  This adds a little complication
+    to ExecBuildUpdateProjection, but allows removal of a comparable
+    amount of now-dead code from the planner.
+    
+    In the back branches, the most expedient solution seems to be to
+    (a) use an output slot for the ON CONFLICT UPDATE projection that
+    actually matches the target table, and then (b) invent a variant of
+    ExecBuildProjectionInfo that can be told to not store values resulting
+    from resjunk columns, so it doesn't try to store into nonexistent
+    columns of the output slot.  (We can't simply ignore the resjunk columns
+    altogether; they have to be evaluated for MULTIEXPR_SUBLINK to work.)
+    This works back to v10.  In 9.6, projections work much differently and
+    we can't cheaply give them such an option.  The 9.6 version of this
+    patch works by inserting a JunkFilter when it's necessary to get rid
+    of resjunk columns.
+    
+    In addition, v11 and up have the reverse problem when trying to
+    perform ON CONFLICT UPDATE on a partitioned table.  Through a
+    further oversight, adjust_partition_tlist() discarded resjunk columns
+    when re-ordering the ON CONFLICT UPDATE tlist to match a partition.
+    This accidentally prevented the storing-bogus-tuples problem, but
+    at the cost that MULTIEXPR_SUBLINK cases didn't work, typically
+    crashing if more than one row has to be updated.  Fix by preserving
+    resjunk columns in that routine.  (I failed to resist the temptation
+    to add more assertions there too, and to do some minor code
+    beautification.)
+    
+    Per report from Andres Freund.  Back-patch to all supported branches.
+    
+    Security: CVE-2021-32028
+
+diff --git a/src/backend/access/heap/heapam.c b/src/backend/access/heap/heapam.c
+index f1431ab18b..7bcef344b1 100644
+--- a/src/backend/access/heap/heapam.c
++++ b/src/backend/access/heap/heapam.c
+@@ -2459,6 +2459,10 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
+ 	Buffer		vmbuffer = InvalidBuffer;
+ 	bool		all_visible_cleared = false;
+ 
++	/* Cheap, simplistic check that the tuple matches the rel's rowtype. */
++	Assert(HeapTupleHeaderGetNatts(tup->t_data) <=
++		   RelationGetNumberOfAttributes(relation));
++
+ 	/*
+ 	 * Fill in tuple header fields, assign an OID, and toast the tuple if
+ 	 * necessary.
+@@ -3573,6 +3577,10 @@ heap_update(Relation relation, ItemPointer otid, HeapTuple newtup,
+ 
+ 	Assert(ItemPointerIsValid(otid));
+ 
++	/* Cheap, simplistic check that the tuple matches the rel's rowtype. */
++	Assert(HeapTupleHeaderGetNatts(newtup->t_data) <=
++		   RelationGetNumberOfAttributes(relation));
++
+ 	/*
+ 	 * Forbid this during a parallel operation, lest it allocate a combocid.
+ 	 * Other workers might need that combocid for visibility checks, and we
+diff --git a/src/backend/executor/execExpr.c b/src/backend/executor/execExpr.c
+index 6ad6214c95..370c94496a 100644
+--- a/src/backend/executor/execExpr.c
++++ b/src/backend/executor/execExpr.c
+@@ -351,6 +351,32 @@ ExecBuildProjectionInfo(List *targetList,
+ 						TupleTableSlot *slot,
+ 						PlanState *parent,
+ 						TupleDesc inputDesc)
++{
++	return ExecBuildProjectionInfoExt(targetList,
++									  econtext,
++									  slot,
++									  true,
++									  parent,
++									  inputDesc);
++}
++
++/*
++ *		ExecBuildProjectionInfoExt
++ *
++ * As above, with one additional option.
++ *
++ * If assignJunkEntries is true (the usual case), resjunk entries in the tlist
++ * are not handled specially: they are evaluated and assigned to the proper
++ * column of the result slot.  If assignJunkEntries is false, resjunk entries
++ * are evaluated, but their result is discarded without assignment.
++ */
++ProjectionInfo *
++ExecBuildProjectionInfoExt(List *targetList,
++						   ExprContext *econtext,
++						   TupleTableSlot *slot,
++						   bool assignJunkEntries,
++						   PlanState *parent,
++						   TupleDesc inputDesc)
+ {
+ 	ProjectionInfo *projInfo = makeNode(ProjectionInfo);
+ 	ExprState  *state;
+@@ -388,7 +414,8 @@ ExecBuildProjectionInfo(List *targetList,
+ 		 */
+ 		if (tle->expr != NULL &&
+ 			IsA(tle->expr, Var) &&
+-			((Var *) tle->expr)->varattno > 0)
++			((Var *) tle->expr)->varattno > 0 &&
++			(assignJunkEntries || !tle->resjunk))
+ 		{
+ 			/* Non-system Var, but how safe is it? */
+ 			variable = (Var *) tle->expr;
+@@ -452,6 +479,10 @@ ExecBuildProjectionInfo(List *targetList,
+ 			ExecInitExprRec(tle->expr, state,
+ 							&state->resvalue, &state->resnull);
+ 
++			/* This makes it easy to discard resjunk results when told to. */
++			if (!assignJunkEntries && tle->resjunk)
++				continue;
++
+ 			/*
+ 			 * Column might be referenced multiple times in upper nodes, so
+ 			 * force value to R/O - but only if it could be an expanded datum.
+diff --git a/src/backend/executor/execExprInterp.c b/src/backend/executor/execExprInterp.c
+index a9a3e8394c..e2fa6da192 100644
+--- a/src/backend/executor/execExprInterp.c
++++ b/src/backend/executor/execExprInterp.c
+@@ -560,6 +560,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < innerslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = innerslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = innerslot->tts_isnull[attnum];
+ 
+@@ -576,6 +577,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < outerslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = outerslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = outerslot->tts_isnull[attnum];
+ 
+@@ -592,6 +594,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 			 * care of at compilation time.  But see EEOP_INNER_VAR comments.
+ 			 */
+ 			Assert(attnum >= 0 && attnum < scanslot->tts_nvalid);
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = scanslot->tts_values[attnum];
+ 			resultslot->tts_isnull[resultnum] = scanslot->tts_isnull[attnum];
+ 
+@@ -602,6 +605,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 		{
+ 			int			resultnum = op->d.assign_tmp.resultnum;
+ 
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_values[resultnum] = state->resvalue;
+ 			resultslot->tts_isnull[resultnum] = state->resnull;
+ 
+@@ -612,6 +616,7 @@ ExecInterpExpr(ExprState *state, ExprContext *econtext, bool *isnull)
+ 		{
+ 			int			resultnum = op->d.assign_tmp.resultnum;
+ 
++			Assert(resultnum >= 0 && resultnum < resultslot->tts_tupleDescriptor->natts);
+ 			resultslot->tts_isnull[resultnum] = state->resnull;
+ 			if (!resultslot->tts_isnull[resultnum])
+ 				resultslot->tts_values[resultnum] =
+@@ -2046,8 +2051,10 @@ ExecJustAssignInnerVar(ExprState *state, ExprContext *econtext, bool *isnull)
+ 	 *
+ 	 * Since we use slot_getattr(), we don't need to implement the FETCHSOME
+ 	 * step explicitly, and we also needn't Assert that the attnum is in range
+-	 * --- slot_getattr() will take care of any problems.
++	 * --- slot_getattr() will take care of any problems.  Nonetheless, check
++	 * that resultnum is in range.
+ 	 */
++	Assert(resultnum >= 0 && resultnum < outslot->tts_tupleDescriptor->natts);
+ 	outslot->tts_values[resultnum] =
+ 		slot_getattr(inslot, attnum, &outslot->tts_isnull[resultnum]);
+ 	return 0;
+@@ -2064,6 +2071,7 @@ ExecJustAssignOuterVar(ExprState *state, ExprContext *econtext, bool *isnull)
+ 	TupleTableSlot *outslot = state->resultslot;
+ 
+ 	/* See comments in ExecJustAssignInnerVar */
++	Assert(resultnum >= 0 && resultnum < outslot->tts_tupleDescriptor->natts);
+ 	outslot->tts_values[resultnum] =
+ 		slot_getattr(inslot, attnum, &outslot->tts_isnull[resultnum]);
+ 	return 0;
+@@ -2080,6 +2088,7 @@ ExecJustAssignScanVar(ExprState *state, ExprContext *econtext, bool *isnull)
+ 	TupleTableSlot *outslot = state->resultslot;
+ 
+ 	/* See comments in ExecJustAssignInnerVar */
++	Assert(resultnum >= 0 && resultnum < outslot->tts_tupleDescriptor->natts);
+ 	outslot->tts_values[resultnum] =
+ 		slot_getattr(inslot, attnum, &outslot->tts_isnull[resultnum]);
+ 	return 0;
+diff --git a/src/backend/executor/execPartition.c b/src/backend/executor/execPartition.c
+index 40b5d3717f..b667d03c7f 100644
+--- a/src/backend/executor/execPartition.c
++++ b/src/backend/executor/execPartition.c
+@@ -629,11 +629,11 @@ ExecInitPartitionInfo(ModifyTableState *mtstate,
+ 				leaf_part_rri->ri_onConflict = rootResultRelInfo->ri_onConflict;
+ 			else
+ 			{
++				OnConflictSetState *onconfl = makeNode(OnConflictSetState);
+ 				List	   *onconflset;
+-				TupleDesc	tupDesc;
+ 				bool		found_whole_row;
+ 
+-				leaf_part_rri->ri_onConflict = makeNode(OnConflictSetState);
++				leaf_part_rri->ri_onConflict = onconfl;
+ 
+ 				/*
+ 				 * Translate expressions in onConflictSet to account for
+@@ -642,7 +642,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate,
+ 				 * pseudo-relation (INNER_VAR), and second to handle the main
+ 				 * target relation (firstVarno).
+ 				 */
+-				onconflset = (List *) copyObject((Node *) node->onConflictSet);
++				onconflset = copyObject(node->onConflictSet);
+ 				if (part_attnos == NULL)
+ 					part_attnos =
+ 						convert_tuples_by_name_map(RelationGetDescr(partrel),
+@@ -665,7 +665,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate,
+ 										&found_whole_row);
+ 				/* We ignore the value of found_whole_row. */
+ 
+-				/* Finally, adjust this tlist to match the partition. */
++				/* Finally, reorder the tlist to match the partition. */
+ 				onconflset = adjust_partition_tlist(onconflset, map);
+ 
+ 				/*
+@@ -675,13 +675,12 @@ ExecInitPartitionInfo(ModifyTableState *mtstate,
+ 				 * partition that's tupdesc-equal to the partitioned table;
+ 				 * partitions of different tupdescs must generate their own.
+ 				 */
+-				tupDesc = ExecTypeFromTL(onconflset, partrelDesc->tdhasoid);
+-				ExecSetSlotDescriptor(mtstate->mt_conflproj, tupDesc);
+-				leaf_part_rri->ri_onConflict->oc_ProjInfo =
+-					ExecBuildProjectionInfo(onconflset, econtext,
+-											mtstate->mt_conflproj,
+-											&mtstate->ps, partrelDesc);
+-				leaf_part_rri->ri_onConflict->oc_ProjTupdesc = tupDesc;
++				ExecSetSlotDescriptor(mtstate->mt_conflproj, partrelDesc);
++				onconfl->oc_ProjInfo =
++					ExecBuildProjectionInfoExt(onconflset, econtext,
++											   mtstate->mt_conflproj, false,
++											   &mtstate->ps, partrelDesc);
++				onconfl->oc_ProjTupdesc = partrelDesc;
+ 
+ 				/*
+ 				 * If there is a WHERE clause, initialize state where it will
+@@ -710,7 +709,7 @@ ExecInitPartitionInfo(ModifyTableState *mtstate,
+ 											RelationGetForm(partrel)->reltype,
+ 											&found_whole_row);
+ 					/* We ignore the value of found_whole_row. */
+-					leaf_part_rri->ri_onConflict->oc_WhereClause =
++					onconfl->oc_WhereClause =
+ 						ExecInitQual((List *) clause, &mtstate->ps);
+ 				}
+ 			}
+@@ -1332,18 +1331,15 @@ ExecBuildSlotPartitionKeyDescription(Relation rel,
+ 
+ /*
+  * adjust_partition_tlist
+- *		Adjust the targetlist entries for a given partition to account for
+- *		attribute differences between parent and the partition
++ *		Re-order the targetlist entries for a given partition to account for
++ *		column position differences between the parent and the partition.
+  *
+- * The expressions have already been fixed, but here we fix the list to make
+- * target resnos match the partition's attribute numbers.  This results in a
+- * copy of the original target list in which the entries appear in resno
+- * order, including both the existing entries (that may have their resno
+- * changed in-place) and the newly added entries for columns that don't exist
+- * in the parent.
++ * The expressions have already been fixed, but we must now re-order the
++ * entries in case the partition has different column order, and possibly
++ * add or remove dummy entries for dropped columns.
+  *
+- * Scribbles on the input tlist, so callers must make sure to make a copy
+- * before passing it to us.
++ * Although a new List is returned, this feels free to scribble on resno
++ * fields of the given tlist, so that should be a working copy.
+  */
+ static List *
+ adjust_partition_tlist(List *tlist, TupleConversionMap *map)
+@@ -1352,31 +1348,35 @@ adjust_partition_tlist(List *tlist, TupleConversionMap *map)
+ 	TupleDesc	tupdesc = map->outdesc;
+ 	AttrNumber *attrMap = map->attrMap;
+ 	AttrNumber	attrno;
++	ListCell   *lc;
+ 
+ 	for (attrno = 1; attrno <= tupdesc->natts; attrno++)
+ 	{
+ 		Form_pg_attribute att_tup = TupleDescAttr(tupdesc, attrno - 1);
++		AttrNumber	parentattrno = attrMap[attrno - 1];
+ 		TargetEntry *tle;
+ 
+-		if (attrMap[attrno - 1] != InvalidAttrNumber)
++		if (parentattrno != InvalidAttrNumber)
+ 		{
+-			Assert(!att_tup->attisdropped);
+-
+ 			/*
+ 			 * Use the corresponding entry from the parent's tlist, adjusting
+-			 * the resno the match the partition's attno.
++			 * the resno to match the partition's attno.
+ 			 */
+-			tle = (TargetEntry *) list_nth(tlist, attrMap[attrno - 1] - 1);
++			Assert(!att_tup->attisdropped);
++			tle = (TargetEntry *) list_nth(tlist, parentattrno - 1);
++			Assert(!tle->resjunk);
++			Assert(tle->resno == parentattrno);
+ 			tle->resno = attrno;
+ 		}
+ 		else
+ 		{
+-			Const	   *expr;
+-
+ 			/*
+ 			 * For a dropped attribute in the partition, generate a dummy
+-			 * entry with resno matching the partition's attno.
++			 * entry with resno matching the partition's attno.  This should
++			 * match what expand_targetlist() does.
+ 			 */
++			Const	   *expr;
++
+ 			Assert(att_tup->attisdropped);
+ 			expr = makeConst(INT4OID,
+ 							 -1,
+@@ -1394,6 +1394,18 @@ adjust_partition_tlist(List *tlist, TupleConversionMap *map)
+ 		new_tlist = lappend(new_tlist, tle);
+ 	}
+ 
++	/* Finally, attach any resjunk entries to the end of the new tlist */
++	foreach(lc, tlist)
++	{
++		TargetEntry *tle = (TargetEntry *) lfirst(lc);
++
++		if (tle->resjunk)
++		{
++			tle->resno = list_length(new_tlist) + 1;
++			new_tlist = lappend(new_tlist, tle);
++		}
++	}
++
+ 	return new_tlist;
+ }
+ 
+diff --git a/src/backend/executor/nodeModifyTable.c b/src/backend/executor/nodeModifyTable.c
+index aa74f27e15..1c254257a2 100644
+--- a/src/backend/executor/nodeModifyTable.c
++++ b/src/backend/executor/nodeModifyTable.c
+@@ -2533,9 +2533,9 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 	 */
+ 	if (node->onConflictAction == ONCONFLICT_UPDATE)
+ 	{
++		OnConflictSetState *onconfl = makeNode(OnConflictSetState);
+ 		ExprContext *econtext;
+ 		TupleDesc	relationDesc;
+-		TupleDesc	tupDesc;
+ 
+ 		/* insert may only have one plan, inheritance is not expanded */
+ 		Assert(nplans == 1);
+@@ -2562,7 +2562,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 		mtstate->mt_excludedtlist = node->exclRelTlist;
+ 
+ 		/* create state for DO UPDATE SET operation */
+-		resultRelInfo->ri_onConflict = makeNode(OnConflictSetState);
++		resultRelInfo->ri_onConflict = onconfl;
+ 
+ 		/*
+ 		 * Create the tuple slot for the UPDATE SET projection.
+@@ -2573,19 +2573,27 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 		 * the tupdesc in the parent's state: it can be reused by partitions
+ 		 * with an identical descriptor to the parent.
+ 		 */
+-		tupDesc = ExecTypeFromTL((List *) node->onConflictSet,
+-								 relationDesc->tdhasoid);
+ 		mtstate->mt_conflproj =
+ 			ExecInitExtraTupleSlot(mtstate->ps.state,
+ 								   mtstate->mt_partition_tuple_routing ?
+-								   NULL : tupDesc);
+-		resultRelInfo->ri_onConflict->oc_ProjTupdesc = tupDesc;
++								   NULL : relationDesc);
++		onconfl->oc_ProjTupdesc = relationDesc;
++
++		/*
++		 * The onConflictSet tlist should already have been adjusted to emit
++		 * the table's exact column list.  It could also contain resjunk
++		 * columns, which should be evaluated but not included in the
++		 * projection result.
++		 */
++		ExecCheckPlanOutput(resultRelInfo->ri_RelationDesc,
++							node->onConflictSet);
+ 
+ 		/* build UPDATE SET projection state */
+-		resultRelInfo->ri_onConflict->oc_ProjInfo =
+-			ExecBuildProjectionInfo(node->onConflictSet, econtext,
+-									mtstate->mt_conflproj, &mtstate->ps,
+-									relationDesc);
++		onconfl->oc_ProjInfo =
++			ExecBuildProjectionInfoExt(node->onConflictSet, econtext,
++									   mtstate->mt_conflproj, false,
++									   &mtstate->ps,
++									   relationDesc);
+ 
+ 		/* initialize state to evaluate the WHERE clause, if any */
+ 		if (node->onConflictWhere)
+@@ -2594,7 +2602,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
+ 
+ 			qualexpr = ExecInitQual((List *) node->onConflictWhere,
+ 									&mtstate->ps);
+-			resultRelInfo->ri_onConflict->oc_WhereClause = qualexpr;
++			onconfl->oc_WhereClause = qualexpr;
+ 		}
+ 	}
+ 
+diff --git a/src/include/executor/executor.h b/src/include/executor/executor.h
+index e225294091..6bc857465c 100644
+--- a/src/include/executor/executor.h
++++ b/src/include/executor/executor.h
+@@ -269,6 +269,12 @@ extern ProjectionInfo *ExecBuildProjectionInfo(List *targetList,
+ 						TupleTableSlot *slot,
+ 						PlanState *parent,
+ 						TupleDesc inputDesc);
++extern ProjectionInfo *ExecBuildProjectionInfoExt(List *targetList,
++												  ExprContext *econtext,
++												  TupleTableSlot *slot,
++												  bool assignJunkEntries,
++												  PlanState *parent,
++												  TupleDesc inputDesc);
+ extern ExprState *ExecPrepareExpr(Expr *node, EState *estate);
+ extern ExprState *ExecPrepareQual(List *qual, EState *estate);
+ extern ExprState *ExecPrepareCheck(List *qual, EState *estate);
+diff --git a/src/test/regress/expected/update.out b/src/test/regress/expected/update.out
+index c35c0dd9f8..7573ca8bd8 100644
+--- a/src/test/regress/expected/update.out
++++ b/src/test/regress/expected/update.out
+@@ -199,7 +199,7 @@ SELECT a, b, char_length(c) FROM update_test;
+ (4 rows)
+ 
+ -- Test ON CONFLICT DO UPDATE
+-INSERT INTO upsert_test VALUES(1, 'Boo');
++INSERT INTO upsert_test VALUES(1, 'Boo'), (3, 'Zoo');
+ -- uncorrelated  sub-select:
+ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+   VALUES (1, 'Bar') ON CONFLICT(a)
+@@ -210,24 +210,55 @@ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+ (1 row)
+ 
+ -- correlated sub-select:
+-INSERT INTO upsert_test VALUES (1, 'Baz') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Baz'), (3, 'Zaz') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a)
+   RETURNING *;
+  a |        b        
+ ---+-----------------
+  1 | Foo, Correlated
+-(1 row)
++ 3 | Zoo, Correlated
++(2 rows)
+ 
+ -- correlated sub-select (EXCLUDED.* alias):
+-INSERT INTO upsert_test VALUES (1, 'Bat') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Bat'), (3, 'Zot') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
+   RETURNING *;
+  a |             b             
+ ---+---------------------------
+  1 | Foo, Correlated, Excluded
+-(1 row)
++ 3 | Zoo, Correlated, Excluded
++(2 rows)
+ 
+ DROP TABLE update_test;
++DROP TABLE upsert_test;
++-- Test ON CONFLICT DO UPDATE with partitioned table and non-identical children
++CREATE TABLE upsert_test (
++    a   INT PRIMARY KEY,
++    b   TEXT
++) PARTITION BY LIST (a);
++CREATE TABLE upsert_test_1 PARTITION OF upsert_test FOR VALUES IN (1);
++CREATE TABLE upsert_test_2 (b TEXT, a INT PRIMARY KEY);
++ALTER TABLE upsert_test ATTACH PARTITION upsert_test_2 FOR VALUES IN (2);
++INSERT INTO upsert_test VALUES(1, 'Boo'), (2, 'Zoo');
++-- uncorrelated sub-select:
++WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
++  VALUES (1, 'Bar') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
++ a |  b  
++---+-----
++ 1 | Foo
++(1 row)
++
++-- correlated sub-select:
++WITH aaa AS (SELECT 1 AS ctea, ' Foo' AS cteb) INSERT INTO upsert_test
++  VALUES (1, 'Bar'), (2, 'Baz') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa) RETURNING *;
++ a |    b    
++---+---------
++ 1 | Foo Foo
++ 2 | Zoo Foo
++(2 rows)
++
+ DROP TABLE upsert_test;
+ ---------------------------
+ -- UPDATE with row movement
+diff --git a/src/test/regress/sql/update.sql b/src/test/regress/sql/update.sql
+index e6a61ace5b..ba373e345b 100644
+--- a/src/test/regress/sql/update.sql
++++ b/src/test/regress/sql/update.sql
+@@ -100,23 +100,47 @@ UPDATE update_test t
+ SELECT a, b, char_length(c) FROM update_test;
+ 
+ -- Test ON CONFLICT DO UPDATE
+-INSERT INTO upsert_test VALUES(1, 'Boo');
++
++INSERT INTO upsert_test VALUES(1, 'Boo'), (3, 'Zoo');
+ -- uncorrelated  sub-select:
+ WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
+   VALUES (1, 'Bar') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
+ -- correlated sub-select:
+-INSERT INTO upsert_test VALUES (1, 'Baz') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Baz'), (3, 'Zaz') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Correlated', a from upsert_test i WHERE i.a = upsert_test.a)
+   RETURNING *;
+ -- correlated sub-select (EXCLUDED.* alias):
+-INSERT INTO upsert_test VALUES (1, 'Bat') ON CONFLICT(a)
++INSERT INTO upsert_test VALUES (1, 'Bat'), (3, 'Zot') ON CONFLICT(a)
+   DO UPDATE SET (b, a) = (SELECT b || ', Excluded', a from upsert_test i WHERE i.a = excluded.a)
+   RETURNING *;
+ 
+ DROP TABLE update_test;
+ DROP TABLE upsert_test;
+ 
++-- Test ON CONFLICT DO UPDATE with partitioned table and non-identical children
++
++CREATE TABLE upsert_test (
++    a   INT PRIMARY KEY,
++    b   TEXT
++) PARTITION BY LIST (a);
++
++CREATE TABLE upsert_test_1 PARTITION OF upsert_test FOR VALUES IN (1);
++CREATE TABLE upsert_test_2 (b TEXT, a INT PRIMARY KEY);
++ALTER TABLE upsert_test ATTACH PARTITION upsert_test_2 FOR VALUES IN (2);
++
++INSERT INTO upsert_test VALUES(1, 'Boo'), (2, 'Zoo');
++-- uncorrelated sub-select:
++WITH aaa AS (SELECT 1 AS a, 'Foo' AS b) INSERT INTO upsert_test
++  VALUES (1, 'Bar') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT b, a FROM aaa) RETURNING *;
++-- correlated sub-select:
++WITH aaa AS (SELECT 1 AS ctea, ' Foo' AS cteb) INSERT INTO upsert_test
++  VALUES (1, 'Bar'), (2, 'Baz') ON CONFLICT(a)
++  DO UPDATE SET (b, a) = (SELECT upsert_test.b||cteb, upsert_test.a FROM aaa) RETURNING *;
++
++DROP TABLE upsert_test;
++
+ 
+ ---------------------------
+ -- UPDATE with row movement

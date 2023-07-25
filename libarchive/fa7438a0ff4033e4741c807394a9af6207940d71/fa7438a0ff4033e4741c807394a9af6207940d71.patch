@@ -1,0 +1,32 @@
+commit fa7438a0ff4033e4741c807394a9af6207940d71
+Author: Joerg Sonnenberger <joerg@bec.de>
+Date:   Tue Sep 5 18:12:19 2017 +0200
+
+    Do something sensible for empty strings to make fuzzers happy.
+
+diff --git a/libarchive/archive_read_support_format_xar.c b/libarchive/archive_read_support_format_xar.c
+index 7a22beb9..93eeacc5 100644
+--- a/libarchive/archive_read_support_format_xar.c
++++ b/libarchive/archive_read_support_format_xar.c
+@@ -1040,6 +1040,9 @@ atol10(const char *p, size_t char_cnt)
+ 	uint64_t l;
+ 	int digit;
+ 
++	if (char_cnt == 0)
++		return (0);
++
+ 	l = 0;
+ 	digit = *p - '0';
+ 	while (digit >= 0 && digit < 10  && char_cnt-- > 0) {
+@@ -1054,7 +1057,10 @@ atol8(const char *p, size_t char_cnt)
+ {
+ 	int64_t l;
+ 	int digit;
+-        
++
++	if (char_cnt == 0)
++		return (0);
++
+ 	l = 0;
+ 	while (char_cnt-- > 0) {
+ 		if (*p >= '0' && *p <= '7')

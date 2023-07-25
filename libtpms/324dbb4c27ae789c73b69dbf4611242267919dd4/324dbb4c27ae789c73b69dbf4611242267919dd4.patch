@@ -1,0 +1,46 @@
+commit 324dbb4c27ae789c73b69dbf4611242267919dd4
+Author: Stefan Berger <stefanb@linux.ibm.com>
+Date:   Mon Feb 20 14:41:10 2023 -0500
+
+    tpm2: Check size of buffer before accessing it (CVE-2023-1017 & -1018)
+    
+    Check that there are sufficient bytes in the buffer before reading the
+    cipherSize from it. Also, reduce the bufferSize variable by the number
+    of bytes that make up the cipherSize to avoid reading and writing bytes
+    beyond the buffer in subsequent steps that do in-place decryption.
+    
+    This fixes CVE-2023-1017 & CVE-2023-1018.
+    
+    Signed-off-by: Stefan Berger <stefanb@linux.ibm.com>
+
+diff --git a/src/tpm2/CryptUtil.c b/src/tpm2/CryptUtil.c
+index 002fde0..8fae5b6 100644
+--- a/src/tpm2/CryptUtil.c
++++ b/src/tpm2/CryptUtil.c
+@@ -830,6 +830,10 @@ CryptParameterDecryption(
+ 			  + sizeof(session->sessionKey.t.buffer)));
+     TPM2B_HMAC_KEY          key;            // decryption key
+     UINT32                  cipherSize = 0; // size of cipher text
++
++    if (leadingSizeInByte > bufferSize)
++	return TPM_RC_INSUFFICIENT;
++
+     // Retrieve encrypted data size.
+     if(leadingSizeInByte == 2)
+ 	{
+@@ -837,6 +841,7 @@ CryptParameterDecryption(
+ 	    // data to be decrypted
+ 	    cipherSize = (UINT32)BYTE_ARRAY_TO_UINT16(buffer);
+ 	    buffer = &buffer[2];   // advance the buffer
++	    bufferSize -= 2;
+ 	}
+ #ifdef  TPM4B
+     else if(leadingSizeInByte == 4)
+@@ -844,6 +849,7 @@ CryptParameterDecryption(
+ 	    // the leading size is four bytes so get the four byte size field
+ 	    cipherSize = BYTE_ARRAY_TO_UINT32(buffer);
+ 	    buffer = &buffer[4];   //advance pointer
++	    bufferSize -= 4;
+ 	}
+ #endif
+     else

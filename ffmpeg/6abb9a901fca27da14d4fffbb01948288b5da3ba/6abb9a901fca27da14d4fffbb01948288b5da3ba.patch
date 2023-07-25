@@ -1,0 +1,25 @@
+commit 6abb9a901fca27da14d4fffbb01948288b5da3ba	6abb9a901fca27da14d4fffbb01948288b5da3ba
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Thu Nov 29 15:56:05 2012 +0100
+
+    huffyuvdec: check width more completely, avoid out of array accesses
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/huffyuv.c b/libavcodec/huffyuv.c
+index 6e88114412..ca5bcd8588 100644
+--- a/libavcodec/huffyuv.c
++++ b/libavcodec/huffyuv.c
+@@ -514,7 +514,10 @@ static av_cold int decode_init(AVCodecContext *avctx)
+         av_log(avctx, AV_LOG_ERROR, "width must be even for this colorspace\n");
+         return AVERROR_INVALIDDATA;
+     }
+-
++    if (s->predictor == MEDIAN && avctx->pix_fmt == AV_PIX_FMT_YUV422P && avctx->width%4) {
++        av_log(avctx, AV_LOG_ERROR, "width must be a multiple of 4 this colorspace and predictor\n");
++        return AVERROR_INVALIDDATA;
++    }
+     alloc_temp(s);
+ 
+     return 0;

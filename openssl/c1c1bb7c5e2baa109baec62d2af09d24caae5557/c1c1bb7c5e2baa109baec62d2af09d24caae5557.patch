@@ -1,0 +1,66 @@
+commit c1c1bb7c5e2baa109baec62d2af09d24caae5557
+Author: Matt Caswell <matt@openssl.org>
+Date:   Fri Dec 3 15:56:58 2021 +0000
+
+    Fix invalid handling of verify errors in libssl
+    
+    In the event that X509_verify() returned an internal error result then
+    libssl would mishandle this and set rwstate to SSL_RETRY_VERIFY. This
+    subsequently causes SSL_get_error() to return SSL_ERROR_WANT_RETRY_VERIFY.
+    That return code is supposed to only ever be returned if an application
+    is using an app verify callback to complete replace the use of
+    X509_verify(). Applications may not be written to expect that return code
+    and could therefore crash (or misbehave in some other way) as a result.
+    
+    CVE-2021-4044
+    
+    Reviewed-by: Tomas Mraz <tomas@openssl.org>
+
+diff --git a/ssl/ssl_cert.c b/ssl/ssl_cert.c
+index e77b6ec097..82028ec5b7 100644
+--- a/ssl/ssl_cert.c
++++ b/ssl/ssl_cert.c
+@@ -362,6 +362,13 @@ void ssl_cert_set_cert_cb(CERT *c, int (*cb) (SSL *ssl, void *arg), void *arg)
+     c->cert_cb_arg = arg;
+ }
+ 
++/*
++ * Verify a certificate chain
++ * Return codes:
++ *  1: Verify success
++ *  0: Verify failure or error
++ * -1: Retry required
++ */
+ int ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *sk)
+ {
+     X509 *x;
+@@ -423,10 +430,14 @@ int ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *sk)
+     if (s->verify_callback)
+         X509_STORE_CTX_set_verify_cb(ctx, s->verify_callback);
+ 
+-    if (s->ctx->app_verify_callback != NULL)
++    if (s->ctx->app_verify_callback != NULL) {
+         i = s->ctx->app_verify_callback(ctx, s->ctx->app_verify_arg);
+-    else
++    } else {
+         i = X509_verify_cert(ctx);
++        /* We treat an error in the same way as a failure to verify */
++        if (i < 0)
++            i = 0;
++    }
+ 
+     s->verify_result = X509_STORE_CTX_get_error(ctx);
+     sk_X509_pop_free(s->verified_chain, X509_free);
+diff --git a/ssl/statem/statem_clnt.c b/ssl/statem/statem_clnt.c
+index 61f035ca58..12f77690cd 100644
+--- a/ssl/statem/statem_clnt.c
++++ b/ssl/statem/statem_clnt.c
+@@ -1878,7 +1878,7 @@ WORK_STATE tls_post_process_server_certificate(SSL *s, WORK_STATE wst)
+      * (less clean) historic behaviour of performing validation if any flag is
+      * set. The *documented* interface remains the same.
+      */
+-    if (s->verify_mode != SSL_VERIFY_NONE && i <= 0) {
++    if (s->verify_mode != SSL_VERIFY_NONE && i == 0) {
+         SSLfatal(s, ssl_x509err2alert(s->verify_result),
+                  SSL_R_CERTIFICATE_VERIFY_FAILED);
+         return WORK_ERROR;

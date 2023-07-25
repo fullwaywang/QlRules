@@ -1,0 +1,40 @@
+commit c600d11f2c1645f6f6965592659d386436f4d6db
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Fri Feb 20 21:32:31 2015 -0800
+
+    Issue 412: Visual Studio 2008 does not support C99
+
+diff --git a/libarchive/archive_entry.c b/libarchive/archive_entry.c
+index 787d281d..4ac19660 100644
+--- a/libarchive/archive_entry.c
++++ b/libarchive/archive_entry.c
+@@ -1739,12 +1739,13 @@ ae_strtofflags(const char *s, unsigned long *setp, unsigned long *clrp)
+ 	while (*start == '\t'  ||  *start == ' '  ||  *start == ',')
+ 		start++;
+ 	while (*start != '\0') {
++		size_t length;
+ 		/* Locate end of token. */
+ 		end = start;
+ 		while (*end != '\0'  &&  *end != '\t'  &&
+ 		    *end != ' '  &&  *end != ',')
+ 			end++;
+-		size_t length = end - start;
++		length = end - start;
+ 		for (flag = flags; flag->name != NULL; flag++) {
+ 			size_t flag_length = strlen(flag->name);
+ 			if (length == flag_length
+@@ -1806,12 +1807,13 @@ ae_wcstofflags(const wchar_t *s, unsigned long *setp, unsigned long *clrp)
+ 	while (*start == L'\t'  ||  *start == L' '  ||  *start == L',')
+ 		start++;
+ 	while (*start != L'\0') {
++		size_t length;
+ 		/* Locate end of token. */
+ 		end = start;
+ 		while (*end != L'\0'  &&  *end != L'\t'  &&
+ 		    *end != L' '  &&  *end != L',')
+ 			end++;
+-		size_t length = end - start;
++		length = end - start;
+ 		for (flag = flags; flag->wname != NULL; flag++) {
+ 			size_t flag_length = wcslen(flag->wname);
+ 			if (length == flag_length

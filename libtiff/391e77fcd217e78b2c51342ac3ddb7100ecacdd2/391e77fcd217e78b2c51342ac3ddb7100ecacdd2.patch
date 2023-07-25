@@ -1,0 +1,53 @@
+commit 391e77fcd217e78b2c51342ac3ddb7100ecacdd2	391e77fcd217e78b2c51342ac3ddb7100ecacdd2
+Author: erouault <erouault>
+Date:   Tue Jun 28 15:12:19 2016 +0000
+
+    * libtiff/tif_pixarlog.c: fix potential buffer write overrun in
+    PixarLogDecode() on corrupted/unexpected images (reported by Mathias Svensson)
+
+diff --git a/ChangeLog b/ChangeLog
+index 1b0e5996..dee18813 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,8 @@
++2016-06-28  Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_pixarlog.c: fix potential buffer write overrun in
++	PixarLogDecode() on corrupted/unexpected images (reported by Mathias Svensson)
++
+ 2016-06-15  Bob Friesenhahn  <bfriesen@simple.dallas.tx.us>
+ 
+ 	* libtiff/libtiff.def: Added _TIFFMultiply32 and _TIFFMultiply64
+diff --git a/libtiff/tif_pixarlog.c b/libtiff/tif_pixarlog.c
+index 06e8af39..cc486c54 100644
+--- a/libtiff/tif_pixarlog.c
++++ b/libtiff/tif_pixarlog.c
+@@ -459,6 +459,7 @@ horizontalAccumulate8abgr(uint16 *wp, int n, int stride, unsigned char *op,
+ typedef	struct {
+ 	TIFFPredictorState	predict;
+ 	z_stream		stream;
++	tmsize_t		tbuf_size; /* only set/used on reading for now */
+ 	uint16			*tbuf; 
+ 	uint16			stride;
+ 	int			state;
+@@ -694,6 +695,7 @@ PixarLogSetupDecode(TIFF* tif)
+ 	sp->tbuf = (uint16 *) _TIFFmalloc(tbuf_size);
+ 	if (sp->tbuf == NULL)
+ 		return (0);
++	sp->tbuf_size = tbuf_size;
+ 	if (sp->user_datafmt == PIXARLOGDATAFMT_UNKNOWN)
+ 		sp->user_datafmt = PixarLogGuessDataFmt(td);
+ 	if (sp->user_datafmt == PIXARLOGDATAFMT_UNKNOWN) {
+@@ -783,6 +785,12 @@ PixarLogDecode(TIFF* tif, uint8* op, tmsize_t occ, uint16 s)
+ 		TIFFErrorExt(tif->tif_clientdata, module, "ZLib cannot deal with buffers this size");
+ 		return (0);
+ 	}
++	/* Check that we will not fill more than what was allocated */
++	if (sp->stream.avail_out > sp->tbuf_size)
++	{
++		TIFFErrorExt(tif->tif_clientdata, module, "sp->stream.avail_out > sp->tbuf_size");
++		return (0);
++	}
+ 	do {
+ 		int state = inflate(&sp->stream, Z_PARTIAL_FLUSH);
+ 		if (state == Z_STREAM_END) {

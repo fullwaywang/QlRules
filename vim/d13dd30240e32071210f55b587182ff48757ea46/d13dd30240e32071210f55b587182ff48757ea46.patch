@@ -1,0 +1,57 @@
+commit d13dd30240e32071210f55b587182ff48757ea46
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Mar 11 20:56:35 2023 +0000
+
+    patch 9.0.1402: crash when using null_class
+    
+    Problem:    Crash when using null_class.
+    Solution:   Give an error when trying to use a null class.
+
+diff --git a/src/testdir/test_vim9_class.vim b/src/testdir/test_vim9_class.vim
+index bc8a8e1d5..4b6a730bb 100644
+--- a/src/testdir/test_vim9_class.vim
++++ b/src/testdir/test_vim9_class.vim
+@@ -203,6 +203,13 @@ def Test_returning_null_object()
+   v9.CheckScriptSuccess(lines)
+ enddef
+ 
++def Test_using_null_class()
++  var lines =<< trim END
++      @_ = null_class.member
++  END
++  v9.CheckDefExecAndScriptFailure(lines, ['E715:', 'E1363:'])
++enddef
++
+ def Test_class_interface_wrong_end()
+   var lines =<< trim END
+       vim9script
+diff --git a/src/version.c b/src/version.c
+index 0265c47a9..2dca10db9 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1402,
+ /**/
+     1401,
+ /**/
+diff --git a/src/vim9class.c b/src/vim9class.c
+index 74664f1b2..817435138 100644
+--- a/src/vim9class.c
++++ b/src/vim9class.c
+@@ -1262,6 +1262,12 @@ class_object_index(
+ 	cl = rettv->vval.v_object->obj_class;
+     }
+ 
++    if (cl == NULL)
++    {
++	emsg(_(e_incomplete_type));
++	return FAIL;
++    }
++
+     if (*name_end == '(')
+     {
+ 	int on_class = rettv->v_type == VAR_CLASS;

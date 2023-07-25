@@ -1,0 +1,27 @@
+commit d3144a8be81aed6e635de68f0d8e97881638a398
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Tue Aug 22 17:41:30 2017 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/691
+
+diff --git a/coders/mat.c b/coders/mat.c
+index b9de9eb20..b3a59c583 100644
+--- a/coders/mat.c
++++ b/coders/mat.c
+@@ -1378,12 +1378,11 @@ END_OF_READING:
+     clone_info = NULL;
+   }
+   if (logging) (void)LogMagickEvent(CoderEvent,GetMagickModule(),"return");
+-  if (image==NULL)
++  if ((image != image2) && (image2 != (Image *) NULL))
++    image2=DestroyImage(image2);
++  if (image == (Image *) NULL)
+     ThrowReaderException(CorruptImageError,"ImproperImageHeader")
+-  else
+-    if ((image != image2) && (image2 != (Image *) NULL))
+-      image2=DestroyImage(image2);
+-  return (image);
++  return(image);
+ }
+ 
+ /*

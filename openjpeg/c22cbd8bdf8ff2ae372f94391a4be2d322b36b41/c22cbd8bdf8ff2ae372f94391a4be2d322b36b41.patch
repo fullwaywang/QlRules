@@ -1,0 +1,53 @@
+commit c22cbd8bdf8ff2ae372f94391a4be2d322b36b41
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Sun Jul 30 18:43:25 2017 +0200
+
+    Avoid heap buffer overflow in function pnmtoimage of convert.c, and unsigned integer overflow in opj_image_create() (CVE-2016-9118, #861)
+
+diff --git a/src/bin/jp2/convert.c b/src/bin/jp2/convert.c
+index b3eb8581..492911c9 100644
+--- a/src/bin/jp2/convert.c
++++ b/src/bin/jp2/convert.c
+@@ -41,6 +41,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <ctype.h>
++#include <limits.h>
+ 
+ #include "openjpeg.h"
+ #include "convert.h"
+@@ -1731,6 +1732,15 @@ opj_image_t* pnmtoimage(const char *filename, opj_cparameters_t *parameters)
+         return NULL;
+     }
+ 
++    /* This limitation could be removed by making sure to use size_t below */
++    if (header_info.height != 0 &&
++            header_info.width > INT_MAX / header_info.height) {
++        fprintf(stderr, "pnmtoimage:Image %dx%d too big!\n",
++                header_info.width, header_info.height);
++        fclose(fp);
++        return NULL;
++    }
++
+     format = header_info.format;
+ 
+     switch (format) {
+diff --git a/src/lib/openjp2/image.c b/src/lib/openjp2/image.c
+index e62b416c..d00a2370 100644
+--- a/src/lib/openjp2/image.c
++++ b/src/lib/openjp2/image.c
+@@ -68,7 +68,13 @@ opj_image_t* OPJ_CALLCONV opj_image_create(OPJ_UINT32 numcmpts,
+             comp->prec = cmptparms[compno].prec;
+             comp->bpp = cmptparms[compno].bpp;
+             comp->sgnd = cmptparms[compno].sgnd;
+-            comp->data = (OPJ_INT32*) opj_calloc(comp->w * comp->h, sizeof(OPJ_INT32));
++            if (comp->h != 0 && (OPJ_SIZE_T)comp->w > SIZE_MAX / comp->h) {
++                // TODO event manager
++                opj_image_destroy(image);
++                return NULL;
++            }
++            comp->data = (OPJ_INT32*) opj_calloc((OPJ_SIZE_T)comp->w * comp->h,
++                                                 sizeof(OPJ_INT32));
+             if (!comp->data) {
+                 /* TODO replace with event manager, breaks API */
+                 /* fprintf(stderr,"Unable to allocate memory for image.\n"); */

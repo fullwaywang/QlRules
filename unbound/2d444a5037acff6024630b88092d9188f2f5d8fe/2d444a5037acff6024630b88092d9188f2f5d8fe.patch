@@ -1,0 +1,42 @@
+commit 2d444a5037acff6024630b88092d9188f2f5d8fe
+Author: W.C.A. Wijngaards <wouter@nlnetlabs.nl>
+Date:   Tue Dec 3 16:17:03 2019 +0100
+
+    - Fix Insufficient Handling of Compressed Names in dname_pkt_copy(),
+      reported by X41 D-Sec.
+
+diff --git a/doc/Changelog b/doc/Changelog
+index 00e20279..bceb443e 100644
+--- a/doc/Changelog
++++ b/doc/Changelog
+@@ -15,6 +15,8 @@
+ 	- Fix Out of Bounds Write in sldns_b64_pton(),
+ 	  fixed by check in sldns_str2wire_int16_data_buf(),
+ 	  reported by X41 D-Sec.
++	- Fix Insufficient Handling of Compressed Names in dname_pkt_copy(),
++	  reported by X41 D-Sec.
+ 
+ 2 December 2019: Wouter
+ 	- Merge pull request #122 from he32: In tcp_callback_writer(),
+diff --git a/util/data/dname.c b/util/data/dname.c
+index 0cca0a4e..9f25e1ef 100644
+--- a/util/data/dname.c
++++ b/util/data/dname.c
+@@ -329,11 +329,17 @@ dname_pkt_hash(sldns_buffer* pkt, uint8_t* dname, hashvalue_type h)
+ void dname_pkt_copy(sldns_buffer* pkt, uint8_t* to, uint8_t* dname)
+ {
+ 	/* copy over the dname and decompress it at the same time */
++	size_t comprcount = 0;
+ 	size_t len = 0;
+ 	uint8_t lablen;
+ 	lablen = *dname++;
+ 	while(lablen) {
+ 		if(LABEL_IS_PTR(lablen)) {
++			if(comprcount++ > MAX_COMPRESS_PTRS) {
++				/* too many compression pointers */
++				*to = 0; /* end the result prematurely */
++				return;
++			}
+ 			/* follow pointer */
+ 			dname = sldns_buffer_at(pkt, PTR_OFFSET(lablen, *dname));
+ 			lablen = *dname++;

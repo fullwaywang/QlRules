@@ -1,0 +1,24 @@
+commit 951cbea56fdc03ef96d07fbd7e5bed755d42ac8a	951cbea56fdc03ef96d07fbd7e5bed755d42ac8a
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sun Apr 22 20:03:53 2012 +0200
+
+    mpeg12dec: reset data size after parsing extradata.
+    
+    This ended up corrupting data structures and may possibly
+    lead to a double free.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/mpeg12.c b/libavcodec/mpeg12.c
+index ea19b819cc..b66d535e28 100644
+--- a/libavcodec/mpeg12.c
++++ b/libavcodec/mpeg12.c
+@@ -2289,6 +2289,7 @@ static int mpeg_decode_frame(AVCodecContext *avctx,
+ 
+     if (avctx->extradata && !avctx->frame_number) {
+         int ret = decode_chunks(avctx, picture, data_size, avctx->extradata, avctx->extradata_size);
++        *data_size = 0;
+         if (ret < 0 && (avctx->err_recognition & AV_EF_EXPLODE))
+             return ret;
+     }

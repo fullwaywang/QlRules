@@ -1,0 +1,29 @@
+commit c24bcb553650b91e9eff15ef6e54ca73de2453b7
+Author: 孙浩(晓黑) <tony.sh@alibaba-inc.com>
+Date:   Tue Aug 29 23:59:21 2017 +0200
+
+    avformat/nsvdec: Fix DoS due to lack of eof check in nsvs_file_offset loop.
+    
+    Fixes: 20170829.nsv
+    
+    Co-Author: 张洪亮(望初)" <wangchu.zhl@alibaba-inc.com>
+    Found-by: Xiaohei and Wangchu from Alibaba Security Team
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/nsvdec.c b/libavformat/nsvdec.c
+index c6ddb67bbd..d8ce656817 100644
+--- a/libavformat/nsvdec.c
++++ b/libavformat/nsvdec.c
+@@ -335,8 +335,11 @@ static int nsv_parse_NSVf_header(AVFormatContext *s)
+         if (!nsv->nsvs_file_offset)
+             return AVERROR(ENOMEM);
+ 
+-        for(i=0;i<table_entries_used;i++)
++        for(i=0;i<table_entries_used;i++) {
++            if (avio_feof(pb))
++                return AVERROR_INVALIDDATA;
+             nsv->nsvs_file_offset[i] = avio_rl32(pb) + size;
++        }
+ 
+         if(table_entries > table_entries_used &&
+            avio_rl32(pb) == MKTAG('T','O','C','2')) {

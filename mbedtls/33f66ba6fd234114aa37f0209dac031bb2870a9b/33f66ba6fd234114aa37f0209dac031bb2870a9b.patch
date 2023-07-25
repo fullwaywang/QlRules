@@ -1,0 +1,6 @@
+commit 33f66ba6fd234114aa37f0209dac031bb2870a9b
+Merge: 3a930650c 7ffe827fc
+Author: Gilles Peskine <Gilles.Peskine@arm.com>
+Date:   Wed Aug 14 16:37:16 2019 +0200
+
+    Merge remote-tracking branch 'upstream-restricted/pr/556' into mbedtls-2.16-restricted

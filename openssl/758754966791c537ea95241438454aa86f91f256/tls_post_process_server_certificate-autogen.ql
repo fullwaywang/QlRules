@@ -1,24 +1,23 @@
+/**
+ * @name openssl-758754966791c537ea95241438454aa86f91f256-tls_post_process_server_certificate
+ * @id cpp/openssl/758754966791c537ea95241438454aa86f91f256/tls-post-process-server-certificate
+ * @description openssl-758754966791c537ea95241438454aa86f91f256-tls_post_process_server_certificate CVE-2021-4044
+ * @kind problem
+ * @problem.severity error
+ * @tags security
+ */
+
 import cpp
 
-predicate func_0(Variable vi, Variable v__func__, Parameter vs) {
-	exists(EQExpr target_0 |
-		target_0.getType().hasName("int")
-		and target_0.getLeftOperand().(VariableAccess).getTarget()=vi
-		and target_0.getRightOperand().(Literal).getValue()="0"
-		and target_0.getParent().(LogicalAndExpr).getLeftOperand().(NEExpr).getType().hasName("int")
-		and target_0.getParent().(LogicalAndExpr).getLeftOperand().(NEExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="verify_mode"
-		and target_0.getParent().(LogicalAndExpr).getLeftOperand().(NEExpr).getLeftOperand().(PointerFieldAccess).getType().hasName("uint32_t")
-		and target_0.getParent().(LogicalAndExpr).getLeftOperand().(NEExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vs
-		and target_0.getParent().(LogicalAndExpr).getLeftOperand().(NEExpr).getRightOperand().(Literal).getValue()="0"
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getExpr().(CommaExpr).getLeftOperand().(CommaExpr).getLeftOperand().(FunctionCall).getTarget().hasName("ERR_new")
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getExpr().(CommaExpr).getLeftOperand().(CommaExpr).getRightOperand().(FunctionCall).getTarget().hasName("ERR_set_debug")
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getExpr().(CommaExpr).getLeftOperand().(CommaExpr).getRightOperand().(FunctionCall).getArgument(0) instanceof StringLiteral
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getExpr().(CommaExpr).getLeftOperand().(CommaExpr).getRightOperand().(FunctionCall).getArgument(1) instanceof Literal
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getExpr().(CommaExpr).getLeftOperand().(CommaExpr).getRightOperand().(FunctionCall).getArgument(2).(VariableAccess).getTarget()=v__func__
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(0).(VariableAccess).getTarget()=vs
+predicate func_0(Variable vi_1860, Parameter vs_1854) {
+	exists(EqualityOperation target_0 |
+		target_0.getAnOperand().(VariableAccess).getTarget()=vi_1860
+		and target_0.getAnOperand() instanceof Literal
+		and target_0.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="verify_mode"
+		and target_0.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vs_1854
+		and target_0.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
+		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(0).(VariableAccess).getTarget()=vs_1854
 		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(1).(FunctionCall).getTarget().hasName("ssl_x509err2alert")
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(1).(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="verify_result"
-		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(1).(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vs
 		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(2).(Literal).getValue()="134"
 		and target_0.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(3).(Literal).getValue()="0")
 }
@@ -29,14 +28,27 @@ predicate func_2(Function func) {
 		and target_2.getEnclosingFunction() = func)
 }
 
-from Function func, Variable vi, Variable v__func__, Parameter vs
+predicate func_3(Variable vi_1860, Parameter vs_1854) {
+	exists(RelationalOperation target_3 |
+		 (target_3 instanceof GEExpr or target_3 instanceof LEExpr)
+		and target_3.getLesserOperand().(VariableAccess).getTarget()=vi_1860
+		and target_3.getGreaterOperand() instanceof Literal
+		and target_3.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="verify_mode"
+		and target_3.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vs_1854
+		and target_3.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
+		and target_3.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(0).(VariableAccess).getTarget()=vs_1854
+		and target_3.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(1).(FunctionCall).getTarget().hasName("ssl_x509err2alert")
+		and target_3.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(2).(Literal).getValue()="134"
+		and target_3.getParent().(LogicalAndExpr).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(ExprCall).getArgument(3).(Literal).getValue()="0")
+}
+
+from Function func, Variable vi_1860, Parameter vs_1854
 where
-not func_0(vi, v__func__, vs)
+not func_0(vi_1860, vs_1854)
 and func_2(func)
-and vi.getType().hasName("int")
-and v__func__.getType().hasName("const char[36]")
-and vs.getType().hasName("SSL *")
-and vi.getParentScope+() = func
-and not v__func__.getParentScope+() = func
-and vs.getParentScope+() = func
-select func, vi, v__func__, vs
+and func_3(vi_1860, vs_1854)
+and vi_1860.getType().hasName("int")
+and vs_1854.getType().hasName("SSL *")
+and vi_1860.getParentScope+() = func
+and vs_1854.getParentScope+() = func
+select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

@@ -1,0 +1,27 @@
+commit 099016b7e8d70a6d5dd814e788bba08d33d48426
+Author: Tobias Stoeckmann <tobias@stoeckmann.org>
+Date:   Mon May 4 19:41:16 2020 +0200
+
+    Protect array_list_del_idx against size_t overflow.
+    
+    If the assignment of stop overflows due to idx and count being
+    larger than SIZE_T_MAX in sum, out of boundary access could happen.
+    
+    It takes invalid usage of this function for this to happen, but
+    I decided to add this check so array_list_del_idx is as safe against
+    bad usage as the other arraylist functions.
+
+diff --git a/arraylist.c b/arraylist.c
+index 12ad8af..e5524ac 100644
+--- a/arraylist.c
++++ b/arraylist.c
+@@ -136,6 +136,9 @@ int array_list_del_idx(struct array_list *arr, size_t idx, size_t count)
+ {
+ 	size_t i, stop;
+ 
++	/* Avoid overflow in calculation with large indices. */
++	if (idx > SIZE_T_MAX - count)
++		return -1;
+ 	stop = idx + count;
+ 	if (idx >= arr->length || stop > arr->length)
+ 		return -1;

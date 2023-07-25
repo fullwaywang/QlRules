@@ -1,0 +1,160 @@
+commit 1e18cbb71515a22b2a6f1eb4aaadea461929b834
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Sat Feb 21 10:37:48 2015 -0800
+
+    Issue 408: Fix escaped newline parsing
+
+diff --git a/libarchive/archive_read_support_format_mtree.c b/libarchive/archive_read_support_format_mtree.c
+index b58f592a..64d5e673 100644
+--- a/libarchive/archive_read_support_format_mtree.c
++++ b/libarchive/archive_read_support_format_mtree.c
+@@ -1775,6 +1775,10 @@ parse_escapes(char *src, struct mtree_entry *mentry)
+ 				c = '\v';
+ 				++src;
+ 				break;
++			case '\\':
++				c = '\\';
++				++src;
++				break;
+ 			}
+ 		}
+ 		*dest++ = c;
+@@ -1919,8 +1923,7 @@ readline(struct archive_read *a, struct mtree *mtree, char **start,
+ 	ssize_t total_size = 0;
+ 	ssize_t find_off = 0;
+ 	const void *t;
+-	const char *s;
+-	void *p;
++	void *nl;
+ 	char *u;
+ 
+ 	/* Accumulate line in a line buffer. */
+@@ -1931,11 +1934,10 @@ readline(struct archive_read *a, struct mtree *mtree, char **start,
+ 			return (0);
+ 		if (bytes_read < 0)
+ 			return (ARCHIVE_FATAL);
+-		s = t;  /* Start of line? */
+-		p = memchr(t, '\n', bytes_read);
+-		/* If we found '\n', trim the read. */
+-		if (p != NULL) {
+-			bytes_read = 1 + ((const char *)p) - s;
++		nl = memchr(t, '\n', bytes_read);
++		/* If we found '\n', trim the read to end exactly there. */
++		if (nl != NULL) {
++			bytes_read = ((const char *)nl) - ((const char *)t) + 1;
+ 		}
+ 		if (total_size + bytes_read + 1 > limit) {
+ 			archive_set_error(&a->archive,
+@@ -1949,38 +1951,34 @@ readline(struct archive_read *a, struct mtree *mtree, char **start,
+ 			    "Can't allocate working buffer");
+ 			return (ARCHIVE_FATAL);
+ 		}
++		/* Append new bytes to string. */
+ 		memcpy(mtree->line.s + total_size, t, bytes_read);
+ 		__archive_read_consume(a, bytes_read);
+ 		total_size += bytes_read;
+-		/* Null terminate. */
+ 		mtree->line.s[total_size] = '\0';
+-		/* If we found an unescaped '\n', clean up and return. */
++
+ 		for (u = mtree->line.s + find_off; *u; ++u) {
+ 			if (u[0] == '\n') {
++				/* Ends with unescaped newline. */
+ 				*start = mtree->line.s;
+ 				return total_size;
+-			}
+-			if (u[0] == '#') {
+-				if (p == NULL)
++			} else if (u[0] == '#') {
++				/* Ends with comment sequence #...\n */
++				if (nl == NULL) {
++					/* But we've not found the \n yet */
+ 					break;
+-				*start = mtree->line.s;
+-				return total_size;
+-			}
+-			if (u[0] != '\\')
+-				continue;
+-			if (u[1] == '\\') {
+-				++u;
+-				continue;
+-			}
+-			if (u[1] == '\n') {
+-				memmove(u, u + 1,
+-				    total_size - (u - mtree->line.s) + 1);
+-				--total_size;
+-				++u;
+-				break;
++				}
++			} else if (u[0] == '\\') {
++				if (u[1] == '\n') {
++					/* Trim escaped newline. */
++					total_size -= 2;
++					mtree->line.s[total_size] = '\0';
++					break;
++				} else if (u[1] != '\0') {
++					/* Skip the two-char escape sequence */
++					++u;
++				}
+ 			}
+-			if (u[1] == '\0')
+-				break;
+ 		}
+ 		find_off = u - mtree->line.s;
+ 	}
+diff --git a/libarchive/test/test_read_format_mtree.c b/libarchive/test/test_read_format_mtree.c
+index f96529da..a8342f55 100644
+--- a/libarchive/test/test_read_format_mtree.c
++++ b/libarchive/test/test_read_format_mtree.c
+@@ -133,6 +133,12 @@ test_read_format_mtree1(void)
+ 	assertEqualInt(archive_entry_is_encrypted(ae), 0);
+ 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
+ 
++	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
++	assertEqualString(archive_entry_pathname(ae), "dir2/dir3b/filename\\with_esc\b\t\fapes");
++	assertEqualInt(archive_entry_filetype(ae), AE_IFREG);
++	assertEqualInt(archive_entry_is_encrypted(ae), 0);
++	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
++
+ 	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+ 	assertEqualString(archive_entry_pathname(ae), "notindir");
+ 	assertEqualInt(archive_entry_is_encrypted(ae), 0);
+@@ -191,7 +197,7 @@ test_read_format_mtree1(void)
+ 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
+ 
+ 	assertEqualIntA(a, ARCHIVE_EOF, archive_read_next_header(a, &ae));
+-	assertEqualInt(19, archive_file_count(a));
++	assertEqualInt(20, archive_file_count(a));
+ 	assertEqualInt(ARCHIVE_OK, archive_read_close(a));
+ 	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+ }
+diff --git a/libarchive/test/test_read_format_mtree.mtree.uu b/libarchive/test/test_read_format_mtree.mtree.uu
+index a0dff18e..f1c9d603 100644
+--- a/libarchive/test/test_read_format_mtree.mtree.uu
++++ b/libarchive/test/test_read_format_mtree.mtree.uu
+@@ -5,14 +5,16 @@ M92!U:60],3@*("XN"F9I;&5<,#0P=VET:%PP-#!S<&%C92!T>7!E/69I;&4*
+ M9&ER,B!T>7!E/61I<@H@9&ER,V$@='EP93UD:7(*("!I;F1I<C-A('1Y<&4]
+ M9FEL90ID:7(R+V9U;&QI;F1I<C(@='EP93UF:6QE(&UO9&4],#<W-PH@("XN
+ M"B!I;F1I<C(@='EP93UF:6QE"B!D:7(S8B!T>7!E/61I<@H@(&EN9&ER,V(@
+-M='EP93UF:6QE"B`@+BX*("XN"FYO=&EN9&ER('1Y<&4]9FEL90ID:7(R+V9U
+-M;&QI;F1I<C(@;6]D93TP-C0T"F1I<C(O96UP='EF:6QE('1Y<&4]9FEL92!S
+-M:7IE/3!X,`ID:7(R+W-M86QL9FEL92!T>7!E/69I;&4@<VEZ93TP,#`P,#`P
+-M,#`P,#`P,#`P,#`P,#`P,#`P,#`P,#$*9&ER,B]T;V]S;6%L;&9I;&4@='EP
+-M93UF:6QE('-I>F4]+3$*9&ER,B]B:6=F:6QE('1Y<&4]9FEL92!S:7IE/3DR
+-M,C,S-S(P,S8X-30W-S4X,#<*9&ER,B]T;V]B:6=F:6QE('1Y<&4]9FEL92!S
+-M:7IE/3DR,C,S-S(P,S8X-30W-S4X,#@*9&ER,B]V97)Y;VQD9FEL92!T>7!E
+-M/69I;&4@=&EM93TM.3(R,S,W,C`S-C@U-#<W-3@P.`ID:7(R+W1O;V]L9&9I
+-H;&4@='EP93UF:6QE('1I;64]+3DR,C,S-S(P,S8X-30W-S4X,#D*"@``
++M='EP93UF:6QE"B`@9FEL96YA;65<7'=I=&A<"E]E<V-<8EQT7&9A<&5S('1Y
++M<&4]9FEL92!M;V1E/3`T-#0@<VEZ93TP"B`@+BX*("XN"FYO=&EN9&ER('1Y
++M<&4]9FEL90ID:7(R+V9U;&QI;F1I<C(@;6]D93TP-C0T"F1I<C(O96UP='EF
++M:6QE('1Y<&4]9FEL92!S:7IE/3!X,`ID:7(R+W-M86QL9FEL92!T>7!E/69I
++M;&4@<VEZ93TP,#`P,#`P,#`P,#`P,#`P,#`P,#`P,#`P,#`P,#$*9&ER,B]T
++M;V]S;6%L;&9I;&4@='EP93UF:6QE('-I>F4]+3$*9&ER,B]B:6=F:6QE('1Y
++M<&4]9FEL92!S:7IE/3DR,C,S-S(P,S8X-30W-S4X,#<*9&ER,B]T;V]B:6=F
++M:6QE('1Y<&4]9FEL92!S:7IE/3DR,C,S-S(P,S8X-30W-S4X,#@*9&ER,B]V
++M97)Y;VQD9FEL92!T>7!E/69I;&4@=&EM93TM.3(R,S,W,C`S-C@U-#<W-3@P
++M.`ID:7(R+W1O;V]L9&9I;&4@='EP93UF:6QE('1I;64]+3DR,C,S-S(P,S8X
++*-30W-S4X,#D*"@``
+ `
+ end

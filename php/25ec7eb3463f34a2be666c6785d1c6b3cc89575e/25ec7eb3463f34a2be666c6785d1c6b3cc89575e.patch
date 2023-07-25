@@ -1,0 +1,12 @@
+commit 25ec7eb3463f34a2be666c6785d1c6b3cc89575e
+Merge: 07bda97e76 5c90f8eb66
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Mon Jan 20 22:22:02 2020 -0800
+
+    Merge branch 'PHP-7.2' into PHP-7.3
+    
+    * PHP-7.2:
+      Update NEWS
+      Fix bug #79037 (global buffer-overflow in `mbfl_filt_conv_big5_wchar`)
+      Fix #79099: OOB read in php_strip_tags_ex
+      Fix #79091: heap use-after-free in session_create_id()

@@ -1,0 +1,76 @@
+commit cced03dd667a5df6df8fd40d8de0bff477ee02e8
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Jul 3 20:33:04 2018 +0200
+
+    avformat/mms: Add missing chunksize check
+    
+    Fixes: out of array read
+    Fixes: mms-crash-01b6c5d85f9d9f40f4e879896103e9f5b222816a
+    
+    Found-by: Paul Ch <paulcher@icloud.com>
+    1st hunk by Paul Ch <paulcher@icloud.com>
+    Tested-by: Paul Ch <paulcher@icloud.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/mms.c b/libavformat/mms.c
+index 17fa76a8d4..768fda6525 100644
+--- a/libavformat/mms.c
++++ b/libavformat/mms.c
+@@ -94,24 +94,26 @@ int ff_mms_asf_header_parser(MMSContext *mms)
+                 }
+             }
+         } else if (!memcmp(p, ff_asf_stream_header, sizeof(ff_asf_guid))) {
+-            flags     = AV_RL16(p + sizeof(ff_asf_guid)*3 + 24);
+-            stream_id = flags & 0x7F;
+-            //The second condition is for checking CS_PKT_STREAM_ID_REQUEST packet size,
+-            //we can calculate the packet size by stream_num.
+-            //Please see function send_stream_selection_request().
+-            if (mms->stream_num < MMS_MAX_STREAMS &&
+-                    46 + mms->stream_num * 6 < sizeof(mms->out_buffer)) {
+-                mms->streams = av_fast_realloc(mms->streams,
+-                                   &mms->nb_streams_allocated,
+-                                   (mms->stream_num + 1) * sizeof(MMSStream));
+-                if (!mms->streams)
+-                    return AVERROR(ENOMEM);
+-                mms->streams[mms->stream_num].id = stream_id;
+-                mms->stream_num++;
+-            } else {
+-                av_log(NULL, AV_LOG_ERROR,
+-                       "Corrupt stream (too many A/V streams)\n");
+-                return AVERROR_INVALIDDATA;
++            if (end - p >= (sizeof(ff_asf_guid) * 3 + 26)) {
++                flags     = AV_RL16(p + sizeof(ff_asf_guid)*3 + 24);
++                stream_id = flags & 0x7F;
++                //The second condition is for checking CS_PKT_STREAM_ID_REQUEST packet size,
++                //we can calculate the packet size by stream_num.
++                //Please see function send_stream_selection_request().
++                if (mms->stream_num < MMS_MAX_STREAMS &&
++                        46 + mms->stream_num * 6 < sizeof(mms->out_buffer)) {
++                    mms->streams = av_fast_realloc(mms->streams,
++                                       &mms->nb_streams_allocated,
++                                       (mms->stream_num + 1) * sizeof(MMSStream));
++                    if (!mms->streams)
++                        return AVERROR(ENOMEM);
++                    mms->streams[mms->stream_num].id = stream_id;
++                    mms->stream_num++;
++                } else {
++                    av_log(NULL, AV_LOG_ERROR,
++                           "Corrupt stream (too many A/V streams)\n");
++                    return AVERROR_INVALIDDATA;
++                }
+             }
+         } else if (!memcmp(p, ff_asf_ext_stream_header, sizeof(ff_asf_guid))) {
+             if (end - p >= 88) {
+@@ -143,6 +145,12 @@ int ff_mms_asf_header_parser(MMSContext *mms)
+             }
+         } else if (!memcmp(p, ff_asf_head1_guid, sizeof(ff_asf_guid))) {
+             chunksize = 46; // see references [2] section 3.4. This should be set 46.
++            if (chunksize > end - p) {
++                av_log(NULL, AV_LOG_ERROR,
++                    "Corrupt stream (header chunksize %"PRId64" is invalid)\n",
++                    chunksize);
++                return AVERROR_INVALIDDATA;
++            }
+         }
+         p += chunksize;
+     }

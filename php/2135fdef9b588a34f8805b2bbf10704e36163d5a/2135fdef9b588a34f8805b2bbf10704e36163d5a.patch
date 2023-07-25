@@ -1,0 +1,187 @@
+commit 2135fdef9b588a34f8805b2bbf10704e36163d5a
+Author: Nikita Popov <nikic@php.net>
+Date:   Mon Aug 8 18:05:29 2016 +0200
+
+    Bug #72663 - part 1
+    
+    Don't call __destruct() on an unserialized object that has a
+    __wakeup() method if either
+    a) unserialization of its properties fails or
+    b) the __wakeup() call fails (e.g. by throwing).
+    
+    This basically treats __wakeup() as a form of constructor and
+    aligns us with the usual behavior that if the constructor call
+    fails the destructor should not be called.
+    
+    The security aspect here is that people use __wakeup() to prevent
+    unserialization of objects with dangerous __destruct() methods,
+    but this is ineffective if __destruct() can still be called while
+    __wakeup() was skipped.
+
+diff --git a/ext/standard/tests/serialize/bug72663.phpt b/ext/standard/tests/serialize/bug72663.phpt
+new file mode 100644
+index 0000000000..c50591ca96
+--- /dev/null
++++ b/ext/standard/tests/serialize/bug72663.phpt
+@@ -0,0 +1,56 @@
++--TEST--
++Bug #72663 (1): Don't call __destruct if __wakeup not called or fails
++--FILE--
++<?php
++
++class Test1 {
++    public function __wakeup() {
++        echo "Wakeup\n";
++    }
++    public function __destruct() {
++        echo "Dtor\n";
++    }
++}
++
++class Test2 {
++    public function __wakeup() {
++        throw new Exception('Unserialization forbidden');
++    }
++    public function __destruct() {
++        echo "Dtor\n";
++    }
++}
++
++// Unserialize object with error in properties
++$s = 'O:5:"Test1":1:{s:10:"";}';
++var_dump(unserialize($s));
++
++// Variation: Object is turned into a reference
++$s = 'O:5:"Test1":2:{i:0;R:1;s:10:"";}';
++var_dump(unserialize($s));
++
++// Unserialize object with throwing __wakeup
++$s = 'O:5:"Test2":0:{}';
++try {
++    var_dump(unserialize($s));
++} catch (Exception $e) {
++    echo "Caught\n";
++}
++//
++// Variation: Object is turned into a reference
++$s = 'O:5:"Test2":1:{i:0;R:1;}';
++try {
++    var_dump(unserialize($s));
++} catch (Exception $e) {
++    echo "Caught\n";
++}
++
++?>
++--EXPECTF--
++Notice: unserialize(): Error at offset 17 of 24 bytes in %s on line %d
++bool(false)
++
++Notice: unserialize(): Error at offset 25 of 32 bytes in %s on line %d
++bool(false)
++Caught
++Caught
+diff --git a/ext/standard/var_unserializer.c b/ext/standard/var_unserializer.c
+index f464c0b63a..317c3f9c48 100644
+--- a/ext/standard/var_unserializer.c
++++ b/ext/standard/var_unserializer.c
+@@ -455,23 +455,32 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
+ 	zval retval;
+ 	zval fname;
+ 	HashTable *ht;
++	zend_bool has_wakeup;
+ 
+ 	if (Z_TYPE_P(rval) != IS_OBJECT) {
+ 		return 0;
+ 	}
+ 
++	has_wakeup = Z_OBJCE_P(rval) != PHP_IC_ENTRY
++		&& zend_hash_str_exists(&Z_OBJCE_P(rval)->function_table, "__wakeup", sizeof("__wakeup")-1);
++
+ 	ht = Z_OBJPROP_P(rval);
+ 	zend_hash_extend(ht, zend_hash_num_elements(ht) + elements, (ht->u.flags & HASH_FLAG_PACKED));
+ 	if (!process_nested_data(UNSERIALIZE_PASSTHRU, ht, elements, 1)) {
++		if (has_wakeup) {
++			ZVAL_DEREF(rval);
++			GC_FLAGS(Z_OBJ_P(rval)) |= IS_OBJ_DESTRUCTOR_CALLED;
++		}
+ 		return 0;
+ 	}
+ 
+ 	ZVAL_DEREF(rval);
+-	if (Z_OBJCE_P(rval) != PHP_IC_ENTRY &&
+-		zend_hash_str_exists(&Z_OBJCE_P(rval)->function_table, "__wakeup", sizeof("__wakeup")-1)) {
++	if (has_wakeup) {
+ 		ZVAL_STRINGL(&fname, "__wakeup", sizeof("__wakeup") - 1);
+ 		BG(serialize_lock)++;
+-		call_user_function_ex(CG(function_table), rval, &fname, &retval, 0, 0, 1, NULL);
++		if (call_user_function_ex(CG(function_table), rval, &fname, &retval, 0, 0, 1, NULL) == FAILURE || Z_ISUNDEF(retval)) {
++			GC_FLAGS(Z_OBJ_P(rval)) |= IS_OBJ_DESTRUCTOR_CALLED;
++		}
+ 		BG(serialize_lock)--;
+ 		zval_dtor(&fname);
+ 		zval_dtor(&retval);
+@@ -482,7 +491,6 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
+ 	}
+ 
+ 	return finish_nested_data(UNSERIALIZE_PASSTHRU);
+-
+ }
+ #ifdef PHP_WIN32
+ # pragma optimize("", on)
+@@ -514,7 +522,7 @@ PHPAPI int php_var_unserialize_ex(UNSERIALIZE_PARAMETER)
+ 	start = cursor;
+ 
+ 
+-#line 518 "ext/standard/var_unserializer.c"
++#line 526 "ext/standard/var_unserializer.c"
+ {
+ 	YYCTYPE yych;
+ 	static const unsigned char yybm[] = {
+diff --git a/ext/standard/var_unserializer.re b/ext/standard/var_unserializer.re
+index 81cc26db9d..fa8cce8880 100644
+--- a/ext/standard/var_unserializer.re
++++ b/ext/standard/var_unserializer.re
+@@ -459,23 +459,32 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
+ 	zval retval;
+ 	zval fname;
+ 	HashTable *ht;
++	zend_bool has_wakeup;
+ 
+ 	if (Z_TYPE_P(rval) != IS_OBJECT) {
+ 		return 0;
+ 	}
+ 
++	has_wakeup = Z_OBJCE_P(rval) != PHP_IC_ENTRY
++		&& zend_hash_str_exists(&Z_OBJCE_P(rval)->function_table, "__wakeup", sizeof("__wakeup")-1);
++
+ 	ht = Z_OBJPROP_P(rval);
+ 	zend_hash_extend(ht, zend_hash_num_elements(ht) + elements, (ht->u.flags & HASH_FLAG_PACKED));
+ 	if (!process_nested_data(UNSERIALIZE_PASSTHRU, ht, elements, 1)) {
++		if (has_wakeup) {
++			ZVAL_DEREF(rval);
++			GC_FLAGS(Z_OBJ_P(rval)) |= IS_OBJ_DESTRUCTOR_CALLED;
++		}
+ 		return 0;
+ 	}
+ 
+ 	ZVAL_DEREF(rval);
+-	if (Z_OBJCE_P(rval) != PHP_IC_ENTRY &&
+-		zend_hash_str_exists(&Z_OBJCE_P(rval)->function_table, "__wakeup", sizeof("__wakeup")-1)) {
++	if (has_wakeup) {
+ 		ZVAL_STRINGL(&fname, "__wakeup", sizeof("__wakeup") - 1);
+ 		BG(serialize_lock)++;
+-		call_user_function_ex(CG(function_table), rval, &fname, &retval, 0, 0, 1, NULL);
++		if (call_user_function_ex(CG(function_table), rval, &fname, &retval, 0, 0, 1, NULL) == FAILURE || Z_ISUNDEF(retval)) {
++			GC_FLAGS(Z_OBJ_P(rval)) |= IS_OBJ_DESTRUCTOR_CALLED;
++		}
+ 		BG(serialize_lock)--;
+ 		zval_dtor(&fname);
+ 		zval_dtor(&retval);
+@@ -486,7 +495,6 @@ static inline int object_common2(UNSERIALIZE_PARAMETER, zend_long elements)
+ 	}
+ 
+ 	return finish_nested_data(UNSERIALIZE_PASSTHRU);
+-
+ }
+ #ifdef PHP_WIN32
+ # pragma optimize("", on)

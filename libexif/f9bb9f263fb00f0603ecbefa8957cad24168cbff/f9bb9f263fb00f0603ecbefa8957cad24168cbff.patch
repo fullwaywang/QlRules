@@ -1,0 +1,32 @@
+commit f9bb9f263fb00f0603ecbefa8957cad24168cbff
+Author: Dan Fandrich <dan@coneharvesters.com>
+Date:   Wed Jul 4 11:06:09 2018 +0200
+
+    Fix a buffer read overflow in exif_entry_get_value
+    
+    While parsing EXIF_TAG_FOCAL_LENGTH it was possible to read 8 bytes past
+    the end of a heap buffer. This was detected by the OSS Fuzz project.
+    Patch from Google.
+    
+    Fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=7344 and
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14543
+
+diff --git a/libexif/exif-entry.c b/libexif/exif-entry.c
+index 61260d3..a224ac2 100644
+--- a/libexif/exif-entry.c
++++ b/libexif/exif-entry.c
+@@ -1040,12 +1040,12 @@ exif_entry_get_value (ExifEntry *e, char *val, unsigned int maxlen)
+ 		d = 0.;
+ 		entry = exif_content_get_entry (
+ 			e->parent->parent->ifd[EXIF_IFD_0], EXIF_TAG_MAKE);
+-		if (entry && entry->data &&
++		if (entry && entry->data && entry->size >= 7 &&
+ 		    !strncmp ((char *)entry->data, "Minolta", 7)) {
+ 			entry = exif_content_get_entry (
+ 					e->parent->parent->ifd[EXIF_IFD_0],
+ 					EXIF_TAG_MODEL);
+-			if (entry && entry->data) {
++			if (entry && entry->data && entry->size >= 8) {
+ 				if (!strncmp ((char *)entry->data, "DiMAGE 7", 8))
+ 					d = 3.9;
+ 				else if (!strncmp ((char *)entry->data, "DiMAGE 5", 8))

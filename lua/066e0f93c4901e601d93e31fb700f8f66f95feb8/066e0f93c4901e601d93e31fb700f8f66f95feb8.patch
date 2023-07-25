@@ -1,0 +1,161 @@
+commit 066e0f93c4901e601d93e31fb700f8f66f95feb8
+Author: Roberto Ierusalimschy <roberto@inf.puc-rio.br>
+Date:   Tue Dec 14 12:50:05 2021 -0300
+
+    Fix debug information about finalizers
+    
+    The flag CIST_FIN does not mark a finalizer, but the function that was
+    running when the finalizer was called. (So, the function did not call
+    the finalizer, but it looks that way in the stack.)
+
+diff --git a/ldebug.c b/ldebug.c
+index dc5f78c6..a716d95e 100644
+--- a/ldebug.c
++++ b/ldebug.c
+@@ -34,8 +34,8 @@
+ #define noLuaClosure(f)		((f) == NULL || (f)->c.tt == LUA_VCCL)
+ 
+ 
+-static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
+-                                    const char **name);
++static const char *funcnamefromcall (lua_State *L, CallInfo *ci,
++                                                   const char **name);
+ 
+ 
+ static int currentpc (CallInfo *ci) {
+@@ -317,15 +317,9 @@ static void collectvalidlines (lua_State *L, Closure *f) {
+ 
+ 
+ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
+-  if (ci == NULL)  /* no 'ci'? */
+-    return NULL;  /* no info */
+-  else if (ci->callstatus & CIST_FIN) {  /* is this a finalizer? */
+-    *name = "__gc";
+-    return "metamethod";  /* report it as such */
+-  }
+-  /* calling function is a known Lua function? */
+-  else if (!(ci->callstatus & CIST_TAIL) && isLua(ci->previous))
+-    return funcnamefromcode(L, ci->previous, name);
++  /* calling function is a known function? */
++  if (ci != NULL && !(ci->callstatus & CIST_TAIL))
++    return funcnamefromcall(L, ci->previous, name);
+   else return NULL;  /* no way to find a name */
+ }
+ 
+@@ -597,16 +591,10 @@ static const char *getobjname (const Proto *p, int lastpc, int reg,
+ ** Returns what the name is (e.g., "for iterator", "method",
+ ** "metamethod") and sets '*name' to point to the name.
+ */
+-static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
+-                                     const char **name) {
++static const char *funcnamefromcode (lua_State *L, const Proto *p,
++                                     int pc, const char **name) {
+   TMS tm = (TMS)0;  /* (initial value avoids warnings) */
+-  const Proto *p = ci_func(ci)->p;  /* calling function */
+-  int pc = currentpc(ci);  /* calling instruction index */
+   Instruction i = p->code[pc];  /* calling instruction */
+-  if (ci->callstatus & CIST_HOOKED) {  /* was it called inside a hook? */
+-    *name = "?";
+-    return "hook";
+-  }
+   switch (GET_OPCODE(i)) {
+     case OP_CALL:
+     case OP_TAILCALL:
+@@ -643,6 +631,26 @@ static const char *funcnamefromcode (lua_State *L, CallInfo *ci,
+   return "metamethod";
+ }
+ 
++
++/*
++** Try to find a name for a function based on how it was called.
++*/
++static const char *funcnamefromcall (lua_State *L, CallInfo *ci,
++                                                   const char **name) {
++  if (ci->callstatus & CIST_HOOKED) {  /* was it called inside a hook? */
++    *name = "?";
++    return "hook";
++  }
++  else if (ci->callstatus & CIST_FIN) {  /* was it called as a finalizer? */
++    *name = "__gc";
++    return "metamethod";  /* report it as such */
++  }
++  else if (isLua(ci))
++    return funcnamefromcode(L, ci_func(ci)->p, currentpc(ci), name);
++  else
++    return NULL;
++}
++
+ /* }====================================================== */
+ 
+ 
+@@ -728,14 +736,14 @@ l_noret luaG_typeerror (lua_State *L, const TValue *o, const char *op) {
+ 
+ 
+ /*
+-** Raise an error for calling a non-callable object. Try to find
+-** a name for the object based on the code that made the call
+-** ('funcnamefromcode'); if it cannot get a name there, try 'varinfo'.
++** Raise an error for calling a non-callable object. Try to find a name
++** for the object based on how it was called ('funcnamefromcall'); if it
++** cannot get a name there, try 'varinfo'.
+ */
+ l_noret luaG_callerror (lua_State *L, const TValue *o) {
+   CallInfo *ci = L->ci;
+   const char *name = NULL;  /* to avoid warnings */
+-  const char *kind = (isLua(ci)) ? funcnamefromcode(L, ci, &name) : NULL;
++  const char *kind = funcnamefromcall(L, ci, &name);
+   const char *extra = kind ? formatvarinfo(L, kind, name) : varinfo(L, o);
+   typeerror(L, o, "call", extra);
+ }
+diff --git a/lgc.c b/lgc.c
+index 7d0b5e4f..d3f5b5b7 100644
+--- a/lgc.c
++++ b/lgc.c
+@@ -917,7 +917,7 @@ static void GCTM (lua_State *L) {
+     L->allowhook = oldah;  /* restore hooks */
+     g->gcstp = oldgcstp;  /* restore state */
+     if (l_unlikely(status != LUA_OK)) {  /* error while running __gc? */
+-      luaE_warnerror(L, "__gc metamethod");
++      luaE_warnerror(L, "__gc");
+       L->top--;  /* pops error object */
+     }
+   }
+diff --git a/lstate.h b/lstate.h
+index 7886d891..61e82cde 100644
+--- a/lstate.h
++++ b/lstate.h
+@@ -209,7 +209,7 @@ typedef struct CallInfo {
+ #define CIST_YPCALL	(1<<4)	/* doing a yieldable protected call */
+ #define CIST_TAIL	(1<<5)	/* call was tail called */
+ #define CIST_HOOKYIELD	(1<<6)	/* last hook called yielded */
+-#define CIST_FIN	(1<<7)	/* call is running a finalizer */
++#define CIST_FIN	(1<<7)	/* function "called" a finalizer */
+ #define CIST_TRAN	(1<<8)	/* 'ci' has transfer information */
+ #define CIST_CLSRET	(1<<9)  /* function is closing tbc variables */
+ /* Bits 10-12 are used for CIST_RECST (see below) */
+diff --git a/testes/db.lua b/testes/db.lua
+index e0699724..f891e9b8 100644
+--- a/testes/db.lua
++++ b/testes/db.lua
+@@ -887,7 +887,7 @@ do   -- testing debug info for finalizers
+ 
+   -- create a piece of garbage with a finalizer
+   setmetatable({}, {__gc = function ()
+-    local t = debug.getinfo(2)   -- get callee information
++    local t = debug.getinfo(1)   -- get function information
+     assert(t.namewhat == "metamethod")
+     name = t.name
+   end})
+diff --git a/testes/gc.lua b/testes/gc.lua
+index d865cb28..381c5548 100644
+--- a/testes/gc.lua
++++ b/testes/gc.lua
+@@ -371,7 +371,7 @@ if T then
+ 
+   warn("@on"); warn("@store")
+   collectgarbage()
+-  assert(string.find(_WARN, "error in __gc metamethod"))
++  assert(string.find(_WARN, "error in __gc"))
+   assert(string.match(_WARN, "@(.-)@") == "expected"); _WARN = false
+   for i = 8, 10 do assert(s[i]) end
+ 

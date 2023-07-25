@@ -1,0 +1,57 @@
+commit 156d3911952d73b03d7420dc3540215247db0fe8
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jun 18 14:09:08 2022 +0100
+
+    patch 8.2.5123: using invalid index when looking for spell suggestions
+    
+    Problem:    Using invalid index when looking for spell suggestions.
+    Solution:   Do not decrement the index when it is zero.
+
+diff --git a/src/spellsuggest.c b/src/spellsuggest.c
+index 5b460a3ea..8f9756534 100644
+--- a/src/spellsuggest.c
++++ b/src/spellsuggest.c
+@@ -1973,7 +1973,8 @@ suggest_trie_walk(
+ 			    sp->ts_isdiff = (newscore != 0)
+ 						       ? DIFF_YES : DIFF_NONE;
+ 			}
+-			else if (sp->ts_isdiff == DIFF_INSERT)
++			else if (sp->ts_isdiff == DIFF_INSERT
++							    && sp->ts_fidx > 0)
+ 			    // When inserting trail bytes don't advance in the
+ 			    // bad word.
+ 			    --sp->ts_fidx;
+diff --git a/src/testdir/test_spell.vim b/src/testdir/test_spell.vim
+index aa5744475..0fd5ed917 100644
+--- a/src/testdir/test_spell.vim
++++ b/src/testdir/test_spell.vim
+@@ -70,6 +70,16 @@ func Test_z_equal_on_invalid_utf8_word()
+   bwipe!
+ endfunc
+ 
++func Test_z_equal_on_single_character()
++  " this was decrementing the index below zero
++  new
++  norm a0\Ê
++  norm zW
++  norm z=
++
++  bwipe!
++endfunc
++
+ " Test spellbadword() with argument
+ func Test_spellbadword()
+   set spell
+diff --git a/src/version.c b/src/version.c
+index 5411e1c18..0a422742f 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5123,
+ /**/
+     5122,
+ /**/

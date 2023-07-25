@@ -1,0 +1,30 @@
+commit 47f4e2d8960ca756ca153ab8e3e93d80449b8c91	47f4e2d8960ca756ca153ab8e3e93d80449b8c91
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Mon Jun 29 21:08:05 2015 +0200
+
+    avcodec/pngdec: Only allow one IHDR chunk
+    
+    Multiple IHDR chunks are forbidden in PNG
+    Fixes inconsistency and out of array accesses
+    
+    Fixes: asan_heap-oob_4d5c5a_1738_cov_2638287726_c-m2-8f2b481b7fd9bd745e620b7c01a18df2.png
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/pngdec.c b/libavcodec/pngdec.c
+index ceda383209..f8b398ffde 100644
+--- a/libavcodec/pngdec.c
++++ b/libavcodec/pngdec.c
+@@ -542,6 +542,11 @@ static int decode_ihdr_chunk(AVCodecContext *avctx, PNGDecContext *s,
+         return AVERROR_INVALIDDATA;
+     }
+ 
++    if (s->state & PNG_IHDR) {
++        av_log(avctx, AV_LOG_ERROR, "Multiple IHDR\n");
++        return AVERROR_INVALIDDATA;
++    }
++
+     s->width  = bytestream2_get_be32(&s->gb);
+     s->height = bytestream2_get_be32(&s->gb);
+     if (av_image_check_size(s->width, s->height, 0, avctx)) {

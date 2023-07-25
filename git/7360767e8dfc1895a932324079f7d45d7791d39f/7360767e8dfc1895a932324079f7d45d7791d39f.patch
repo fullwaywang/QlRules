@@ -1,0 +1,13 @@
+commit 7360767e8dfc1895a932324079f7d45d7791d39f
+Merge: dfaa2147fc b03dafd9c2
+Author: Derrick Stolee <derrickstolee@github.com>
+Date:   Tue Jan 17 13:47:49 2023 -0500
+
+    Merge v2.39.1.windows.1 (#4219)
+    
+    This PR takes the embargoed release tag `v2.39.1.windows.1` and merges
+    it into the `main` branch.
+    
+    It likely that I messed something up in the order of releasing the
+    security release and merging the [security
+    advisory](https://github.com/git-for-windows/git/security/advisories/GHSA-v4px-mx59-w99c).

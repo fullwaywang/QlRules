@@ -1,0 +1,18 @@
+commit c5d012a46ae22be9444326aa37969a3f75daa3ba
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Mon Apr 22 12:43:09 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick6/issues/43
+
+diff --git a/MagickCore/blob.c b/MagickCore/blob.c
+index 7de1023f6..70760a83b 100644
+--- a/MagickCore/blob.c
++++ b/MagickCore/blob.c
+@@ -996,6 +996,7 @@ MagickExport void *DetachBlob(BlobInfo *blob_info)
+   if (blob_info->mapped != MagickFalse)
+     {
+       (void) UnmapBlob(blob_info->data,blob_info->length);
++      blob_info->data=NULL;
+       RelinquishMagickResource(MapResource,blob_info->length);
+     }
+   blob_info->mapped=MagickFalse;

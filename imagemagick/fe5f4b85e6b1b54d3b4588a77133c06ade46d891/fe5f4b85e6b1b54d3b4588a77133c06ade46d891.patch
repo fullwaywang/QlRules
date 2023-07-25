@@ -1,0 +1,23 @@
+commit fe5f4b85e6b1b54d3b4588a77133c06ade46d891
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Tue Jun 18 11:57:54 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1602
+
+diff --git a/coders/tiff.c b/coders/tiff.c
+index 7efbb970b..97402f2cb 100644
+--- a/coders/tiff.c
++++ b/coders/tiff.c
+@@ -258,6 +258,12 @@ static MagickOffsetType TIFFSeekCustomStream(const MagickOffsetType offset,
+     }
+     case SEEK_CUR:
+     {
++      if (((offset > 0) && (profile->offset > (SSIZE_MAX-offset))) ||
++          ((offset < 0) && (profile->offset < (-SSIZE_MAX-offset))))
++        {
++          errno=EOVERFLOW;
++          return(-1);
++        }
+       if ((profile->offset+offset) < 0)
+         return(-1);
+       profile->offset+=offset;

@@ -1,0 +1,37 @@
+commit 296debd213bd6dce7647cedd34eb64e5b94cdc92
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Wed Jul 26 03:26:59 2017 +0200
+
+    avcodec/dnxhddec: Move mb height check out of non hr branch
+    
+    Fixes: out of array access
+    Fixes: poc.dnxhd
+    
+    Found-by: Bingchang, Liu@VARAS of IIE
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/dnxhddec.c b/libavcodec/dnxhddec.c
+index 40d41f9bf1..f46e41a456 100644
+--- a/libavcodec/dnxhddec.c
++++ b/libavcodec/dnxhddec.c
+@@ -298,14 +298,18 @@ static int dnxhd_decode_header(DNXHDContext *ctx, AVFrame *frame,
+     if (ctx->mb_height > 68 && ff_dnxhd_check_header_prefix_hr(header_prefix)) {
+         ctx->data_offset = 0x170 + (ctx->mb_height << 2);
+     } else {
+-        if (ctx->mb_height > 68 ||
+-            (ctx->mb_height << frame->interlaced_frame) > (ctx->height + 15) >> 4) {
++        if (ctx->mb_height > 68) {
+             av_log(ctx->avctx, AV_LOG_ERROR,
+                    "mb height too big: %d\n", ctx->mb_height);
+             return AVERROR_INVALIDDATA;
+         }
+         ctx->data_offset = 0x280;
+     }
++    if ((ctx->mb_height << frame->interlaced_frame) > (ctx->height + 15) >> 4) {
++        av_log(ctx->avctx, AV_LOG_ERROR,
++                "mb height too big: %d\n", ctx->mb_height);
++        return AVERROR_INVALIDDATA;
++    }
+ 
+     if (buf_size < ctx->data_offset) {
+         av_log(ctx->avctx, AV_LOG_ERROR,

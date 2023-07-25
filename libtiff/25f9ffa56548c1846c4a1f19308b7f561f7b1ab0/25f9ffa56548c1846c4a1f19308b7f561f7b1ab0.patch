@@ -1,0 +1,123 @@
+commit 25f9ffa56548c1846c4a1f19308b7f561f7b1ab0	25f9ffa56548c1846c4a1f19308b7f561f7b1ab0
+Author: Bob Friesenhahn <bfriesen@simple.dallas.tx.us>
+Date:   Wed Nov 1 13:41:58 2017 +0000
+
+    * tools/tiff2bw.c (main): Free memory allocated in the tiff2bw
+    program.  This is in response to the report associated with
+    CVE-2017-16232 but does not solve the extremely high memory usage
+    with the associated POC file.
+
+diff --git a/ChangeLog b/ChangeLog
+index 5a88d14e..6ce22a64 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,10 @@
++2017-11-01  Bob Friesenhahn  <bfriesen@simple.dallas.tx.us>
++
++	* tools/tiff2bw.c (main): Free memory allocated in the tiff2bw
++	program.  This is in response to the report associated with
++	CVE-2017-16232 but does not solve the extremely high memory usage
++	with the associated POC file.
++
+ 2017-10-29  Bob Friesenhahn  <bfriesen@simple.dallas.tx.us>
+ 
+ 	* tools/tiff2pdf.c (t2p_sample_realize_palette): Fix possible
+diff --git a/tools/tiff2bw.c b/tools/tiff2bw.c
+index 90d3973d..dad54afa 100644
+--- a/tools/tiff2bw.c
++++ b/tools/tiff2bw.c
+@@ -1,4 +1,4 @@
+-/* $Id: tiff2bw.c,v 1.20 2017-04-28 18:08:47 erouault Exp $ */
++/* $Id: tiff2bw.c,v 1.21 2017-11-01 13:41:58 bfriesen Exp $ */
+ 
+ /*
+  * Copyright (c) 1988-1997 Sam Leffler
+@@ -131,6 +131,11 @@ main(int argc, char* argv[])
+ 	extern int optind;
+ 	extern char *optarg;
+ #endif
++        
++        in = (TIFF *) NULL;
++        out = (TIFF *) NULL;
++        inbuf = (unsigned char *) NULL;
++        outbuf = (unsigned char *) NULL;
+ 
+ 	while ((c = getopt(argc, argv, "c:r:R:G:B:")) != -1)
+ 		switch (c) {
+@@ -165,28 +170,24 @@ main(int argc, char* argv[])
+ 		fprintf(stderr,
+ 	    "%s: Bad photometric; can only handle RGB and Palette images.\n",
+ 		    argv[optind]);
+-		TIFFClose(in);
+-		return (-1);
++                goto tiff2bw_error;
+ 	}
+ 	TIFFGetField(in, TIFFTAG_SAMPLESPERPIXEL, &samplesperpixel);
+ 	if (samplesperpixel != 1 && samplesperpixel != 3) {
+ 		fprintf(stderr, "%s: Bad samples/pixel %u.\n",
+ 		    argv[optind], samplesperpixel);
+-		TIFFClose(in);
+-		return (-1);
++                goto tiff2bw_error;
+ 	}
+ 	if( photometric == PHOTOMETRIC_RGB && samplesperpixel != 3) {
+ 		fprintf(stderr, "%s: Bad samples/pixel %u for PHOTOMETRIC_RGB.\n",
+ 		    argv[optind], samplesperpixel);
+-		TIFFClose(in);
+-		return (-1);
++                goto tiff2bw_error;
+ 	}
+ 	TIFFGetField(in, TIFFTAG_BITSPERSAMPLE, &bitspersample);
+ 	if (bitspersample != 8) {
+ 		fprintf(stderr,
+ 		    " %s: Sorry, only handle 8-bit samples.\n", argv[optind]);
+-		TIFFClose(in);
+-		return (-1);
++                goto tiff2bw_error;
+ 	}
+ 	TIFFGetField(in, TIFFTAG_IMAGEWIDTH, &w);
+ 	TIFFGetField(in, TIFFTAG_IMAGELENGTH, &h);
+@@ -195,8 +196,7 @@ main(int argc, char* argv[])
+ 	out = TIFFOpen(argv[optind+1], "w");
+ 	if (out == NULL)
+ 	{
+-		TIFFClose(in);
+-		return (-1);
++                goto tiff2bw_error;
+ 	}
+ 	TIFFSetField(out, TIFFTAG_IMAGEWIDTH, w);
+ 	TIFFSetField(out, TIFFTAG_IMAGELENGTH, h);
+@@ -271,7 +271,7 @@ main(int argc, char* argv[])
+ 			for (s = 0; s < 3; s++)
+ 				if (TIFFReadScanline(in,
+ 				    inbuf+s*rowsize, row, s) < 0)
+-					 return (-1);
++                                        goto tiff2bw_error;
+ 			compresssep(outbuf,
+ 			    inbuf, inbuf+rowsize, inbuf+2*rowsize, w);
+ 			if (TIFFWriteScanline(out, outbuf, row, 0) < 0)
+@@ -280,8 +280,24 @@ main(int argc, char* argv[])
+ 		break;
+ 	}
+ #undef pack
++        if (inbuf)
++                _TIFFfree(inbuf);
++        if (outbuf)
++                _TIFFfree(outbuf);
++        TIFFClose(in);
+ 	TIFFClose(out);
+ 	return (0);
++
++ tiff2bw_error:
++        if (inbuf)
++                _TIFFfree(inbuf);
++        if (outbuf)
++                _TIFFfree(outbuf);
++        if (out)
++                TIFFClose(out);
++        if (in)
++                TIFFClose(in);
++        return (-1);
+ }
+ 
+ static int

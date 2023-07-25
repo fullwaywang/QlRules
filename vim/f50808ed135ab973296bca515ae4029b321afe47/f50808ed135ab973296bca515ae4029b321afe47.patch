@@ -1,0 +1,102 @@
+commit f50808ed135ab973296bca515ae4029b321afe47
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Apr 16 18:52:17 2022 +0100
+
+    patch 8.2.4763: using invalid pointer with "V:" in Ex mode
+    
+    Problem:    Using invalid pointer with "V:" in Ex mode.
+    Solution:   Correctly handle the command being changed to "+".
+
+diff --git a/src/ex_docmd.c b/src/ex_docmd.c
+index 47a12fd2c..58df97a9a 100644
+--- a/src/ex_docmd.c
++++ b/src/ex_docmd.c
+@@ -2783,7 +2783,9 @@ parse_command_modifiers(
+ 	cmdmod_T    *cmod,
+ 	int	    skip_only)
+ {
++    char_u  *orig_cmd = eap->cmd;
+     char_u  *cmd_start = NULL;
++    int	    did_plus_cmd = FALSE;
+     char_u  *p;
+     int	    starts_with_colon = FALSE;
+     int	    vim9script = in_vim9script();
+@@ -2819,6 +2821,7 @@ parse_command_modifiers(
+ 			&& curwin->w_cursor.lnum < curbuf->b_ml.ml_line_count)
+ 	{
+ 	    eap->cmd = (char_u *)"+";
++	    did_plus_cmd = TRUE;
+ 	    if (!skip_only)
+ 		ex_pressedreturn = TRUE;
+ 	}
+@@ -3105,13 +3108,29 @@ parse_command_modifiers(
+ 	    // Since the modifiers have been parsed put the colon on top of the
+ 	    // space: "'<,'>mod cmd" -> "mod:'<,'>cmd
+ 	    // Put eap->cmd after the colon.
+-	    mch_memmove(cmd_start - 5, cmd_start, eap->cmd - cmd_start);
+-	    eap->cmd -= 5;
+-	    mch_memmove(eap->cmd - 1, ":'<,'>", 6);
++	    if (did_plus_cmd)
++	    {
++		size_t len = STRLEN(cmd_start);
++
++		// Special case: empty command may have been changed to "+":
++		//  "'<,'>mod" -> "mod'<,'>+
++		mch_memmove(orig_cmd, cmd_start, len);
++		STRCPY(orig_cmd + len, "'<,'>+");
++	    }
++	    else
++	    {
++		mch_memmove(cmd_start - 5, cmd_start, eap->cmd - cmd_start);
++		eap->cmd -= 5;
++		mch_memmove(eap->cmd - 1, ":'<,'>", 6);
++	    }
+ 	}
+ 	else
+-	    // no modifiers, move the pointer back
+-	    eap->cmd -= 5;
++	    // No modifiers, move the pointer back.
++	    // Special case: empty command may have been changed to "+".
++	    if (did_plus_cmd)
++		eap->cmd = (char_u *)"'<,'>+";
++	    else
++		eap->cmd = orig_cmd;
+     }
+ 
+     return OK;
+diff --git a/src/testdir/test_ex_mode.vim b/src/testdir/test_ex_mode.vim
+index 2642a16d2..d981ced6b 100644
+--- a/src/testdir/test_ex_mode.vim
++++ b/src/testdir/test_ex_mode.vim
+@@ -250,5 +250,18 @@ func Test_ex_mode_large_indent()
+   bwipe!
+ endfunc
+ 
++" This was accessing illegal memory when using "+" for eap->cmd.
++func Test_empty_command_visual_mode()
++  let lines =<< trim END
++      r<sfile>
++      0norm0V:
++      :qall!
++  END
++  call writefile(lines, 'Xexmodescript')
++  call assert_equal(1, RunVim([], [], '-u NONE -e -s -S Xexmodescript'))
++
++  call delete('Xexmodescript')
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 1cc0d906b..d6f2ef431 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4763,
+ /**/
+     4762,
+ /**/

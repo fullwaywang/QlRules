@@ -1,0 +1,54 @@
+commit b05cd1ea7e45a836f7f6071a716c38bb30326e0f	b05cd1ea7e45a836f7f6071a716c38bb30326e0f
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Aug 30 06:08:32 2013 +0200
+
+    ffv1dec: Check bits_per_raw_sample and colorspace for equality in ver 0/1 headers
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/ffv1dec.c b/libavcodec/ffv1dec.c
+index 3081207a04..38e0849d87 100644
+--- a/libavcodec/ffv1dec.c
++++ b/libavcodec/ffv1dec.c
+@@ -580,7 +580,7 @@ static int read_header(FFV1Context *f)
+     memset(state, 128, sizeof(state));
+ 
+     if (f->version < 2) {
+-        int chroma_planes, chroma_h_shift, chroma_v_shift, transparency;
++        int chroma_planes, chroma_h_shift, chroma_v_shift, transparency, colorspace, bits_per_raw_sample;
+         unsigned v= get_symbol(c, state, 0);
+         if (v >= 2) {
+             av_log(f->avctx, AV_LOG_ERROR, "invalid version %d in ver01 header\n", v);
+@@ -593,18 +593,17 @@ static int read_header(FFV1Context *f)
+                 f->state_transition[i] = get_symbol(c, state, 1) + c->one_state[i];
+         }
+ 
+-        f->colorspace = get_symbol(c, state, 0); //YUV cs type
+-
+-        if (f->version > 0)
+-            f->avctx->bits_per_raw_sample = get_symbol(c, state, 0);
+-
++        colorspace     = get_symbol(c, state, 0); //YUV cs type
++        bits_per_raw_sample = f->version > 0 ? get_symbol(c, state, 0) : f->avctx->bits_per_raw_sample;
+         chroma_planes  = get_rac(c, state);
+         chroma_h_shift = get_symbol(c, state, 0);
+         chroma_v_shift = get_symbol(c, state, 0);
+         transparency   = get_rac(c, state);
+ 
+         if (f->plane_count) {
+-            if (   chroma_planes != f->chroma_planes
++            if (   colorspace    != f->colorspace
++                || bits_per_raw_sample != f->avctx->bits_per_raw_sample
++                || chroma_planes != f->chroma_planes
+                 || chroma_h_shift!= f->chroma_h_shift
+                 || chroma_v_shift!= f->chroma_v_shift
+                 || transparency  != f->transparency) {
+@@ -613,6 +612,8 @@ static int read_header(FFV1Context *f)
+             }
+         }
+ 
++        f->colorspace     = colorspace;
++        f->avctx->bits_per_raw_sample = bits_per_raw_sample;
+         f->chroma_planes  = chroma_planes;
+         f->chroma_h_shift = chroma_h_shift;
+         f->chroma_v_shift = chroma_v_shift;

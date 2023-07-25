@@ -1,0 +1,100 @@
+commit 597a53bbc681089d85b082b46c2e2428dec43b86
+Author: Roberto Ierusalimschy <roberto@inf.puc-rio.br>
+Date:   Wed Dec 22 09:00:52 2021 -0300
+
+    Bug: finalizer calling exit can corrupt finalization order
+    
+    'os.exit' can call lua_close again, separating new finalizers
+    created after all previous finalizers were already separated.
+
+diff --git a/lgc.c b/lgc.c
+index d3f5b5b7..42a73d81 100644
+--- a/lgc.c
++++ b/lgc.c
+@@ -907,7 +907,7 @@ static void GCTM (lua_State *L) {
+     int status;
+     lu_byte oldah = L->allowhook;
+     int oldgcstp  = g->gcstp;
+-    g->gcstp = GCSTPGC;  /* avoid GC steps */
++    g->gcstp |= GCSTPGC;  /* avoid GC steps */
+     L->allowhook = 0;  /* stop debug hooks during GC metamethod */
+     setobj2s(L, L->top++, tm);  /* push finalizer... */
+     setobj2s(L, L->top++, &v);  /* ... and its argument */
+@@ -1011,7 +1011,8 @@ static void correctpointers (global_State *g, GCObject *o) {
+ void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt) {
+   global_State *g = G(L);
+   if (tofinalize(o) ||                 /* obj. is already marked... */
+-      gfasttm(g, mt, TM_GC) == NULL)   /* or has no finalizer? */
++      gfasttm(g, mt, TM_GC) == NULL ||    /* or has no finalizer... */
++      (g->gcstp & GCSTPCLS))                   /* or closing state? */
+     return;  /* nothing to be done */
+   else {  /* move 'o' to 'finobj' list */
+     GCObject **p;
+@@ -1502,14 +1503,13 @@ static void deletelist (lua_State *L, GCObject *p, GCObject *limit) {
+ */
+ void luaC_freeallobjects (lua_State *L) {
+   global_State *g = G(L);
+-  g->gcstp = GCSTPGC;
++  g->gcstp = GCSTPCLS;  /* no extra finalizers after here */
+   luaC_changemode(L, KGC_INC);
+   separatetobefnz(g, 1);  /* separate all objects with finalizers */
+   lua_assert(g->finobj == NULL);
+-  g->gcstp = 0;
+   callallpendingfinalizers(L);
+   deletelist(L, g->allgc, obj2gco(g->mainthread));
+-  deletelist(L, g->finobj, NULL);
++  lua_assert(g->finobj == NULL);  /* no new finalizers */
+   deletelist(L, g->fixedgc, NULL);  /* collect fixed objects */
+   lua_assert(g->strt.nuse == 0);
+ }
+diff --git a/lgc.h b/lgc.h
+index 024a4328..4a125634 100644
+--- a/lgc.h
++++ b/lgc.h
+@@ -154,6 +154,7 @@
+ */
+ #define GCSTPUSR	1  /* bit true when GC stopped by user */
+ #define GCSTPGC		2  /* bit true when GC stopped by itself */
++#define GCSTPCLS	4  /* bit true when closing Lua state */
+ #define gcrunning(g)	((g)->gcstp == 0)
+ 
+ 
+diff --git a/testes/main.lua b/testes/main.lua
+index 52c77954..9def6386 100644
+--- a/testes/main.lua
++++ b/testes/main.lua
+@@ -261,6 +261,34 @@ u2 = setmetatable({}, {__gc = function () error("ZYX") end})
+ RUN('lua -W %s 2> %s', prog, out)
+ checkprogout("ZYX)\nXYZ)\n")
+ 
++-- bug since 5.2: finalizer called when closing a state could
++-- subvert finalization order
++prepfile[[
++-- should be called last
++print("creating 1")
++setmetatable({}, {__gc = function () print(1) end})
++
++print("creating 2")
++setmetatable({}, {__gc = function ()
++  print("2")
++  print("creating 3")
++  -- this finalizer should not be called, as object will be
++  -- created after 'lua_close' has been called
++  setmetatable({}, {__gc = function () print(3) end})
++  print(collectgarbage())    -- cannot call collector here
++  os.exit(0, true)
++end})
++]]
++RUN('lua -W %s > %s', prog, out)
++checkout[[
++creating 1
++creating 2
++2
++creating 3
++nil
++1
++]]
++
+ 
+ -- test many arguments
+ prepfile[[print(({...})[30])]]

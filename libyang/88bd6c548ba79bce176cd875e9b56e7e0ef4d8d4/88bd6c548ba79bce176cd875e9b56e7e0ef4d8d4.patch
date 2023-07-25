@@ -1,0 +1,32 @@
+commit 88bd6c548ba79bce176cd875e9b56e7e0ef4d8d4
+Author: Michal Vasko <mvasko@cesnet.cz>
+Date:   Fri Mar 29 11:08:52 2019 +0100
+
+    yang parser BUGFIX double free
+    
+    Fixes #739
+
+diff --git a/src/parser_yang_bis.c b/src/parser_yang_bis.c
+index 3fa7a40d..42f28582 100644
+--- a/src/parser_yang_bis.c
++++ b/src/parser_yang_bis.c
+@@ -9123,6 +9123,7 @@ void
+ yyerror(YYLTYPE *yylloc, void *scanner, struct yang_parameter *param, ...)
+ {
+   free(*param->value);
++  *param->value = NULL;
+   if (yylloc->first_line != -1) {
+     if (*param->data_node && (*param->data_node) == (*param->actual_node)) {
+       LOGVAL(param->module->ctx, LYE_INSTMT, LY_VLOG_LYS, *param->data_node, yyget_text(scanner));
+diff --git a/src/yang.y.in b/src/yang.y.in
+index 70d7341a..25879f6d 100644
+--- a/src/yang.y.in
++++ b/src/yang.y.in
+@@ -4833,6 +4833,7 @@ void
+ yyerror(YYLTYPE *yylloc, void *scanner, struct yang_parameter *param, ...)
+ {
+   free(*param->value);
++  *param->value = NULL;
+   if (yylloc->first_line != -1) {
+     if (*param->data_node && (*param->data_node) == (*param->actual_node)) {
+       LOGVAL(param->module->ctx, LYE_INSTMT, LY_VLOG_LYS, *param->data_node, yyget_text(scanner));

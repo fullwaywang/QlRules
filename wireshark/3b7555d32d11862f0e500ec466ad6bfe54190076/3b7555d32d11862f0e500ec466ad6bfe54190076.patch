@@ -1,0 +1,70 @@
+commit 3b7555d32d11862f0e500ec466ad6bfe54190076
+Author: Jeff Morriss <jeff.morriss.ws@gmail.com>
+Date:   Fri Nov 9 15:16:35 2018 -0500
+
+    MMSE: catch length overflows to avoid infinite loop.
+    
+    After fetching a length from the packet ensure those bytes exist to
+    avoid integer overflows by callers (while avoiding having to ensure
+    every caller checks for overflows).
+    
+    Also add a check to ensure the loop in question is progressing through
+    the TVB; report a dissector bug if it doesn't.
+    
+    Bug: 15250
+    Bug: 15246
+    Change-Id: I9434bfe9d530942fd45342690383df2decacdba1
+    Reviewed-on: https://code.wireshark.org/review/30560
+    Petri-Dish: Jeff Morriss <jeff.morriss.ws@gmail.com>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 1ddaf1a0944ffe95d69717ac9fdc60824932f676)
+    Reviewed-on: https://code.wireshark.org/review/30673
+    Reviewed-by: Jeff Morriss <jeff.morriss.ws@gmail.com>
+
+diff --git a/epan/dissectors/packet-mmse.c b/epan/dissectors/packet-mmse.c
+index 53763e5529..be821b4e32 100644
+--- a/epan/dissectors/packet-mmse.c
++++ b/epan/dissectors/packet-mmse.c
+@@ -499,6 +499,12 @@ get_value_length(tvbuff_t *tvb, guint offset, guint *byte_count, packet_info *pi
+         field = tvb_get_guintvar(tvb, offset, byte_count, pinfo, &ei_mmse_oversized_uintvar);
+         (*byte_count)++;
+     }
++
++    /* The packet says there are this many bytes; ensure they're there.
++     * We do this here because several callers do math on the length we
++     * return here and may not catch an overflow.
++     */
++    tvb_ensure_bytes_exist(tvb, offset, field);
+     return field;
+ }
+ 
+@@ -701,7 +707,7 @@ static void
+ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
+         const char *message_type)
+ {
+-    guint        offset;
++    guint        offset, old_offset;
+     guint8       field = 0;
+     const char   *strval;
+     guint        length;
+@@ -723,6 +729,7 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
+     proto_tree_add_uint(mmse_tree, hf_mmse_message_type, tvb, 0, 2, pdut);
+ 
+     offset = 2;                 /* Skip Message-Type    */
++    old_offset = 1;
+ 
+     /*
+      * Cycle through MMS-headers
+@@ -1221,6 +1228,11 @@ dissect_mmse(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, guint8 pdut,
+                 break;
+         }
+         DebugLog(("\tEnd(case)\n"));
++
++        if (offset <= old_offset) {
++            REPORT_DISSECTOR_BUG("Offset isn't increasing");
++        }
++        old_offset = offset;
+     }
+ 
+     DebugLog(("\tEnd(switch)\n"));

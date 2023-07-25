@@ -1,0 +1,64 @@
+commit d6211a52ab9f53b82f884561ed43d2fe4d24ff7d
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Jun 18 19:48:14 2022 +0100
+
+    patch 8.2.5126: substitute may overrun destination buffer
+    
+    Problem:    Substitute may overrun destination buffer.
+    Solution:   Disallow switching buffers in a substitute expression.
+
+diff --git a/src/ex_docmd.c b/src/ex_docmd.c
+index fed9330b5..1185cd155 100644
+--- a/src/ex_docmd.c
++++ b/src/ex_docmd.c
+@@ -7138,9 +7138,10 @@ do_exedit(
+ #endif
+ 	    )
+     {
+-	// Can't edit another file when "curbuf_lock" is set.  Only ":edit"
+-	// can bring us here, others are stopped earlier.
+-	if (*eap->arg != NUL && curbuf_locked())
++	// Can't edit another file when "textlock" or "curbuf_lock" is set.
++	// Only ":edit" or ":script" can bring us here, others are stopped
++	// earlier.
++	if (*eap->arg != NUL && text_or_buf_locked())
+ 	    return;
+ 
+ 	n = readonlymode;
+diff --git a/src/testdir/test_substitute.vim b/src/testdir/test_substitute.vim
+index 46ea95513..c056fa965 100644
+--- a/src/testdir/test_substitute.vim
++++ b/src/testdir/test_substitute.vim
+@@ -1063,6 +1063,19 @@ func Test_sub_open_cmdline_win()
+   call delete('Xresult')
+ endfunc
+ 
++" This was editing a script file from the expression
++func Test_sub_edit_scriptfile()
++  new
++  norm o0000000000000000000000000000000000000000000000000000
++  func EditScript()
++    silent! scr! Xfile
++  endfunc
++  s/\%')/\=EditScript()
++
++  delfunc EditScript
++  bwipe!
++endfunc
++
+ " Test for the 2-letter and 3-letter :substitute commands
+ func Test_substitute_short_cmd()
+   new
+diff --git a/src/version.c b/src/version.c
+index 82ac4eaf2..2f397ae31 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -734,6 +734,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    5126,
+ /**/
+     5125,
+ /**/

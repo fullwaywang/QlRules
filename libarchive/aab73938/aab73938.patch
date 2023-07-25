@@ -1,0 +1,34 @@
+commit aab73938f8914f0def6cdd5d5be3f142ae7c77f6
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Tue Mar 3 20:17:37 2015 -0800
+
+    Issue 410: Segfault on invalid rar archive
+    
+    Libarchive's API passes a void ** which is set by the format
+    to the address of the entry data that was just read.
+    
+    In one particular case, the RAR decompression logic uses a
+    non-NULL value here to indicate that the internal 128k decompression
+    buffer has been filled.  But the RAR code took no steps to ensure
+    that the value was set NULL on entry.  As a result, a crafted RAR
+    file can trick libarchive into returning to the caller a 128k block
+    of data starting at whatever value was previously in the caller's
+    variable.
+    
+    The fix is simply to set *buff = NULL on entry to the RAR
+    decompression logic.
+
+diff --git a/libarchive/archive_read_support_format_rar.c b/libarchive/archive_read_support_format_rar.c
+index 3e7412f8..ee8ce539 100644
+--- a/libarchive/archive_read_support_format_rar.c
++++ b/libarchive/archive_read_support_format_rar.c
+@@ -1002,8 +1002,8 @@ archive_read_format_rar_read_data(struct archive_read *a, const void **buff,
+       rar->bytes_unconsumed = 0;
+   }
+ 
++  *buff = NULL;
+   if (rar->entry_eof || rar->offset_seek >= rar->unp_size) {
+-    *buff = NULL;
+     *size = 0;
+     *offset = rar->offset;
+     if (*offset < rar->unp_size)

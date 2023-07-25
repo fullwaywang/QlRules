@@ -1,0 +1,88 @@
+commit b27ad8e1d3e68eb3214fcbb398ca436873aa7c67
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Sat Jan 22 16:56:00 2022 +0100
+
+    url: revert the removal of trailing dot from host name
+    
+    Reverts 5de8d84098db1bd24e (May 2014, shipped in 7.37.0) and the
+    follow-up changes done afterward.
+    
+    Keep the dot in names for everything except the SNI to make curl behave
+    more similar to current browsers. This means 'name' and 'name.' send the
+    same SNI for different 'Host:' headers.
+    
+    Updated test 1322 accordingly
+    
+    Fixes #8290
+    Reported-by: Charles Cazabon
+    Closes #8320
+
+diff --git a/lib/url.c b/lib/url.c
+index 6561923e3..a80d605a5 100644
+--- a/lib/url.c
++++ b/lib/url.c
+@@ -1573,20 +1573,6 @@ bool Curl_is_ASCII_name(const char *hostname)
+   return TRUE;
+ }
+ 
+-/*
+- * Strip single trailing dot in the hostname,
+- * primarily for SNI and http host header.
+- */
+-static void strip_trailing_dot(struct hostname *host)
+-{
+-  size_t len;
+-  if(!host || !host->name)
+-    return;
+-  len = strlen(host->name);
+-  if(len && (host->name[len-1] == '.'))
+-    host->name[len-1] = 0;
+-}
+-
+ /*
+  * Perform any necessary IDN conversion of hostname
+  */
+@@ -4053,17 +4039,6 @@ static CURLcode create_conn(struct Curl_easy *data,
+    *************************************************************/
+   result = resolve_server(data, conn, async);
+ 
+-  /* Strip trailing dots. resolve_server copied the name. */
+-  strip_trailing_dot(&conn->host);
+-#ifndef CURL_DISABLE_PROXY
+-  if(conn->bits.httpproxy)
+-    strip_trailing_dot(&conn->http_proxy.host);
+-  if(conn->bits.socksproxy)
+-    strip_trailing_dot(&conn->socks_proxy.host);
+-#endif
+-  if(conn->bits.conn_to_host)
+-    strip_trailing_dot(&conn->conn_to_host);
+-
+ out:
+   return result;
+ }
+diff --git a/lib/vtls/openssl.c b/lib/vtls/openssl.c
+index 9796c1ff9..5e8a65716 100644
+--- a/lib/vtls/openssl.c
++++ b/lib/vtls/openssl.c
+@@ -3254,6 +3254,8 @@ static CURLcode ossl_connect_step1(struct Curl_easy *data,
+        out there that don't work unless the name is lowercased */
+     Curl_strntolower(data->state.buffer, hostname, nlen);
+     data->state.buffer[nlen] = 0;
++    DEBUGASSERT(nlen);
++    DEBUGASSERT(data->state.buffer[nlen-1] != '.');
+     if(!SSL_set_tlsext_host_name(backend->handle, data->state.buffer))
+       infof(data, "WARNING: failed to configure server name indication (SNI) "
+             "TLS extension");
+diff --git a/tests/data/test1322 b/tests/data/test1322
+index ffd5048a7..ddc9aaa7f 100644
+--- a/tests/data/test1322
++++ b/tests/data/test1322
+@@ -46,7 +46,7 @@ HTTP with --resolve and hostname with trailing dot
+ <verify>
+ <protocol>
+ GET /%TESTNUMBER HTTP/1.1
+-Host: example.com:%HTTPPORT
++Host: example.com.:%HTTPPORT
+ User-Agent: curl/%VERSION
+ Accept: */*
+ 

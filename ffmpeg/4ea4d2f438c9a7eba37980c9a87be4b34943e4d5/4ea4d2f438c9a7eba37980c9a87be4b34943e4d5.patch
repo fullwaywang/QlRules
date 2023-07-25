@@ -1,0 +1,24 @@
+commit 4ea4d2f438c9a7eba37980c9a87be4b34943e4d5
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Nov 24 22:12:37 2015 +0100
+
+    avcodec/h264_slice: Limit max_contexts when slice_context_count is initialized
+    
+    Fixes out of array access
+    Fixes: 1430e9c43fae47a24c179c7c54f94918/signal_sigsegv_421427_2049_f2192b6829ab6e0eefcb035329c03c60.264
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/h264_slice.c b/libavcodec/h264_slice.c
+index 2eaffa580c..dca5d7699e 100644
+--- a/libavcodec/h264_slice.c
++++ b/libavcodec/h264_slice.c
+@@ -1097,6 +1097,7 @@ static int h264_slice_header_init(H264Context *h)
+         nb_slices = max_slices;
+     }
+     h->slice_context_count = nb_slices;
++    h->max_contexts = FFMIN(h->max_contexts, nb_slices);
+ 
+     if (!HAVE_THREADS || !(h->avctx->active_thread_type & FF_THREAD_SLICE)) {
+         ret = ff_h264_slice_context_init(h, &h->slice_ctx[0]);

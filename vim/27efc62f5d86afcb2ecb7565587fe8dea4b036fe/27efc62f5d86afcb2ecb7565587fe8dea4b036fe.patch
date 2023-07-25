@@ -1,0 +1,53 @@
+commit 27efc62f5d86afcb2ecb7565587fe8dea4b036fe
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Fri Jul 1 16:35:45 2022 +0100
+
+    patch 9.0.0018: going over the end of the typahead
+    
+    Problem:    Going over the end of the typahead.
+    Solution:   Put a NUL after the typeahead.
+
+diff --git a/src/term.c b/src/term.c
+index 754ef822d..7d7b84b9a 100644
+--- a/src/term.c
++++ b/src/term.c
+@@ -5393,6 +5393,7 @@ check_termcode(
+ 	if (*tp == ESC && !p_ek && (State & MODE_INSERT))
+ 	    continue;
+ 
++	tp[len] = NUL;
+ 	key_name[0] = NUL;	// no key name found yet
+ 	key_name[1] = NUL;	// no key name found yet
+ 	modifiers = 0;		// no modifiers yet
+diff --git a/src/testdir/test_mapping.vim b/src/testdir/test_mapping.vim
+index ace6453f4..2927ba718 100644
+--- a/src/testdir/test_mapping.vim
++++ b/src/testdir/test_mapping.vim
+@@ -1715,4 +1715,14 @@ func Test_map_after_timed_out_nop()
+   call delete('Xtest_map_after_timed_out_nop')
+ endfunc
+ 
++func Test_using_past_typeahead()
++  nnoremap :00 0
++  exe "norm :set \x80\xfb0=0\<CR>"
++  exe "sil norm :0\x0f\<C-U>\<CR>"
++
++  exe "norm :set \x80\xfb0=\<CR>"
++  nunmap :00
++endfunc
++
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 5d1090913..6415b59ca 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -735,6 +735,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    18,
+ /**/
+     17,
+ /**/

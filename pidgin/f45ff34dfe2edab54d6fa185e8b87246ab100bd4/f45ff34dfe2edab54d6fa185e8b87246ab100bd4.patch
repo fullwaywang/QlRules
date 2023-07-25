@@ -1,0 +1,19 @@
+commit f45ff34dfe2edab54d6fa185e8b87246ab100bd4
+Author: Wojtek Kaniewski <wojtekka@toxygen.net>
+Date:   Thu May 8 21:56:16 2014 +0200
+
+    Poprawka weryfikacji ilości serwerów pośredniczących.
+
+diff --git a/src/dcc7.c b/src/dcc7.c
+index 6849619..912c022 100644
+--- a/src/dcc7.c
++++ b/src/dcc7.c
+@@ -1442,7 +1442,7 @@ struct gg_event *gg_dcc7_watch_fd(struct gg_dcc7 *dcc)
+ 
+ 			pkt = (struct gg_dcc7_relay_reply*) buf;
+ 
+-			if (gg_fix32(pkt->magic) != GG_DCC7_RELAY_REPLY || gg_fix32(pkt->rcount) < 1 || gg_fix32(pkt->rcount > 256) || gg_fix32(pkt->len) < sizeof(*pkt) + gg_fix32(pkt->rcount) * sizeof(srv)) {
++			if (gg_fix32(pkt->magic) != GG_DCC7_RELAY_REPLY || gg_fix32(pkt->rcount) < 1 || gg_fix32(pkt->rcount) > 256 || gg_fix32(pkt->len) < sizeof(*pkt) + gg_fix32(pkt->rcount) * sizeof(srv)) {
+ 				gg_debug_dcc(dcc, GG_DEBUG_MISC, "// gg_dcc7_wathc_fd() invalid reply\n");
+ 				errno = EINVAL;
+ 				e->type = GG_EVENT_DCC7_ERROR;

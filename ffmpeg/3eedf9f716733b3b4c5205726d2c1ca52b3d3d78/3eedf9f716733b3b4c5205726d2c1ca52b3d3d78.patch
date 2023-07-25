@@ -1,0 +1,23 @@
+commit 3eedf9f716733b3b4c5205726d2c1ca52b3d3d78	3eedf9f716733b3b4c5205726d2c1ca52b3d3d78
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Dec 24 05:06:20 2011 +0100
+
+    j2kdec: Check curtileno for validity
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/j2kdec.c b/libavcodec/j2kdec.c
+index c8dabc0bde..4e11030cb8 100644
+--- a/libavcodec/j2kdec.c
++++ b/libavcodec/j2kdec.c
+@@ -427,6 +427,10 @@ static uint8_t get_sot(J2kDecoderContext *s)
+         return AVERROR(EINVAL);
+ 
+     s->curtileno = bytestream_get_be16(&s->buf); ///< Isot
++    if((unsigned)s->curtileno >= s->numXtiles * s->numYtiles){
++        s->curtileno=0;
++        return AVERROR(EINVAL);
++    }
+ 
+     s->buf += 4; ///< Psot (ignored)
+ 

@@ -1,0 +1,166 @@
+commit 9fee4ae076b1ec97b97efb79ece08d1dab4df29a
+Author: Armin Novak <armin.novak@thincast.com>
+Date:   Fri Oct 4 14:49:30 2019 +0200
+
+    Fixed #5645: realloc return handling
+
+diff --git a/client/X11/generate_argument_docbook.c b/client/X11/generate_argument_docbook.c
+index b700539e2..1a3ebf563 100644
+--- a/client/X11/generate_argument_docbook.c
++++ b/client/X11/generate_argument_docbook.c
+@@ -9,6 +9,7 @@
+ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ {
+ 	LPSTR tmp = NULL;
++	LPSTR tmp2 = NULL;
+ 	size_t cs = 0, x, ds, len;
+ 	size_t s;
+ 
+@@ -25,7 +26,12 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 	ds = s + 1;
+ 
+ 	if (s)
+-		tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++	{
++		tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++		if (!tmp2)
++			free(tmp);
++		tmp = tmp2;
++	}
+ 
+ 	if (NULL == tmp)
+ 	{
+@@ -43,7 +49,10 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 			case '<':
+ 				len = format ? 13 : 4;
+ 				ds += len - 1;
+-				tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				if (!tmp2)
++					free(tmp);
++				tmp = tmp2;
+ 
+ 				if (NULL == tmp)
+ 				{
+@@ -64,7 +73,10 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 			case '>':
+ 				len = format ? 14 : 4;
+ 				ds += len - 1;
+-				tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				if (!tmp2)
++					free(tmp);
++				tmp = tmp2;
+ 
+ 				if (NULL == tmp)
+ 				{
+@@ -84,7 +96,10 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 
+ 			case '\'':
+ 				ds += 5;
+-				tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				if (!tmp2)
++					free(tmp);
++				tmp = tmp2;
+ 
+ 				if (NULL == tmp)
+ 				{
+@@ -102,7 +117,10 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 
+ 			case '"':
+ 				ds += 5;
+-				tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				if (!tmp2)
++					free(tmp);
++				tmp = tmp2;
+ 
+ 				if (NULL == tmp)
+ 				{
+@@ -120,7 +138,10 @@ LPSTR tr_esc_str(LPCSTR arg, bool format)
+ 
+ 			case '&':
+ 				ds += 4;
+-				tmp = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				tmp2 = (LPSTR)realloc(tmp, ds * sizeof(CHAR));
++				if (!tmp2)
++					free(tmp);
++				tmp = tmp2;
+ 
+ 				if (NULL == tmp)
+ 				{
+diff --git a/libfreerdp/codec/region.c b/libfreerdp/codec/region.c
+index 2bc866538..c5d19c806 100644
+--- a/libfreerdp/codec/region.c
++++ b/libfreerdp/codec/region.c
+@@ -467,8 +467,12 @@ static BOOL region16_simplify_bands(REGION16* region)
+ 
+ 	if (finalNbRects != nbRects)
+ 	{
+-		int allocSize = sizeof(REGION16_DATA) + (finalNbRects * sizeof(RECTANGLE_16));
+-		region->data = realloc(region->data, allocSize);
++		REGION16_DATA* data;
++		size_t allocSize = sizeof(REGION16_DATA) + (finalNbRects * sizeof(RECTANGLE_16));
++		data = realloc(region->data, allocSize);
++		if (!data)
++			free(region->data);
++		region->data = data;
+ 
+ 		if (!region->data)
+ 		{
+@@ -485,10 +489,12 @@ static BOOL region16_simplify_bands(REGION16* region)
+ 
+ BOOL region16_union_rect(REGION16* dst, const REGION16* src, const RECTANGLE_16* rect)
+ {
++	REGION16_DATA* data;
+ 	const RECTANGLE_16* srcExtents;
+ 	RECTANGLE_16* dstExtents;
+ 	const RECTANGLE_16* currentBand, *endSrcRect, *nextBand;
+ 	REGION16_DATA* newItems = NULL;
++	REGION16_DATA* tmpItems = NULL;
+ 	RECTANGLE_16* dstRect = NULL;
+ 	UINT32 usedRects, srcNbRects;
+ 	UINT16 topInterBand;
+@@ -673,7 +679,11 @@ BOOL region16_union_rect(REGION16* dst, const REGION16* src, const RECTANGLE_16*
+ 	dstExtents->bottom = MAX(rect->bottom, srcExtents->bottom);
+ 	dstExtents->right = MAX(rect->right, srcExtents->right);
+ 	newItems->size = sizeof(REGION16_DATA) + (usedRects * sizeof(RECTANGLE_16));
+-	dst->data = realloc(newItems, newItems->size);
++	tmpItems = realloc(newItems, newItems->size);
++	if (!tmpItems)
++		free(newItems);
++	newItems = tmpItems;
++	dst->data = newItems;
+ 
+ 	if (!dst->data)
+ 	{
+@@ -717,6 +727,7 @@ BOOL region16_intersects_rect(const REGION16* src, const RECTANGLE_16* arg2)
+ 
+ BOOL region16_intersect_rect(REGION16* dst, const REGION16* src, const RECTANGLE_16* rect)
+ {
++	REGION16_DATA* data;
+ 	REGION16_DATA* newItems;
+ 	const RECTANGLE_16* srcPtr, *endPtr, *srcExtents;
+ 	RECTANGLE_16* dstPtr;
+diff --git a/winpr/libwinpr/utils/lodepng/lodepng.c b/winpr/libwinpr/utils/lodepng/lodepng.c
+index 741a953b8..b48c881a2 100644
+--- a/winpr/libwinpr/utils/lodepng/lodepng.c
++++ b/winpr/libwinpr/utils/lodepng/lodepng.c
+@@ -841,11 +841,15 @@ unsigned lodepng_huffman_code_lengths(unsigned* lengths, const unsigned* frequen
+ static unsigned HuffmanTree_makeFromFrequencies(HuffmanTree* tree, const unsigned* frequencies,
+                                                 size_t mincodes, size_t numcodes, unsigned maxbitlen)
+ {
++	unsigned* lengths;
+   unsigned error = 0;
+   while(!frequencies[numcodes - 1] && numcodes > mincodes) numcodes--; /*trim zeroes*/
+   tree->maxbitlen = maxbitlen;
+   tree->numcodes = (unsigned)numcodes; /*number of symbols*/
+-  tree->lengths = (unsigned*)realloc(tree->lengths, numcodes * sizeof(unsigned));
++  lengths = (unsigned*)realloc(tree->lengths, numcodes * sizeof(unsigned));
++	if (!lengths)
++		free(tree->lengths);
++	tree->lengths = lengths;
+   if(!tree->lengths) return 83; /*alloc fail*/
+   /*initialize all lengths to 0*/
+   memset(tree->lengths, 0, numcodes * sizeof(unsigned));

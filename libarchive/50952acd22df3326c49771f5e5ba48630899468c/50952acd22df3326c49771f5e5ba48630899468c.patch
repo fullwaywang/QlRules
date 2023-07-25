@@ -1,0 +1,78 @@
+commit 50952acd22df3326c49771f5e5ba48630899468c
+Author: Tim Kientzle <kientzle@acm.org>
+Date:   Sun Sep 11 13:19:05 2016 -0700
+
+    Fix the test cases for Issue #745 and Issue #746
+    
+    Thanks to Doran Moppert for pointing out the inconsistencies here.
+
+diff --git a/libarchive/test/test_write_disk_secure745.c b/libarchive/test/test_write_disk_secure745.c
+index fa6939b8..870b0647 100644
+--- a/libarchive/test/test_write_disk_secure745.c
++++ b/libarchive/test/test_write_disk_secure745.c
+@@ -58,7 +58,7 @@ DEFINE_TEST(test_write_disk_secure745)
+ 	/* Create a symlink pointing to the target directory */
+ 	assert((ae = archive_entry_new()) != NULL);
+ 	archive_entry_copy_pathname(ae, "sym");
+-	archive_entry_set_mode(ae, S_IFREG | 0777);
++	archive_entry_set_mode(ae, AE_IFLNK | 0777);
+ 	archive_entry_copy_symlink(ae, "../target");
+ 	assert(0 == archive_write_header(a, ae));
+ 	archive_entry_free(ae);
+@@ -72,5 +72,8 @@ DEFINE_TEST(test_write_disk_secure745)
+ 
+ 	/* Permission of target dir should not have changed. */
+ 	assertFileMode("../target", 0700);
++
++	assert(0 == archive_write_close(a));
++	archive_write_free(a);
+ #endif
+ }
+diff --git a/libarchive/test/test_write_disk_secure746.c b/libarchive/test/test_write_disk_secure746.c
+index 0daf1b09..460aafef 100644
+--- a/libarchive/test/test_write_disk_secure746.c
++++ b/libarchive/test/test_write_disk_secure746.c
+@@ -63,11 +63,11 @@ DEFINE_TEST(test_write_disk_secure746a)
+ 	/* Attempt to hardlink to the target directory. */
+ 	assert((ae = archive_entry_new()) != NULL);
+ 	archive_entry_copy_pathname(ae, "bar");
+-	archive_entry_set_mode(ae, S_IFREG | 0777);
++	archive_entry_set_mode(ae, AE_IFREG | 0777);
+ 	archive_entry_set_size(ae, 8);
+ 	archive_entry_copy_hardlink(ae, "../target/foo");
+ 	assertEqualInt(ARCHIVE_FAILED, archive_write_header(a, ae));
+-	assertEqualInt(ARCHIVE_FAILED, archive_write_data(a, "modified", 8));
++	assertEqualInt(ARCHIVE_FATAL, archive_write_data(a, "modified", 8));
+ 	archive_entry_free(ae);
+ 
+ 	/* Verify that target file contents are unchanged. */
+@@ -105,21 +105,25 @@ DEFINE_TEST(test_write_disk_secure746b)
+ 	/* Create a symlink to the target directory. */
+ 	assert((ae = archive_entry_new()) != NULL);
+ 	archive_entry_copy_pathname(ae, "symlink");
++	archive_entry_set_mode(ae, AE_IFLNK | 0777);
+ 	archive_entry_copy_symlink(ae, "../target");
+-	assertEqualInt(ARCHIVE_FAILED, archive_write_header(a, ae));
++	assertEqualIntA(a, ARCHIVE_OK, archive_write_header(a, ae));
+ 	archive_entry_free(ae);
+ 
+ 	/* Attempt to hardlink to the target directory via the symlink. */
+ 	assert((ae = archive_entry_new()) != NULL);
+ 	archive_entry_copy_pathname(ae, "bar");
+-	archive_entry_set_mode(ae, S_IFREG | 0777);
++	archive_entry_set_mode(ae, AE_IFREG | 0777);
+ 	archive_entry_set_size(ae, 8);
+ 	archive_entry_copy_hardlink(ae, "symlink/foo");
+-	assertEqualInt(ARCHIVE_FAILED, archive_write_header(a, ae));
+-	assertEqualInt(ARCHIVE_FAILED, archive_write_data(a, "modified", 8));
++	assertEqualIntA(a, ARCHIVE_FAILED, archive_write_header(a, ae));
++	assertEqualIntA(a, ARCHIVE_FATAL, archive_write_data(a, "modified", 8));
+ 	archive_entry_free(ae);
+ 
+ 	/* Verify that target file contents are unchanged. */
+ 	assertTextFileContents("unmodified", "../target/foo");
++
++	assertEqualIntA(a, ARCHIVE_FATAL, archive_write_close(a));
++	archive_write_free(a);
+ #endif
+ }

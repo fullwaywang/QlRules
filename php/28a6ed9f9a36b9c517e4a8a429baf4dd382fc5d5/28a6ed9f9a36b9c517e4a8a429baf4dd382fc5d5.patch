@@ -1,0 +1,52 @@
+commit 28a6ed9f9a36b9c517e4a8a429baf4dd382fc5d5
+Author: Stanislav Malyshev <stas@php.net>
+Date:   Sun Mar 20 22:29:08 2016 -0700
+
+    Fix bug #71735: Double-free in SplDoublyLinkedList::offsetSet
+
+diff --git a/NEWS b/NEWS
+index 3fd121c030..fc6a40b806 100644
+--- a/NEWS
++++ b/NEWS
+@@ -30,6 +30,7 @@ PHP                                                                        NEWS
+   . Fixed bug #52339 (SPL autoloader breaks class_exists()). (Nikita)
+   . Fixed bug #67582 (Cloned SplObjectStorage with overwritten getHash fails
+     offsetExists()). (Nikita)
++  . Fixed bug #71735 (Double-free in SplDoublyLinkedList::offsetSet). (Stas)
+ 
+ - Standard:
+   . Fixed bug #71837 (Wrong arrays behaviour). (Laruence)
+diff --git a/ext/spl/spl_dllist.c b/ext/spl/spl_dllist.c
+index aa0c6c3840..1675c7eaf3 100644
+--- a/ext/spl/spl_dllist.c
++++ b/ext/spl/spl_dllist.c
+@@ -830,7 +830,6 @@ SPL_METHOD(SplDoublyLinkedList, offsetSet)
+ 		index = spl_offset_convert_to_long(zindex);
+ 
+ 		if (index < 0 || index >= intern->llist->count) {
+-			zval_ptr_dtor(value);
+ 			zend_throw_exception(spl_ce_OutOfRangeException, "Offset invalid or out of range", 0);
+ 			return;
+ 		}
+diff --git a/ext/spl/tests/bug71735.phpt b/ext/spl/tests/bug71735.phpt
+new file mode 100644
+index 0000000000..92568028c4
+--- /dev/null
++++ b/ext/spl/tests/bug71735.phpt
+@@ -0,0 +1,15 @@
++--TEST--
++Bug #71735 (Double-free in SplDoublyLinkedList::offsetSet)
++--FILE--
++<?php
++try {
++$var_1=new SplStack();
++$var_1->offsetSet(100,new DateTime('2000-01-01'));
++} catch(OutOfRangeException $e) {
++	print $e->getMessage()."\n";
++}
++?>
++===DONE===
++--EXPECT--
++Offset invalid or out of range
++===DONE===
+\ No newline at end of file

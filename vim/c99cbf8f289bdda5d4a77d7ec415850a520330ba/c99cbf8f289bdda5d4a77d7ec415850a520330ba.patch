@@ -1,0 +1,56 @@
+commit c99cbf8f289bdda5d4a77d7ec415850a520330ba
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Mar 4 14:13:10 2023 +0000
+
+    patch 9.0.1378: illegal memory access when using virtual editing
+    
+    Problem:    Illegal memory access when using virtual editing.
+    Solution:   Make sure "startspaces" is not negative.
+
+diff --git a/src/register.c b/src/register.c
+index 461363be3..f3df79cfd 100644
+--- a/src/register.c
++++ b/src/register.c
+@@ -1245,6 +1245,8 @@ op_yank(oparg_T *oap, int deleting, int mess)
+ 				// double-count it.
+ 				bd.startspaces = (ce - cs + 1)
+ 							  - oap->start.coladd;
++				if (bd.startspaces < 0)
++				    bd.startspaces = 0;
+ 				startcol++;
+ 			    }
+ 			}
+diff --git a/src/testdir/test_virtualedit.vim b/src/testdir/test_virtualedit.vim
+index 71cea427b..edaae6786 100644
+--- a/src/testdir/test_virtualedit.vim
++++ b/src/testdir/test_virtualedit.vim
+@@ -88,6 +88,16 @@ func Test_edit_change()
+   set virtualedit=
+ endfunc
+ 
++func Test_edit_special_char()
++  new
++  se ve=all
++  norm a0
++  sil! exe "norm o00000\<Nul>k<a0s"
++
++  bwipe!
++  set virtualedit=
++endfunc
++
+ " Tests for pasting at the beginning, end and middle of a tab character
+ " in virtual edit mode.
+ func Test_paste_in_tab()
+diff --git a/src/version.c b/src/version.c
+index a9cf30e2f..c93499c41 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1378,
+ /**/
+     1377,
+ /**/

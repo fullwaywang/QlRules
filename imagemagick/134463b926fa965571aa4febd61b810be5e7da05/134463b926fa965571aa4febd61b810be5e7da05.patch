@@ -1,0 +1,95 @@
+commit 134463b926fa965571aa4febd61b810be5e7da05
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sun Feb 14 10:40:47 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/129
+
+diff --git a/MagickCore/memory.c b/MagickCore/memory.c
+index 02bae6a23..01f8e9142 100644
+--- a/MagickCore/memory.c
++++ b/MagickCore/memory.c
+@@ -233,6 +233,7 @@ static MagickBooleanType
+ %    o quantum: the number of bytes in each quantum.
+ %
+ */
++
+ static MagickBooleanType CheckMemoryOverflow(const size_t count,
+   const size_t quantum)
+ {
+diff --git a/MagickCore/quantum-import.c b/MagickCore/quantum-import.c
+index a0085f3b7..8aa766e2b 100644
+--- a/MagickCore/quantum-import.c
++++ b/MagickCore/quantum-import.c
+@@ -2024,6 +2024,7 @@ static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
+ 
+   assert(image != (Image *) NULL);
+   assert(image->signature == MagickCoreSignature);
++  pixel=0;
+   switch (quantum_info->depth)
+   {
+     case 1:
+diff --git a/coders/viff.c b/coders/viff.c
+index 2c7281228..bb5175ec5 100644
+--- a/coders/viff.c
++++ b/coders/viff.c
+@@ -137,6 +137,22 @@ static MagickBooleanType IsVIFF(const unsigned char *magick,const size_t length)
+ %    o exception: return any errors or warnings in this structure.
+ %
+ */
++
++static MagickBooleanType CheckMemoryOverflow(const size_t count,
++  const size_t quantum)
++{
++  size_t
++    size;
++
++  size=count*quantum;
++  if ((count == 0) || (quantum != (size/count)))
++    {
++      errno=ENOMEM;
++      return(MagickTrue);
++    }
++  return(MagickFalse);
++}
++
+ static Image *ReadVIFFImage(const ImageInfo *image_info,
+   ExceptionInfo *exception)
+ {
+@@ -475,7 +491,7 @@ static Image *ReadVIFFImage(const ImageInfo *image_info,
+     /*
+       Initialize image structure.
+     */
+-    image->alpha_trait=viff_info.number_data_bands == 4 ? BlendPixelTrait : 
++    image->alpha_trait=viff_info.number_data_bands == 4 ? BlendPixelTrait :
+       UndefinedPixelTrait;
+     image->storage_class=(viff_info.number_data_bands < 3 ? PseudoClass :
+       DirectClass);
+@@ -499,9 +515,17 @@ static Image *ReadVIFFImage(const ImageInfo *image_info,
+       default: bytes_per_pixel=1; break;
+     }
+     if (viff_info.data_storage_type == VFF_TYP_BIT)
+-      max_packets=((image->columns+7UL) >> 3UL)*image->rows;
++      {
++        if (CheckMemoryOverflow((image->columns+7UL) >> 3UL,image->rows) != MagickFalse)
++          ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
++        max_packets=((image->columns+7UL) >> 3UL)*image->rows;
++      }
+     else
+-      max_packets=(size_t) (number_pixels*viff_info.number_data_bands);
++      {
++        if (CheckMemoryOverflow(number_pixels,viff_info.number_data_bands) != MagickFalse)
++          ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
++        max_packets=(size_t) (number_pixels*viff_info.number_data_bands);
++      }
+     pixels=(unsigned char *) AcquireQuantumMemory(MagickMax(number_pixels,
+       max_packets),bytes_per_pixel*sizeof(*pixels));
+     if (pixels == (unsigned char *) NULL)
+@@ -695,7 +719,7 @@ static Image *ReadVIFFImage(const ImageInfo *image_info,
+                 {
+                   ssize_t
+                     index;
+-                  
++
+                   index=(ssize_t) GetPixelRed(image,q);
+                   SetPixelRed(image,image->colormap[
+                     ConstrainColormapIndex(image,index,exception)].red,q);

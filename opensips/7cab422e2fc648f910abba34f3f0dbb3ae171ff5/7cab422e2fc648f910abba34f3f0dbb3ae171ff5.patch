@@ -1,0 +1,33 @@
+commit 7cab422e2fc648f910abba34f3f0dbb3ae171ff5
+Author: Liviu Chircu <liviu@opensips.org>
+Date:   Fri Mar 18 13:53:04 2022 +0200
+
+    core: Fix Content-Length parsing
+    
+    Issue discovered during OpenSIPS Security Audit 2022,
+            by Alfred Farrugia & Sandro Gauci (Enable Security)
+    
+    https://github.com/OpenSIPS/opensips/security/advisories/GHSA-c6j5-f4h4-2xrq
+
+diff --git a/parser/parse_content.c b/parser/parse_content.c
+index f7d77a6f3..d105d860b 100644
+--- a/parser/parse_content.c
++++ b/parser/parse_content.c
+@@ -241,12 +241,14 @@ char* parse_content_length( char* buffer, char* end, int* length)
+ 	size = 0;
+ 	number = 0;
+ 	while (p<end && *p>='0' && *p<='9') {
+-		number = number*10 + (*p)-'0';
+-		if (number<0) {
+-			LM_ERR("number overflow at pos %d in len number [%.*s]\n",
++		/* do not actually cause an integer overflow, as it is UB! --liviu */
++		if (number > 214748363) {
++			LM_ERR("integer overflow risk at pos %d in len number [%.*s]\n",
+ 				(int)(p-buffer),(int)(end-buffer), buffer);
+ 			return 0;
+ 		}
++
++		number = number*10 + (*p)-'0';
+ 		size ++;
+ 		p++;
+ 	}

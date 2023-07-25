@@ -1,0 +1,72 @@
+commit 9c8645ec7b28e4d7193962ecd2a418613bf6a84f
+Author: Peter Wu <peter@lekensteyn.nl>
+Date:   Sun Oct 21 15:10:57 2018 +0200
+
+    LBMPDM: fix heap-buffer-overflow (write) in dissect_segment_ofstable
+    
+    id_list and ofs_list contain offsets read directly from the packet.
+    While the field type is FT_UINT32, it is somehow interpreted as signed
+    number. This means that ofs_table->offset_list[id_list[idx]]=... could
+    in fact result in an arbitrary write before "ofs_table->offset_list" due
+    to id_list[idx] being negative.
+    
+    Another way for id_list[idx] to remain negative (-1) is for the loop to
+    terminate before all "field_count" elements are set. Thus, remove the
+    "datalen_remaining >= L_LBMPDM_OFFSET_ENTRY_T" check, if the offset is
+    invalid the proto_tree_add_item accessors will throw an exception.
+    
+    Fixes the crash in the linked bug. Regression tested against the 8
+    capture files from bug 9718, its dissection results are still the same.
+    
+    Bug: 15132
+    Change-Id: If5d2f11ee47578acb80bc43ba7ed16adb27e0c02
+    Fixes: v1.11.3-rc1-2270-g2f4ca9c8d9 ("Initial checkin of LBM aka 29West dissectors. See Bug 9718.")
+    Reviewed-on: https://code.wireshark.org/review/30300
+    Petri-Dish: Peter Wu <peter@lekensteyn.nl>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 5797f602741a7505c18c2e0c505e963ca3349153)
+    Reviewed-on: https://code.wireshark.org/review/30347
+    Reviewed-by: Peter Wu <peter@lekensteyn.nl>
+
+diff --git a/epan/dissectors/packet-lbmpdm.c b/epan/dissectors/packet-lbmpdm.c
+index c23878a657..c19d3242fb 100644
+--- a/epan/dissectors/packet-lbmpdm.c
++++ b/epan/dissectors/packet-lbmpdm.c
+@@ -24,6 +24,7 @@
+ 
+ #include "config.h"
+ #include <epan/packet.h>
++#include <epan/exceptions.h>
+ #include "packet-lbm.h"
+ 
+ /* Magic number for message header to check if data is big-endian or little-endian. */
+@@ -849,7 +850,6 @@ static int dissect_segment_ofstable(tvbuff_t * tvb, int offset, packet_info * pi
+     proto_tree * subtree = NULL;
+     int datalen = 0;
+     int seglen = 0;
+-    int datalen_remaining = 0;
+     int ofs = 0;
+     int field_count = 0;
+     int idx;
+@@ -874,9 +874,8 @@ static int dissect_segment_ofstable(tvbuff_t * tvb, int offset, packet_info * pi
+         id_list[idx] = -1;
+         ofs_list[idx] = -1;
+     }
+-    datalen_remaining = datalen;
+     ofs = offset + L_LBMPDM_SEG_HDR_T;
+-    for (idx = 0; (idx < field_count) && (datalen_remaining >= L_LBMPDM_OFFSET_ENTRY_T); idx++, ofs += L_LBMPDM_OFFSET_ENTRY_T)
++    for (idx = 0; idx < field_count; idx++, ofs += L_LBMPDM_OFFSET_ENTRY_T)
+     {
+         proto_item * offset_item = NULL;
+         proto_tree * offset_tree = NULL;
+@@ -887,6 +886,9 @@ static int dissect_segment_ofstable(tvbuff_t * tvb, int offset, packet_info * pi
+         id_list[idx] = (gint32)lbmpdm_fetch_uint32_encoded(tvb, ofs + O_LBMPDM_OFFSET_ENTRY_T_ID, encoding);
+         proto_tree_add_item(offset_tree, hf_lbmpdm_offset_entry_offset, tvb, ofs + O_LBMPDM_OFFSET_ENTRY_T_OFFSET, L_LBMPDM_OFFSET_ENTRY_T_OFFSET, encoding);
+         ofs_list[idx] = (gint32)lbmpdm_fetch_uint32_encoded(tvb, ofs + O_LBMPDM_OFFSET_ENTRY_T_OFFSET, encoding);
++        if (id_list[idx] < 0 || ofs_list[idx] < 0) {
++            THROW(ReportedBoundsError);
++        }
+         if (id_list[idx] > max_index)
+         {
+             max_index = id_list[idx];

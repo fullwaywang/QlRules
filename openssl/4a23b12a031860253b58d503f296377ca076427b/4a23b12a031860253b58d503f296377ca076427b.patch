@@ -1,0 +1,36 @@
+commit 4a23b12a031860253b58d503f296377ca076427b
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Thu Jul 31 20:56:22 2014 +0100
+
+    Fix SRP buffer overrun vulnerability.
+    
+    Invalid parameters passed to the SRP code can be overrun an internal
+    buffer. Add sanity check that g, A, B < N to SRP code.
+    
+    Thanks to Sean Devlin and Watson Ladd of Cryptography Services, NCC
+    Group for reporting this issue.
+
+diff --git a/crypto/srp/srp_lib.c b/crypto/srp/srp_lib.c
+index 18d1bb92da..d2c237e960 100644
+--- a/crypto/srp/srp_lib.c
++++ b/crypto/srp/srp_lib.c
+@@ -89,6 +89,9 @@ static BIGNUM *srp_Calc_k(BIGNUM *N, BIGNUM *g)
+ 	int longg ;
+ 	int longN = BN_num_bytes(N);
+ 
++	if (BN_ucmp(g, N) >= 0)
++		return NULL;
++
+ 	if ((tmp = OPENSSL_malloc(longN)) == NULL)
+ 		return NULL;
+ 	BN_bn2bin(N,tmp) ;
+@@ -121,6 +124,9 @@ BIGNUM *SRP_Calc_u(BIGNUM *A, BIGNUM *B, BIGNUM *N)
+ 	if ((A == NULL) ||(B == NULL) || (N == NULL))
+ 		return NULL;
+ 
++	if (BN_ucmp(A, N) >= 0 || BN_ucmp(B, N) >= 0)
++		return NULL;
++
+ 	longN= BN_num_bytes(N);
+ 
+ 	if ((cAB = OPENSSL_malloc(2*longN)) == NULL) 

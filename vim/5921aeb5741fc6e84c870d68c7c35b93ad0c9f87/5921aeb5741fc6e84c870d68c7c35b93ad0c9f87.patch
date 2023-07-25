@@ -1,0 +1,87 @@
+commit 5921aeb5741fc6e84c870d68c7c35b93ad0c9f87
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sat Feb 19 11:20:12 2022 +0000
+
+    patch 8.2.4418: crash when using special multi-byte character
+    
+    Problem:    Crash when using special multi-byte character.
+    Solution:   Don't use isalpha() for an arbitrary character.
+
+diff --git a/src/charset.c b/src/charset.c
+index 2ecb96c89..ed09bd23f 100644
+--- a/src/charset.c
++++ b/src/charset.c
+@@ -1644,6 +1644,12 @@ vim_isupper(int c)
+     return isupper(c);
+ }
+ 
++    int
++vim_isalpha(int c)
++{
++    return vim_islower(c) || vim_isupper(c);
++}
++
+     int
+ vim_toupper(int c)
+ {
+diff --git a/src/filepath.c b/src/filepath.c
+index 929fa56a4..7a5dae441 100644
+--- a/src/filepath.c
++++ b/src/filepath.c
+@@ -3626,7 +3626,7 @@ unix_expandpath(
+ 	else if (path_end >= path + wildoff
+ 			 && (vim_strchr((char_u *)"*?[{~$", *path_end) != NULL
+ 			     || (!p_fic && (flags & EW_ICASE)
+-					     && isalpha(PTR2CHAR(path_end)))))
++					  && vim_isalpha(PTR2CHAR(path_end)))))
+ 	    e = p;
+ 	if (has_mbyte)
+ 	{
+diff --git a/src/proto/charset.pro b/src/proto/charset.pro
+index ee5370bcc..df097109c 100644
+--- a/src/proto/charset.pro
++++ b/src/proto/charset.pro
+@@ -50,6 +50,7 @@ int vim_isxdigit(int c);
+ int vim_isbdigit(int c);
+ int vim_islower(int c);
+ int vim_isupper(int c);
++int vim_isalpha(int c);
+ int vim_toupper(int c);
+ int vim_tolower(int c);
+ char_u *skiptowhite(char_u *p);
+@@ -63,5 +64,4 @@ int hexhex2nr(char_u *p);
+ int rem_backslash(char_u *str);
+ void backslash_halve(char_u *p);
+ char_u *backslash_halve_save(char_u *p);
+-void ebcdic2ascii(char_u *buffer, int len);
+ /* vim: set ft=c : */
+diff --git a/src/testdir/test_autochdir.vim b/src/testdir/test_autochdir.vim
+index 5d367757f..95004d278 100644
+--- a/src/testdir/test_autochdir.vim
++++ b/src/testdir/test_autochdir.vim
+@@ -110,4 +110,12 @@ func Test_verbose_pwd()
+   call delete('Xautodir', 'rf')
+ endfunc
+ 
++func Test_multibyte()
++  " using an invalid character should not cause a crash
++  set wic
++  call assert_fails('tc ˚ççç¶*', 'E344:')
++  set nowic
++endfunc
++
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index f95b395b7..5cb721870 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -750,6 +750,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4418,
+ /**/
+     4417,
+ /**/

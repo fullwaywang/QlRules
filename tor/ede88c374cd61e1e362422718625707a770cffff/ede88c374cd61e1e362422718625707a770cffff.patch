@@ -1,0 +1,44 @@
+commit ede88c374cd61e1e362422718625707a770cffff
+Author: Nick Mathewson <nickm@torproject.org>
+Date:   Fri Feb 19 12:31:19 2021 -0500
+
+    Disable the dump_desc() function.
+    
+    It can be called with strings that should have been
+    length-delimited, but which in fact are not.  This can cause a
+    CPU-DoS bug or, in a worse case, a crash.
+    
+    Since this function isn't essential, the best solution for older
+    Tors is to just turn it off.
+    
+    Fixes bug 40286; bugfix on 0.2.2.1-alpha when dump_desc() was
+    introduced.
+
+diff --git a/changes/ticket40286_minimal b/changes/ticket40286_minimal
+new file mode 100644
+index 0000000000..b8669debaa
+--- /dev/null
++++ b/changes/ticket40286_minimal
+@@ -0,0 +1,5 @@
++  o Major bugfixes (denial of service):
++    - Disable the dump_desc() function that we used to dump unparseable
++      information to disk. It was called incorrectly in several places,
++      in a way that could lead to excessive CPU usage.
++      Fixes bug 40286; bugfix on 0.2.2.1-alpha.
+diff --git a/src/feature/dirparse/unparseable.c b/src/feature/dirparse/unparseable.c
+index 941b5a1f6d..a547335452 100644
+--- a/src/feature/dirparse/unparseable.c
++++ b/src/feature/dirparse/unparseable.c
+@@ -492,6 +492,12 @@ dump_desc,(const char *desc, const char *type))
+ {
+   tor_assert(desc);
+   tor_assert(type);
++#ifndef TOR_UNIT_TESTS
++  /* On older versions of Tor we are disabling this function, since it
++   * can be called with strings that are far too long. */
++  if (1)
++    return;
++#endif
+   size_t len;
+   /* The SHA256 of the string */
+   uint8_t digest_sha256[DIGEST256_LEN];

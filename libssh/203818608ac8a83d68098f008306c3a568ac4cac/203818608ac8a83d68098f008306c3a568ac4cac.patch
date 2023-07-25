@@ -1,0 +1,865 @@
+commit 203818608ac8a83d68098f008306c3a568ac4cac
+Author: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+Date:   Tue Aug 28 18:13:03 2018 +0200
+
+    CVE-2018-10933: Introduced packet filtering
+    
+    The packet filter checks required states for the incoming packets and
+    reject them if they arrived in the wrong state.
+    
+    Fixes T101
+    
+    Signed-off-by: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+    Reviewed-by: Andreas Schneider <asn@cryptomilk.org>
+
+diff --git a/include/libssh/packet.h b/include/libssh/packet.h
+index a3bcb9a8..fbe09700 100644
+--- a/include/libssh/packet.h
++++ b/include/libssh/packet.h
+@@ -43,6 +43,12 @@ enum ssh_packet_state_e {
+   PACKET_STATE_PROCESSING
+ };
+ 
++enum ssh_packet_filter_result_e {
++    SSH_PACKET_UNKNOWN,
++    SSH_PACKET_ALLOWED,
++    SSH_PACKET_DENIED
++};
++
+ int ssh_packet_send(ssh_session session);
+ 
+ SSH_PACKET_CALLBACK(ssh_packet_unimplemented);
+diff --git a/src/packet.c b/src/packet.c
+index aa2f17f0..0b070fd4 100644
+--- a/src/packet.c
++++ b/src/packet.c
+@@ -128,6 +128,797 @@ static ssh_packet_callback default_packet_handlers[]= {
+   ssh_packet_channel_failure,              // SSH2_MSG_CHANNEL_FAILURE            100
+ };
+ 
++/** @internal
++ * @brief check if the received packet is allowed for the current session state
++ * @param session current ssh_session
++ * @returns SSH_PACKET_ALLOWED if the packet is allowed; SSH_PACKET_DENIED
++ * if the packet arrived in wrong state; SSH_PACKET_UNKNOWN if the packet type
++ * is unknown
++ */
++static enum ssh_packet_filter_result_e ssh_packet_incoming_filter(ssh_session session)
++{
++    enum ssh_packet_filter_result_e rc;
++
++#ifdef DEBUG_PACKET
++    SSH_LOG(SSH_LOG_PACKET, "Filtering packet type %d",
++            session->in_packet.type);
++#endif
++
++    switch(session->in_packet.type) {
++    case SSH2_MSG_DISCONNECT:                         // 1
++        /*
++         * States required:
++         * - None
++         *
++         * Transitions:
++         * - session->socket->state = SSH_SOCKET_CLOSED
++         * - session->session_state = SSH_SESSION_STATE_ERROR
++         * */
++
++        /* Always allowed */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_IGNORE:                             // 2
++        /*
++         * States required:
++         * - None
++         *
++         * Transitions:
++         * - None
++         * */
++
++        /* Always allowed */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_UNIMPLEMENTED:                      // 3
++        /*
++         * States required:
++         * - None
++         *
++         * Transitions:
++         * - None
++         * */
++
++        /* Always allowed */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_DEBUG:                              // 4
++        /*
++         * States required:
++         * - None
++         *
++         * Transitions:
++         * - None
++         * */
++
++        /* Always allowed */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_SERVICE_REQUEST:                    // 5
++        /* Server only */
++
++        /*
++         * States required:
++         * - session->session_state == SSH_SESSION_STATE_AUTHENTICATING
++         *   or session->session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - session->dh_handshake_state == DH_STATE_FINISHED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        /* If this is a client, reject the message */
++        if (session->client) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if ((session->session_state != SSH_SESSION_STATE_AUTHENTICATING) &&
++            (session->session_state != SSH_SESSION_STATE_AUTHENTICATED))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_SERVICE_ACCEPT:                     // 6
++        /*
++         * States required:
++         * - session->session_state == SSH_SESSION_STATE_AUTHENTICATING
++         *   or session->session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - session->dh_handshake_state == DH_STATE_FINISHED
++         * - session->auth.service_state == SSH_AUTH_SERVICE_SENT
++         *
++         * Transitions:
++         * - auth.service_state = SSH_AUTH_SERVICE_ACCEPTED
++         * */
++
++        if ((session->session_state != SSH_SESSION_STATE_AUTHENTICATING) &&
++            (session->session_state != SSH_SESSION_STATE_AUTHENTICATED))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        /* TODO check if only auth service can be requested */
++        if (session->auth.service_state != SSH_AUTH_SERVICE_SENT) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_EXT_INFO:                           // 7
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - dh_handshake_state == DH_STATE_FINISHED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEXINIT:                            // 20
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *   or session_state == SSH_SESSION_STATE_INITIAL_KEX
++         * - dh_handshake_state == DH_STATE_INIT
++         *   or dh_handshake_state == DH_STATE_FINISHED (re-exchange)
++         *
++         * Transitions:
++         * - session->dh_handshake_state = DH_STATE_INIT
++         * - session->session_state = SSH_SESSION_STATE_KEXINIT_RECEIVED
++         *
++         * On server:
++         * - session->session_state = SSH_SESSION_STATE_DH
++         * */
++
++        if ((session->session_state != SSH_SESSION_STATE_AUTHENTICATED) &&
++            (session->session_state != SSH_SESSION_STATE_INITIAL_KEX))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if ((session->dh_handshake_state != DH_STATE_INIT) &&
++            (session->dh_handshake_state != DH_STATE_FINISHED))
++        {
++            rc = SSH_PACKET_DENIED;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_NEWKEYS:                            // 21
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_DH
++         * - dh_handshake_state == DH_STATE_NEWKEYS_SENT
++         *
++         * Transitions:
++         * - session->dh_handshake_state = DH_STATE_FINISHED
++         * - session->session_state = SSH_SESSION_STATE_AUTHENTICATING
++         * if session->flags & SSH_SESSION_FLAG_AUTHENTICATED
++         * - session->session_state = SSH_SESSION_STATE_AUTHENTICATED
++         * */
++
++        /* If DH has not been started, reject message */
++        if (session->session_state != SSH_SESSION_STATE_DH) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        /* Only allowed if dh_handshake_state is in NEWKEYS_SENT state */
++        if (session->dh_handshake_state != DH_STATE_NEWKEYS_SENT) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEXDH_INIT:                         // 30
++      // SSH2_MSG_KEX_ECDH_INIT:                      // 30
++      // SSH2_MSG_ECMQV_INIT:                         // 30
++      // SSH2_MSG_KEX_DH_GEX_REQUEST_OLD:             // 30
++
++        /* Server only */
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_DH
++         * - dh_handshake_state == DH_STATE_INIT
++         *
++         * Transitions:
++         * - session->dh_handshake_state = DH_STATE_INIT_SENT
++         * then calls dh_handshake_server which triggers:
++         * - session->dh_handhsake_state = DH_STATE_NEWKEYS_SENT
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_DH) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        /* Only allowed if dh_handshake_state is in initial state */
++        if (session->dh_handshake_state != DH_STATE_INIT) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEXDH_REPLY:                        // 31
++      // SSH2_MSG_KEX_ECDH_REPLY:                     // 31
++      // SSH2_MSG_ECMQV_REPLY:                        // 31
++      // SSH2_MSG_KEX_DH_GEX_GROUP:                   // 31
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_DH
++         * - dh_handshake_state == DH_STATE_INIT_SENT
++         *
++         * Transitions:
++         * - session->dh_handhsake_state = DH_STATE_NEWKEYS_SENT
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_DH) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_INIT_SENT) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEX_DH_GEX_INIT:                    // 32
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEX_DH_GEX_REPLY:                   // 33
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_KEX_DH_GEX_REQUEST:                 // 34
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_REQUEST:                   // 50
++        /* Server only */
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - dh_hanshake_state == DH_STATE_FINISHED
++         *
++         * Transitions:
++         * - if authentication was successful:
++         *   - session_state = SSH_SESSION_STATE_AUTHENTICATED
++         * */
++
++        /* If this is a client, reject the message */
++        if (session->client) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_FAILURE:                   // 51
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - dh_hanshake_state == DH_STATE_FINISHED
++         * - session->auth.state == SSH_AUTH_STATE_KBDINT_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_PUBKEY_OFFER_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_PUBKEY_AUTH_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_PASSWORD_AUTH_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_GSSAPI_MIC_SENT
++         *
++         * Transitions:
++         * - if unpacking failed:
++         *   - session->auth.state = SSH_AUTH_ERROR
++         * - if failure was partial:
++         *   - session->auth.state = SSH_AUTH_PARTIAL
++         * - else:
++         *   - session->auth.state = SSH_AUTH_STATE_FAILED
++         * */
++
++        /* If this is a server, reject the message */
++        if (session->server) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_SUCCESS:                   // 52
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - dh_hanshake_state == DH_STATE_FINISHED
++         * - session->auth.state == SSH_AUTH_STATE_KBDINT_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_PUBKEY_AUTH_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_PASSWORD_AUTH_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_GSSAPI_MIC_SENT
++         *   or session->auth.state == SSH_AUTH_STATE_AUTH_NONE_SENT
++         *
++         * Transitions:
++         * - session->auth.state = SSH_AUTH_STATE_SUCCESS
++         * - session->session_state = SSH_SESSION_STATE_AUTHENTICATED
++         * - session->flags |= SSH_SESSION_FLAG_AUTHENTICATED
++         * - sessions->auth.current_method = SSH_AUTH_METHOD_UNKNOWN
++         * */
++
++        /* If this is a server, reject the message */
++        if (session->server) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if ((session->auth.state != SSH_AUTH_STATE_KBDINT_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_PUBKEY_AUTH_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_PASSWORD_AUTH_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_GSSAPI_MIC_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_AUTH_NONE_SENT))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_BANNER:                    // 53
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_PK_OK:                     // 60
++      // SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ:          // 60
++      // SSH2_MSG_USERAUTH_INFO_REQUEST:              // 60
++      // SSH2_MSG_USERAUTH_GSSAPI_RESPONSE:           // 60
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - session->auth.state == SSH_AUTH_STATE_KBDINT_SENT
++         *   or
++         *   session->auth.state == SSH_AUTH_STATE_GSSAPI_REQUEST_SENT
++         *   or
++         *   session->auth.state == SSH_AUTH_STATE_PUBKEY_OFFER_SENT
++         *
++         * Transitions:
++         * Depending on the current state, the message is treated
++         * differently:
++         * - session->auth.state == SSH_AUTH_STATE_KBDINT_SENT
++         *   - session->auth.state = SSH_AUTH_STATE_INFO
++         * - session->auth.state == SSH_AUTH_STATE_GSSAPI_REQUEST_SENT
++         *   - session->auth.state = SSH_AUTH_STATE_GSSAPI_TOKEN
++         * - session->auth.state == SSH_AUTH_STATE_PUBKEY_OFFER_SENT
++         *   - session->auth.state = SSH_AUTH_STATE_PK_OK
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if ((session->auth.state != SSH_AUTH_STATE_KBDINT_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_PUBKEY_OFFER_SENT) &&
++            (session->auth.state != SSH_AUTH_STATE_GSSAPI_REQUEST_SENT))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_INFO_RESPONSE:             // 61
++      // SSH2_MSG_USERAUTH_GSSAPI_TOKEN:              // 61
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - session_state->auth.state == SSH_SESSION_STATE_GSSAPI_TOKEN
++         *   or
++         *   session_state->auth.state == SSH_SESSION_STATE_INFO
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if ((session->auth.state != SSH_AUTH_STATE_INFO) &&
++            (session->auth.state != SSH_AUTH_STATE_GSSAPI_TOKEN))
++        {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE:  // 63
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_GSSAPI_ERROR:              // 64
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_GSSAPI_ERRTOK:             // 65
++        /* TODO Not filtered */
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_USERAUTH_GSSAPI_MIC:                // 66
++        /* Server only */
++
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATING
++         * - session->gssapi->state == SSH_GSSAPI_STATE_RCV_MIC
++         *
++         * Transitions:
++         * Depending on the result of the verification, the states are
++         * changed:
++         * - SSH_AUTH_SUCCESS:
++         *   - session->session_state = SSH_SESSION_STATE_AUTHENTICATED
++         *   - session->flags != SSH_SESSION_FLAG_AUTHENTICATED
++         * - SSH_AUTH_PARTIAL:
++         *   - None
++         * - any other case:
++         *   - None
++         * */
++
++        /* If this is a client, reject the message */
++        if (session->client) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->dh_handshake_state != DH_STATE_FINISHED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_GLOBAL_REQUEST:                     // 80
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_REQUEST_SUCCESS:                    // 81
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - session->global_req_state == SSH_CHANNEL_REQ_STATE_PENDING
++         *
++         * Transitions:
++         * - session->global_req_state == SSH_CHANNEL_REQ_STATE_ACCEPTED
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->global_req_state != SSH_CHANNEL_REQ_STATE_PENDING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_REQUEST_FAILURE:                    // 82
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - session->global_req_state == SSH_CHANNEL_REQ_STATE_PENDING
++         *
++         * Transitions:
++         * - session->global_req_state == SSH_CHANNEL_REQ_STATE_DENIED
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        if (session->global_req_state != SSH_CHANNEL_REQ_STATE_PENDING) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_OPEN:                       // 90
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_OPEN_CONFIRMATION:          // 91
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - channel->state = SSH_CHANNEL_STATE_OPEN
++         * - channel->flags &= ~SSH_CHANNEL_FLAG_NOT_BOUND
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_OPEN_FAILURE:               // 92
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - channel->state = SSH_CHANNEL_STATE_OPEN_DENIED
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_WINDOW_ADJUST:              // 93
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_DATA:                       // 94
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_EXTENDED_DATA:              // 95
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_EOF:                        // 96
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - None
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_CLOSE:                      // 97
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - channel->state = SSH_CHANNEL_STATE_CLOSED
++         * - channel->flags |= SSH_CHANNEL_FLAG_CLOSED_REMOTE
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_REQUEST:                    // 98
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         *
++         * Transitions:
++         * - Depends on the request
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_SUCCESS:                    // 99
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - channel->request_state == SSH_CHANNEL_REQ_STATE_PENDING
++         *
++         * Transitions:
++         * - channel->request_state = SSH_CHANNEL_REQ_STATE_ACCEPTED
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    case SSH2_MSG_CHANNEL_FAILURE:                    // 100
++        /*
++         * States required:
++         * - session_state == SSH_SESSION_STATE_AUTHENTICATED
++         * - channel->request_state == SSH_CHANNEL_REQ_STATE_PENDING
++         *
++         * Transitions:
++         * - channel->request_state = SSH_CHANNEL_REQ_STATE_DENIED
++         * */
++
++        if (session->session_state != SSH_SESSION_STATE_AUTHENTICATED) {
++            rc = SSH_PACKET_DENIED;
++            break;
++        }
++
++        rc = SSH_PACKET_ALLOWED;
++        break;
++    default:
++        /* Unknown message, do not filter */
++        rc = SSH_PACKET_UNKNOWN;
++        goto end;
++    }
++
++end:
++#ifdef DEBUG_PACKET
++    if (rc == SSH_PACKET_DENIED) {
++        SSH_LOG(SSH_LOG_PACKET, "REJECTED packet type %d: ",
++                session->in_packet.type);
++    }
++
++    if (rc == SSH_PACKET_UNKNOWN) {
++        SSH_LOG(SSH_LOG_PACKET, "UNKNOWN packet type %d",
++                session->in_packet.type);
++    }
++#endif
++
++    return rc;
++}
++
+ /* in nonblocking mode, socket_read will read as much as it can, and return */
+ /* SSH_OK if it has read at least len bytes, otherwise, SSH_AGAIN. */
+ /* in blocking mode, it will read at least len bytes and will block until it's ok. */
+@@ -158,6 +949,7 @@ int ssh_packet_socket_callback(const void *data, size_t receivedlen, void *user)
+     uint32_t packet_len, compsize, payloadsize;
+     uint8_t padding;
+     size_t processed = 0; /* number of byte processed from the callback */
++    enum ssh_packet_filter_result_e filter_result;
+ 
+     if(session->current_crypto != NULL) {
+       current_macsize = hmac_digest_len(session->current_crypto->in_hmac);
+@@ -345,8 +1137,21 @@ int ssh_packet_socket_callback(const void *data, size_t receivedlen, void *user)
+                     "packet: read type %hhd [len=%d,padding=%hhd,comp=%d,payload=%d]",
+                     session->in_packet.type, packet_len, padding, compsize, payloadsize);
+ 
+-            /* Execute callbacks */
+-            ssh_packet_process(session, session->in_packet.type);
++            /* Check if the packet is expected */
++            filter_result = ssh_packet_incoming_filter(session);
++
++            switch(filter_result) {
++            case SSH_PACKET_ALLOWED:
++                /* Execute callbacks */
++                ssh_packet_process(session, session->in_packet.type);
++                break;
++            case SSH_PACKET_DENIED:
++                goto error;
++            case SSH_PACKET_UNKNOWN:
++                ssh_packet_send_unimplemented(session, session->recv_seq - 1);
++                break;
++            }
++
+             session->packet_state = PACKET_STATE_INIT;
+             if (processed < receivedlen) {
+                 /* Handle a potential packet left in socket buffer */

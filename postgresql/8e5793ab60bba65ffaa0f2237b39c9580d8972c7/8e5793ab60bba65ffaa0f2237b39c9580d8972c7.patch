@@ -1,0 +1,1095 @@
+commit 8e5793ab60bba65ffaa0f2237b39c9580d8972c7
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon Oct 19 19:03:46 2020 -0400
+
+    Fix connection string handling in src/bin/scripts/ programs.
+    
+    When told to process all databases, clusterdb, reindexdb, and vacuumdb
+    would reconnect by replacing their --maintenance-db parameter with the
+    name of the target database.  If that parameter is a connstring (which
+    has been allowed for a long time, though we failed to document that
+    before this patch), we'd lose any other options it might specify, for
+    example SSL or GSS parameters, possibly resulting in failure to connect.
+    Thus, this is the same bug as commit a45bc8a4f fixed in pg_dump and
+    pg_restore.  We can fix it in the same way, by using libpq's rules for
+    handling multiple "dbname" parameters to add the target database name
+    separately.  I chose to apply the same refactoring approach as in that
+    patch, with a struct to handle the command line parameters that need to
+    be passed through to connectDatabase.  (Maybe someday we can unify the
+    very similar functions here and in pg_dump/pg_restore.)
+    
+    Per Peter Eisentraut's comments on bug #16604.  Back-patch to all
+    supported branches.
+    
+    Discussion: https://postgr.es/m/16604-933f4b8791227b15@postgresql.org
+
+diff --git a/doc/src/sgml/ref/clusterdb.sgml b/doc/src/sgml/ref/clusterdb.sgml
+index c53bacf864..c838b22c44 100644
+--- a/doc/src/sgml/ref/clusterdb.sgml
++++ b/doc/src/sgml/ref/clusterdb.sgml
+@@ -90,9 +90,9 @@ PostgreSQL documentation
+       <term><option><optional>--dbname=</optional><replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-        Specifies the name of the database to be clustered.
+-        If this is not specified and <option>-a</option> (or
+-        <option>--all</option>) is not used, the database name is read
++        Specifies the name of the database to be clustered,
++        when <option>-a</option>/<option>--all</option> is not used.
++        If this is not specified, the database name is read
+         from the environment variable <envar>PGDATABASE</envar>.  If
+         that is not set, the user name specified for the connection is
+         used.  The <replaceable>dbname</replaceable> can be a <link
+@@ -249,10 +249,16 @@ PostgreSQL documentation
+       <term><option>--maintenance-db=<replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-         Specifies the name of the database to connect to discover what other
+-         databases should be clustered. If not specified, the
+-         <literal>postgres</literal> database will be used,
+-         and if that does not exist, <literal>template1</literal> will be used.
++        Specifies the name of the database to connect to to discover which
++        databases should be clustered,
++        when <option>-a</option>/<option>--all</option> is used.
++        If not specified, the <literal>postgres</literal> database will be used,
++        or if that does not exist, <literal>template1</literal> will be used.
++        This can be a <link linkend="libpq-connstring">connection
++        string</link>.  If so, connection string parameters will override any
++        conflicting command line options.  Also, connection string parameters
++        other than the database name itself will be re-used when connecting
++        to other databases.
+        </para>
+       </listitem>
+      </varlistentry>
+diff --git a/doc/src/sgml/ref/createdb.sgml b/doc/src/sgml/ref/createdb.sgml
+index 95cc82dc88..86473455c9 100644
+--- a/doc/src/sgml/ref/createdb.sgml
++++ b/doc/src/sgml/ref/createdb.sgml
+@@ -284,6 +284,9 @@ PostgreSQL documentation
+          database will be used; if that does not exist (or if it is the name
+          of the new database being created), <literal>template1</literal> will
+          be used.
++         This can be a <link linkend="libpq-connstring">connection
++         string</link>.  If so, connection string parameters will override any
++         conflicting command line options.
+        </para>
+       </listitem>
+      </varlistentry>
+diff --git a/doc/src/sgml/ref/dropdb.sgml b/doc/src/sgml/ref/dropdb.sgml
+index fe523a2ee1..d36aed38c5 100644
+--- a/doc/src/sgml/ref/dropdb.sgml
++++ b/doc/src/sgml/ref/dropdb.sgml
+@@ -217,6 +217,9 @@ PostgreSQL documentation
+          target database. If not specified, the <literal>postgres</literal>
+          database will be used; if that does not exist (or is the database
+          being dropped), <literal>template1</literal> will be used.
++         This can be a <link linkend="libpq-connstring">connection
++         string</link>.  If so, connection string parameters will override any
++         conflicting command line options.
+        </para>
+       </listitem>
+      </varlistentry>
+diff --git a/doc/src/sgml/ref/reindexdb.sgml b/doc/src/sgml/ref/reindexdb.sgml
+index a6d93693c5..5741445333 100644
+--- a/doc/src/sgml/ref/reindexdb.sgml
++++ b/doc/src/sgml/ref/reindexdb.sgml
+@@ -134,9 +134,9 @@ PostgreSQL documentation
+       <term><option><optional>--dbname=</optional><replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-        Specifies the name of the database to be reindexed.
+-        If this is not specified and <option>-a</option> (or
+-        <option>--all</option>) is not used, the database name is read
++        Specifies the name of the database to be reindexed,
++        when <option>-a</option>/<option>--all</option> is not used.
++        If this is not specified, the database name is read
+         from the environment variable <envar>PGDATABASE</envar>.  If
+         that is not set, the user name specified for the connection is
+         used.  The <replaceable>dbname</replaceable> can be a <link
+@@ -351,10 +351,16 @@ PostgreSQL documentation
+       <term><option>--maintenance-db=<replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-         Specifies the name of the database to connect to discover what other
+-         databases should be reindexed. If not specified, the
+-         <literal>postgres</literal> database will be used,
+-         and if that does not exist, <literal>template1</literal> will be used.
++        Specifies the name of the database to connect to to discover which
++        databases should be reindexed,
++        when <option>-a</option>/<option>--all</option> is used.
++        If not specified, the <literal>postgres</literal> database will be used,
++        or if that does not exist, <literal>template1</literal> will be used.
++        This can be a <link linkend="libpq-connstring">connection
++        string</link>.  If so, connection string parameters will override any
++        conflicting command line options.  Also, connection string parameters
++        other than the database name itself will be re-used when connecting
++        to other databases.
+        </para>
+       </listitem>
+      </varlistentry>
+diff --git a/doc/src/sgml/ref/vacuumdb.sgml b/doc/src/sgml/ref/vacuumdb.sgml
+index 6dcdab9caf..a90fc9322f 100644
+--- a/doc/src/sgml/ref/vacuumdb.sgml
++++ b/doc/src/sgml/ref/vacuumdb.sgml
+@@ -92,9 +92,9 @@ PostgreSQL documentation
+       <term><option><optional>--dbname=</optional><replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-        Specifies the name of the database to be cleaned or analyzed.
+-        If this is not specified and <option>-a</option> (or
+-        <option>--all</option>) is not used, the database name is read
++        Specifies the name of the database to be cleaned or analyzed,
++        when <option>-a</option>/<option>--all</option> is not used.
++        If this is not specified, the database name is read
+         from the environment variable <envar>PGDATABASE</envar>.  If
+         that is not set, the user name specified for the connection is
+         used.  The <replaceable>dbname</replaceable> can be a <link
+@@ -474,10 +474,16 @@ PostgreSQL documentation
+       <term><option>--maintenance-db=<replaceable class="parameter">dbname</replaceable></option></term>
+       <listitem>
+        <para>
+-         Specifies the name of the database to connect to discover what other
+-         databases should be vacuumed. If not specified, the
+-         <literal>postgres</literal> database will be used,
+-         and if that does not exist, <literal>template1</literal> will be used.
++        Specifies the name of the database to connect to to discover which
++        databases should be vacuumed,
++        when <option>-a</option>/<option>--all</option> is used.
++        If not specified, the <literal>postgres</literal> database will be used,
++        or if that does not exist, <literal>template1</literal> will be used.
++        This can be a <link linkend="libpq-connstring">connection
++        string</link>.  If so, connection string parameters will override any
++        conflicting command line options.  Also, connection string parameters
++        other than the database name itself will be re-used when connecting
++        to other databases.
+        </para>
+       </listitem>
+      </varlistentry>
+diff --git a/src/bin/scripts/clusterdb.c b/src/bin/scripts/clusterdb.c
+index 12972de0e9..2f786e6103 100644
+--- a/src/bin/scripts/clusterdb.c
++++ b/src/bin/scripts/clusterdb.c
+@@ -17,15 +17,10 @@
+ #include "fe_utils/string_utils.h"
+ 
+ 
+-static void cluster_one_database(const char *dbname, bool verbose, const char *table,
+-								 const char *host, const char *port,
+-								 const char *username, enum trivalue prompt_password,
+-								 const char *progname, bool echo);
+-static void cluster_all_databases(bool verbose, const char *maintenance_db,
+-								  const char *host, const char *port,
+-								  const char *username, enum trivalue prompt_password,
+-								  const char *progname, bool echo, bool quiet);
+-
++static void cluster_one_database(const ConnParams *cparams, const char *table,
++								 const char *progname, bool verbose, bool echo);
++static void cluster_all_databases(ConnParams *cparams, const char *progname,
++								  bool verbose, bool echo, bool quiet);
+ static void help(const char *progname);
+ 
+ 
+@@ -58,6 +53,7 @@ main(int argc, char *argv[])
+ 	char	   *port = NULL;
+ 	char	   *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	bool		quiet = false;
+ 	bool		alldb = false;
+@@ -134,6 +130,13 @@ main(int argc, char *argv[])
+ 		exit(1);
+ 	}
+ 
++	/* fill cparams except for dbname, which is set below */
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
+ 	setup_cancel_handler(NULL);
+ 
+ 	if (alldb)
+@@ -150,8 +153,9 @@ main(int argc, char *argv[])
+ 			exit(1);
+ 		}
+ 
+-		cluster_all_databases(verbose, maintenance_db, host, port, username, prompt_password,
+-							  progname, echo, quiet);
++		cparams.dbname = maintenance_db;
++
++		cluster_all_databases(&cparams, progname, verbose, echo, quiet);
+ 	}
+ 	else
+ 	{
+@@ -165,21 +169,21 @@ main(int argc, char *argv[])
+ 				dbname = get_user_name_or_exit(progname);
+ 		}
+ 
++		cparams.dbname = dbname;
++
+ 		if (tables.head != NULL)
+ 		{
+ 			SimpleStringListCell *cell;
+ 
+ 			for (cell = tables.head; cell; cell = cell->next)
+ 			{
+-				cluster_one_database(dbname, verbose, cell->val,
+-									 host, port, username, prompt_password,
+-									 progname, echo);
++				cluster_one_database(&cparams, cell->val,
++									 progname, verbose, echo);
+ 			}
+ 		}
+ 		else
+-			cluster_one_database(dbname, verbose, NULL,
+-								 host, port, username, prompt_password,
+-								 progname, echo);
++			cluster_one_database(&cparams, NULL,
++								 progname, verbose, echo);
+ 	}
+ 
+ 	exit(0);
+@@ -187,17 +191,14 @@ main(int argc, char *argv[])
+ 
+ 
+ static void
+-cluster_one_database(const char *dbname, bool verbose, const char *table,
+-					 const char *host, const char *port,
+-					 const char *username, enum trivalue prompt_password,
+-					 const char *progname, bool echo)
++cluster_one_database(const ConnParams *cparams, const char *table,
++					 const char *progname, bool verbose, bool echo)
+ {
+ 	PQExpBufferData sql;
+ 
+ 	PGconn	   *conn;
+ 
+-	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, echo, false, false);
++	conn = connectDatabase(cparams, progname, echo, false, false);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+@@ -228,22 +229,17 @@ cluster_one_database(const char *dbname, bool verbose, const char *table,
+ 
+ 
+ static void
+-cluster_all_databases(bool verbose, const char *maintenance_db,
+-					  const char *host, const char *port,
+-					  const char *username, enum trivalue prompt_password,
+-					  const char *progname, bool echo, bool quiet)
++cluster_all_databases(ConnParams *cparams, const char *progname,
++					  bool verbose, bool echo, bool quiet)
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
+-	PQExpBufferData connstr;
+ 	int			i;
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname, echo);
++	conn = connectMaintenanceDatabase(cparams, progname, echo);
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", echo);
+ 	PQfinish(conn);
+ 
+-	initPQExpBuffer(&connstr);
+ 	for (i = 0; i < PQntuples(result); i++)
+ 	{
+ 		char	   *dbname = PQgetvalue(result, i, 0);
+@@ -254,15 +250,10 @@ cluster_all_databases(bool verbose, const char *maintenance_db,
+ 			fflush(stdout);
+ 		}
+ 
+-		resetPQExpBuffer(&connstr);
+-		appendPQExpBufferStr(&connstr, "dbname=");
+-		appendConnStrVal(&connstr, dbname);
++		cparams->override_dbname = dbname;
+ 
+-		cluster_one_database(connstr.data, verbose, NULL,
+-							 host, port, username, prompt_password,
+-							 progname, echo);
++		cluster_one_database(cparams, NULL, progname, verbose, echo);
+ 	}
+-	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }
+diff --git a/src/bin/scripts/common.c b/src/bin/scripts/common.c
+index e987eef234..3362221a31 100644
+--- a/src/bin/scripts/common.c
++++ b/src/bin/scripts/common.c
+@@ -54,7 +54,7 @@ handle_help_version_opts(int argc, char *argv[],
+  * Make a database connection with the given parameters.
+  *
+  * An interactive password prompt is automatically issued if needed and
+- * allowed by prompt_password.
++ * allowed by cparams->prompt_password.
+  *
+  * If allow_password_reuse is true, we will try to re-use any password
+  * given during previous calls to this routine.  (Callers should not pass
+@@ -62,22 +62,23 @@ handle_help_version_opts(int argc, char *argv[],
+  * as before, else we might create password exposure hazards.)
+  */
+ PGconn *
+-connectDatabase(const char *dbname, const char *pghost,
+-				const char *pgport, const char *pguser,
+-				enum trivalue prompt_password, const char *progname,
++connectDatabase(const ConnParams *cparams, const char *progname,
+ 				bool echo, bool fail_ok, bool allow_password_reuse)
+ {
+ 	PGconn	   *conn;
+ 	bool		new_pass;
+ 	static char *password = NULL;
+ 
++	/* Callers must supply at least dbname; other params can be NULL */
++	Assert(cparams->dbname);
++
+ 	if (!allow_password_reuse && password)
+ 	{
+ 		free(password);
+ 		password = NULL;
+ 	}
+ 
+-	if (!password && prompt_password == TRI_YES)
++	if (cparams->prompt_password == TRI_YES && password == NULL)
+ 		password = simple_prompt("Password: ", false);
+ 
+ 	/*
+@@ -86,23 +87,35 @@ connectDatabase(const char *dbname, const char *pghost,
+ 	 */
+ 	do
+ 	{
+-		const char *keywords[7];
+-		const char *values[7];
+-
+-		keywords[0] = "host";
+-		values[0] = pghost;
+-		keywords[1] = "port";
+-		values[1] = pgport;
+-		keywords[2] = "user";
+-		values[2] = pguser;
+-		keywords[3] = "password";
+-		values[3] = password;
+-		keywords[4] = "dbname";
+-		values[4] = dbname;
+-		keywords[5] = "fallback_application_name";
+-		values[5] = progname;
+-		keywords[6] = NULL;
+-		values[6] = NULL;
++		const char *keywords[8];
++		const char *values[8];
++		int			i = 0;
++
++		/*
++		 * If dbname is a connstring, its entries can override the other
++		 * values obtained from cparams; but in turn, override_dbname can
++		 * override the dbname component of it.
++		 */
++		keywords[i] = "host";
++		values[i++] = cparams->pghost;
++		keywords[i] = "port";
++		values[i++] = cparams->pgport;
++		keywords[i] = "user";
++		values[i++] = cparams->pguser;
++		keywords[i] = "password";
++		values[i++] = password;
++		keywords[i] = "dbname";
++		values[i++] = cparams->dbname;
++		if (cparams->override_dbname)
++		{
++			keywords[i] = "dbname";
++			values[i++] = cparams->override_dbname;
++		}
++		keywords[i] = "fallback_application_name";
++		values[i++] = progname;
++		keywords[i] = NULL;
++		values[i++] = NULL;
++		Assert(i <= lengthof(keywords));
+ 
+ 		new_pass = false;
+ 		conn = PQconnectdbParams(keywords, values, true);
+@@ -110,7 +123,7 @@ connectDatabase(const char *dbname, const char *pghost,
+ 		if (!conn)
+ 		{
+ 			pg_log_error("could not connect to database %s: out of memory",
+-						 dbname);
++						 cparams->dbname);
+ 			exit(1);
+ 		}
+ 
+@@ -119,7 +132,7 @@ connectDatabase(const char *dbname, const char *pghost,
+ 		 */
+ 		if (PQstatus(conn) == CONNECTION_BAD &&
+ 			PQconnectionNeedsPassword(conn) &&
+-			prompt_password != TRI_NO)
++			cparams->prompt_password != TRI_NO)
+ 		{
+ 			PQfinish(conn);
+ 			if (password)
+@@ -138,10 +151,11 @@ connectDatabase(const char *dbname, const char *pghost,
+ 			return NULL;
+ 		}
+ 		pg_log_error("could not connect to database %s: %s",
+-					 dbname, PQerrorMessage(conn));
++					 cparams->dbname, PQerrorMessage(conn));
+ 		exit(1);
+ 	}
+ 
++	/* Start strict; callers may override this. */
+ 	PQclear(executeQuery(conn, ALWAYS_SECURE_SEARCH_PATH_SQL, echo));
+ 
+ 	return conn;
+@@ -149,27 +163,30 @@ connectDatabase(const char *dbname, const char *pghost,
+ 
+ /*
+  * Try to connect to the appropriate maintenance database.
++ *
++ * This differs from connectDatabase only in that it has a rule for
++ * inserting a default "dbname" if none was given (which is why cparams
++ * is not const).  Note that cparams->dbname should typically come from
++ * a --maintenance-db command line parameter.
+  */
+ PGconn *
+-connectMaintenanceDatabase(const char *maintenance_db,
+-						   const char *pghost, const char *pgport,
+-						   const char *pguser, enum trivalue prompt_password,
++connectMaintenanceDatabase(ConnParams *cparams,
+ 						   const char *progname, bool echo)
+ {
+ 	PGconn	   *conn;
+ 
+ 	/* If a maintenance database name was specified, just connect to it. */
+-	if (maintenance_db)
+-		return connectDatabase(maintenance_db, pghost, pgport, pguser,
+-							   prompt_password, progname, echo, false, false);
++	if (cparams->dbname)
++		return connectDatabase(cparams, progname, echo, false, false);
+ 
+ 	/* Otherwise, try postgres first and then template1. */
+-	conn = connectDatabase("postgres", pghost, pgport, pguser, prompt_password,
+-						   progname, echo, true, false);
++	cparams->dbname = "postgres";
++	conn = connectDatabase(cparams, progname, echo, true, false);
+ 	if (!conn)
+-		conn = connectDatabase("template1", pghost, pgport, pguser,
+-							   prompt_password, progname, echo, false, false);
+-
++	{
++		cparams->dbname = "template1";
++		conn = connectDatabase(cparams, progname, echo, false, false);
++	}
+ 	return conn;
+ }
+ 
+diff --git a/src/bin/scripts/common.h b/src/bin/scripts/common.h
+index ddf6320b47..9ec57cdd87 100644
+--- a/src/bin/scripts/common.h
++++ b/src/bin/scripts/common.h
+@@ -21,20 +21,32 @@ enum trivalue
+ 	TRI_YES
+ };
+ 
++/* Parameters needed by connectDatabase/connectMaintenanceDatabase */
++typedef struct _connParams
++{
++	/* These fields record the actual command line parameters */
++	const char *dbname;			/* this may be a connstring! */
++	const char *pghost;
++	const char *pgport;
++	const char *pguser;
++	enum trivalue prompt_password;
++	/* If not NULL, this overrides the dbname obtained from command line */
++	/* (but *only* the DB name, not anything else in the connstring) */
++	const char *override_dbname;
++} ConnParams;
++
+ typedef void (*help_handler) (const char *progname);
+ 
+ extern void handle_help_version_opts(int argc, char *argv[],
+ 									 const char *fixed_progname,
+ 									 help_handler hlp);
+ 
+-extern PGconn *connectDatabase(const char *dbname, const char *pghost,
+-							   const char *pgport, const char *pguser,
+-							   enum trivalue prompt_password, const char *progname,
+-							   bool echo, bool fail_ok, bool allow_password_reuse);
++extern PGconn *connectDatabase(const ConnParams *cparams,
++							   const char *progname,
++							   bool echo, bool fail_ok,
++							   bool allow_password_reuse);
+ 
+-extern PGconn *connectMaintenanceDatabase(const char *maintenance_db,
+-										  const char *pghost, const char *pgport,
+-										  const char *pguser, enum trivalue prompt_password,
++extern PGconn *connectMaintenanceDatabase(ConnParams *cparams,
+ 										  const char *progname, bool echo);
+ 
+ extern void disconnectDatabase(PGconn *conn);
+diff --git a/src/bin/scripts/createdb.c b/src/bin/scripts/createdb.c
+index 1353af97c4..91e6e2194b 100644
+--- a/src/bin/scripts/createdb.c
++++ b/src/bin/scripts/createdb.c
+@@ -51,6 +51,7 @@ main(int argc, char *argv[])
+ 	char	   *port = NULL;
+ 	char	   *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	char	   *owner = NULL;
+ 	char	   *tablespace = NULL;
+@@ -180,8 +181,14 @@ main(int argc, char *argv[])
+ 	if (maintenance_db == NULL && strcmp(dbname, "postgres") == 0)
+ 		maintenance_db = "template1";
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname, echo);
++	cparams.dbname = maintenance_db;
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
++	conn = connectMaintenanceDatabase(&cparams, progname, echo);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+diff --git a/src/bin/scripts/createuser.c b/src/bin/scripts/createuser.c
+index 6179199563..d6b56f15c3 100644
+--- a/src/bin/scripts/createuser.c
++++ b/src/bin/scripts/createuser.c
+@@ -59,6 +59,7 @@ main(int argc, char *argv[])
+ 	char	   *username = NULL;
+ 	SimpleStringList roles = {NULL, NULL};
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	bool		interactive = false;
+ 	int			conn_limit = -2;	/* less than minimum valid value */
+@@ -252,8 +253,14 @@ main(int argc, char *argv[])
+ 	if (login == 0)
+ 		login = TRI_YES;
+ 
+-	conn = connectDatabase("postgres", host, port, username, prompt_password,
+-						   progname, echo, false, false);
++	cparams.dbname = NULL;		/* this program lacks any dbname option... */
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
++	conn = connectMaintenanceDatabase(&cparams, progname, echo);
+ 
+ 	initPQExpBuffer(&sql);
+ 
+diff --git a/src/bin/scripts/dropdb.c b/src/bin/scripts/dropdb.c
+index 581c7749c8..ccbf78e91a 100644
+--- a/src/bin/scripts/dropdb.c
++++ b/src/bin/scripts/dropdb.c
+@@ -48,6 +48,7 @@ main(int argc, char *argv[])
+ 	char	   *port = NULL;
+ 	char	   *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	bool		interactive = false;
+ 	bool		force = false;
+@@ -137,9 +138,14 @@ main(int argc, char *argv[])
+ 	if (maintenance_db == NULL && strcmp(dbname, "postgres") == 0)
+ 		maintenance_db = "template1";
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db,
+-									  host, port, username, prompt_password,
+-									  progname, echo);
++	cparams.dbname = maintenance_db;
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
++	conn = connectMaintenanceDatabase(&cparams, progname, echo);
+ 
+ 	if (echo)
+ 		printf("%s\n", sql.data);
+diff --git a/src/bin/scripts/dropuser.c b/src/bin/scripts/dropuser.c
+index f7ddd1402d..73d7328a88 100644
+--- a/src/bin/scripts/dropuser.c
++++ b/src/bin/scripts/dropuser.c
+@@ -46,6 +46,7 @@ main(int argc, char *argv[])
+ 	char	   *port = NULL;
+ 	char	   *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	bool		interactive = false;
+ 
+@@ -129,13 +130,19 @@ main(int argc, char *argv[])
+ 			exit(0);
+ 	}
+ 
++	cparams.dbname = NULL;		/* this program lacks any dbname option... */
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
++	conn = connectMaintenanceDatabase(&cparams, progname, echo);
++
+ 	initPQExpBuffer(&sql);
+ 	appendPQExpBuffer(&sql, "DROP ROLE %s%s;",
+ 					  (if_exists ? "IF EXISTS " : ""), fmtId(dropuser));
+ 
+-	conn = connectDatabase("postgres", host, port, username, prompt_password,
+-						   progname, echo, false, false);
+-
+ 	if (echo)
+ 		printf("%s\n", sql.data);
+ 	result = PQexec(conn, sql.data);
+diff --git a/src/bin/scripts/reindexdb.c b/src/bin/scripts/reindexdb.c
+index 1efb53110e..b32a7746ba 100644
+--- a/src/bin/scripts/reindexdb.c
++++ b/src/bin/scripts/reindexdb.c
+@@ -34,15 +34,12 @@ static SimpleStringList *get_parallel_object_list(PGconn *conn,
+ 												  ReindexType type,
+ 												  SimpleStringList *user_list,
+ 												  bool echo);
+-static void reindex_one_database(const char *dbname, ReindexType type,
+-								 SimpleStringList *user_list, const char *host,
+-								 const char *port, const char *username,
+-								 enum trivalue prompt_password, const char *progname,
++static void reindex_one_database(const ConnParams *cparams, ReindexType type,
++								 SimpleStringList *user_list,
++								 const char *progname,
+ 								 bool echo, bool verbose, bool concurrently,
+ 								 int concurrentCons);
+-static void reindex_all_databases(const char *maintenance_db,
+-								  const char *host, const char *port,
+-								  const char *username, enum trivalue prompt_password,
++static void reindex_all_databases(ConnParams *cparams,
+ 								  const char *progname, bool echo,
+ 								  bool quiet, bool verbose, bool concurrently,
+ 								  int concurrentCons);
+@@ -86,6 +83,7 @@ main(int argc, char *argv[])
+ 	const char *port = NULL;
+ 	const char *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		syscatalog = false;
+ 	bool		alldb = false;
+ 	bool		echo = false;
+@@ -188,6 +186,13 @@ main(int argc, char *argv[])
+ 		exit(1);
+ 	}
+ 
++	/* fill cparams except for dbname, which is set below */
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
+ 	setup_cancel_handler(NULL);
+ 
+ 	if (alldb)
+@@ -218,8 +223,9 @@ main(int argc, char *argv[])
+ 			exit(1);
+ 		}
+ 
+-		reindex_all_databases(maintenance_db, host, port, username,
+-							  prompt_password, progname, echo, quiet, verbose,
++		cparams.dbname = maintenance_db;
++
++		reindex_all_databases(&cparams, progname, echo, quiet, verbose,
+ 							  concurrently, concurrentCons);
+ 	}
+ 	else if (syscatalog)
+@@ -256,9 +262,11 @@ main(int argc, char *argv[])
+ 				dbname = get_user_name_or_exit(progname);
+ 		}
+ 
+-		reindex_one_database(dbname, REINDEX_SYSTEM, NULL, host,
+-							 port, username, prompt_password, progname,
+-							 echo, verbose, concurrently, 1);
++		cparams.dbname = dbname;
++
++		reindex_one_database(&cparams, REINDEX_SYSTEM, NULL,
++							 progname, echo, verbose,
++							 concurrently, 1);
+ 	}
+ 	else
+ 	{
+@@ -283,40 +291,40 @@ main(int argc, char *argv[])
+ 				dbname = get_user_name_or_exit(progname);
+ 		}
+ 
++		cparams.dbname = dbname;
++
+ 		if (schemas.head != NULL)
+-			reindex_one_database(dbname, REINDEX_SCHEMA, &schemas, host,
+-								 port, username, prompt_password, progname,
+-								 echo, verbose, concurrently, concurrentCons);
++			reindex_one_database(&cparams, REINDEX_SCHEMA, &schemas,
++								 progname, echo, verbose,
++								 concurrently, concurrentCons);
+ 
+ 		if (indexes.head != NULL)
+-			reindex_one_database(dbname, REINDEX_INDEX, &indexes, host,
+-								 port, username, prompt_password, progname,
+-								 echo, verbose, concurrently, 1);
++			reindex_one_database(&cparams, REINDEX_INDEX, &indexes,
++								 progname, echo, verbose,
++								 concurrently, 1);
+ 
+ 		if (tables.head != NULL)
+-			reindex_one_database(dbname, REINDEX_TABLE, &tables, host,
+-								 port, username, prompt_password, progname,
+-								 echo, verbose, concurrently,
+-								 concurrentCons);
++			reindex_one_database(&cparams, REINDEX_TABLE, &tables,
++								 progname, echo, verbose,
++								 concurrently, concurrentCons);
+ 
+ 		/*
+ 		 * reindex database only if neither index nor table nor schema is
+ 		 * specified
+ 		 */
+ 		if (indexes.head == NULL && tables.head == NULL && schemas.head == NULL)
+-			reindex_one_database(dbname, REINDEX_DATABASE, NULL, host,
+-								 port, username, prompt_password, progname,
+-								 echo, verbose, concurrently, concurrentCons);
++			reindex_one_database(&cparams, REINDEX_DATABASE, NULL,
++								 progname, echo, verbose,
++								 concurrently, concurrentCons);
+ 	}
+ 
+ 	exit(0);
+ }
+ 
+ static void
+-reindex_one_database(const char *dbname, ReindexType type,
+-					 SimpleStringList *user_list, const char *host,
+-					 const char *port, const char *username,
+-					 enum trivalue prompt_password, const char *progname, bool echo,
++reindex_one_database(const ConnParams *cparams, ReindexType type,
++					 SimpleStringList *user_list,
++					 const char *progname, bool echo,
+ 					 bool verbose, bool concurrently, int concurrentCons)
+ {
+ 	PGconn	   *conn;
+@@ -328,8 +336,7 @@ reindex_one_database(const char *dbname, ReindexType type,
+ 	bool		failed = false;
+ 	int			items_count = 0;
+ 
+-	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, echo, false, false);
++	conn = connectDatabase(cparams, progname, echo, false, false);
+ 
+ 	if (concurrently && PQserverVersion(conn) < 120000)
+ 	{
+@@ -436,8 +443,7 @@ reindex_one_database(const char *dbname, ReindexType type,
+ 
+ 	Assert(process_list != NULL);
+ 
+-	slots = ParallelSlotsSetup(dbname, host, port, username, prompt_password,
+-							   progname, echo, conn, concurrentCons);
++	slots = ParallelSlotsSetup(cparams, progname, echo, conn, concurrentCons);
+ 
+ 	cell = process_list->head;
+ 	do
+@@ -705,23 +711,18 @@ get_parallel_object_list(PGconn *conn, ReindexType type,
+ }
+ 
+ static void
+-reindex_all_databases(const char *maintenance_db,
+-					  const char *host, const char *port,
+-					  const char *username, enum trivalue prompt_password,
++reindex_all_databases(ConnParams *cparams,
+ 					  const char *progname, bool echo, bool quiet, bool verbose,
+ 					  bool concurrently, int concurrentCons)
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
+-	PQExpBufferData connstr;
+ 	int			i;
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname, echo);
++	conn = connectMaintenanceDatabase(cparams, progname, echo);
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", echo);
+ 	PQfinish(conn);
+ 
+-	initPQExpBuffer(&connstr);
+ 	for (i = 0; i < PQntuples(result); i++)
+ 	{
+ 		char	   *dbname = PQgetvalue(result, i, 0);
+@@ -732,16 +733,12 @@ reindex_all_databases(const char *maintenance_db,
+ 			fflush(stdout);
+ 		}
+ 
+-		resetPQExpBuffer(&connstr);
+-		appendPQExpBufferStr(&connstr, "dbname=");
+-		appendConnStrVal(&connstr, dbname);
++		cparams->override_dbname = dbname;
+ 
+-		reindex_one_database(connstr.data, REINDEX_DATABASE, NULL, host,
+-							 port, username, prompt_password,
++		reindex_one_database(cparams, REINDEX_DATABASE, NULL,
+ 							 progname, echo, verbose, concurrently,
+ 							 concurrentCons);
+ 	}
+-	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }
+diff --git a/src/bin/scripts/scripts_parallel.c b/src/bin/scripts/scripts_parallel.c
+index 01bc6dfeff..ec264a269a 100644
+--- a/src/bin/scripts/scripts_parallel.c
++++ b/src/bin/scripts/scripts_parallel.c
+@@ -205,8 +205,7 @@ ParallelSlotsGetIdle(ParallelSlot *slots, int numslots)
+  * set.
+  */
+ ParallelSlot *
+-ParallelSlotsSetup(const char *dbname, const char *host, const char *port,
+-				   const char *username, bool prompt_password,
++ParallelSlotsSetup(const ConnParams *cparams,
+ 				   const char *progname, bool echo,
+ 				   PGconn *conn, int numslots)
+ {
+@@ -221,8 +220,7 @@ ParallelSlotsSetup(const char *dbname, const char *host, const char *port,
+ 	{
+ 		for (i = 1; i < numslots; i++)
+ 		{
+-			conn = connectDatabase(dbname, host, port, username, prompt_password,
+-								   progname, echo, false, true);
++			conn = connectDatabase(cparams, progname, echo, false, true);
+ 
+ 			/*
+ 			 * Fail and exit immediately if trying to use a socket in an
+diff --git a/src/bin/scripts/scripts_parallel.h b/src/bin/scripts/scripts_parallel.h
+index cf20449ce3..c9d9f0623e 100644
+--- a/src/bin/scripts/scripts_parallel.h
++++ b/src/bin/scripts/scripts_parallel.h
+@@ -12,6 +12,7 @@
+ #ifndef SCRIPTS_PARALLEL_H
+ #define SCRIPTS_PARALLEL_H
+ 
++#include "common.h"
+ #include "libpq-fe.h"
+ 
+ 
+@@ -23,10 +24,7 @@ typedef struct ParallelSlot
+ 
+ extern ParallelSlot *ParallelSlotsGetIdle(ParallelSlot *slots, int numslots);
+ 
+-extern ParallelSlot *ParallelSlotsSetup(const char *dbname, const char *host,
+-										const char *port,
+-										const char *username,
+-										bool prompt_password,
++extern ParallelSlot *ParallelSlotsSetup(const ConnParams *cparams,
+ 										const char *progname, bool echo,
+ 										PGconn *conn, int numslots);
+ 
+diff --git a/src/bin/scripts/vacuumdb.c b/src/bin/scripts/vacuumdb.c
+index 2a1247a1b0..8c2eade1d5 100644
+--- a/src/bin/scripts/vacuumdb.c
++++ b/src/bin/scripts/vacuumdb.c
+@@ -42,19 +42,16 @@ typedef struct vacuumingOptions
+ } vacuumingOptions;
+ 
+ 
+-static void vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
++static void vacuum_one_database(const ConnParams *cparams,
++								vacuumingOptions *vacopts,
+ 								int stage,
+ 								SimpleStringList *tables,
+-								const char *host, const char *port,
+-								const char *username, enum trivalue prompt_password,
+ 								int concurrentCons,
+ 								const char *progname, bool echo, bool quiet);
+ 
+-static void vacuum_all_databases(vacuumingOptions *vacopts,
++static void vacuum_all_databases(ConnParams *cparams,
++								 vacuumingOptions *vacopts,
+ 								 bool analyze_in_stages,
+-								 const char *maintenance_db,
+-								 const char *host, const char *port,
+-								 const char *username, enum trivalue prompt_password,
+ 								 int concurrentCons,
+ 								 const char *progname, bool echo, bool quiet);
+ 
+@@ -112,6 +109,7 @@ main(int argc, char *argv[])
+ 	char	   *port = NULL;
+ 	char	   *username = NULL;
+ 	enum trivalue prompt_password = TRI_DEFAULT;
++	ConnParams	cparams;
+ 	bool		echo = false;
+ 	bool		quiet = false;
+ 	vacuumingOptions vacopts;
+@@ -311,6 +309,13 @@ main(int argc, char *argv[])
+ 		}
+ 	}
+ 
++	/* fill cparams except for dbname, which is set below */
++	cparams.pghost = host;
++	cparams.pgport = port;
++	cparams.pguser = username;
++	cparams.prompt_password = prompt_password;
++	cparams.override_dbname = NULL;
++
+ 	setup_cancel_handler(NULL);
+ 
+ 	/* Avoid opening extra connections. */
+@@ -330,10 +335,10 @@ main(int argc, char *argv[])
+ 			exit(1);
+ 		}
+ 
+-		vacuum_all_databases(&vacopts,
++		cparams.dbname = maintenance_db;
++
++		vacuum_all_databases(&cparams, &vacopts,
+ 							 analyze_in_stages,
+-							 maintenance_db,
+-							 host, port, username, prompt_password,
+ 							 concurrentCons,
+ 							 progname, echo, quiet);
+ 	}
+@@ -349,25 +354,25 @@ main(int argc, char *argv[])
+ 				dbname = get_user_name_or_exit(progname);
+ 		}
+ 
++		cparams.dbname = dbname;
++
+ 		if (analyze_in_stages)
+ 		{
+ 			int			stage;
+ 
+ 			for (stage = 0; stage < ANALYZE_NUM_STAGES; stage++)
+ 			{
+-				vacuum_one_database(dbname, &vacopts,
++				vacuum_one_database(&cparams, &vacopts,
+ 									stage,
+ 									&tables,
+-									host, port, username, prompt_password,
+ 									concurrentCons,
+ 									progname, echo, quiet);
+ 			}
+ 		}
+ 		else
+-			vacuum_one_database(dbname, &vacopts,
++			vacuum_one_database(&cparams, &vacopts,
+ 								ANALYZE_NO_STAGE,
+ 								&tables,
+-								host, port, username, prompt_password,
+ 								concurrentCons,
+ 								progname, echo, quiet);
+ 	}
+@@ -389,11 +394,10 @@ main(int argc, char *argv[])
+  * a list of tables from the database.
+  */
+ static void
+-vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
++vacuum_one_database(const ConnParams *cparams,
++					vacuumingOptions *vacopts,
+ 					int stage,
+ 					SimpleStringList *tables,
+-					const char *host, const char *port,
+-					const char *username, enum trivalue prompt_password,
+ 					int concurrentCons,
+ 					const char *progname, bool echo, bool quiet)
+ {
+@@ -424,8 +428,7 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
+ 	Assert(stage == ANALYZE_NO_STAGE ||
+ 		   (stage >= 0 && stage < ANALYZE_NUM_STAGES));
+ 
+-	conn = connectDatabase(dbname, host, port, username, prompt_password,
+-						   progname, echo, false, true);
++	conn = connectDatabase(cparams, progname, echo, false, true);
+ 
+ 	if (vacopts->disable_page_skipping && PQserverVersion(conn) < 90600)
+ 	{
+@@ -663,8 +666,7 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
+ 	 * for the first slot.  If not in parallel mode, the first slot in the
+ 	 * array contains the connection.
+ 	 */
+-	slots = ParallelSlotsSetup(dbname, host, port, username, prompt_password,
+-							   progname, echo, conn, concurrentCons);
++	slots = ParallelSlotsSetup(cparams, progname, echo, conn, concurrentCons);
+ 
+ 	/*
+ 	 * Prepare all the connections to run the appropriate analyze stage, if
+@@ -736,28 +738,23 @@ finish:
+  * quickly everywhere before generating more detailed ones.
+  */
+ static void
+-vacuum_all_databases(vacuumingOptions *vacopts,
++vacuum_all_databases(ConnParams *cparams,
++					 vacuumingOptions *vacopts,
+ 					 bool analyze_in_stages,
+-					 const char *maintenance_db, const char *host,
+-					 const char *port, const char *username,
+-					 enum trivalue prompt_password,
+ 					 int concurrentCons,
+ 					 const char *progname, bool echo, bool quiet)
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
+-	PQExpBufferData connstr;
+ 	int			stage;
+ 	int			i;
+ 
+-	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+-									  prompt_password, progname, echo);
++	conn = connectMaintenanceDatabase(cparams, progname, echo);
+ 	result = executeQuery(conn,
+ 						  "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;",
+ 						  echo);
+ 	PQfinish(conn);
+ 
+-	initPQExpBuffer(&connstr);
+ 	if (analyze_in_stages)
+ 	{
+ 		/*
+@@ -772,14 +769,11 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 		{
+ 			for (i = 0; i < PQntuples(result); i++)
+ 			{
+-				resetPQExpBuffer(&connstr);
+-				appendPQExpBufferStr(&connstr, "dbname=");
+-				appendConnStrVal(&connstr, PQgetvalue(result, i, 0));
++				cparams->override_dbname = PQgetvalue(result, i, 0);
+ 
+-				vacuum_one_database(connstr.data, vacopts,
++				vacuum_one_database(cparams, vacopts,
+ 									stage,
+ 									NULL,
+-									host, port, username, prompt_password,
+ 									concurrentCons,
+ 									progname, echo, quiet);
+ 			}
+@@ -789,19 +783,15 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 	{
+ 		for (i = 0; i < PQntuples(result); i++)
+ 		{
+-			resetPQExpBuffer(&connstr);
+-			appendPQExpBufferStr(&connstr, "dbname=");
+-			appendConnStrVal(&connstr, PQgetvalue(result, i, 0));
++			cparams->override_dbname = PQgetvalue(result, i, 0);
+ 
+-			vacuum_one_database(connstr.data, vacopts,
++			vacuum_one_database(cparams, vacopts,
+ 								ANALYZE_NO_STAGE,
+ 								NULL,
+-								host, port, username, prompt_password,
+ 								concurrentCons,
+ 								progname, echo, quiet);
+ 		}
+ 	}
+-	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }

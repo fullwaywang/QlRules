@@ -1,0 +1,138 @@
+commit 87184a20cfcfe1523926a2e4a724c1a01c7ae0fb
+Author: Luiz Augusto von Dentz <luiz.von.dentz@intel.com>
+Date:   Tue Jan 5 16:38:03 2021 -0800
+
+    shared/gatt-db: Introduce gatt_db_attribute_set_fixed_length
+    
+    This enables user to inform if an attribute has a fixed length so it can
+    automatically perform bounds checking.
+
+diff --git a/src/shared/gatt-db.c b/src/shared/gatt-db.c
+index 54e64d0e0..8bff4d37a 100644
+--- a/src/shared/gatt-db.c
++++ b/src/shared/gatt-db.c
+@@ -1836,6 +1836,38 @@ static uint8_t attribute_authorize(struct gatt_db_attribute *attrib,
+ 	return db->authorize(attrib, opcode, att, db->authorize_data);
+ }
+ 
++bool gatt_db_attribute_set_fixed_length(struct gatt_db_attribute *attrib,
++						uint16_t len)
++{
++	struct gatt_db_service *service;
++
++	if (!attrib)
++		return false;
++
++	service = attrib->service;
++
++	/* Don't allow overwriting length of service attribute */
++	if (attrib->service->attributes[0] == attrib)
++		return false;
++
++	/* If attribute is a characteristic declaration ajust to its value */
++	if (!bt_uuid_cmp(&characteristic_uuid, &attrib->uuid)) {
++		int i;
++
++		/* Start from the attribute following the value handle */
++		for (i = 0; i < service->num_handles; i++) {
++			if (service->attributes[i] == attrib) {
++				attrib = service->attributes[i + 1];
++				break;
++			}
++		}
++	}
++
++	attrib->value_len = len;
++
++	return true;
++}
++
+ bool gatt_db_attribute_read(struct gatt_db_attribute *attrib, uint16_t offset,
+ 				uint8_t opcode, struct bt_att *att,
+ 				gatt_db_attribute_read_t func, void *user_data)
+@@ -1845,6 +1877,12 @@ bool gatt_db_attribute_read(struct gatt_db_attribute *attrib, uint16_t offset,
+ 	if (!attrib || !func)
+ 		return false;
+ 
++	/* Check boundaries if value_len is set */
++	if (attrib->value_len && offset > attrib->value_len) {
++		func(attrib, BT_ATT_ERROR_INVALID_OFFSET, NULL, 0, user_data);
++		return true;
++	}
++
+ 	if (attrib->read_func) {
+ 		struct pending_read *p;
+ 		uint8_t err;
+@@ -1870,12 +1908,6 @@ bool gatt_db_attribute_read(struct gatt_db_attribute *attrib, uint16_t offset,
+ 		return true;
+ 	}
+ 
+-	/* Check boundary if value is stored in the db */
+-	if (offset > attrib->value_len) {
+-		func(attrib, BT_ATT_ERROR_INVALID_OFFSET, NULL, 0, user_data);
+-		return true;
+-	}
+-
+ 	/* Guard against invalid access if offset equals to value length */
+ 	value = offset == attrib->value_len ? NULL : &attrib->value[offset];
+ 
+@@ -1930,19 +1962,31 @@ bool gatt_db_attribute_write(struct gatt_db_attribute *attrib, uint16_t offset,
+ 					gatt_db_attribute_write_t func,
+ 					void *user_data)
+ {
++	uint8_t err = 0;
++
+ 	if (!attrib || !func)
+ 		return false;
+ 
+ 	if (attrib->write_func) {
+ 		struct pending_write *p;
+-		uint8_t err;
+ 
+-		err = attribute_authorize(attrib, opcode, att);
+-		if (err) {
+-			func(attrib, err, user_data);
+-			return true;
++		/* Check boundaries if value_len is set */
++		if (attrib->value_len) {
++			if (offset > attrib->value_len) {
++				err = BT_ATT_ERROR_INVALID_OFFSET;
++				goto done;
++			}
++
++			if (offset + len > attrib->value_len) {
++				err = BT_ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LEN;
++				goto done;
++			}
+ 		}
+ 
++		err = attribute_authorize(attrib, opcode, att);
++		if (err)
++			goto done;
++
+ 		p = new0(struct pending_write, 1);
+ 		p->attrib = attrib;
+ 		p->id = ++attrib->write_id;
+@@ -1983,7 +2027,7 @@ bool gatt_db_attribute_write(struct gatt_db_attribute *attrib, uint16_t offset,
+ 	memcpy(&attrib->value[offset], value, len);
+ 
+ done:
+-	func(attrib, 0, user_data);
++	func(attrib, err, user_data);
+ 
+ 	return true;
+ }
+diff --git a/src/shared/gatt-db.h b/src/shared/gatt-db.h
+index a0da33065..321a2aba6 100644
+--- a/src/shared/gatt-db.h
++++ b/src/shared/gatt-db.h
+@@ -241,6 +241,9 @@ bool gatt_db_attribute_get_incl_data(const struct gatt_db_attribute *attrib,
+ uint32_t
+ gatt_db_attribute_get_permissions(const struct gatt_db_attribute *attrib);
+ 
++bool gatt_db_attribute_set_fixed_length(struct gatt_db_attribute *attrib,
++						uint16_t len);
++
+ typedef void (*gatt_db_attribute_read_t) (struct gatt_db_attribute *attrib,
+ 						int err, const uint8_t *value,
+ 						size_t length, void *user_data);

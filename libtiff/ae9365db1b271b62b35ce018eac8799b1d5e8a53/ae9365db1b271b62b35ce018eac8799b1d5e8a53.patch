@@ -1,0 +1,46 @@
+commit ae9365db1b271b62b35ce018eac8799b1d5e8a53	ae9365db1b271b62b35ce018eac8799b1d5e8a53
+Author: erouault <erouault>
+Date:   Fri Oct 14 19:13:20 2016 +0000
+
+    * tools/tiffcrop.c: fix out-of-bound read of up to 3 bytes in
+    readContigTilesIntoBuffer(). Reported as MSVR 35092 by Axel Souchet
+    & Vishal Chauhan from the MSRC Vulnerabilities & Mitigations team.
+
+diff --git a/ChangeLog b/ChangeLog
+index d6e718de..84d016d7 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,9 @@
++2016-10-14 Even Rouault <even.rouault at spatialys.com>
++
++	* tools/tiffcrop.c: fix out-of-bound read of up to 3 bytes in
++	readContigTilesIntoBuffer(). Reported as MSVR 35092 by Axel Souchet
++	& Vishal Chauhan from the MSRC Vulnerabilities & Mitigations team.
++
+ 2016-10-09 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* tools/tiff2pdf.c: fix write buffer overflow of 2 bytes on JPEG
+diff --git a/tools/tiffcrop.c b/tools/tiffcrop.c
+index eb6de77c..47177373 100644
+--- a/tools/tiffcrop.c
++++ b/tools/tiffcrop.c
+@@ -819,9 +819,18 @@ static int readContigTilesIntoBuffer (TIFF* in, uint8* buf,
+     }
+     }
+ 
+-  tilebuf = _TIFFmalloc(tile_buffsize);
++  /* Add 3 padding bytes for extractContigSamplesShifted32bits */
++  if( tile_buffsize > 0xFFFFFFFFU - 3 )
++  {
++      TIFFError("readContigTilesIntoBuffer", "Integer overflow when calculating buffer size.");
++      exit(-1);
++  }
++  tilebuf = _TIFFmalloc(tile_buffsize + 3);
+   if (tilebuf == 0)
+     return 0;
++  tilebuf[tile_buffsize] = 0;
++  tilebuf[tile_buffsize+1] = 0;
++  tilebuf[tile_buffsize+2] = 0;
+ 
+   dst_rowsize = ((imagewidth * bps * spp) + 7) / 8;  
+   for (row = 0; row < imagelength; row += tl)

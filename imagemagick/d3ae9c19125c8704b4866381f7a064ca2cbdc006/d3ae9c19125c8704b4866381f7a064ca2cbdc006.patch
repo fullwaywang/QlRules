@@ -1,0 +1,20 @@
+commit d3ae9c19125c8704b4866381f7a064ca2cbdc006
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Thu Mar 28 20:22:13 2019 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1533
+
+diff --git a/coders/svg.c b/coders/svg.c
+index 6cc261df0..05f5d228b 100644
+--- a/coders/svg.c
++++ b/coders/svg.c
+@@ -2821,6 +2821,9 @@ static void SVGEndElement(void *context,const xmlChar *name)
+             SVGProcessStyleElement(context,name,value);
+             (void) FormatLocaleFile(svg_info->file,"pop class\n");
+           }
++          for (j=0; tokens[j] != (char *) NULL; j++)
++            tokens[j]=DestroyString(tokens[j]);
++          tokens=(char **) RelinquishMagickMemory(tokens);
+           break;
+         }
+       if (LocaleCompare((const char *) name,"svg") == 0)

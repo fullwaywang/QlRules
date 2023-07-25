@@ -1,0 +1,12 @@
+commit cfbb883bf6ea7bedcb04177cc4e52d304522fdff
+Merge: e8131125 afd70860
+Author: Even Rouault <even.rouault@spatialys.com>
+Date:   Thu Oct 13 14:33:28 2022 +0000
+
+    Merge branch 'tiffcrop_fix_#435' into 'master'
+    
+    tiffcrop subroutines require a larger buffer (fixes #271, #381, #386, #388, #389, #435)
+    
+    Closes #465, #464, #435, #389, #388, #386, #381 et #271
+    
+    See merge request libtiff/libtiff!382

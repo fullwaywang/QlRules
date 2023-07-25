@@ -1,0 +1,26 @@
+commit 6f2a3958cfac135c60b509a61a4fd39432d8f9a9
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Thu Oct 24 15:36:35 2019 +0200
+
+    fftools/ffmpeg: Free swresample dictionary during cleanup
+    
+    Freeing this was forgotten in ad899522.
+    
+    Fixes #8315 and #8316.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+    Reviewed-by: Paul B Mahol <onemda@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/fftools/ffmpeg.c b/fftools/ffmpeg.c
+index 8e408c808a..27f68933f8 100644
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -567,6 +567,7 @@ static void ffmpeg_cleanup(int ret)
+         ost->audio_channels_mapped = 0;
+ 
+         av_dict_free(&ost->sws_dict);
++        av_dict_free(&ost->swr_opts);
+ 
+         avcodec_free_context(&ost->enc_ctx);
+         avcodec_parameters_free(&ost->ref_par);

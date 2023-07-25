@@ -1,0 +1,21 @@
+commit d514bb866ef9d7d8ab394fbce5168c3b45f7c504
+Author: Max Bruckner <max@maxbruckner.de>
+Date:   Wed Feb 7 19:36:59 2018 +0100
+
+    Fix #241, potential double free
+
+diff --git a/cJSON.c b/cJSON.c
+index 67fda56..e8da3d3 100644
+--- a/cJSON.c
++++ b/cJSON.c
+@@ -1311,10 +1311,6 @@ static cJSON_bool print_value(const cJSON * const item, printbuffer * const outp
+             size_t raw_length = 0;
+             if (item->valuestring == NULL)
+             {
+-                if (!output_buffer->noalloc)
+-                {
+-                    output_buffer->hooks.deallocate(output_buffer->buffer);
+-                }
+                 return false;
+             }
+ 

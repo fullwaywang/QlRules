@@ -1,0 +1,38 @@
+commit e74cd2f4706f71da5e9205003c1d8263b54ed3fb	e74cd2f4706f71da5e9205003c1d8263b54ed3fb
+Author: Nicolas George <nicolas.george@normalesup.org>
+Date:   Tue Dec 4 19:49:51 2012 +0100
+
+    lavf: compute probe buffer size more reliably.
+    
+    The previous code computes the offset by reversing the growth
+    of the allocated buffer size: it is complex and did lead to
+    inconsistencies when the size limit is reached.
+    
+    Fix trac ticket #1991.
+    (cherry picked from commit 03847eb8259291b4ff1bd840bd779d0699d71f96)
+    
+    Conflicts:
+            libavformat/utils.c
+
+diff --git a/libavformat/utils.c b/libavformat/utils.c
+index 7940037782..be73c4acb7 100644
+--- a/libavformat/utils.c
++++ b/libavformat/utils.c
+@@ -459,7 +459,7 @@ int av_probe_input_buffer(AVIOContext *pb, AVInputFormat **fmt,
+ {
+     AVProbeData pd = { filename ? filename : "", NULL, -offset };
+     unsigned char *buf = NULL;
+-    int ret = 0, probe_size;
++    int ret = 0, probe_size, buf_offset = 0;
+ 
+     if (!max_probe_size) {
+         max_probe_size = PROBE_BUF_MAX;
+@@ -499,7 +499,7 @@ int av_probe_input_buffer(AVIOContext *pb, AVInputFormat **fmt,
+             score = 0;
+             ret = 0;            /* error was end of file, nothing read */
+         }
+-        pd.buf_size += ret;
++        pd.buf_size = buf_offset += ret;
+         pd.buf = &buf[offset];
+ 
+         memset(pd.buf + pd.buf_size, 0, AVPROBE_PADDING_SIZE);

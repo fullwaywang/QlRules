@@ -1,0 +1,19 @@
+commit 17a1a6f97fd088a71931bdc422f4e96bb6ffc549
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Sun Aug 19 08:09:05 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1249
+
+diff --git a/coders/psd.c b/coders/psd.c
+index 41456cd12..2dff0ce3e 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -790,7 +790,7 @@ static StringInfo *ParseImageResourceBlocks(Image *image,
+     if (p > (blocks+length-4))
+       break;
+     p=PushLongPixel(MSBEndian,p,&count);
+-    if ((p+count) > (blocks+length))
++    if (((p+count) < blocks) || ((p+count) > (blocks+length)))
+       break;
+     switch (id)
+     {

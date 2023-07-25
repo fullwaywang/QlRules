@@ -1,0 +1,55 @@
+commit 1a8318f6c24623189ecb65e049267c6f2e005c0e
+Author: mayeut <mayeut@users.noreply.github.com>
+Date:   Sun May 8 20:10:13 2016 +0200
+
+    Fix Out-of-Bounds Access in function opj_tgt_reset
+    
+    Fix uclouvain/openjpeg#775
+
+diff --git a/src/lib/openjp2/j2k.c b/src/lib/openjp2/j2k.c
+index 8086b004..9eaa155e 100644
+--- a/src/lib/openjp2/j2k.c
++++ b/src/lib/openjp2/j2k.c
+@@ -8889,6 +8889,10 @@ static OPJ_BOOL opj_j2k_read_SPCod_SPCoc(  opj_j2k_t *p_j2k,
+ 
+         opj_read_bytes(l_current_ptr,&l_tccp->cblksty ,1);              /* SPcoc (G) */
+         ++l_current_ptr;
++        if (l_tccp->cblksty & 0xC0U) { /* 2 msb are reserved, assume we can't read */
++                opj_event_msg(p_manager, EVT_ERROR, "Error reading SPCod SPCoc element, Invalid code-block style found\n");
++                return OPJ_FALSE;
++        }
+ 
+         opj_read_bytes(l_current_ptr,&l_tccp->qmfbid ,1);               /* SPcoc (H) */
+         ++l_current_ptr;
+diff --git a/src/lib/openjp2/t2.c b/src/lib/openjp2/t2.c
+index ebc26b2d..5a8d440c 100644
+--- a/src/lib/openjp2/t2.c
++++ b/src/lib/openjp2/t2.c
+@@ -868,9 +868,14 @@ static OPJ_BOOL opj_t2_read_packet_header( opj_t2_t* p_t2,
+ 
+                 /* reset tagtrees */
+                 for (bandno = 0; bandno < l_res->numbands; ++bandno) {
+-                        opj_tcd_precinct_t *l_prc = &l_band->precincts[p_pi->precno];
+-
+                         if ( ! ((l_band->x1-l_band->x0 == 0)||(l_band->y1-l_band->y0 == 0)) ) {
++                                opj_tcd_precinct_t *l_prc = &l_band->precincts[p_pi->precno];
++                                if (!(p_pi->precno < (l_band->precincts_data_size / sizeof(opj_tcd_precinct_t)))) {
++                                        opj_event_msg(p_manager, EVT_ERROR, "Invalid precinct\n");
++                                        return OPJ_FALSE;
++                                }
++													
++													
+                                 opj_tgt_reset(l_prc->incltree);
+                                 opj_tgt_reset(l_prc->imsbtree);
+                                 l_cblk = l_prc->cblks.dec;
+diff --git a/tests/nonregression/test_suite.ctest.in b/tests/nonregression/test_suite.ctest.in
+index 13112216..e1eb7027 100644
+--- a/tests/nonregression/test_suite.ctest.in
++++ b/tests/nonregression/test_suite.ctest.in
+@@ -561,3 +561,6 @@ opj_decompress -i @INPUT_NR_PATH@/issue726.j2k -o @TEMP_PATH@/issue726.png
+ !opj_decompress -i @INPUT_NR_PATH@/issue733.jp2 -o @TEMP_PATH@/issue733.png
+ # issue 774
+ !opj_decompress -i @INPUT_NR_PATH@/issue774.jp2 -o @TEMP_PATH@/issue774.png
++# issue 775
++!opj_decompress -i @INPUT_NR_PATH@/issue775.j2k -o @TEMP_PATH@/issue775.png
++!opj_decompress -i @INPUT_NR_PATH@/issue775-2.j2k -o @TEMP_PATH@/issue775-2.png

@@ -1,0 +1,130 @@
+commit e0f869196930ef5f25a0ac41c9215b09c9ce2d3c
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Mar 1 17:55:31 2023 +0000
+
+    patch 9.0.1367: divide by zero in zero-width window
+    
+    Problem:    Divide by zero in zero-width window.
+    Solution:   Check the width is positive.
+
+diff --git a/src/move.c b/src/move.c
+index 921fec6fb..0550ef5d1 100644
+--- a/src/move.c
++++ b/src/move.c
+@@ -1734,7 +1734,7 @@ scrolldown(
+ 	    col -= width1;
+ 	    ++row;
+ 	}
+-	if (col > width2)
++	if (col > width2 && width2 > 0)
+ 	{
+ 	    row += col / width2;
+ 	    col = col % width2;
+diff --git a/src/testdir/test_window_cmd.vim b/src/testdir/test_window_cmd.vim
+index 969edff26..3d2926650 100644
+--- a/src/testdir/test_window_cmd.vim
++++ b/src/testdir/test_window_cmd.vim
+@@ -1772,7 +1772,7 @@ func Test_splitkeep_options()
+   let &t_WS = save_WS
+ endfunc
+ 
+-function Test_splitkeep_cmdwin_cursor_position()
++func Test_splitkeep_cmdwin_cursor_position()
+   set splitkeep=screen
+   call setline(1, range(&lines))
+ 
+@@ -1797,9 +1797,9 @@ function Test_splitkeep_cmdwin_cursor_position()
+ 
+   %bwipeout!
+   set splitkeep&
+-endfunction
++endfunc
+ 
+-function Test_splitkeep_misc()
++func Test_splitkeep_misc()
+   set splitkeep=screen
+   set splitbelow
+ 
+@@ -1832,7 +1832,7 @@ function Test_splitkeep_misc()
+   set splitkeep&
+ endfunc
+ 
+-function Test_splitkeep_callback()
++func Test_splitkeep_callback()
+   CheckScreendump
+   let lines =<< trim END
+     set splitkeep=screen
+@@ -1865,7 +1865,7 @@ function Test_splitkeep_callback()
+   call StopVimInTerminal(buf)
+ endfunc
+ 
+-function Test_splitkeep_fold()
++func Test_splitkeep_fold()
+   CheckScreendump
+ 
+   let lines =<< trim END
+@@ -1895,9 +1895,9 @@ function Test_splitkeep_fold()
+   call VerifyScreenDump(buf, 'Test_splitkeep_fold_4', {})
+ 
+   call StopVimInTerminal(buf)
+-endfunction
++endfunc
+ 
+-function Test_splitkeep_status()
++func Test_splitkeep_status()
+   CheckScreendump
+ 
+   let lines =<< trim END
+@@ -1915,9 +1915,9 @@ function Test_splitkeep_status()
+   call VerifyScreenDump(buf, 'Test_splitkeep_status_1', {})
+ 
+   call StopVimInTerminal(buf)
+-endfunction
++endfunc
+ 
+-function Test_new_help_window_on_error()
++func Test_new_help_window_on_error()
+   help change.txt
+   execute "normal! /CTRL-@\<CR>"
+   silent! execute "normal! \<C-W>]"
+@@ -1927,7 +1927,26 @@ function Test_new_help_window_on_error()
+ 
+   call assert_equal(wincount, winnr('$'))
+   call assert_equal(expand("<cword>"), "'mod'")
+-endfunction
++endfunc
++
++func Test_smoothscroll_in_zero_width_window()
++  let save_lines = &lines
++  let save_columns = &columns
++
++  winsize 0 24
++  set cpo+=n
++  exe "noremap 0 \<C-W>n\<C-W>L"
++  norm 000000
++  set number smoothscroll
++  exe "norm \<C-Y>"
++
++  only!
++  let &lines = save_lines
++  let &columns = save_columns
++  set cpo-=n
++  unmap 0
++  set nonumber nosmoothscroll
++endfunc
+ 
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index 200779dcd..a370b3b11 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    1367,
+ /**/
+     1366,
+ /**/

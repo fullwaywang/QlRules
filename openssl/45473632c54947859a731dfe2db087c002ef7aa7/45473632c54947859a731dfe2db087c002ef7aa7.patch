@@ -1,0 +1,41 @@
+commit 45473632c54947859a731dfe2db087c002ef7aa7
+Author: Dr. Stephen Henson <steve@openssl.org>
+Date:   Tue Oct 15 13:37:01 2013 +0100
+
+    Prevent use of RSA+MD5 in TLS 1.2 by default.
+    
+    Removing RSA+MD5 from the default signature algorithm list
+    prevents its use by default.
+    
+    If a broken implementation attempts to use RSA+MD5 anyway the sanity
+    checking of signature algorithms will cause a fatal alert.
+
+diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
+index 81ed88f6b2..1bdac2201f 100644
+--- a/ssl/t1_lib.c
++++ b/ssl/t1_lib.c
+@@ -876,9 +876,6 @@ static unsigned char tls12_sigalgs[] = {
+ #ifndef OPENSSL_NO_SHA
+ 	tlsext_sigalg(TLSEXT_hash_sha1)
+ #endif
+-#ifndef OPENSSL_NO_MD5
+-	tlsext_sigalg_rsa(TLSEXT_hash_md5)
+-#endif
+ };
+ #ifndef OPENSSL_NO_ECDSA
+ static unsigned char suiteb_sigalgs[] = {
+@@ -921,13 +918,7 @@ size_t tls12_get_psigalgs(SSL *s, const unsigned char **psigs)
+ 	else
+ 		{
+ 		*psigs = tls12_sigalgs;
+-#ifdef OPENSSL_FIPS
+-		/* If FIPS mode don't include MD5 which is last */
+-		if (FIPS_mode())
+-			return sizeof(tls12_sigalgs) - 2;
+-		else
+-#endif
+-			return sizeof(tls12_sigalgs);
++		return sizeof(tls12_sigalgs);
+ 		}
+ 	}
+ /* Check signature algorithm is consistent with sent supported signature

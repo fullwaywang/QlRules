@@ -1,0 +1,21 @@
+commit 72ad7d9cdd4384857eec31d7ae295a330aa2d0ff
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Mon Nov 1 11:32:28 2021 -0700
+
+    IPPUSB: Add a pointer check.
+    
+    Fixes #17705.
+
+diff --git a/epan/dissectors/packet-ippusb.c b/epan/dissectors/packet-ippusb.c
+index 15aae1b8e6..b68156de5b 100644
+--- a/epan/dissectors/packet-ippusb.c
++++ b/epan/dissectors/packet-ippusb.c
+@@ -401,7 +401,7 @@ dissect_ippusb(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, void* data)
+                     }
+                 }
+             }
+-            else if ((last_chunk && strncmp(last_chunk, CHUNKED_END, CHUNK_LENGTH_MIN) == 0)) {
++            else if (current_msp &&last_chunk && strncmp(last_chunk, CHUNKED_END, CHUNK_LENGTH_MIN) == 0) {
+                 /* This is the last segment of the chunked transfer and reassembled packet */
+ 
+                 proto_tree_add_item(tree, proto_ippusb, tvb, offset, -1, 0);

@@ -1,0 +1,29 @@
+commit 5a396bb3a66a61a68b80f2369d0249729bf85e04	5a396bb3a66a61a68b80f2369d0249729bf85e04
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Jan 24 17:51:40 2012 +0100
+
+    dv: Fix null pointer dereference due to ach=0
+    
+    dv: Fix null pointer dereference due to ach=0
+    
+    Fixes part2 of CVE-2011-3929
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Reviewed-by: Roman Shaposhnik <roman@shaposhnik.org>
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+    Signed-off-by: Alex Converse <alex.converse@gmail.com>
+
+diff --git a/libavformat/dv.c b/libavformat/dv.c
+index c90ddec0d3..5e1c798586 100644
+--- a/libavformat/dv.c
++++ b/libavformat/dv.c
+@@ -343,7 +343,8 @@ int avpriv_dv_produce_packet(DVDemuxContext *c, AVPacket *pkt,
+        c->audio_pkt[i].pts  = c->abytes * 30000*8 / c->ast[i]->codec->bit_rate;
+        ppcm[i] = c->audio_buf[i];
+     }
+-    dv_extract_audio(buf, ppcm, c->sys);
++    if (c->ach)
++        dv_extract_audio(buf, ppcm, c->sys);
+ 
+     /* We work with 720p frames split in half, thus even frames have
+      * channels 0,1 and odd 2,3. */

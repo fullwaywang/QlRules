@@ -1,0 +1,54 @@
+commit 0c8485f0e4931463c0f7986e1ea84a7d79f10c75
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Sun Feb 26 18:17:10 2017 +0100
+
+    patch 8.0.0378: possible overflow when reading corrupted undo file
+    
+    Problem:    Another possible overflow when reading corrupted undo file.
+    Solution:   Check if allocated size is not too big. (King)
+
+diff --git a/src/undo.c b/src/undo.c
+index ba7c0b83c..5b953795e 100644
+--- a/src/undo.c
++++ b/src/undo.c
+@@ -1385,7 +1385,7 @@ unserialize_uep(bufinfo_T *bi, int *error, char_u *file_name)
+ {
+     int		i;
+     u_entry_T	*uep;
+-    char_u	**array;
++    char_u	**array = NULL;
+     char_u	*line;
+     int		line_len;
+ 
+@@ -1402,7 +1402,8 @@ unserialize_uep(bufinfo_T *bi, int *error, char_u *file_name)
+     uep->ue_size = undo_read_4c(bi);
+     if (uep->ue_size > 0)
+     {
+-	array = (char_u **)U_ALLOC_LINE(sizeof(char_u *) * uep->ue_size);
++	if (uep->ue_size < LONG_MAX / (int)sizeof(char_u *))
++	    array = (char_u **)U_ALLOC_LINE(sizeof(char_u *) * uep->ue_size);
+ 	if (array == NULL)
+ 	{
+ 	    *error = TRUE;
+@@ -1410,8 +1411,6 @@ unserialize_uep(bufinfo_T *bi, int *error, char_u *file_name)
+ 	}
+ 	vim_memset(array, 0, sizeof(char_u *) * uep->ue_size);
+     }
+-    else
+-	array = NULL;
+     uep->ue_array = array;
+ 
+     for (i = 0; i < uep->ue_size; ++i)
+diff --git a/src/version.c b/src/version.c
+index c79020b21..026b82981 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -764,6 +764,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    378,
+ /**/
+     377,
+ /**/

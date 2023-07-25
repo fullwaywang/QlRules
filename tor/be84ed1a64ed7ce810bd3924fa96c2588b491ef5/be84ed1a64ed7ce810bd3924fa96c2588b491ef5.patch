@@ -1,0 +1,50 @@
+commit be84ed1a64ed7ce810bd3924fa96c2588b491ef5
+Author: David Goulet <dgoulet@torproject.org>
+Date:   Thu Jan 24 10:52:08 2019 -0500
+
+    kist: Don't write above the highwater outbuf mark
+    
+    KIST works by computing how much should be allowed to write to the kernel for
+    a given socket, and then it writes that amount to the outbuf.
+    
+    The problem is that it could be possible that the outbuf already has lots of
+    data in it from a previous scheduling round (because the kernel is full/busy
+    and Tor was not able to flush the outbuf yet). KIST ignores that the outbuf
+    has been filling (is above its "highwater") and writes more anyway. The end
+    result is that the outbuf length would exceed INT_MAX, hence causing an
+    assertion error and a corresponding "Bug()" message to get printed to the
+    logs.
+    
+    This commit makes it for KIST to take into account the outbuf length when
+    computing the available space.
+    
+    Bug found and patch by Rob Jansen.
+    
+    Closes #29168. TROVE-2019-001.
+    
+    Signed-off-by: David Goulet <dgoulet@torproject.org>
+
+diff --git a/changes/ticket29168 b/changes/ticket29168
+new file mode 100644
+index 0000000000..65c5232f65
+--- /dev/null
++++ b/changes/ticket29168
+@@ -0,0 +1,5 @@
++  o Major bugfixes (cell scheduler, KIST):
++    - Make KIST to always take into account the outbuf length when computing
++      what we can actually put in the outbuf. This could lead to the outbuf
++      being filled up and thus a possible memory DoS vector. TROVE-2019-001.
++      Fixes bug 29168; bugfix on 0.3.2.1-alpha.
+diff --git a/src/or/scheduler_kist.c b/src/or/scheduler_kist.c
+index 6d6490077d..fb33a5d1d8 100644
+--- a/src/or/scheduler_kist.c
++++ b/src/or/scheduler_kist.c
+@@ -280,7 +280,7 @@ update_socket_info_impl, (socket_table_ent_t *ent))
+   extra_space =
+     clamp_double_to_int64(
+                  (ent->cwnd * (int64_t)ent->mss) * sock_buf_size_factor) -
+-    ent->notsent;
++    ent->notsent - (int64_t)channel_outbuf_length((channel_t *) ent->chan);
+   if ((tcp_space + extra_space) < 0) {
+     /* This means that the "notsent" queue is just too big so we shouldn't put
+      * more in the kernel for now. */

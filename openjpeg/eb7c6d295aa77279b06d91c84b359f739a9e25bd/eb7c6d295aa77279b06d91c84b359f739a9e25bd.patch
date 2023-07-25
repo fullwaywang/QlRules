@@ -1,0 +1,55 @@
+commit eb7c6d295aa77279b06d91c84b359f739a9e25bd
+Author: Antonin Descampe <antonin@gmail.com>
+Date:   Mon Oct 6 21:05:32 2014 +0000
+
+    [trunk] fixed potential negative size params (fixes issue 390)
+
+diff --git a/src/lib/openjp2/bio.c b/src/lib/openjp2/bio.c
+index 5d495801..636264ce 100644
+--- a/src/lib/openjp2/bio.c
++++ b/src/lib/openjp2/bio.c
+@@ -81,7 +81,7 @@ static OPJ_BOOL opj_bio_bytein(opj_bio_t *bio);
+ OPJ_BOOL opj_bio_byteout(opj_bio_t *bio) {
+ 	bio->buf = (bio->buf << 8) & 0xffff;
+ 	bio->ct = bio->buf == 0xff00 ? 7 : 8;
+-	if (bio->bp >= bio->end) {
++	if ((OPJ_SIZE_T)bio->bp >= (OPJ_SIZE_T)bio->end) {
+ 		return OPJ_FALSE;
+ 	}
+ 	*bio->bp++ = (OPJ_BYTE)(bio->buf >> 8);
+@@ -91,7 +91,7 @@ OPJ_BOOL opj_bio_byteout(opj_bio_t *bio) {
+ OPJ_BOOL opj_bio_bytein(opj_bio_t *bio) {
+ 	bio->buf = (bio->buf << 8) & 0xffff;
+ 	bio->ct = bio->buf == 0xff00 ? 7 : 8;
+-	if (bio->bp >= bio->end) {
++	if ((OPJ_SIZE_T)bio->bp >= (OPJ_SIZE_T)bio->end) {
+ 		return OPJ_FALSE;
+ 	}
+ 	bio->buf |= *bio->bp++;
+diff --git a/src/lib/openjp2/jp2.c b/src/lib/openjp2/jp2.c
+index c77bfaae..94226903 100644
+--- a/src/lib/openjp2/jp2.c
++++ b/src/lib/openjp2/jp2.c
+@@ -1017,7 +1017,7 @@ OPJ_BOOL opj_jp2_read_pclr(	opj_jp2_t *jp2,
+ 
+ 			if (bytes_to_read > sizeof(OPJ_UINT32))
+ 				bytes_to_read = sizeof(OPJ_UINT32);
+-			if ((ptrdiff_t)p_pclr_header_size < p_pclr_header_data - orig_header_data + (ptrdiff_t)bytes_to_read)
++			if ((ptrdiff_t)p_pclr_header_size < (ptrdiff_t)(p_pclr_header_data - orig_header_data) + (ptrdiff_t)bytes_to_read)
+ 				return OPJ_FALSE;
+ 
+ 			opj_read_bytes(p_pclr_header_data, &l_value , bytes_to_read);	/* Cji */
+diff --git a/src/lib/openjp2/t2.c b/src/lib/openjp2/t2.c
+index cdd35e8c..358e815b 100644
+--- a/src/lib/openjp2/t2.c
++++ b/src/lib/openjp2/t2.c
+@@ -1265,7 +1265,8 @@ OPJ_BOOL opj_t2_skip_packet_data(   opj_t2_t* p_t2,
+                         }
+ 
+                         do {
+-                                if (* p_data_read + l_seg->newlen > p_max_length) {
++                                /* Check possible overflow then size */
++                                if (((*p_data_read + l_seg->newlen) < (*p_data_read)) || ((*p_data_read + l_seg->newlen) > p_max_length)) {
+                                         fprintf(stderr, "skip: segment too long (%d) with max (%d) for codeblock %d (p=%d, b=%d, r=%d, c=%d)\n",
+                                                 l_seg->newlen, p_max_length, cblkno, p_pi->precno, bandno, p_pi->resno, p_pi->compno);
+                                         return OPJ_FALSE;

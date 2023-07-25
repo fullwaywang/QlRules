@@ -1,0 +1,65 @@
+commit cdef1cefa2a440911c727558562f83ed9b00e16b
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Oct 20 14:17:18 2022 +0100
+
+    patch 9.0.0804: crash when trying to divide a number by -1
+    
+    Problem:    Crash when trying to divice the largest negative number by -1.
+    Solution:   Handle this case specifically.
+
+diff --git a/src/eval.c b/src/eval.c
+index 1652fcb4a..062fab0ac 100644
+--- a/src/eval.c
++++ b/src/eval.c
+@@ -66,6 +66,12 @@ num_divide(varnumber_T n1, varnumber_T n2, int *failed)
+ 	else
+ 	    result = VARNUM_MAX;
+     }
++    else if (n1 == VARNUM_MIN && n2 == -1)
++    {
++	// specific case: trying to do VARNUM_MIN / -1 results in a positive
++	// number that doesn't fit in varnumber_T and causes an FPE
++	result = VARNUM_MAX;
++    }
+     else
+ 	result = n1 / n2;
+ 
+@@ -6023,7 +6029,7 @@ var2fpos(
+ }
+ 
+ /*
+- * Convert list in "arg" into position "psop" and optional file number "fnump".
++ * Convert list in "arg" into position "posp" and optional file number "fnump".
+  * When "fnump" is NULL there is no file number, only 3 items: [lnum, col, off]
+  * Note that the column is passed on as-is, the caller may want to decrement
+  * it to use 1 for the first column.
+diff --git a/src/testdir/test_expr.vim b/src/testdir/test_expr.vim
+index b47896340..e1fed369b 100644
+--- a/src/testdir/test_expr.vim
++++ b/src/testdir/test_expr.vim
+@@ -761,6 +761,12 @@ func Test_eval_after_if()
+   call assert_equal('b', s:val)
+ endfunc
+ 
++func Test_divide_by_zero()
++  " only tests that this doesn't crash, the result is not important
++  echo 0 / 0
++  echo 0 / 0 / -1
++endfunc
++
+ " Test for command-line completion of expressions
+ func Test_expr_completion()
+   CheckFeature cmdline_compl
+diff --git a/src/version.c b/src/version.c
+index 0de044e3c..b4756ca04 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    804,
+ /**/
+     803,
+ /**/

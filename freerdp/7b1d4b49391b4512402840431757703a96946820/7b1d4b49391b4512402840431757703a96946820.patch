@@ -1,0 +1,35 @@
+commit 7b1d4b49391b4512402840431757703a96946820
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Mon Mar 30 18:05:17 2020 +0200
+
+    Fix CVE-2020-11524: out of bounds access in interleaved
+    
+    Thanks to Sunglin and HuanGMz from Knownsec 404
+
+diff --git a/libfreerdp/codec/include/bitmap.c b/libfreerdp/codec/include/bitmap.c
+index 68d10fe3a..5b4804f2e 100644
+--- a/libfreerdp/codec/include/bitmap.c
++++ b/libfreerdp/codec/include/bitmap.c
+@@ -334,6 +334,9 @@ static INLINE BOOL RLEDECOMPRESS(const BYTE* pbSrcBuffer, UINT32 cbSrcBuffer, BY
+ 			case MEGA_MEGA_COLOR_IMAGE:
+ 				runLength = ExtractRunLength(code, pbSrc, &advance);
+ 				pbSrc = pbSrc + advance;
++				if (!ENSURE_CAPACITY(pbDest, pbDestEnd, runLength))
++					return FALSE;
++
+ 				UNROLL(runLength, {
+ 					SRCREADPIXEL(temp, pbSrc);
+ 					SRCNEXTPIXEL(pbSrc);
+diff --git a/libfreerdp/codec/interleaved.c b/libfreerdp/codec/interleaved.c
+index 5916811e3..784937a49 100644
+--- a/libfreerdp/codec/interleaved.c
++++ b/libfreerdp/codec/interleaved.c
+@@ -215,7 +215,7 @@ static INLINE BOOL ensure_capacity(const BYTE* start, const BYTE* end, size_t si
+ {
+ 	const size_t available = (uintptr_t)end - (uintptr_t)start;
+ 	const BOOL rc = available >= size * base;
+-	return rc;
++	return rc && (start <= end);
+ }
+ 
+ static INLINE void write_pixel_8(BYTE* _buf, BYTE _pix)

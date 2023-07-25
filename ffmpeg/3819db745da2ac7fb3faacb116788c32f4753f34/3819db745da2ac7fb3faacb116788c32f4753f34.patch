@@ -1,0 +1,72 @@
+commit 3819db745da2ac7fb3faacb116788c32f4753f34	3819db745da2ac7fb3faacb116788c32f4753f34
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Thu Aug 22 01:07:32 2013 +0200
+
+    avcodec/rpza: Perform pointer advance and checks before using the pointers
+    
+    Fixes out of array accesses
+    Fixes Ticket2850
+    
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/rpza.c b/libavcodec/rpza.c
+index 2aa0091d32..416f8b6722 100644
+--- a/libavcodec/rpza.c
++++ b/libavcodec/rpza.c
+@@ -85,7 +85,7 @@ static void rpza_decode_stream(RpzaContext *s)
+     unsigned short *pixels = (unsigned short *)s->frame.data[0];
+ 
+     int row_ptr = 0;
+-    int pixel_ptr = 0;
++    int pixel_ptr = -4;
+     int block_ptr;
+     int pixel_x, pixel_y;
+     int total_blocks;
+@@ -141,6 +141,7 @@ static void rpza_decode_stream(RpzaContext *s)
+             colorA = AV_RB16 (&s->buf[stream_ptr]);
+             stream_ptr += 2;
+             while (n_blocks--) {
++                ADVANCE_BLOCK()
+                 block_ptr = row_ptr + pixel_ptr;
+                 for (pixel_y = 0; pixel_y < 4; pixel_y++) {
+                     for (pixel_x = 0; pixel_x < 4; pixel_x++){
+@@ -149,7 +150,6 @@ static void rpza_decode_stream(RpzaContext *s)
+                     }
+                     block_ptr += row_inc;
+                 }
+-                ADVANCE_BLOCK();
+             }
+             break;
+ 
+@@ -188,6 +188,7 @@ static void rpza_decode_stream(RpzaContext *s)
+             if (s->size - stream_ptr < n_blocks * 4)
+                 return;
+             while (n_blocks--) {
++                ADVANCE_BLOCK();
+                 block_ptr = row_ptr + pixel_ptr;
+                 for (pixel_y = 0; pixel_y < 4; pixel_y++) {
+                     index = s->buf[stream_ptr++];
+@@ -198,7 +199,6 @@ static void rpza_decode_stream(RpzaContext *s)
+                     }
+                     block_ptr += row_inc;
+                 }
+-                ADVANCE_BLOCK();
+             }
+             break;
+ 
+@@ -206,6 +206,7 @@ static void rpza_decode_stream(RpzaContext *s)
+         case 0x00:
+             if (s->size - stream_ptr < 16)
+                 return;
++            ADVANCE_BLOCK();
+             block_ptr = row_ptr + pixel_ptr;
+             for (pixel_y = 0; pixel_y < 4; pixel_y++) {
+                 for (pixel_x = 0; pixel_x < 4; pixel_x++){
+@@ -219,7 +220,6 @@ static void rpza_decode_stream(RpzaContext *s)
+                 }
+                 block_ptr += row_inc;
+             }
+-            ADVANCE_BLOCK();
+             break;
+ 
+         /* Unknown opcode */

@@ -1,0 +1,52 @@
+commit e477f09d0b3619f3d29173b2cd593e17e2d1978e
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Feb 4 12:24:14 2017 +0100
+
+    avcodec/pngdec: Check trns more completely
+    
+    Fixes out of array access
+    Fixes: 546/clusterfuzz-testcase-4809433909559296
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/pngdec.c b/libavcodec/pngdec.c
+index 50a0a296b3..e87c2aa03b 100644
+--- a/libavcodec/pngdec.c
++++ b/libavcodec/pngdec.c
+@@ -772,6 +772,16 @@ static int decode_trns_chunk(AVCodecContext *avctx, PNGDecContext *s,
+ {
+     int v, i;
+ 
++    if (!(s->state & PNG_IHDR)) {
++        av_log(avctx, AV_LOG_ERROR, "trns before IHDR\n");
++        return AVERROR_INVALIDDATA;
++    }
++
++    if (s->state & PNG_IDAT) {
++        av_log(avctx, AV_LOG_ERROR, "trns after IDAT\n");
++        return AVERROR_INVALIDDATA;
++    }
++
+     if (s->color_type == PNG_COLOR_TYPE_PALETTE) {
+         if (length > 256 || !(s->state & PNG_PLTE))
+             return AVERROR_INVALIDDATA;
+@@ -782,7 +792,8 @@ static int decode_trns_chunk(AVCodecContext *avctx, PNGDecContext *s,
+         }
+     } else if (s->color_type == PNG_COLOR_TYPE_GRAY || s->color_type == PNG_COLOR_TYPE_RGB) {
+         if ((s->color_type == PNG_COLOR_TYPE_GRAY && length != 2) ||
+-            (s->color_type == PNG_COLOR_TYPE_RGB && length != 6))
++            (s->color_type == PNG_COLOR_TYPE_RGB && length != 6) ||
++            s->bit_depth == 1)
+             return AVERROR_INVALIDDATA;
+ 
+         for (i = 0; i < length / 2; i++) {
+@@ -1242,6 +1253,8 @@ exit_loop:
+         size_t raw_bpp = s->bpp - byte_depth;
+         unsigned x, y;
+ 
++        av_assert0(s->bit_depth > 1);
++
+         for (y = 0; y < s->height; ++y) {
+             uint8_t *row = &s->image_buf[s->image_linesize * y];
+ 

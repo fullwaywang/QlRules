@@ -1,0 +1,27 @@
+commit be8c8640ead04b1e4fc9176c504bf688351c8924
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Fri Jul 3 10:26:38 2020 +0200
+
+    Fixed input sanitation in rdpgfx_recv_solid_fill_pdu
+    
+    The input rectangle must be checked for plausibility.
+    
+    Thanks to Sunglin and HuanGMz of the Knownsec 404 security team and pangzi of pwnzen
+    
+    (cherry picked from commit d862a03cbf88ec6e76e47b84eae7e214690cb607)
+
+diff --git a/channels/rdpgfx/rdpgfx_common.c b/channels/rdpgfx/rdpgfx_common.c
+index 090aa50ab..e0a50a606 100644
+--- a/channels/rdpgfx/rdpgfx_common.c
++++ b/channels/rdpgfx/rdpgfx_common.c
+@@ -182,6 +182,10 @@ UINT rdpgfx_read_rect16(wStream* s, RECTANGLE_16* rect16)
+ 	Stream_Read_UINT16(s, rect16->top);    /* top (2 bytes) */
+ 	Stream_Read_UINT16(s, rect16->right);  /* right (2 bytes) */
+ 	Stream_Read_UINT16(s, rect16->bottom); /* bottom (2 bytes) */
++	if (rect16->left >= rect16->right)
++		return ERROR_INVALID_DATA;
++	if (rect16->top >= rect16->bottom)
++		return ERROR_INVALID_DATA;
+ 	return CHANNEL_RC_OK;
+ }
+ 

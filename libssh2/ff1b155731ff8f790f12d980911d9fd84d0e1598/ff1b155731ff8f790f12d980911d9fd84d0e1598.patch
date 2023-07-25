@@ -1,0 +1,32 @@
+commit ff1b155731ff8f790f12d980911d9fd84d0e1598
+Author: Will Cosgrove <will@panic.com>
+Date:   Fri Apr 5 09:46:03 2019 -0700
+
+    Simplified _libssh2_check_length (#350)
+    
+    * Simplified _libssh2_check_length
+    
+    misc.c : _libssh2_check_length()
+    
+    Removed cast and improved bounds checking and format.
+    
+    Credit : Yuriy M. Kaminskiy
+
+diff --git a/src/misc.c b/src/misc.c
+index 8d80456..76644a3 100644
+--- a/src/misc.c
++++ b/src/misc.c
+@@ -811,10 +811,9 @@ int _libssh2_get_bignum_bytes(struct string_buf *buf, unsigned char **outbuf)
+ 
+ int _libssh2_check_length(struct string_buf *buf, size_t len)
+ {
+-    if(len > buf->len)
+-        return 0;
+-
+-    return ((int)(buf->dataptr - buf->data) <= (int)(buf->len - len)) ? 1 : 0;
++    unsigned char *endp = &buf->data[buf->len];
++    size_t left = endp - buf->dataptr;
++    return ((len <= left) && (left <= buf->len));
+ }
+ 
+ /* Wrappers */

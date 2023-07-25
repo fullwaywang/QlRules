@@ -1,0 +1,44 @@
+commit 07428f6a640ff93aa0b4cc69ca372e2cf8490e41
+Author: Michael Sweet <michael.r.sweet@gmail.com>
+Date:   Wed Dec 14 10:02:17 2016 -0500
+
+    Only list supported PDLs (Issue #4923)
+
+diff --git a/CHANGES.txt b/CHANGES.txt
+index ba44aaa11..e2975f549 100644
+--- a/CHANGES.txt
++++ b/CHANGES.txt
+@@ -5,7 +5,8 @@ CHANGES IN CUPS V2.2.2
+ 
+ 	- Fixed some issues with the Zebra ZPL printer driver (Issue #4898)
+ 	- Fixed some issues with IPP Everywhere printer support (Issue #4893,
+-	  Issue #4909, Issue #4916, Issue #4921, Issue #4932, Issue #4933)
++	  Issue #4909, Issue #4916, Issue #4921, Issue #4923, Issue #4932,
++	  Issue #4933)
+ 	- The cups-lpd program did not catch all legacy usage of ISO-8859-1
+           (Issue #4899)
+         - Fixed builds on systems without a working poll() implementation
+diff --git a/cups/ppd-cache.c b/cups/ppd-cache.c
+index 582041bcd..003180633 100644
+--- a/cups/ppd-cache.c
++++ b/cups/ppd-cache.c
+@@ -3103,9 +3103,7 @@ _ppdCreateFromIPP(char   *buffer,	/* I - Filename buffer */
+ 					/* PDL */
+ 
+      /*
+-      * Write cupsFilter2 lines for supported formats, except for PostScript
+-      * (which has compatibility problems over IPP with some vendors), text,
+-      * TIFF, and vendor MIME media types...
++      * Write cupsFilter2 lines for supported formats...
+       */
+ 
+       if (!_cups_strcasecmp(format, "application/pdf"))
+@@ -3114,8 +3112,6 @@ _ppdCreateFromIPP(char   *buffer,	/* I - Filename buffer */
+         cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 0 -\"\n", format, format);
+       else if (!_cups_strcasecmp(format, "image/pwg-raster") || !_cups_strcasecmp(format, "image/urf"))
+         cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 100 -\"\n", format, format);
+-      else if (_cups_strcasecmp(format, "application/octet-stream") && _cups_strcasecmp(format, "application/postscript") && _cups_strncasecmp(format, "application/vnd.", 16) && _cups_strncasecmp(format, "image/vnd.", 10) && _cups_strcasecmp(format, "image/tiff") && _cups_strncasecmp(format, "text/", 5))
+-        cupsFilePrintf(fp, "*cupsFilter2: \"%s %s 10 -\"\n", format, format);
+     }
+   }
+ 

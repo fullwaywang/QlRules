@@ -1,0 +1,21 @@
+commit 01bf2ad7351fdaa2e21b6bdf963d22d6ffccb920	01bf2ad7351fdaa2e21b6bdf963d22d6ffccb920
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Apr 14 20:04:05 2012 +0200
+
+    indeo4: setup width/height properly.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/indeo4.c b/libavcodec/indeo4.c
+index 0fe5f8fb5c..4d315b5b8a 100644
+--- a/libavcodec/indeo4.c
++++ b/libavcodec/indeo4.c
+@@ -805,6 +805,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *data_size,
+     if (ctx->frame.data[0])
+         avctx->release_buffer(avctx, &ctx->frame);
+ 
++    avcodec_set_dimensions(avctx, ctx->planes[0].width, ctx->planes[0].height);
+     ctx->frame.reference = 0;
+     if ((result = avctx->get_buffer(avctx, &ctx->frame)) < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");

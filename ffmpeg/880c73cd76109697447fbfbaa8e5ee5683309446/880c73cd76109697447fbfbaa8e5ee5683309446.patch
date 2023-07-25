@@ -1,0 +1,27 @@
+commit 880c73cd76109697447fbfbaa8e5ee5683309446	880c73cd76109697447fbfbaa8e5ee5683309446
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Tue Aug 20 23:18:48 2013 +0200
+
+    avcodec/flashsv: check diff_start/height
+    
+    Fixes out of array accesses
+    Fixes Ticket2844
+    
+    Found-by: ami_stuff
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/flashsv.c b/libavcodec/flashsv.c
+index 9982b5e966..f00bf21d47 100644
+--- a/libavcodec/flashsv.c
++++ b/libavcodec/flashsv.c
+@@ -387,6 +387,10 @@ static int flashsv_decode_frame(AVCodecContext *avctx, void *data,
+                     }
+                     s->diff_start  = get_bits(&gb, 8);
+                     s->diff_height = get_bits(&gb, 8);
++                    if (s->diff_start + s->diff_height > cur_blk_height) {
++                        av_log(avctx, AV_LOG_ERROR, "Block parameters invalid\n");
++                        return AVERROR_INVALIDDATA;
++                    }
+                     av_log(avctx, AV_LOG_DEBUG,
+                            "%dx%d diff start %d height %d\n",
+                            i, j, s->diff_start, s->diff_height);

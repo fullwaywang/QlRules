@@ -1,0 +1,52 @@
+commit f76275d4a91b28d687250525d3a0c5509bbd666f
+Author: Sebastian Pipping <sebastian@pipping.org>
+Date:   Sun Sep 23 21:30:39 2018 +0200
+
+    UriQuery.c: Catch integer overflow in ComposeQuery and ...Ex
+
+diff --git a/ChangeLog b/ChangeLog
+index 7c32d86..fae1ede 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -4,6 +4,8 @@
+       Thanks to Google Autofuzz team for the report!
+   * Fixed: Fix off-by-one in uriComposeQueryCharsRequired* and ...Ex*
+       Reported space requirements were 1 byte bigger than necessary
++  * Fixed: Detect integer overflow in uriComposeQuery* and uriComposeQueryEx*
++      Thanks to Google Autofuzz team for the report!
+   * TODO BUMP SONAME
+ 
+ 2018-08-18 -- 0.8.6
+diff --git a/src/UriQuery.c b/src/UriQuery.c
+index 45acf5a..9165ec8 100644
+--- a/src/UriQuery.c
++++ b/src/UriQuery.c
+@@ -68,6 +68,10 @@
+ 
+ 
+ 
++#include <limits.h>
++
++
++
+ static int URI_FUNC(ComposeQueryEngine)(URI_CHAR * dest,
+ 		const URI_TYPE(QueryList) * queryList,
+ 		int maxChars, int * charsWritten, int * charsRequired,
+@@ -201,9 +205,15 @@ int URI_FUNC(ComposeQueryEngine)(URI_CHAR * dest,
+ 		const URI_CHAR * const value = queryList->value;
+ 		const int worstCase = (normalizeBreaks == URI_TRUE ? 6 : 3);
+ 		const int keyLen = (key == NULL) ? 0 : (int)URI_STRLEN(key);
+-		const int keyRequiredChars = worstCase * keyLen;
++		int keyRequiredChars;
+ 		const int valueLen = (value == NULL) ? 0 : (int)URI_STRLEN(value);
+-		const int valueRequiredChars = worstCase * valueLen;
++		int valueRequiredChars;
++
++		if ((keyLen >= INT_MAX / worstCase) || (valueLen >= INT_MAX / worstCase)) {
++			return URI_ERROR_OUTPUT_TOO_LARGE;
++		}
++		keyRequiredChars = worstCase * keyLen;
++		valueRequiredChars = worstCase * valueLen;
+ 
+ 		if (dest == NULL) {
+ 			(*charsRequired) += ampersandLen + keyRequiredChars + ((value == NULL)

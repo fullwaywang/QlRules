@@ -1,0 +1,85 @@
+commit 11da97024abbe76b8c81e3f2375b2a62e9717c67
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Aug 10 09:22:54 2020 -0700
+
+    Empty search_path in logical replication apply worker and walsender.
+    
+    This is like CVE-2018-1058 commit
+    582edc369cdbd348d68441fc50fa26a84afd0c1a.  Today, a malicious user of a
+    publisher or subscriber database can invoke arbitrary SQL functions
+    under an identity running replication, often a superuser.  This fix may
+    cause "does not exist" or "no schema has been selected to create in"
+    errors in a replication process.  After upgrading, consider watching
+    server logs for these errors.  Objects accruing schema qualification in
+    the wake of the earlier commit are unlikely to need further correction.
+    Back-patch to v10, which introduced logical replication.
+    
+    Security: CVE-2020-14349
+
+diff --git a/src/backend/replication/libpqwalreceiver/libpqwalreceiver.c b/src/backend/replication/libpqwalreceiver/libpqwalreceiver.c
+index e9057230e4..8afa5a29b4 100644
+--- a/src/backend/replication/libpqwalreceiver/libpqwalreceiver.c
++++ b/src/backend/replication/libpqwalreceiver/libpqwalreceiver.c
+@@ -21,6 +21,7 @@
+ 
+ #include "access/xlog.h"
+ #include "catalog/pg_type.h"
++#include "common/connect.h"
+ #include "funcapi.h"
+ #include "libpq-fe.h"
+ #include "mb/pg_wchar.h"
+@@ -213,6 +214,22 @@ libpqrcv_connect(const char *conninfo, bool logical, const char *appname,
+ 		return NULL;
+ 	}
+ 
++	if (logical)
++	{
++		PGresult   *res;
++
++		res = libpqrcv_PQexec(conn->streamConn,
++							  ALWAYS_SECURE_SEARCH_PATH_SQL);
++		if (PQresultStatus(res) != PGRES_TUPLES_OK)
++		{
++			PQclear(res);
++			ereport(ERROR,
++					(errmsg("could not clear search path: %s",
++							pchomp(PQerrorMessage(conn->streamConn)))));
++		}
++		PQclear(res);
++	}
++
+ 	conn->logical = logical;
+ 
+ 	return conn;
+diff --git a/src/backend/replication/logical/worker.c b/src/backend/replication/logical/worker.c
+index 2fcf2e61bc..b576e342cb 100644
+--- a/src/backend/replication/logical/worker.c
++++ b/src/backend/replication/logical/worker.c
+@@ -2019,6 +2019,12 @@ ApplyWorkerMain(Datum main_arg)
+ 											  MyLogicalRepWorker->userid,
+ 											  0);
+ 
++	/*
++	 * Set always-secure search path, so malicious users can't redirect user
++	 * code (e.g. pg_index.indexprs).
++	 */
++	SetConfigOption("search_path", "", PGC_SUSET, PGC_S_OVERRIDE);
++
+ 	/* Load the subscription into persistent memory context. */
+ 	ApplyContext = AllocSetContextCreate(TopMemoryContext,
+ 										 "ApplyContext",
+diff --git a/src/test/subscription/t/001_rep_changes.pl b/src/test/subscription/t/001_rep_changes.pl
+index 3f8318fc7c..0680f44a1a 100644
+--- a/src/test/subscription/t/001_rep_changes.pl
++++ b/src/test/subscription/t/001_rep_changes.pl
+@@ -16,6 +16,10 @@ $node_subscriber->init(allows_streaming => 'logical');
+ $node_subscriber->start;
+ 
+ # Create some preexisting content on publisher
++$node_publisher->safe_psql(
++	'postgres',
++	"CREATE FUNCTION public.pg_get_replica_identity_index(int)
++	 RETURNS regclass LANGUAGE sql AS 'SELECT 1/0'");    # shall not call
+ $node_publisher->safe_psql('postgres',
+ 	"CREATE TABLE tab_notrep AS SELECT generate_series(1,10) AS a");
+ $node_publisher->safe_psql('postgres',

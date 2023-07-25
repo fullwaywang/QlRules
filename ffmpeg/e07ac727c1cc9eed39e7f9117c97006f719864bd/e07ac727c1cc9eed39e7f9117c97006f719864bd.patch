@@ -1,0 +1,31 @@
+commit e07ac727c1cc9eed39e7f9117c97006f719864bd	e07ac727c1cc9eed39e7f9117c97006f719864bd
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Sep 21 23:34:11 2013 +0200
+
+    avcodec/g2meet: Fix framebuf size
+    
+    Currently the code can in some cases draw tiles that hang outside the
+    allocated buffer. This patch increases the buffer size to avoid out
+    of array accesses. An alternative would be to fail if such tiles are
+    encountered.
+    I do not know if any valid files use such hanging tiles.
+    
+    Fixes Ticket2971
+    Found-by: ami_stuff
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/g2meet.c b/libavcodec/g2meet.c
+index ccccf21834..1eae1a49b5 100644
+--- a/libavcodec/g2meet.c
++++ b/libavcodec/g2meet.c
+@@ -443,8 +443,8 @@ static int g2m_init_buffers(G2MContext *c)
+     int aligned_height;
+ 
+     if (!c->framebuf || c->old_width < c->width || c->old_height < c->height) {
+-        c->framebuf_stride = FFALIGN(c->width * 3, 16);
+-        aligned_height     = FFALIGN(c->height,    16);
++        c->framebuf_stride = FFALIGN(c->width + 15, 16) * 3;
++        aligned_height     = c->height + 15;
+         av_free(c->framebuf);
+         c->framebuf = av_mallocz(c->framebuf_stride * aligned_height);
+         if (!c->framebuf)

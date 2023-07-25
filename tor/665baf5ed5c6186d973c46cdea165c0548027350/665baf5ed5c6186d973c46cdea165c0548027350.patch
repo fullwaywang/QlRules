@@ -1,0 +1,141 @@
+commit 665baf5ed5c6186d973c46cdea165c0548027350
+Author: Nick Mathewson <nickm@torproject.org>
+Date:   Wed Jun 28 11:41:50 2017 -0400
+
+    Consider the exit family when applying guard restrictions.
+    
+    When the new path selection logic went into place, I accidentally
+    dropped the code that considered the _family_ of the exit node when
+    deciding if the guard was usable, and we didn't catch that during
+    code review.
+    
+    This patch makes the guard_restriction_t code consider the exit
+    family as well, and adds some (hopefully redundant) checks for the
+    case where we lack a node_t for a guard but we have a bridge_info_t
+    for it.
+    
+    Fixes bug 22753; bugfix on 0.3.0.1-alpha. Tracked as TROVE-2016-006
+    and CVE-2017-0377.
+
+diff --git a/changes/bug22753 b/changes/bug22753
+new file mode 100644
+index 0000000000..32a6dfa56c
+--- /dev/null
++++ b/changes/bug22753
+@@ -0,0 +1,7 @@
++  o Major bugfixes (path selection, security):
++    - When choosing which guard to use for a circuit, avoid the
++      exit's family along with the exit itself. Previously, the new
++      guard selection logic avoided the exit, but did not consider
++      its family.  Fixes bug 22753; bugfix on 0.3.0.1-alpha. Tracked
++      as TROVE-2016-006 and CVE-2017-0377.
++
+diff --git a/src/or/entrynodes.c b/src/or/entrynodes.c
+index aba35e69f7..ccb080880c 100644
+--- a/src/or/entrynodes.c
++++ b/src/or/entrynodes.c
+@@ -1428,6 +1428,38 @@ entry_guard_passes_filter(const or_options_t *options, guard_selection_t *gs,
+   }
+ }
+ 
++/** Return true iff <b>guard</b> is in the same family as <b>node</b>.
++ */
++static int
++guard_in_node_family(const entry_guard_t *guard, const node_t *node)
++{
++  const node_t *guard_node = node_get_by_id(guard->identity);
++  if (guard_node) {
++    return nodes_in_same_family(guard_node, node);
++  } else {
++    /* If we don't have a node_t for the guard node, we might have
++     * a bridge_info_t for it. So let's check to see whether the bridge
++     * address matches has any family issues.
++     *
++     * (Strictly speaking, I believe this check is unnecessary, since we only
++     * use it to avoid the exit's family when building circuits, and we don't
++     * build multihop circuits until we have a routerinfo_t for the
++     * bridge... at which point, we'll also have a node_t for the
++     * bridge. Nonetheless, it seems wise to include it, in case our
++     * assumptions change down the road.  -nickm.)
++     */
++    if (get_options()->EnforceDistinctSubnets && guard->bridge_addr) {
++      tor_addr_t node_addr;
++      node_get_addr(node, &node_addr);
++      if (addrs_in_same_network_family(&node_addr,
++                                       &guard->bridge_addr->addr)) {
++        return 1;
++      }
++    }
++    return 0;
++  }
++}
++
+ /**
+  * Return true iff <b>guard</b> obeys the restrictions defined in <b>rst</b>.
+  * (If <b>rst</b> is NULL, there are no restrictions.)
+@@ -1440,7 +1472,12 @@ entry_guard_obeys_restriction(const entry_guard_t *guard,
+   if (! rst)
+     return 1; // No restriction?  No problem.
+ 
+-  // Only one kind of restriction exists right now
++  // Only one kind of restriction exists right now: excluding an exit
++  // ID and all of its family.
++  const node_t *node = node_get_by_id((const char*)rst->exclude_id);
++  if (node && guard_in_node_family(guard, node))
++    return 0;
++
+   return tor_memneq(guard->identity, rst->exclude_id, DIGEST_LEN);
+ }
+ 
+diff --git a/src/or/entrynodes.h b/src/or/entrynodes.h
+index f02901f5d7..6ccc48f32f 100644
+--- a/src/or/entrynodes.h
++++ b/src/or/entrynodes.h
+@@ -276,16 +276,17 @@ struct entry_guard_handle_t;
+  * A restriction to remember which entry guards are off-limits for a given
+  * circuit.
+  *
+- * Right now, we only use restrictions to block a single guard from being
+- * selected; this mechanism is designed to be more extensible in the future,
+- * however.
++ * Right now, we only use restrictions to block a single guard and its family
++ * from being selected; this mechanism is designed to be more extensible in
++ * the future, however.
+  *
+  * Note: This mechanism is NOT for recording which guards are never to be
+  * used: only which guards cannot be used on <em>one particular circuit</em>.
+  */
+ struct entry_guard_restriction_t {
+   /**
+-   * The guard's RSA identity digest must not equal this.
++   * The guard's RSA identity digest must not equal this; and it must not
++   * be in the same family as any node with this digest.
+    */
+   uint8_t exclude_id[DIGEST_LEN];
+ };
+diff --git a/src/or/nodelist.c b/src/or/nodelist.c
+index 96e95baf5a..2ca52e74b5 100644
+--- a/src/or/nodelist.c
++++ b/src/or/nodelist.c
+@@ -1343,7 +1343,7 @@ nodelist_refresh_countries(void)
+ 
+ /** Return true iff router1 and router2 have similar enough network addresses
+  * that we should treat them as being in the same family */
+-static inline int
++int
+ addrs_in_same_network_family(const tor_addr_t *a1,
+                              const tor_addr_t *a2)
+ {
+diff --git a/src/or/nodelist.h b/src/or/nodelist.h
+index 8456d21c6c..4e5301df6b 100644
+--- a/src/or/nodelist.h
++++ b/src/or/nodelist.h
+@@ -94,6 +94,8 @@ int node_is_unreliable(const node_t *router, int need_uptime,
+ int router_exit_policy_all_nodes_reject(const tor_addr_t *addr, uint16_t port,
+                                         int need_uptime);
+ void router_set_status(const char *digest, int up);
++int addrs_in_same_network_family(const tor_addr_t *a1,
++                                 const tor_addr_t *a2);
+ 
+ /** router_have_minimum_dir_info tests to see if we have enough
+  * descriptor information to create circuits.

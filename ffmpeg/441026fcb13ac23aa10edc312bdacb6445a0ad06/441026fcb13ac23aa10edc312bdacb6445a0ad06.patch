@@ -1,0 +1,28 @@
+commit 441026fcb13ac23aa10edc312bdacb6445a0ad06
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sun May 7 18:50:49 2017 +0200
+
+    avcodec/xwddec: Check bpp more completely
+    
+    Fixes out of array access
+    Fixes: 1399/clusterfuzz-testcase-minimized-4866094172995584
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/xwddec.c b/libavcodec/xwddec.c
+index 64cd8418a2..8b0845fc01 100644
+--- a/libavcodec/xwddec.c
++++ b/libavcodec/xwddec.c
+@@ -157,9 +157,9 @@ static int xwd_decode_frame(AVCodecContext *avctx, void *data,
+     case XWD_GRAY_SCALE:
+         if (bpp != 1 && bpp != 8)
+             return AVERROR_INVALIDDATA;
+-        if (pixdepth == 1) {
++        if (bpp == 1 && pixdepth == 1) {
+             avctx->pix_fmt = AV_PIX_FMT_MONOWHITE;
+-        } else if (pixdepth == 8) {
++        } else if (bpp == 8 && pixdepth == 8) {
+             avctx->pix_fmt = AV_PIX_FMT_GRAY8;
+         }
+         break;

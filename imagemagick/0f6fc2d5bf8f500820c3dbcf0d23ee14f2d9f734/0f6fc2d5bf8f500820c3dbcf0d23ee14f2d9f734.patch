@@ -1,0 +1,303 @@
+commit 0f6fc2d5bf8f500820c3dbcf0d23ee14f2d9f734
+Author: cristy <urban-warrior@git.imagemagick.org>
+Date:   Sat May 30 00:49:11 2015 +0000
+
+diff --git a/MagickCore/memory.c b/MagickCore/memory.c
+index fa1d44ea7..50755a91a 100644
+--- a/MagickCore/memory.c
++++ b/MagickCore/memory.c
+@@ -606,7 +606,8 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
+       else
+         RelinquishMagickResource(MapResource,length);
+     }
+-  if (memory_info->blob == NULL)
++  if ((memory_info->blob == NULL) &&
++      (AcquireMagickResource(DiskResource,length) != MagickFalse))
+     {
+       int
+         file;
+@@ -615,15 +616,26 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
+         Anonymous memory mapping failed, try file-backed memory mapping.
+       */
+       file=AcquireUniqueFileResource(memory_info->filename);
+-      if (file != -1)
++      if (file == -1)
++        RelinquishMagickResource(DiskResource,length);
++      else
+         {
+-          if ((lseek(file,length-1,SEEK_SET) >= 0) && (write(file,"",1) == 1))
++          if ((lseek(file,length-1,SEEK_SET) < 0) || (write(file,"",1) != 1))
++            RelinquishMagickResource(DiskResource,length);
++          else
+             {
+-              memory_info->blob=MapBlob(file,IOMode,0,length);
+-              if (memory_info->blob != NULL)
++              if (AcquireMagickResource(MapResource,length) == MagickFalse)
++                RelinquishMagickResource(DiskResource,length);
++              else
+                 {
+-                  memory_info->type=MapVirtualMemory;
+-                  (void) AcquireMagickResource(MapResource,length);
++                  memory_info->blob=MapBlob(file,IOMode,0,length);
++                  if (memory_info->blob != NULL)
++                    memory_info->type=MapVirtualMemory;
++                  else
++                    {
++                      RelinquishMagickResource(MapResource,length);
++                      RelinquishMagickResource(DiskResource,length);
++                    }
+                 }
+             }
+           (void) close(file);
+@@ -1033,7 +1045,10 @@ MagickExport MemoryInfo *RelinquishVirtualMemory(MemoryInfo *memory_info)
+         memory_info->blob=NULL;
+         RelinquishMagickResource(MapResource,memory_info->length);
+         if (*memory_info->filename != '\0')
+-          (void) RelinquishUniqueFileResource(memory_info->filename);
++          {
++            (void) RelinquishUniqueFileResource(memory_info->filename);
++            RelinquishMagickResource(DiskResource,memory_info->length);
++          }
+         break;
+       }
+       case UnalignedVirtualMemory:
+diff --git a/MagickCore/studio.h b/MagickCore/studio.h
+index c434028d7..6905a11fa 100644
+--- a/MagickCore/studio.h
++++ b/MagickCore/studio.h
+@@ -46,9 +46,6 @@ extern "C" {
+ #if defined(_magickcore_inline) && !defined(inline)
+ # define inline  _magickcore_inline
+ #endif
+-#if defined(_magickcore_restrict) && !defined(restrict)
+-# define restrict  _magickcore_restrict
+-#endif
+ # if defined(__cplusplus) || defined(c_plusplus)
+ #  undef inline
+ # endif
+@@ -75,6 +72,9 @@ extern "C" {
+ #  include <stdlib.h>
+ # endif
+ #endif
++#if defined(_magickcore_restrict) && !defined(restrict)
++# define restrict  _magickcore_restrict
++#endif
+ #if defined(MAGICKCORE_HAVE_STRING_H)
+ # if !defined(STDC_HEADERS) && defined(MAGICKCORE_HAVE_MEMORY_H)
+ #  include <memory.h>
+diff --git a/MagickCore/version.c b/MagickCore/version.c
+index 36e5b5361..d4407437a 100644
+--- a/MagickCore/version.c
++++ b/MagickCore/version.c
+@@ -219,17 +219,26 @@ MagickExport const char *GetMagickDelegates(void)
+ MagickExport const char *GetMagickFeatures(void)
+ {
+   return "DPC"
+-#if defined(MAGICKCORE_BUILD_MODULES) || defined(_DLL)
+-  " Modules"
++#if defined(MAGICKCORE_WINDOWS_SUPPORT) && defined(_DEBUG)
++  " Debug"
++#endif
++#if defined(MAGICKCORE_CIPHER_SUPPORT)
++  " Cipher"
+ #endif
+ #if defined(MAGICKCORE_HDRI_SUPPORT)
+   " HDRI"
+ #endif
++#if defined(MAGICKCORE_BUILD_MODULES) || defined(_DLL)
++  " Modules"
++#endif
+ #if defined(MAGICKCORE_OPENCL_SUPPORT)
+   " OpenCL"
+ #endif
+ #if defined(MAGICKCORE_OPENMP_SUPPORT)
+   " OpenMP"
++#endif
++#if defined(ZERO_CONFIGURATION_SUPPORT)
++  " Zero-configuration"
+ #endif
+   ;
+ }
+diff --git a/MagickCore/version.h b/MagickCore/version.h
+index 7aa97dc01..f5221f15c 100644
+--- a/MagickCore/version.h
++++ b/MagickCore/version.h
+@@ -27,7 +27,7 @@ extern "C" {
+ */
+ #define MagickPackageName "ImageMagick"
+ #define MagickCopyright  "Copyright (C) 1999-2015 ImageMagick Studio LLC"
+-#define MagickSVNRevision  "18658:18662M"
++#define MagickSVNRevision  "18670M"
+ #define MagickLibVersion  0x700
+ #define MagickLibVersionText  "7.0.0"
+ #define MagickLibVersionNumber  0,0,0
+@@ -48,12 +48,12 @@ extern "C" {
+ #define MagickppLibAddendum  "-0"
+ #define MagickppLibInterface  0
+ #define MagickppLibMinInterface  0
+-#define MagickReleaseDate  "2015-05-26"
++#define MagickReleaseDate  "2015-05-29"
+ #define MagickChangeDate   "20120427"
+ #define MagickAuthoritativeLicense  \
+   "http://www.imagemagick.org/script/license.php"
+ #define MagickAuthoritativeURL  "http://www.imagemagick.org"
+-#define MagickFeatures "DPC HDRI OpenMP"
++#define MagickFeatures "DPC HDRI Cipher OpenMP"
+ #define MagickDelegates "bzlib djvu mpeg fftw fpx fontconfig freetype jbig jng jpeg lcms lzma openexr pango png ps tiff webp x xml zlib"
+ #define MagickHomeURL  "file:///usr/local/share/doc/ImageMagick-7/index.html"
+ #if (MAGICKCORE_QUANTUM_DEPTH == 8)
+diff --git a/MagickWand/studio.h b/MagickWand/studio.h
+index b463d0a9b..7bf0aa3a1 100644
+--- a/MagickWand/studio.h
++++ b/MagickWand/studio.h
+@@ -46,9 +46,6 @@ extern "C" {
+ #if defined(_magickcore_inline) && !defined(inline)
+ # define inline _magickcore_inline
+ #endif
+-#if defined(_magickcore_restrict) && !defined(restrict)
+-# define restrict  _magickcore_restrict
+-#endif
+ # if defined(__cplusplus) || defined(c_plusplus)
+ #  undef inline
+ # endif
+@@ -77,6 +74,9 @@ extern "C" {
+ #  include <stdlib.h>
+ # endif
+ #endif
++#if defined(_magickcore_restrict) && !defined(restrict)
++# define restrict  _magickcore_restrict
++#endif
+ #if defined(MAGICKCORE_HAVE_STRING_H)
+ # if !defined(STDC_HEADERS) && defined(MAGICKCORE_HAVE_MEMORY_H)
+ #  include <memory.h>
+diff --git a/coders/icon.c b/coders/icon.c
+index 94c31e6b8..222dec254 100644
+--- a/coders/icon.c
++++ b/coders/icon.c
+@@ -183,8 +183,8 @@ Image *AutoResizeImage(const Image *image,const char *option,
+       p++;
+ 
+     size=(size_t)strtol(p,&q,10);
+-    if (p == q || size < 16 || size > 256)
+-        return((Image *) NULL);
++    if ((p == q) || (size < 16) || (size > 256))
++      return((Image *) NULL);
+ 
+     p=q;
+     sizes[i++]=size;
+@@ -354,6 +354,8 @@ static Image *ReadICONImage(const ImageInfo *image_info,
+           Icon image encoded as a compressed PNG image.
+         */
+         length=icon_file.directory[i].size;
++        if (~length < 16)
++          ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+         png=(unsigned char *) AcquireQuantumMemory(length+16,sizeof(*png));
+         if (png == (unsigned char *) NULL)
+           ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+diff --git a/coders/pict.c b/coders/pict.c
+index 4f51eb393..027119d81 100644
+--- a/coders/pict.c
++++ b/coders/pict.c
+@@ -1637,6 +1637,7 @@ static MagickBooleanType WritePICTImage(const ImageInfo *image_info,
+   size_t
+     bytes_per_line,
+     count,
++    row_bytes,
+     storage_class;
+ 
+   ssize_t
+@@ -1649,7 +1650,6 @@ static MagickBooleanType WritePICTImage(const ImageInfo *image_info,
+ 
+   unsigned short
+     base_address,
+-    row_bytes,
+     transfer_mode;
+ 
+   /*
+@@ -1681,7 +1681,7 @@ static MagickBooleanType WritePICTImage(const ImageInfo *image_info,
+   source_rectangle=size_rectangle;
+   destination_rectangle=size_rectangle;
+   base_address=0xff;
+-  row_bytes=(unsigned short) (image->columns | 0x8000);
++  row_bytes=image->columns;
+   bounds.top=0;
+   bounds.left=0;
+   bounds.bottom=(short) image->rows;
+@@ -1711,7 +1711,7 @@ static MagickBooleanType WritePICTImage(const ImageInfo *image_info,
+       pixmap.bits_per_pixel=32;
+       pixmap.pack_type=0x04;
+       transfer_mode=0x40;
+-      row_bytes=(unsigned short) ((4*image->columns) | 0x8000);
++      row_bytes=4*image->columns;
+     }
+   /*
+     Allocate memory.
+diff --git a/configure b/configure
+index f1bfd46bc..7633dd204 100755
+--- a/configure
++++ b/configure
+@@ -4341,7 +4341,7 @@ MAGICK_PATCHLEVEL_VERSION=0
+ 
+ MAGICK_VERSION=7.0.0-0
+ 
+-MAGICK_SVN_REVISION=18658:18662M
++MAGICK_SVN_REVISION=18670M
+ 
+ 
+ # Substitute library versioning
+@@ -21655,6 +21655,7 @@ if test "$enable_cipher" = 'yes'; then
+ 
+ $as_echo "#define CIPHER_SUPPORT 1" >>confdefs.h
+ 
++    MAGICK_FEATURES="Cipher $MAGICK_FEATURES"
+ fi
+ 
+ # Build a zero-configuration version of ImageMagick.
+@@ -21670,7 +21671,7 @@ if test "$enable_zero_configuration" = 'yes'; then
+ 
+ $as_echo "#define ZERO_CONFIGURATION_SUPPORT 1" >>confdefs.h
+ 
+-    MAGICK_FEATURES="Zero-Configuration $MAGICK_FEATURES"
++    MAGICK_FEATURES="Zero-configuration $MAGICK_FEATURES"
+ fi
+ 
+ # Build a high dynamic range version of ImageMagick.
+@@ -36535,7 +36536,7 @@ fi
+ if test "$build_modules" != 'no'; then
+     MAGICK_DEP_LIBS="$USER_LIBS $LCMS_LIBS $FREETYPE_LIBS $LQR_LIBS $FFTW_LIBS $FONTCONFIG_LIBS $XEXT_LIBS $IPC_LIBS $X11_LIBS $XT_LIBS $LZMA_LIBS $BZLIB_LIBS $ZLIB_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
+ else
+-    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $TIFF_LIBS $FREETYPE_LIBS $JPEG_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FPX_LIBS $FONTCONFIG_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $OPENJPEG_LIBS $PANGO_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
++    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $TIFF_LIBS $FREETYPE_LIBS $JPEG_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FPX_LIBS $FONTCONFIG_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $LIBOPENJP2_LIB $PANGO_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
+ fi
+ 
+ 
+diff --git a/configure.ac b/configure.ac
+index 5d2cb8a13..ba0e11186 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -642,6 +642,7 @@ AC_ARG_ENABLE([cipher],
+ 
+ if test "$enable_cipher" = 'yes'; then
+     AC_DEFINE(CIPHER_SUPPORT,1,[permit enciphering and deciphering image pixels])
++    MAGICK_FEATURES="Cipher $MAGICK_FEATURES"
+ fi
+ 
+ # Build a zero-configuration version of ImageMagick.
+@@ -653,7 +654,7 @@ AC_ARG_ENABLE([zero-configuration],
+ 
+ if test "$enable_zero_configuration" = 'yes'; then
+     AC_DEFINE(ZERO_CONFIGURATION_SUPPORT,1,[Build self-contained, embeddable, zero-configuration ImageMagick])
+-    MAGICK_FEATURES="Zero-Configuration $MAGICK_FEATURES"
++    MAGICK_FEATURES="Zero-configuration $MAGICK_FEATURES"
+ fi
+ 
+ # Build a high dynamic range version of ImageMagick.
+@@ -3996,7 +3997,7 @@ fi
+ if test "$build_modules" != 'no'; then
+     MAGICK_DEP_LIBS="$USER_LIBS $LCMS_LIBS $FREETYPE_LIBS $LQR_LIBS $FFTW_LIBS $FONTCONFIG_LIBS $XEXT_LIBS $IPC_LIBS $X11_LIBS $XT_LIBS $LZMA_LIBS $BZLIB_LIBS $ZLIB_LIBS $LTDL_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
+ else
+-    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $TIFF_LIBS $FREETYPE_LIBS $JPEG_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FPX_LIBS $FONTCONFIG_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $OPENJPEG_LIBS $PANGO_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
++    MAGICK_DEP_LIBS="$USER_LIBS $JBIG_LIBS $LCMS_LIBS $TIFF_LIBS $FREETYPE_LIBS $JPEG_LIBS $GS_LIBS $LQR_LIBS $PNG_LIBS $AUTOTRACE_LIBS $DJVU_LIBS $FFTW_LIBS $FPX_LIBS $FONTCONFIG_LIBS $WEBP_LIBS $WMF_LIBS $DPS_LIBS $XEXT_LIBS $XT_LIBS $IPC_LIBS $X11_LIBS $LZMA_LIBS $BZLIB_LIBS $OPENEXR_LIBS $LIBOPENJP2_LIB $PANGO_LIBS $RSVG_LIBS $XML_LIBS $GVC_LIBS $ZLIB_LIBS $GDI32_LIBS $MATH_LIBS $GOMP_LIBS $CL_LIBS $UMEM_LIBS $JEMALLOC_LIBS $THREAD_LIBS"
+ fi
+ AC_SUBST(MAGICK_DEP_LIBS)
+ 

@@ -1,0 +1,110 @@
+commit 45daecb4f73a47ab3236a29a3a48c52324cbf19a
+Author: James Zern <jzern@google.com>
+Date:   Wed Jun 7 20:46:13 2017 -0700
+
+    vp8_decode_frame: fix oob read on truncated key frame
+    
+    the check for error correction being disabled was overriding the data
+    length checks. this avoids returning incorrect information (width /
+    height) for the decoded frame which could result in inconsistent sizes
+    returned in to an application causing it to read beyond the bounds of
+    the frame allocation.
+    
+    BUG=webm:1443
+    BUG=b/62458770
+    
+    Change-Id: I063459674e01b57c0990cb29372e0eb9a1fbf342
+
+diff --git a/test/invalid_file_test.cc b/test/invalid_file_test.cc
+index eae81faa1..3d9f5c16a 100644
+--- a/test/invalid_file_test.cc
++++ b/test/invalid_file_test.cc
+@@ -120,6 +120,15 @@ class InvalidFileTest : public ::libvpx_test::DecoderTest,
+ 
+ TEST_P(InvalidFileTest, ReturnCode) { RunTest(); }
+ 
++#if CONFIG_VP8_DECODER
++const DecodeParam kVP8InvalidFileTests[] = {
++  { 1, "invalid-bug-1443.ivf" },
++};
++
++VP8_INSTANTIATE_TEST_CASE(InvalidFileTest,
++                          ::testing::ValuesIn(kVP8InvalidFileTests));
++#endif  // CONFIG_VP8_DECODER
++
+ #if CONFIG_VP9_DECODER
+ const DecodeParam kVP9InvalidFileTests[] = {
+   { 1, "invalid-vp90-02-v2.webm" },
+@@ -164,12 +173,12 @@ class InvalidFileInvalidPeekTest : public InvalidFileTest {
+ TEST_P(InvalidFileInvalidPeekTest, ReturnCode) { RunTest(); }
+ 
+ #if CONFIG_VP8_DECODER
+-const DecodeParam kVP8InvalidFileTests[] = {
++const DecodeParam kVP8InvalidPeekTests[] = {
+   { 1, "invalid-vp80-00-comprehensive-018.ivf.2kf_0x6.ivf" },
+ };
+ 
+ VP8_INSTANTIATE_TEST_CASE(InvalidFileInvalidPeekTest,
+-                          ::testing::ValuesIn(kVP8InvalidFileTests));
++                          ::testing::ValuesIn(kVP8InvalidPeekTests));
+ #endif  // CONFIG_VP8_DECODER
+ 
+ #if CONFIG_VP9_DECODER
+diff --git a/test/test-data.mk b/test/test-data.mk
+index b39ab8763..1656372b3 100644
+--- a/test/test-data.mk
++++ b/test/test-data.mk
+@@ -732,6 +732,8 @@ LIBVPX_TEST_DATA-$(CONFIG_VP9_DECODER) += vp93-2-20-12bit-yuv444.webm.md5
+ endif  # CONFIG_VP9_HIGHBITDEPTH
+ 
+ # Invalid files for testing libvpx error checking.
++LIBVPX_TEST_DATA-$(CONFIG_VP8_DECODER) += invalid-bug-1443.ivf
++LIBVPX_TEST_DATA-$(CONFIG_VP8_DECODER) += invalid-bug-1443.ivf.res
+ LIBVPX_TEST_DATA-$(CONFIG_VP8_DECODER) += invalid-vp80-00-comprehensive-018.ivf.2kf_0x6.ivf
+ LIBVPX_TEST_DATA-$(CONFIG_VP8_DECODER) += invalid-vp80-00-comprehensive-018.ivf.2kf_0x6.ivf.res
+ LIBVPX_TEST_DATA-$(CONFIG_VP9_DECODER) += invalid-vp90-01-v3.webm
+diff --git a/test/test-data.sha1 b/test/test-data.sha1
+index 22ca6f564..7948f9e3f 100644
+--- a/test/test-data.sha1
++++ b/test/test-data.sha1
+@@ -848,3 +848,5 @@ a000d568431d07379dd5a8ec066061c07e560b47 *invalid-vp90-2-00-quantizer-63.ivf.kf_
+ 6fa3d3ac306a3d9ce1d610b78441dc00d2c2d4b9 *tos_vp8.webm
+ e402cbbf9e550ae017a1e9f1f73931c1d18474e8 *invalid-crbug-667044.webm
+ d3964f9dad9f60363c81b688324d95b4ec7c8038 *invalid-crbug-667044.webm.res
++fd9df7f3f6992af1d7a9dde975c9a0d6f28c053d *invalid-bug-1443.ivf
++fd3020fa6e9ca5966206738654c97dec313b0a95 *invalid-bug-1443.ivf.res
+diff --git a/vp8/decoder/decodeframe.c b/vp8/decoder/decodeframe.c
+index 0aec2a01b..d900b670d 100644
+--- a/vp8/decoder/decodeframe.c
++++ b/vp8/decoder/decodeframe.c
+@@ -930,7 +930,7 @@ int vp8_decode_frame(VP8D_COMP *pbi) {
+       /* When error concealment is enabled we should only check the sync
+        * code if we have enough bits available
+        */
+-      if (!pbi->ec_active || data + 3 < data_end) {
++      if (data + 3 < data_end) {
+         if (clear[0] != 0x9d || clear[1] != 0x01 || clear[2] != 0x2a) {
+           vpx_internal_error(&pc->error, VPX_CODEC_UNSUP_BITSTREAM,
+                              "Invalid frame sync code");
+@@ -941,13 +941,19 @@ int vp8_decode_frame(VP8D_COMP *pbi) {
+        * if we have enough data. Otherwise we will end up with the wrong
+        * size.
+        */
+-      if (!pbi->ec_active || data + 6 < data_end) {
++      if (data + 6 < data_end) {
+         pc->Width = (clear[3] | (clear[4] << 8)) & 0x3fff;
+         pc->horiz_scale = clear[4] >> 6;
+         pc->Height = (clear[5] | (clear[6] << 8)) & 0x3fff;
+         pc->vert_scale = clear[6] >> 6;
++        data += 7;
++      } else if (!pbi->ec_active) {
++        vpx_internal_error(&pc->error, VPX_CODEC_CORRUPT_FRAME,
++                           "Truncated key frame header");
++      } else {
++        /* Error concealment is active, clear the frame. */
++        data = data_end;
+       }
+-      data += 7;
+     } else {
+       memcpy(&xd->pre, yv12_fb_new, sizeof(YV12_BUFFER_CONFIG));
+       memcpy(&xd->dst, yv12_fb_new, sizeof(YV12_BUFFER_CONFIG));

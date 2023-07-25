@@ -1,0 +1,43 @@
+commit 64a805883d7223c868a683f0030837d859edd2ab
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Wed Oct 16 12:13:04 2019 +0200
+
+    avfilter/vf_gblur: fix heap-buffer overflow
+    
+    Fixes #8282
+
+diff --git a/libavfilter/vf_gblur.c b/libavfilter/vf_gblur.c
+index 1957d79e0f..9b3e168b1d 100644
+--- a/libavfilter/vf_gblur.c
++++ b/libavfilter/vf_gblur.c
+@@ -236,7 +236,7 @@ static int config_input(AVFilterLink *inlink)
+ 
+     s->nb_planes = av_pix_fmt_count_planes(inlink->format);
+ 
+-    s->buffer = av_malloc_array(inlink->w, inlink->h * sizeof(*s->buffer));
++    s->buffer = av_malloc_array(FFALIGN(inlink->w, 16), FFALIGN(inlink->h, 16) * sizeof(*s->buffer));
+     if (!s->buffer)
+         return AVERROR(ENOMEM);
+ 
+diff --git a/libavfilter/x86/vf_gblur.asm b/libavfilter/x86/vf_gblur.asm
+index 762c953c85..a25b1659f5 100644
+--- a/libavfilter/x86/vf_gblur.asm
++++ b/libavfilter/x86/vf_gblur.asm
+@@ -100,7 +100,7 @@ cglobal horiz_slice, 4, 9, 9, ptr, width, height, steps, nu, bscale, x, y, step,
+ 
+         add widthq, remainq
+         cmp xq, widthq
+-        je .end_scalar
++        jge .end_scalar
+ 
+         .loop_scalar:
+             ; ptr[x] += nu * ptr[x-1]
+@@ -148,7 +148,7 @@ cglobal horiz_slice, 4, 9, 9, ptr, width, height, steps, nu, bscale, x, y, step,
+             jg .loop_x_back
+ 
+         cmp xq, 0
+-        je .end_scalar_back
++        jle .end_scalar_back
+ 
+         .loop_scalar_back:
+             ; ptr[x-1] += nu * ptr[x]

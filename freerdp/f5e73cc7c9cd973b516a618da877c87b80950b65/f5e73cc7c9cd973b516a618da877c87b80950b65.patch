@@ -1,0 +1,19 @@
+commit f5e73cc7c9cd973b516a618da877c87b80950b65
+Author: akallabeth <akallabeth@posteo.net>
+Date:   Tue Mar 31 09:19:17 2020 +0200
+
+    Fixed #6009: Bounds checks in autodetect_recv_bandwidth_measure_results
+
+diff --git a/libfreerdp/core/autodetect.c b/libfreerdp/core/autodetect.c
+index 215a36608..c846fb5a9 100644
+--- a/libfreerdp/core/autodetect.c
++++ b/libfreerdp/core/autodetect.c
+@@ -465,6 +465,8 @@ static BOOL autodetect_recv_bandwidth_measure_results(rdpRdp* rdp, wStream* s,
+ 		return FALSE;
+ 
+ 	WLog_VRB(AUTODETECT_TAG, "received Bandwidth Measure Results PDU");
++	if (Stream_GetRemainingLength(s) < 8)
++		return -1;
+ 	Stream_Read_UINT32(s, rdp->autodetect->bandwidthMeasureTimeDelta); /* timeDelta (4 bytes) */
+ 	Stream_Read_UINT32(s, rdp->autodetect->bandwidthMeasureByteCount); /* byteCount (4 bytes) */
+ 

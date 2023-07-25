@@ -1,0 +1,22 @@
+commit 0acd1ab4d08d53d80393b1a37b8781f6e7b2b996
+Author: Tobias Brunner <tobias@strongswan.org>
+Date:   Tue Mar 13 18:54:08 2018 +0100
+
+    stroke: Ensure a minimum message length
+
+diff --git a/src/libcharon/plugins/stroke/stroke_socket.c b/src/libcharon/plugins/stroke/stroke_socket.c
+index c568440b7..1e7f210e9 100644
+--- a/src/libcharon/plugins/stroke/stroke_socket.c
++++ b/src/libcharon/plugins/stroke/stroke_socket.c
+@@ -627,6 +627,11 @@ static bool on_accept(private_stroke_socket_t *this, stream_t *stream)
+ 		}
+ 		return FALSE;
+ 	}
++	if (len < offsetof(stroke_msg_t, buffer))
++	{
++		DBG1(DBG_CFG, "invalid stroke message length %d", len);
++		return FALSE;
++	}
+ 
+ 	/* read message (we need an additional byte to terminate the buffer) */
+ 	msg = malloc(len + 1);

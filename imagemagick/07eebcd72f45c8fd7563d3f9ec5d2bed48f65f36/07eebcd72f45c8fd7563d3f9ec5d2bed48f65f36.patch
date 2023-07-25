@@ -1,0 +1,34 @@
+commit 07eebcd72f45c8fd7563d3f9ec5d2bed48f65f36
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Mon Mar 4 19:25:01 2019 -0500
+
+    ...
+
+diff --git a/MagickCore/locale.c b/MagickCore/locale.c
+index d30960e9d..158b7ef92 100644
+--- a/MagickCore/locale.c
++++ b/MagickCore/locale.c
+@@ -1523,9 +1523,9 @@ MagickExport int LocaleLowercase(const int c)
+ {
+ #if defined(MAGICKCORE_LOCALE_SUPPORT)
+   if (c_locale != (locale_t) NULL)
+-    return(tolower_l(c,c_locale));
++    return(tolower_l((int) ((unsigned char) c),c_locale));
+ #endif
+-  return(tolower(c));
++  return(tolower((int) ((unsigned char) c)));
+ }
+ 
+ /*
+@@ -1661,9 +1661,9 @@ MagickExport int LocaleUppercase(const int c)
+ {
+ #if defined(MAGICKCORE_LOCALE_SUPPORT)
+   if (c_locale != (locale_t) NULL)
+-    return(toupper_l(c,c_locale));
++    return(toupper_l((int) ((unsigned char) c),c_locale));
+ #endif
+-  return(toupper(c));
++  return(toupper((int) ((unsigned char) c)));
+ }
+ 
+ /*

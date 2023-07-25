@@ -1,0 +1,24 @@
+commit c94f9e854228e0ea00e1de8769d8d3f7cab84a55	c94f9e854228e0ea00e1de8769d8d3f7cab84a55
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Fri Aug 9 13:37:18 2013 +0200
+
+    avutil/mem: Fix flipped condition
+    
+    Fixes return code and later null pointer dereference
+    
+    Found-by: Laurent Butti <laurentb@gmail.com>
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavutil/mem.c b/libavutil/mem.c
+index 76f6b65d1a..20dfd629a8 100644
+--- a/libavutil/mem.c
++++ b/libavutil/mem.c
+@@ -191,7 +191,7 @@ int av_reallocp_array(void *ptr, size_t nmemb, size_t size)
+ {
+     void **ptrptr = ptr;
+     *ptrptr = av_realloc_f(*ptrptr, nmemb, size);
+-    if (!*ptrptr && !(nmemb && size))
++    if (!*ptrptr && nmemb && size)
+         return AVERROR(ENOMEM);
+     return 0;
+ }

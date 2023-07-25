@@ -1,0 +1,120 @@
+commit a8c319a2b281af68f7ca0e2f9a28ca57b44ceb2b
+Author: Glenn Randers-Pehrson <glennrp at users.sourceforge.net>
+Date:   Sun Feb 26 20:31:00 2012 -0600
+
+    [libpng14] Fixed off-by-one bug in png_handle_sCAL() when using fixed point
+    
+    arithmetic, causing out-of-bounds read in png_set_sCAL() because of failure
+    to copy the string terminators (Franke Busse).
+
+diff --git a/ANNOUNCE b/ANNOUNCE
+index 27b3c6ce0..9847bfb04 100644
+--- a/ANNOUNCE
++++ b/ANNOUNCE
+@@ -1,5 +1,5 @@
+ 
+-Libpng 1.4.10beta01 - February 21, 2012
++Libpng 1.4.10beta01 - February 27, 2012
+ 
+ This is not intended to be a public release.  It will be replaced
+ within a few weeks by a public version or by another test version.
+@@ -26,13 +26,17 @@ Other information:
+ 
+ Changes since the last public release (1.4.9):
+ 
+-version 1.4.10beta01 [February 21, 2012]
++version 1.4.10beta01 [February 27, 2012]
+   Removed two useless #ifdef directives from pngread.c and one from pngrutil.c
+   Eliminated redundant png_push_read_tEXt|zTXt|iTXt|unknown code from
+     pngpread.c and use the sequential png_handle_tEXt, etc., in pngrutil.c;
+     now that png_ptr->buffer is inaccessible to applications, the special
+     handling is no longer useful.
+   Fixed bug with png_handle_hIST with odd chunk length (Frank Busse).
++  Fixed incorrect type (int copy should be png_size_t copy) in png_inflate().
++  Fixed off-by-one bug in png_handle_sCAL() when using fixed point arithmetic,
++    causing out-of-bounds read in png_set_sCAL() because of failure to copy
++    the string terminators (Franke Busse).
+ 
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+diff --git a/CHANGES b/CHANGES
+index 5bf5ce3e3..7b90107f8 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -2832,20 +2832,25 @@ version 1.4.9beta01 [February 16, 2012]
+     Makefile.in were not updated)
+ 
+ version 1.4.9rc01 [February 17, 2012]
+-  Fixed CVE-2011-3026 buffer overrun bug.  Deal more correctly with the test
+-    on iCCP chunk length. Also removed spurious casts that may hide problems
+-    on 16-bit systems.
++  Fixed CVE-2011-3026 buffer overrun bug.  This bug was introduced when
++    iCCP chunk support was added at libpng-1.0.6. Deal more correctly with the
++    test on iCCP chunk length. Also removed spurious casts that may hide
++    problems on 16-bit systems.
+ 
+ version 1.4.9 [February 18, 2012]
+   No changes.
+ 
+-version 1.4.10beta01 [February 21, 2012]
++version 1.4.10beta01 [February 27, 2012]
+   Removed two useless #ifdef directives from pngread.c and one from pngrutil.c
+   Eliminated redundant png_push_read_tEXt|zTXt|iTXt|unknown code from
+     pngpread.c and use the sequential png_handle_tEXt, etc., in pngrutil.c;
+     now that png_ptr->buffer is inaccessible to applications, the special
+     handling is no longer useful.
+   Fixed bug with png_handle_hIST with odd chunk length (Frank Busse).
++  Fixed incorrect type (int copy should be png_size_t copy) in png_inflate().
++  Fixed off-by-one bug in png_handle_sCAL() when using fixed point arithmetic,
++    causing out-of-bounds read in png_set_sCAL() because of failure to copy
++    the string terminators (Franke Busse).
+ 
+ Send comments/corrections/commendations to glennrp at users.sourceforge.net
+ or to png-mng-implement at lists.sf.net (subscription required; visit
+diff --git a/pngrutil.c b/pngrutil.c
+index 841eb3d56..376f6fba3 100644
+--- a/pngrutil.c
++++ b/pngrutil.c
+@@ -1,7 +1,7 @@
+ 
+ /* pngrutil.c - utilities to read a PNG file
+  *
+- * Last changed in libpng 1.4.10 [February 21, 2012]
++ * Last changed in libpng 1.4.10 [February 27, 2012]
+  * Copyright (c) 1998-2012 Glenn Randers-Pehrson
+  * (Version 0.96 Copyright (c) 1996, 1997 Andreas Dilger)
+  * (Version 0.88 Copyright (c) 1995, 1996 Guy Eric Schalnat, Group 42, Inc.)
+@@ -282,8 +282,8 @@ png_inflate(png_structp png_ptr, const png_byte *data, png_size_t size,
+       {
+          if (output != 0 && output_size > count)
+          {
+-            int copy = output_size - count;
+-            if (avail < copy) copy = avail;
++            png_size_t copy = output_size - count;
++            if ((png_size_t) avail < copy) copy = (png_size_t) avail;
+             png_memcpy(output + count, png_ptr->zbuf, copy);
+          }
+ 
+@@ -1909,11 +1909,11 @@ png_handle_sCAL(png_structp png_ptr, png_infop info_ptr, png_uint_32 length)
+       png_ptr->chunkdata = NULL;
+       return;
+    }
+-   png_memcpy(swidth, ep, png_strlen(ep));
++   png_memcpy(swidth, ep, png_strlen(ep)+1);
+ #endif
+ #endif
+ 
+-   for (ep = png_ptr->chunkdata; *ep; ep++)
++   for (ep = png_ptr->chunkdata+1; *ep; ep++)
+       /* Empty loop */ ;
+    ep++;
+ 
+@@ -1948,7 +1948,7 @@ png_handle_sCAL(png_structp png_ptr, png_infop info_ptr, png_uint_32 length)
+       png_free(png_ptr, swidth);
+       return;
+    }
+-   png_memcpy(sheight, ep, png_strlen(ep));
++   png_memcpy(sheight, ep, png_strlen(ep)+1);
+ #endif
+ #endif
+ 

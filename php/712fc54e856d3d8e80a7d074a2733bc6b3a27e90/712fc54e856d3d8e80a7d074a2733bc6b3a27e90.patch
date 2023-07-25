@@ -1,0 +1,65 @@
+commit 712fc54e856d3d8e80a7d074a2733bc6b3a27e90
+Author: Christoph M. Becker <cmbecker69@gmx.de>
+Date:   Mon Nov 29 15:48:41 2021 +0100
+
+    Fix #74604: Out of bounds in php_pcre_replace_impl
+    
+    Trying to allocate a `zend_string` with a length only slighty smaller
+    than `SIZE_MAX` causes an integer overflow; we make sure that this
+    doesn't happen by catering to the maximal overhead of a `zend_string`.
+    
+    Closes GH-7597.
+
+diff --git a/NEWS b/NEWS
+index 0b46c1ad5c..cfe36d9281 100644
+--- a/NEWS
++++ b/NEWS
+@@ -16,6 +16,9 @@ PHP                                                                        NEWS
+ - OpenSSL:
+   . Fixed bug #75725 (./configure: detecting RAND_egd). (Dilyan Palauzov)
+ 
++- PCRE:
++  . Fixed bug #74604 (Out of bounds in php_pcre_replace_impl). (cmb, Dmitry)
++
+ - Standard:
+   . Fixed bug #81618 (dns_get_record fails on FreeBSD for missing type).
+     (fsbruva)
+diff --git a/Zend/zend_string.h b/Zend/zend_string.h
+index d90d2e06d3..ff6ada34cc 100644
+--- a/Zend/zend_string.h
++++ b/Zend/zend_string.h
+@@ -75,7 +75,8 @@ END_EXTERN_C()
+ 
+ #define _ZSTR_STRUCT_SIZE(len) (_ZSTR_HEADER_SIZE + len + 1)
+ 
+-#define ZSTR_MAX_LEN (SIZE_MAX - ZEND_MM_ALIGNED_SIZE(_ZSTR_HEADER_SIZE + 1))
++#define ZSTR_MAX_OVERHEAD (ZEND_MM_ALIGNED_SIZE(_ZSTR_HEADER_SIZE + 1))
++#define ZSTR_MAX_LEN (SIZE_MAX - ZSTR_MAX_OVERHEAD)
+ 
+ #define ZSTR_ALLOCA_ALLOC(str, _len, use_heap) do { \
+ 	(str) = (zend_string *)do_alloca(ZEND_MM_ALIGNED_SIZE_EX(_ZSTR_STRUCT_SIZE(_len), 8), (use_heap)); \
+diff --git a/ext/pcre/php_pcre.c b/ext/pcre/php_pcre.c
+index 9d01b32822..a93b35c4f3 100644
+--- a/ext/pcre/php_pcre.c
++++ b/ext/pcre/php_pcre.c
+@@ -1725,7 +1725,7 @@ matched:
+ 			}
+ 
+ 			if (new_len >= alloc_len) {
+-				alloc_len = zend_safe_address_guarded(2, new_len, 0);
++				alloc_len = zend_safe_address_guarded(2, new_len, ZSTR_MAX_OVERHEAD) - ZSTR_MAX_OVERHEAD;
+ 				if (result == NULL) {
+ 					result = zend_string_alloc(alloc_len, 0);
+ 				} else {
+@@ -1961,9 +1961,9 @@ matched:
+ 				pcre2_get_mark(match_data), flags);
+ 
+ 			ZEND_ASSERT(eval_result);
+-			new_len = zend_safe_address_guarded(1, ZSTR_LEN(eval_result), new_len);
++			new_len = zend_safe_address_guarded(1, ZSTR_LEN(eval_result) + ZSTR_MAX_OVERHEAD, new_len) -ZSTR_MAX_OVERHEAD;
+ 			if (new_len >= alloc_len) {
+-				alloc_len = zend_safe_address_guarded(2, new_len, 0);
++				alloc_len = zend_safe_address_guarded(2, new_len, ZSTR_MAX_OVERHEAD) - ZSTR_MAX_OVERHEAD;
+ 				if (result == NULL) {
+ 					result = zend_string_alloc(alloc_len, 0);
+ 				} else {

@@ -1,0 +1,25 @@
+commit f52fbf4f3ed02a7d872d8a102006f29b4421f360
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri May 5 20:42:11 2017 +0200
+
+    avcodec/dfa: Fix off by 1 error
+    
+    Fixes out of array access
+    Fixes: 1345/clusterfuzz-testcase-minimized-6062963045695488
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/dfa.c b/libavcodec/dfa.c
+index f45d019a79..5ddb647c4c 100644
+--- a/libavcodec/dfa.c
++++ b/libavcodec/dfa.c
+@@ -175,7 +175,7 @@ static int decode_dds1(GetByteContext *gb, uint8_t *frame, int width, int height
+                 return AVERROR_INVALIDDATA;
+             frame += v;
+         } else {
+-            if (frame_end - frame < width + 3)
++            if (frame_end - frame < width + 4)
+                 return AVERROR_INVALIDDATA;
+             frame[0] = frame[1] =
+             frame[width] = frame[width + 1] =  bytestream2_get_byte(gb);

@@ -1,0 +1,30 @@
+commit 2871c70efaaaa0f102557a17c727fd4d5204dd4b
+Author: libnex <emmanuel.law@gmail.com>
+Date:   Mon Jan 4 12:27:27 2016 +1300
+
+    Patch for Heap Buffer Overflow in EscapeShell
+    
+    Proposed patch for bug #71270
+
+diff --git a/ext/standard/exec.c b/ext/standard/exec.c
+index c724b79535..c4afce3337 100644
+--- a/ext/standard/exec.c
++++ b/ext/standard/exec.c
+@@ -253,7 +253,7 @@ PHPAPI zend_string *php_escape_shell_cmd(char *str)
+ #endif
+ 
+ 
+-	cmd = zend_string_alloc(2 * l, 0);
++	cmd = zend_string_safe_alloc(2, l, 0, 0);
+ 
+ 	for (x = 0, y = 0; x < l; x++) {
+ 		int mb_len = php_mblen(str + x, (l - x));
+@@ -345,7 +345,7 @@ PHPAPI zend_string *php_escape_shell_arg(char *str)
+ 	size_t estimate = (4 * l) + 3;
+ 
+ 
+-	cmd = zend_string_alloc(4 * l + 2, 0); /* worst case */
++	cmd = zend_string_safe_alloc(4, l, 2, 0); /* worst case */
+ 
+ #ifdef PHP_WIN32
+ 	ZSTR_VAL(cmd)[y++] = '"';

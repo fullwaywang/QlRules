@@ -1,0 +1,63 @@
+commit 28d032cc688ccfda18c5bbcab8b50aba6e18cde5
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed May 18 16:29:08 2022 +0100
+
+    patch 8.2.4979: accessing freed memory when line is flushed
+    
+    Problem:    Accessing freed memory when line is flushed.
+    Solution:   Make a copy of the pattern to search for.
+
+diff --git a/src/testdir/test_tagjump.vim b/src/testdir/test_tagjump.vim
+index 97670bcfc..8b19c634d 100644
+--- a/src/testdir/test_tagjump.vim
++++ b/src/testdir/test_tagjump.vim
+@@ -1392,6 +1392,15 @@ func Test_macro_search()
+   close!
+ endfunc
+ 
++func Test_define_search()
++  " this was accessing freed memory
++  new
++  call setline(1, ['first line', '', '#define something 0'])
++  sil norm o0
++  sil! norm 
++  bwipe!
++endfunc
++
+ " Test for [*, [/, ]* and ]/
+ func Test_comment_search()
+   new
+diff --git a/src/version.c b/src/version.c
+index 854de4597..37e3d80f8 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -746,6 +746,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    4979,
+ /**/
+     4978,
+ /**/
+diff --git a/src/window.c b/src/window.c
+index fca0eea32..984fb4631 100644
+--- a/src/window.c
++++ b/src/window.c
+@@ -579,9 +579,16 @@ wingotofile:
+ 		CHECK_CMDWIN;
+ 		if ((len = find_ident_under_cursor(&ptr, FIND_IDENT)) == 0)
+ 		    break;
++
++		// Make a copy, if the line was changed it will be freed.
++		ptr = vim_strnsave(ptr, len);
++		if (ptr == NULL)
++		    break;
++
+ 		find_pattern_in_path(ptr, 0, len, TRUE,
+ 			Prenum == 0 ? TRUE : FALSE, type,
+ 			Prenum1, ACTION_SPLIT, (linenr_T)1, (linenr_T)MAXLNUM);
++		vim_free(ptr);
+ 		curwin->w_set_curswant = TRUE;
+ 		break;
+ #endif

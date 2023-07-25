@@ -1,0 +1,19 @@
+commit 4b1b9c0522628887195bad3a6723f7000b0c9a58
+Author: dirk <dirk@git.imagemagick.org>
+Date:   Tue Feb 2 21:15:13 2016 +0100
+
+    Added extra check to fix https://github.com/ImageMagick/ImageMagick/issues/93
+
+diff --git a/coders/psd.c b/coders/psd.c
+index 9f69d8a71..47c6bcf73 100644
+--- a/coders/psd.c
++++ b/coders/psd.c
+@@ -1936,7 +1936,7 @@ static Image *ReadPSDImage(const ImageInfo *image_info,ExceptionInfo *exception)
+       if (blocks == (unsigned char *) NULL)
+         ThrowReaderException(ResourceLimitError,"MemoryAllocationFailed");
+       count=ReadBlob(image,(size_t) length,blocks);
+-      if ((count != (ssize_t) length) ||
++      if ((count != (ssize_t) length) || (length < 4) ||
+           (LocaleNCompare((char *) blocks,"8BIM",4) != 0))
+         {
+           blocks=(unsigned char *) RelinquishMagickMemory(blocks);

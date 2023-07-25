@@ -1,7 +1,7 @@
 /**
  * @name httpd-d4901cb32133bc0e59ad193a29d1665597080d67-ap_proxy_pre_request
  * @id cpp/httpd/d4901cb32133bc0e59ad193a29d1665597080d67/ap-proxy-pre-request
- * @description httpd-d4901cb32133bc0e59ad193a29d1665597080d67-ap_proxy_pre_request CVE-2021-40438
+ * @description httpd-d4901cb32133bc0e59ad193a29d1665597080d67-modules/proxy/proxy_util.c-ap_proxy_pre_request CVE-2021-40438
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -13,6 +13,7 @@ predicate func_0(PointerDereferenceExpr target_6, Function func) {
 	exists(IfStmt target_0 |
 		target_0.getCondition().(NotExpr).getOperand() instanceof FunctionCall
 		and target_0.getThen().(BlockStmt).getStmt(0).(ReturnStmt).getExpr().(Literal).getValue()="500"
+		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(2)=target_0
 		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_6
 		and target_0.getEnclosingFunction() = func)
 }
@@ -21,6 +22,7 @@ predicate func_1(PointerFieldAccess target_7, Function func) {
 	exists(IfStmt target_1 |
 		target_1.getCondition().(NotExpr).getOperand() instanceof FunctionCall
 		and target_1.getThen().(BlockStmt).getStmt(0).(ReturnStmt).getExpr().(Literal).getValue()="500"
+		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(5)=target_1
 		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_7
 		and target_1.getEnclosingFunction() = func)
 }
@@ -70,6 +72,6 @@ and func_6(target_6)
 and func_7(target_7)
 and vr_2309.getType().hasName("request_rec *")
 and vurl_2310.getType().hasName("char **")
-and vr_2309.getParentScope+() = func
-and vurl_2310.getParentScope+() = func
+and vr_2309.getFunction() = func
+and vurl_2310.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

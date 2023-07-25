@@ -1,0 +1,19 @@
+commit 79a7b36d207c9142468a7ea33695a14181a9fd24
+Author: Roger A. Light <roger@atchoo.org>
+Date:   Thu Apr 19 20:53:38 2018 +0100
+
+    Don't derefence a null message.
+
+diff --git a/lib/messages_mosq.c b/lib/messages_mosq.c
+index e6baeb67..a5376e9e 100644
+--- a/lib/messages_mosq.c
++++ b/lib/messages_mosq.c
+@@ -178,7 +178,7 @@ void message__reconnect_reset(struct mosquitto *mosq)
+ 			* whatever the client has got. */
+ 		}
+ 		prev = message;
+-		message = message->next;
++		if(message) message = message->next;
+ 	}
+ 	mosq->in_messages_last = prev;
+ 	pthread_mutex_unlock(&mosq->in_message_mutex);

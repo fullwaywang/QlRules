@@ -1,0 +1,24 @@
+commit 59a0bff1a5a2f0a0eac07e4bf94d4aea9dd3708d
+Author: Michal Vasko <mvasko@cesnet.cz>
+Date:   Mon Mar 8 09:20:30 2021 +0100
+
+    plugins BUGFIX handle empty revision correctly
+    
+    Fixes #1451
+
+diff --git a/src/plugins.c b/src/plugins.c
+index 7e6fdf35..fa62ce76 100644
+--- a/src/plugins.c
++++ b/src/plugins.c
+@@ -457,9 +457,8 @@ ext_get_plugin(const char *name, const char *module, const char *revision)
+     assert(module);
+ 
+     for (u = 0; u < ext_plugins_count; u++) {
+-        if (!strcmp(name, ext_plugins[u].name) &&
+-                !strcmp(module, ext_plugins[u].module) &&
+-                (!ext_plugins[u].revision || !strcmp(revision, ext_plugins[u].revision))) {
++        if (!strcmp(name, ext_plugins[u].name) && !strcmp(module, ext_plugins[u].module) &&
++                ((!revision && !ext_plugins[u].revision) || (revision && !strcmp(revision, ext_plugins[u].revision)))) {
+             /* we have the match */
+             return ext_plugins[u].plugin;
+         }

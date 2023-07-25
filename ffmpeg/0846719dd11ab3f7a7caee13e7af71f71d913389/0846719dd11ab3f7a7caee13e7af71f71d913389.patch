@@ -1,0 +1,60 @@
+commit 0846719dd11ab3f7a7caee13e7af71f71d913389	0846719dd11ab3f7a7caee13e7af71f71d913389
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sun Apr 15 13:26:19 2012 +0200
+
+    indeo4: check transform size.
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/indeo4.c b/libavcodec/indeo4.c
+index 4d315b5b8a..eacf70d52f 100644
+--- a/libavcodec/indeo4.c
++++ b/libavcodec/indeo4.c
+@@ -383,6 +383,10 @@ static int decode_band_hdr(IVI4DecContext *ctx, IVIBandDesc *band,
+                 return AVERROR_PATCHWELCOME;
+             }
+ 
++            if (transform_id < 10 && band->blk_size < 8) {
++                av_log(avctx, AV_LOG_ERROR, "wrong transform size!\n");
++                return AVERROR_INVALIDDATA;
++            }
+ #if IVI4_STREAM_ANALYSER
+             if ((transform_id >= 0 && transform_id <= 2) || transform_id == 10)
+                 ctx->uses_haar = 1;
+@@ -391,6 +395,7 @@ static int decode_band_hdr(IVI4DecContext *ctx, IVIBandDesc *band,
+             band->inv_transform = transforms[transform_id].inv_trans;
+             band->dc_transform  = transforms[transform_id].dc_trans;
+             band->is_2d_trans   = transforms[transform_id].is_2d_trans;
++            band->transform_size= (transform_id < 10) ? 8 : 4;
+ 
+             scan_indx = get_bits(&ctx->gb, 4);
+             if ((scan_indx>4 && scan_indx<10) != (band->blk_size==4)) {
+diff --git a/libavcodec/ivi_common.c b/libavcodec/ivi_common.c
+index 6b2ddc8cc7..64f7363345 100644
+--- a/libavcodec/ivi_common.c
++++ b/libavcodec/ivi_common.c
+@@ -440,7 +440,10 @@ int ff_ivi_decode_blocks(GetBitContext *gb, IVIBandDesc *band, IVITile *tile)
+                     trvec[0]      = prev_dc;
+                     col_flags[0] |= !!prev_dc;
+                 }
+-
++                if(band->transform_size > band->blk_size){
++                    av_log(0, AV_LOG_ERROR, "Too large transform\n");
++                    return AVERROR_INVALIDDATA;
++                }
+                 /* apply inverse transform */
+                 band->inv_transform(trvec, band->buf + buf_offs,
+                                     band->pitch, col_flags);
+diff --git a/libavcodec/ivi_common.h b/libavcodec/ivi_common.h
+index dd060854f3..78b6e1c656 100644
+--- a/libavcodec/ivi_common.h
++++ b/libavcodec/ivi_common.h
+@@ -160,6 +160,7 @@ typedef struct {
+     InvTransformPtr *inv_transform;
+     DCTransformPtr  *dc_transform;
+     int             is_2d_trans;    ///< 1 indicates that the two-dimensional inverse transform is used
++    int             transform_size; ///< block size of the transform
+     int32_t         checksum;       ///< for debug purposes
+     int             checksum_present;
+     int             bufsize;        ///< band buffer size in bytes

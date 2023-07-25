@@ -1,0 +1,52 @@
+commit 4fe23595732b6f1254cfc11a9b8d6da900b55b0c
+Author: Petteri Aimonen <jpa@git.mail.kapsi.fi>
+Date:   Wed Nov 25 11:38:40 2020 +0200
+
+    Fix memory leak with oneofs and PB_ENABLE_MALLOC (#615)
+    
+    Nanopb would leak memory when all of the following conditions were true:
+    - PB_ENABLE_MALLOC is defined at the compile time
+    - Message definitions contains an oneof field,
+      the oneof contains a static submessage, and
+      the static submessage contains a pointer field.
+    - Data being decoded contains two values for the submessage.
+    
+    The logic in pb_release_union_field would detect that the same
+    submessage occurs twice, and wouldn't release it because keeping
+    the old values is necessary to match the C++ library behavior
+    regarding message merges.
+    
+    But then decode_static_field() would go to memset() the whole
+    submessage to zero, because it unconditionally assumed it to
+    be uninitialized memory. This would normally happen when the
+    contents of the union field is switched to a different oneof
+    item, instead of merging with the same one.
+    
+    This commit changes it so that the field is memset() only when
+    `which_field` contains a different tag.
+
+diff --git a/pb_decode.c b/pb_decode.c
+index ce5c4ae..3f14a39 100644
+--- a/pb_decode.c
++++ b/pb_decode.c
+@@ -464,14 +464,17 @@ static bool checkreturn decode_static_field(pb_istream_t *stream, pb_wire_type_t
+             }
+ 
+         case PB_HTYPE_ONEOF:
+-            *(pb_size_t*)iter->pSize = iter->pos->tag;
+-            if (PB_LTYPE(type) == PB_LTYPE_SUBMESSAGE)
++            if (PB_LTYPE(type) == PB_LTYPE_SUBMESSAGE &&
++                *(pb_size_t*)iter->pSize != iter->pos->tag)
+             {
+                 /* We memset to zero so that any callbacks are set to NULL.
+-                 * Then set any default values. */
++                 * This is because the callbacks might otherwise have values
++                 * from some other union field. */
+                 memset(iter->pData, 0, iter->pos->data_size);
+                 pb_message_set_to_defaults((const pb_field_t*)iter->pos->ptr, iter->pData);
+             }
++            *(pb_size_t*)iter->pSize = iter->pos->tag;
++
+             return func(stream, iter->pos, iter->pData);
+ 
+         default:

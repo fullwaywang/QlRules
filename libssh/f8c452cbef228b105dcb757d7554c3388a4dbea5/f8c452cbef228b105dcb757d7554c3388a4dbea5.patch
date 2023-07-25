@@ -1,0 +1,44 @@
+commit f8c452cbef228b105dcb757d7554c3388a4dbea5
+Author: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+Date:   Fri Sep 7 17:12:01 2018 +0200
+
+    CVE-2018-10933: Check channel state when OPEN_FAILURE arrives
+    
+    When a SSH2_MSG_OPEN_FAILURE arrives, the channel state is checked
+    to be in SSH_CHANNEL_STATE_OPENING.
+    
+    Fixes T101
+    
+    Signed-off-by: Anderson Toshiyuki Sasaki <ansasaki@redhat.com>
+    Reviewed-by: Andreas Schneider <asn@cryptomilk.org>
+
+diff --git a/src/channels.c b/src/channels.c
+index b26f6bd4..0e61e5cd 100644
+--- a/src/channels.c
++++ b/src/channels.c
+@@ -220,6 +220,14 @@ SSH_PACKET_CALLBACK(ssh_packet_channel_open_fail){
+       return SSH_PACKET_USED;
+   }
+ 
++  if (channel->state != SSH_CHANNEL_STATE_OPENING) {
++      SSH_LOG(SSH_LOG_RARE,
++              "SSH2_MSG_CHANNEL_OPEN_FAILURE received in incorrect channel "
++              "state %d",
++              channel->state);
++      goto error;
++  }
++
+   ssh_set_error(session, SSH_REQUEST_DENIED,
+       "Channel opening failure: channel %u error (%lu) %s",
+       channel->local_channel,
+@@ -228,6 +236,10 @@ SSH_PACKET_CALLBACK(ssh_packet_channel_open_fail){
+   SAFE_FREE(error);
+   channel->state=SSH_CHANNEL_STATE_OPEN_DENIED;
+   return SSH_PACKET_USED;
++
++error:
++  ssh_set_error(session, SSH_FATAL, "Invalid packet");
++  return SSH_PACKET_USED;
+ }
+ 
+ static int ssh_channel_open_termination(void *c){

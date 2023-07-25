@@ -1,0 +1,161 @@
+commit 8789f6bb926fa4c33b4231a8444340515c82bdff
+Author: Eric Covener <covener@apache.org>
+Date:   Sun Mar 5 20:28:43 2023 +0000
+
+    Merge r1908095 from trunk:
+    
+        don't forward invalid query strings
+    
+        Submitted by: rpluem
+    
+    Reviewed By:  covener, fielding, rpluem, gbechis
+    
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1908096 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/modules/http2/mod_proxy_http2.c b/modules/http2/mod_proxy_http2.c
+index 3faf03472b..aa299b937a 100644
+--- a/modules/http2/mod_proxy_http2.c
++++ b/modules/http2/mod_proxy_http2.c
+@@ -158,6 +158,16 @@ static int proxy_http2_canon(request_rec *r, char *url)
+             path = ap_proxy_canonenc(r->pool, url, (int)strlen(url),
+                                      enc_path, 0, r->proxyreq);
+             search = r->args;
++            if (search && *(ap_scan_vchar_obstext(search))) {
++                /*
++                 * We have a raw control character or a ' ' in r->args.
++                 * Correct encoding was missed.
++                 */
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO()
++                              "To be forwarded query string contains control "
++                              "characters or spaces");
++                return HTTP_FORBIDDEN;
++            }
+         }
+         break;
+     case PROXYREQ_PROXY:
+diff --git a/modules/mappers/mod_rewrite.c b/modules/mappers/mod_rewrite.c
+index 943996560e..f6398f1938 100644
+--- a/modules/mappers/mod_rewrite.c
++++ b/modules/mappers/mod_rewrite.c
+@@ -4729,6 +4729,17 @@ static int hook_uri2file(request_rec *r)
+         unsigned skip;
+         apr_size_t flen;
+ 
++        if (r->args && *(ap_scan_vchar_obstext(r->args))) {
++            /*
++             * We have a raw control character or a ' ' in r->args.
++             * Correct encoding was missed.
++             */
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10410)
++                          "Rewritten query string contains control "
++                          "characters or spaces");
++            return HTTP_FORBIDDEN;
++        }
++
+         if (ACTION_STATUS == rulestatus) {
+             int n = r->status;
+ 
+@@ -5013,6 +5024,17 @@ static int hook_fixup(request_rec *r)
+     if (rulestatus) {
+         unsigned skip;
+ 
++        if (r->args && *(ap_scan_vchar_obstext(r->args))) {
++            /*
++             * We have a raw control character or a ' ' in r->args.
++             * Correct encoding was missed.
++             */
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10411)
++                          "Rewritten query string contains control "
++                          "characters or spaces");
++            return HTTP_FORBIDDEN;
++        }
++
+         if (ACTION_STATUS == rulestatus) {
+             int n = r->status;
+ 
+diff --git a/modules/proxy/mod_proxy_ajp.c b/modules/proxy/mod_proxy_ajp.c
+index 1449acad73..e46bd903a3 100644
+--- a/modules/proxy/mod_proxy_ajp.c
++++ b/modules/proxy/mod_proxy_ajp.c
+@@ -69,6 +69,16 @@ static int proxy_ajp_canon(request_rec *r, char *url)
+         path = ap_proxy_canonenc(r->pool, url, strlen(url), enc_path, 0,
+                                  r->proxyreq);
+         search = r->args;
++        if (search && *(ap_scan_vchar_obstext(search))) {
++            /*
++             * We have a raw control character or a ' ' in r->args.
++             * Correct encoding was missed.
++             */
++             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10406)
++                           "To be forwarded query string contains control "
++                           "characters or spaces");
++             return HTTP_FORBIDDEN;
++        }
+     }
+     if (path == NULL)
+         return HTTP_BAD_REQUEST;
+diff --git a/modules/proxy/mod_proxy_balancer.c b/modules/proxy/mod_proxy_balancer.c
+index f6fb6345ae..7f99008433 100644
+--- a/modules/proxy/mod_proxy_balancer.c
++++ b/modules/proxy/mod_proxy_balancer.c
+@@ -106,6 +106,16 @@ static int proxy_balancer_canon(request_rec *r, char *url)
+         path = ap_proxy_canonenc(r->pool, url, strlen(url), enc_path, 0,
+                                  r->proxyreq);
+         search = r->args;
++        if (search && *(ap_scan_vchar_obstext(search))) {
++            /*
++             * We have a raw control character or a ' ' in r->args.
++             * Correct encoding was missed.
++             */
++             ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10407)
++                           "To be forwarded query string contains control "
++                           "characters or spaces");
++             return HTTP_FORBIDDEN;
++        }
+     }
+     if (path == NULL)
+         return HTTP_BAD_REQUEST;
+diff --git a/modules/proxy/mod_proxy_http.c b/modules/proxy/mod_proxy_http.c
+index ec4e7fb06b..51d19a0a21 100644
+--- a/modules/proxy/mod_proxy_http.c
++++ b/modules/proxy/mod_proxy_http.c
+@@ -125,6 +125,16 @@ static int proxy_http_canon(request_rec *r, char *url)
+             path = ap_proxy_canonenc(r->pool, url, strlen(url),
+                                      enc_path, 0, r->proxyreq);
+             search = r->args;
++            if (search && *(ap_scan_vchar_obstext(search))) {
++                /*
++                 * We have a raw control character or a ' ' in r->args.
++                 * Correct encoding was missed.
++                 */
++                ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10408)
++                              "To be forwarded query string contains control "
++                              "characters or spaces");
++                return HTTP_FORBIDDEN;
++            }
+         }
+         break;
+     case PROXYREQ_PROXY:
+diff --git a/modules/proxy/mod_proxy_wstunnel.c b/modules/proxy/mod_proxy_wstunnel.c
+index bcbba42f9a..88f86a49db 100644
+--- a/modules/proxy/mod_proxy_wstunnel.c
++++ b/modules/proxy/mod_proxy_wstunnel.c
+@@ -114,6 +114,16 @@ static int proxy_wstunnel_canon(request_rec *r, char *url)
+         path = ap_proxy_canonenc(r->pool, url, strlen(url), enc_path, 0,
+                                  r->proxyreq);
+         search = r->args;
++        if (search && *(ap_scan_vchar_obstext(search))) {
++            /*
++             * We have a raw control character or a ' ' in r->args.
++             * Correct encoding was missed.
++             */
++            ap_log_rerror(APLOG_MARK, APLOG_ERR, 0, r, APLOGNO(10409)
++                          "To be forwarded query string contains control "
++                          "characters or spaces");
++            return HTTP_FORBIDDEN;
++        }
+     }
+     if (path == NULL)
+         return HTTP_BAD_REQUEST;

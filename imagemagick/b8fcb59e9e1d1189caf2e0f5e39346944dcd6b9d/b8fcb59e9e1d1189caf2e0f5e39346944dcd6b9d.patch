@@ -1,0 +1,18 @@
+commit b8fcb59e9e1d1189caf2e0f5e39346944dcd6b9d
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Dec 22 07:50:39 2017 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/910
+
+diff --git a/coders/txt.c b/coders/txt.c
+index 56da48582..f6f671ae3 100644
+--- a/coders/txt.c
++++ b/coders/txt.c
+@@ -565,6 +565,7 @@ static Image *ReadTXTImage(const ImageInfo *image_info,ExceptionInfo *exception)
+           break;
+       }
+     }
++    *text='\0';
+     (void) ReadBlobString(image,text);
+     if (LocaleNCompare((char *) text,MagickID,strlen(MagickID)) == 0)
+       {

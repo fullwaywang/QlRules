@@ -1,0 +1,34 @@
+commit 3a2d21bc5f97aa0161db3ae731fc2732be6108b8
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Fri Jul 6 22:23:25 2018 +0200
+
+    avformat/movenc: Check input sample count
+    
+    Fixes: division by 0
+    Fixes: fpe_movenc.c_199_1.wav
+    Fixes: fpe_movenc.c_199_2.wav
+    Fixes: fpe_movenc.c_199_3.wav
+    Fixes: fpe_movenc.c_199_4.wav
+    Fixes: fpe_movenc.c_199_5.wav
+    Fixes: fpe_movenc.c_199_6.wav
+    Fixes: fpe_movenc.c_199_7.wav
+    
+    Found-by: #CHEN HONGXU# <HCHEN017@e.ntu.edu.sg>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index fe0a244a8f..78291a9adc 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -5269,6 +5269,11 @@ int ff_mov_write_packet(AVFormatContext *s, AVPacket *pkt)
+     else
+         samples_in_chunk = 1;
+ 
++    if (samples_in_chunk < 1) {
++        av_log(s, AV_LOG_ERROR, "fatal error, input packet contains no samples\n");
++        return AVERROR_PATCHWELCOME;
++    }
++
+     /* copy extradata if it exists */
+     if (trk->vos_len == 0 && par->extradata_size > 0 &&
+         !TAG_IS_AVCI(trk->tag) &&

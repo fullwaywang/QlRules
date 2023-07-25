@@ -1,0 +1,25 @@
+commit 1d3a3b9f8907625b361420d48fe05716859620ff	1d3a3b9f8907625b361420d48fe05716859620ff
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Nov 26 18:56:39 2014 +0100
+
+    avcodec/rawdec: Check the return code of avpicture_get_size()
+    
+    Fixes out of array access
+    Fixes: asan_heap-oob_22388d0_3435_cov_3297128910_small_roll5_FlashCine1.cine
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/rawdec.c b/libavcodec/rawdec.c
+index 28792a1688..647dfa9a0a 100644
+--- a/libavcodec/rawdec.c
++++ b/libavcodec/rawdec.c
+@@ -172,6 +172,9 @@ static int raw_decode(AVCodecContext *avctx, void *data, int *got_frame,
+         context->frame_size = avpicture_get_size(avctx->pix_fmt, avctx->width,
+                                                  avctx->height);
+     }
++    if (context->frame_size < 0)
++        return context->frame_size;
++
+     need_copy = !avpkt->buf || context->is_2_4_bpp || context->is_yuv2 || context->is_lt_16bpp;
+ 
+     frame->pict_type        = AV_PICTURE_TYPE_I;

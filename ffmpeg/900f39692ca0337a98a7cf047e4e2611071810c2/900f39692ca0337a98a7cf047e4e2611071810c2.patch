@@ -1,0 +1,34 @@
+commit 900f39692ca0337a98a7cf047e4e2611071810c2
+Author: 孙浩(晓黑) <tony.sh@alibaba-inc.com>
+Date:   Tue Aug 29 23:59:21 2017 +0200
+
+    avformat/mxfdec: Fix DoS issues in mxf_read_index_entry_array()
+    
+    Fixes: 20170829A.mxf
+    
+    Co-Author: 张洪亮(望初)" <wangchu.zhl@alibaba-inc.com>
+    Found-by: Xiaohei and Wangchu from Alibaba Security Team
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/mxfdec.c b/libavformat/mxfdec.c
+index f8d0f9e057..6adb77d81f 100644
+--- a/libavformat/mxfdec.c
++++ b/libavformat/mxfdec.c
+@@ -899,6 +899,8 @@ static int mxf_read_index_entry_array(AVIOContext *pb, MXFIndexTableSegment *seg
+     segment->nb_index_entries = avio_rb32(pb);
+ 
+     length = avio_rb32(pb);
++    if(segment->nb_index_entries && length < 11)
++        return AVERROR_INVALIDDATA;
+ 
+     if (!(segment->temporal_offset_entries=av_calloc(segment->nb_index_entries, sizeof(*segment->temporal_offset_entries))) ||
+         !(segment->flag_entries          = av_calloc(segment->nb_index_entries, sizeof(*segment->flag_entries))) ||
+@@ -909,6 +911,8 @@ static int mxf_read_index_entry_array(AVIOContext *pb, MXFIndexTableSegment *seg
+     }
+ 
+     for (i = 0; i < segment->nb_index_entries; i++) {
++        if(avio_feof(pb))
++            return AVERROR_INVALIDDATA;
+         segment->temporal_offset_entries[i] = avio_r8(pb);
+         avio_r8(pb);                                        /* KeyFrameOffset */
+         segment->flag_entries[i] = avio_r8(pb);

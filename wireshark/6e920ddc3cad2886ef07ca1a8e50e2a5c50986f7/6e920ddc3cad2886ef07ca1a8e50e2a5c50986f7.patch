@@ -1,0 +1,79 @@
+commit 6e920ddc3cad2886ef07ca1a8e50e2a5c50986f7
+Author: Peter Wu <peter@lekensteyn.nl>
+Date:   Tue Oct 9 18:16:11 2018 +0200
+
+    steam-ihs: fix memleak on exception
+    
+    When protobuf_dissect_unknown_field throws an exception,
+    steamdiscover_dissect_body_status will leak memory as
+    wmem_destroy_allocator is not called. Capture fuzz-2018-10-06-3104.pcap
+    from the linked bug leaks 64kiB memory in each frame 14 and 36.
+    
+    Bug: 15171
+    Change-Id: I930d0738fde61799ab4ef2310f8ff11c1bcb032b
+    Fixes: v2.5.1rc0-130-g7ae954c7ac ("steam-ihs: Add dissector for the Steam IHS Discovery Protocol")
+    Reviewed-on: https://code.wireshark.org/review/30098
+    Petri-Dish: Peter Wu <peter@lekensteyn.nl>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit f3986c24728f03a346a10388fd6c15ea9ae16d41)
+    Reviewed-on: https://code.wireshark.org/review/30108
+    Reviewed-by: Peter Wu <peter@lekensteyn.nl>
+
+diff --git a/epan/dissectors/packet-steam-ihs-discovery.c b/epan/dissectors/packet-steam-ihs-discovery.c
+index 1bec81e594..9d238f4e88 100644
+--- a/epan/dissectors/packet-steam-ihs-discovery.c
++++ b/epan/dissectors/packet-steam-ihs-discovery.c
+@@ -491,9 +491,7 @@ steamdiscover_dissect_body_status(tvbuff_t *tvb, packet_info *pinfo, proto_tree
+     protobuf_desc_t pb = { tvb, offset, bytes_left };
+     protobuf_desc_t pb2 = { tvb, 0, 0 };
+     protobuf_tag_t tag = { 0, 0, 0 };
+-    wmem_allocator_t* strpool;
+     guint8 *hostname;
+-    strpool = wmem_allocator_new(WMEM_ALLOCATOR_SIMPLE);
+     nstime_t timestamp;
+     proto_tree *user_tree;
+     proto_item *user_it;
+@@ -522,7 +520,7 @@ steamdiscover_dissect_body_status(tvbuff_t *tvb, packet_info *pinfo, proto_tree
+                 value = get_varint64(pb.tvb, pb.offset, pb.bytes_left, &len);
+                 proto_tree_add_item(tree, hf_steam_ihs_discovery_body_status_hostname, pb.tvb,
+                         pb.offset+len, (gint)value, ENC_UTF_8|ENC_NA);
+-                hostname = tvb_get_string_enc(strpool, pb.tvb, pb.offset+len, (gint)value, ENC_UTF_8);
++                hostname = tvb_get_string_enc(wmem_packet_scope(), pb.tvb, pb.offset+len, (gint)value, ENC_UTF_8);
+                 if(hostname && strlen(hostname)) {
+                     col_add_fstr(pinfo->cinfo, COL_INFO, "%s from %s", hf_steam_ihs_discovery_header_msgtype_strings[STEAMDISCOVER_MSGTYPE_CLIENTBROADCASTMSGSTATUS].strptr, hostname);
+                 }
+@@ -615,7 +613,6 @@ steamdiscover_dissect_body_status(tvbuff_t *tvb, packet_info *pinfo, proto_tree
+         }
+         protobuf_seek_forward(&pb, len);
+     }
+-    wmem_destroy_allocator(strpool);
+ }
+ 
+ /* Dissect a CMsgRemoteDeviceAuthorizationRequest protobuf message body.
+@@ -648,8 +645,6 @@ steamdiscover_dissect_body_authrequest(tvbuff_t *tvb, packet_info *pinfo, proto_
+     gint64 value;
+     protobuf_desc_t pb = { tvb, offset, bytes_left };
+     protobuf_tag_t tag = { 0, 0, 0 };
+-    wmem_allocator_t *strpool;
+-    strpool = wmem_allocator_new(WMEM_ALLOCATOR_SIMPLE);
+     guint8* devicename;
+     while (protobuf_iter_next(&pb, &tag)) {
+         switch(tag.field_number) {
+@@ -665,7 +660,7 @@ steamdiscover_dissect_body_authrequest(tvbuff_t *tvb, packet_info *pinfo, proto_
+                 value = get_varint64(pb.tvb, pb.offset, pb.bytes_left, &len);
+                 proto_tree_add_item(tree, hf_steam_ihs_discovery_body_authrequest_devicename, pb.tvb,
+                         pb.offset+len, (gint)value, ENC_UTF_8|ENC_NA);
+-                devicename = tvb_get_string_enc(strpool, pb.tvb, pb.offset+len, (gint)value, ENC_UTF_8);
++                devicename = tvb_get_string_enc(wmem_packet_scope(), pb.tvb, pb.offset+len, (gint)value, ENC_UTF_8);
+                 if (devicename && strlen(devicename)) {
+                     col_append_fstr(pinfo->cinfo, COL_INFO, " from %s", devicename);
+                 }
+@@ -684,7 +679,6 @@ steamdiscover_dissect_body_authrequest(tvbuff_t *tvb, packet_info *pinfo, proto_
+         }
+         protobuf_seek_forward(&pb, len);
+     }
+-    wmem_destroy_allocator(strpool);
+ }
+ 
+ /* Dissect a CMsgRemoteDeviceAuthorizationResponse protobuf message body.

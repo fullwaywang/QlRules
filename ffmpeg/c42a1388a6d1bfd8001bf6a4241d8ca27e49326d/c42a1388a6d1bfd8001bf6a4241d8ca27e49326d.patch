@@ -1,0 +1,24 @@
+commit c42a1388a6d1bfd8001bf6a4241d8ca27e49326d
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Wed Aug 23 21:30:37 2017 +0200
+
+    avformat/rtpdec_h264: Fix heap-buffer-overflow
+    
+    Fixes: rtp_sdp/poc.sdp
+    
+    Found-by: Bingchang <l.bing.chang.bc@gmail.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/rtpdec_h264.c b/libavformat/rtpdec_h264.c
+index 8dd56a549e..6f8148ab6d 100644
+--- a/libavformat/rtpdec_h264.c
++++ b/libavformat/rtpdec_h264.c
+@@ -166,7 +166,7 @@ static int sdp_parse_fmtp_config_h264(AVFormatContext *s,
+             parse_profile_level_id(s, h264_data, value);
+     } else if (!strcmp(attr, "sprop-parameter-sets")) {
+         int ret;
+-        if (value[strlen(value) - 1] == ',') {
++        if (*value == 0 || value[strlen(value) - 1] == ',') {
+             av_log(s, AV_LOG_WARNING, "Missing PPS in sprop-parameter-sets, ignoring\n");
+             return 0;
+         }

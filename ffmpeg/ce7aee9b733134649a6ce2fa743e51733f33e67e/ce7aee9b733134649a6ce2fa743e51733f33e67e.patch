@@ -1,0 +1,35 @@
+commit ce7aee9b733134649a6ce2fa743e51733f33e67e	ce7aee9b733134649a6ce2fa743e51733f33e67e
+Author: Alex Converse <alex.converse@gmail.com>
+Date:   Fri Feb 17 14:13:40 2012 -0800
+
+    dpcm: ignore extra unpaired bytes in stereo streams.
+    
+    Fixes: CVE-2011-3951
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+
+diff --git a/libavcodec/dpcm.c b/libavcodec/dpcm.c
+index 1b0f6b005b..7f5dbfe3b9 100644
+--- a/libavcodec/dpcm.c
++++ b/libavcodec/dpcm.c
+@@ -183,6 +183,11 @@ static int dpcm_decode_frame(AVCodecContext *avctx, void *data,
+     int stereo = s->channels - 1;
+     int16_t *output_samples;
+ 
++    if (stereo && (buf_size & 1)) {
++        buf_size--;
++        buf_end--;
++    }
++
+     /* calculate output size */
+     switch(avctx->codec->id) {
+     case CODEC_ID_ROQ_DPCM:
+@@ -317,7 +322,7 @@ static int dpcm_decode_frame(AVCodecContext *avctx, void *data,
+     *got_frame_ptr   = 1;
+     *(AVFrame *)data = s->frame;
+ 
+-    return buf_size;
++    return avpkt->size;
+ }
+ 
+ #define DPCM_DECODER(id_, name_, long_name_)                \

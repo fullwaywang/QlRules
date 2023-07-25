@@ -1,0 +1,78 @@
+commit d0fab10ed2a86698937e3c3fed2f10bd9bb5e731
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Oct 20 16:03:33 2022 +0100
+
+    patch 9.0.0805: filetype autocmd may cause freed memory access
+    
+    Problem:    Filetype autocmd may cause freed memory access.
+    Solution:   Set the quickfix-busy flag while filling the buffer.
+
+diff --git a/src/quickfix.c b/src/quickfix.c
+index a90611475..f85fff56f 100644
+--- a/src/quickfix.c
++++ b/src/quickfix.c
+@@ -4595,6 +4595,9 @@ qf_update_buffer(qf_info_T *qi, qfline_T *old_last)
+ 	    qf_winid = win->w_id;
+ 	}
+ 
++	// autocommands may cause trouble
++	incr_quickfix_busy();
++
+ 	if (old_last == NULL)
+ 	    // set curwin/curbuf to buf and save a few things
+ 	    aucmd_prepbuf(&aco, buf);
+@@ -4616,6 +4619,9 @@ qf_update_buffer(qf_info_T *qi, qfline_T *old_last)
+ 	// when the added lines are not visible.
+ 	if ((win = qf_find_win(qi)) != NULL && old_line_count < win->w_botline)
+ 	    redraw_buf_later(buf, UPD_NOT_VALID);
++
++	// always called after incr_quickfix_busy()
++	decr_quickfix_busy();
+     }
+ }
+ 
+diff --git a/src/testdir/test_quickfix.vim b/src/testdir/test_quickfix.vim
+index 2ee754b39..bcaef5da1 100644
+--- a/src/testdir/test_quickfix.vim
++++ b/src/testdir/test_quickfix.vim
+@@ -3455,6 +3455,21 @@ func Test_resize_from_copen()
+   endtry
+ endfunc
+ 
++func Test_filetype_autocmd()
++  " this changes the location list while it is in use to fill a buffer
++  lexpr ''
++  lopen
++  augroup FT_loclist
++    au FileType * call setloclist(0, [], 'f')
++  augroup END
++  silent! lolder
++  lexpr ''
++
++  augroup FT_loclist
++    au! FileType
++  augroup END
++endfunc
++
+ func Test_vimgrep_with_textlock()
+   new
+ 
+@@ -6372,4 +6387,5 @@ func Test_info_line_with_space()
+   call setqflist([], 'f')
+ endfunc
+ 
++
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index b4756ca04..7f72a2c47 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    805,
+ /**/
+     804,
+ /**/

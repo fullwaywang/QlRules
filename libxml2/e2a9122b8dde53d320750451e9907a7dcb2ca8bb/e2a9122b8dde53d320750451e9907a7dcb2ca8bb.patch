@@ -1,0 +1,27 @@
+commit e2a9122b8dde53d320750451e9907a7dcb2ca8bb	e2a9122b8dde53d320750451e9907a7dcb2ca8bb
+Author: Nick Wellnhofer <wellnhofer@aevum.de>
+Date:   Thu Sep 7 18:36:01 2017 +0200
+
+    Set memory limit for LZMA decompression
+    
+    Otherwise malicious LZMA compressed files could consume large amounts
+    of memory when decompressed.
+    
+    According to the xz man page, files compressed with `xz -9` currently
+    require 65 MB to decompress, so set the limit to 100 MB.
+    
+    Should fix bug 786696.
+
+diff --git a/xzlib.c b/xzlib.c
+index 782957f6..f43632bd 100644
+--- a/xzlib.c
++++ b/xzlib.c
+@@ -408,7 +408,7 @@ xz_head(xz_statep state)
+         state->strm = init;
+         state->strm.avail_in = 0;
+         state->strm.next_in = NULL;
+-        if (lzma_auto_decoder(&state->strm, UINT64_MAX, 0) != LZMA_OK) {
++        if (lzma_auto_decoder(&state->strm, 100000000, 0) != LZMA_OK) {
+             xmlFree(state->out);
+             xmlFree(state->in);
+             state->size = 0;

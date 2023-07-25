@@ -1,0 +1,249 @@
+commit a63893791280d441c713293491da97c79c0950fe
+Author: Niels Möller <nisse@lysator.liu.se>
+Date:   Thu Mar 11 19:37:41 2021 +0100
+
+    New functions ecc_mod_mul_canonical and ecc_mod_sqr_canonical.
+    
+    * ecc-mod-arith.c (ecc_mod_mul_canonical, ecc_mod_sqr_canonical):
+    New functions.
+    * ecc-internal.h: Declare and document new functions.
+    * curve448-eh-to-x.c (curve448_eh_to_x): Use ecc_mod_sqr_canonical.
+    * curve25519-eh-to-x.c (curve25519_eh_to_x): Use ecc_mod_mul_canonical.
+    * ecc-eh-to-a.c (ecc_eh_to_a): Likewise.
+    * ecc-j-to-a.c (ecc_j_to_a): Likewise.
+    * ecc-mul-m.c (ecc_mul_m): Likewise.
+    
+    (cherry picked from commit 2bf497ba4d6acc6f352bca015837fad33008565c)
+
+diff --git a/ChangeLog b/ChangeLog
+index fd138d82..5cc5c188 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,14 @@
++2021-03-11  Niels Möller  <nisse@lysator.liu.se>
++
++	* ecc-mod-arith.c (ecc_mod_mul_canonical, ecc_mod_sqr_canonical):
++	New functions.
++	* ecc-internal.h: Declare and document new functions.
++	* curve448-eh-to-x.c (curve448_eh_to_x): Use ecc_mod_sqr_canonical.
++	* curve25519-eh-to-x.c (curve25519_eh_to_x): Use ecc_mod_mul_canonical.
++	* ecc-eh-to-a.c (ecc_eh_to_a): Likewise.
++	* ecc-j-to-a.c (ecc_j_to_a): Likewise.
++	* ecc-mul-m.c (ecc_mul_m): Likewise.
++
+ 2021-02-17  Niels Möller  <nisse@lysator.liu.se>
+ 
+ 	* Released Nettle-3.7.1.
+diff --git a/curve25519-eh-to-x.c b/curve25519-eh-to-x.c
+index f0f1920d..d90defda 100644
+--- a/curve25519-eh-to-x.c
++++ b/curve25519-eh-to-x.c
+@@ -53,7 +53,6 @@ curve25519_eh_to_x (mp_limb_t *xp, const mp_limb_t *p,
+ #define tp (scratch + 2*ecc->p.size)
+ 
+   const struct ecc_curve *ecc = &_nettle_curve25519;
+-  mp_limb_t cy;
+ 
+   /* If u = U/W and v = V/W are the coordinates of the point on the
+      Edwards curve we get the curve25519 x coordinate as
+@@ -69,10 +68,7 @@ curve25519_eh_to_x (mp_limb_t *xp, const mp_limb_t *p,
+   ecc->p.invert (&ecc->p, t1, t0, tp);
+   
+   ecc_mod_add (&ecc->p, t0, wp, vp);
+-  ecc_mod_mul (&ecc->p, t0, t0, t1, tp);
+-
+-  cy = mpn_sub_n (xp, t0, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, xp, t0, ecc->p.size);
++  ecc_mod_mul_canonical (&ecc->p, xp, t0, t1, tp);
+ #undef vp
+ #undef wp
+ #undef t0
+diff --git a/curve448-eh-to-x.c b/curve448-eh-to-x.c
+index 8f3f8c45..3b9bf3ec 100644
+--- a/curve448-eh-to-x.c
++++ b/curve448-eh-to-x.c
+@@ -52,7 +52,6 @@ curve448_eh_to_x (mp_limb_t *xp, const mp_limb_t *p, mp_limb_t *scratch)
+ #define tp (scratch + ecc->p.size)
+ 
+   const struct ecc_curve *ecc = &_nettle_curve448;
+-  mp_limb_t cy;
+ 
+   /* If u = U/W and v = V/W are the coordinates of the point on
+      edwards448 we get the curve448 x coordinate as
+@@ -62,10 +61,8 @@ curve448_eh_to_x (mp_limb_t *xp, const mp_limb_t *p, mp_limb_t *scratch)
+   /* Needs a total of 5*size storage. */
+   ecc->p.invert (&ecc->p, t0, up, tp);
+   ecc_mod_mul (&ecc->p, t0, t0, vp, tp);
+-  ecc_mod_sqr (&ecc->p, t0, t0, tp);
++  ecc_mod_sqr_canonical (&ecc->p, xp, t0, tp);
+ 
+-  cy = mpn_sub_n (xp, t0, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, xp, t0, ecc->p.size);
+ #undef up
+ #undef vp
+ #undef t0
+diff --git a/ecc-eh-to-a.c b/ecc-eh-to-a.c
+index 24f6d0c0..5e3571c1 100644
+--- a/ecc-eh-to-a.c
++++ b/ecc-eh-to-a.c
+@@ -49,23 +49,15 @@ ecc_eh_to_a (const struct ecc_curve *ecc,
+ #define izp scratch
+ #define tp (scratch + ecc->p.size)
+ 
+-
+ #define xp p
+ #define yp (p + ecc->p.size)
+ #define zp (p + 2*ecc->p.size)
+ 
+-  mp_limb_t cy;
+-
+   assert(op == 0);
+ 
+   /* Needs size + scratch for the invert call. */
+   ecc->p.invert (&ecc->p, izp, zp, tp);
+ 
+-  ecc_mod_mul (&ecc->p, tp, xp, izp, tp);
+-  cy = mpn_sub_n (r, tp, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, r, tp, ecc->p.size);
+-
+-  ecc_mod_mul (&ecc->p, tp, yp, izp, tp);
+-  cy = mpn_sub_n (r + ecc->p.size, tp, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, r + ecc->p.size, tp, ecc->p.size);
++  ecc_mod_mul_canonical (&ecc->p, r, xp, izp, tp);
++  ecc_mod_mul_canonical (&ecc->p, r + ecc->p.size, yp, izp, tp);
+ }
+diff --git a/ecc-internal.h b/ecc-internal.h
+index 55c9be27..acfcb4d7 100644
+--- a/ecc-internal.h
++++ b/ecc-internal.h
+@@ -49,6 +49,8 @@
+ #define ecc_mod_submul_1 _nettle_ecc_mod_submul_1
+ #define ecc_mod_mul _nettle_ecc_mod_mul
+ #define ecc_mod_sqr _nettle_ecc_mod_sqr
++#define ecc_mod_mul_canonical _nettle_ecc_mod_mul_canonical
++#define ecc_mod_sqr_canonical _nettle_ecc_mod_sqr_canonical
+ #define ecc_mod_pow_2k _nettle_ecc_mod_pow_2k
+ #define ecc_mod_pow_2k_mul _nettle_ecc_mod_pow_2k_mul
+ #define ecc_mod_random _nettle_ecc_mod_random
+@@ -264,6 +266,19 @@ void
+ ecc_mod_sqr (const struct ecc_modulo *m, mp_limb_t *rp,
+ 	     const mp_limb_t *ap, mp_limb_t *tp);
+ 
++/* These mul and sqr functions produce a canonical result, 0 <= R < M.
++   Requirements on input and output areas are similar to the above
++   functions, except that it is *not* allowed to pass rp = rp +
++   m->size.
++ */
++void
++ecc_mod_mul_canonical (const struct ecc_modulo *m, mp_limb_t *rp,
++		       const mp_limb_t *ap, const mp_limb_t *bp, mp_limb_t *tp);
++
++void
++ecc_mod_sqr_canonical (const struct ecc_modulo *m, mp_limb_t *rp,
++		       const mp_limb_t *ap, mp_limb_t *tp);
++
+ /* R <-- X^{2^k} mod M. Needs 2*ecc->size limbs of scratch space, same
+    overlap requirements as mul and sqr above. */
+ void
+diff --git a/ecc-j-to-a.c b/ecc-j-to-a.c
+index 2d55b3a5..ac134b51 100644
+--- a/ecc-j-to-a.c
++++ b/ecc-j-to-a.c
+@@ -49,8 +49,6 @@ ecc_j_to_a (const struct ecc_curve *ecc,
+ #define iz3p (scratch + 2*ecc->p.size)
+ #define tp    scratch
+ 
+-  mp_limb_t cy;
+-
+   ecc->p.invert (&ecc->p, izp, p+2*ecc->p.size, izp + ecc->p.size);
+   ecc_mod_sqr (&ecc->p, iz2p, izp, iz2p);
+ 
+@@ -63,17 +61,13 @@ ecc_j_to_a (const struct ecc_curve *ecc,
+     }
+ 
+   /* r_x <-- x / z^2 */
+-  ecc_mod_mul (&ecc->p, iz3p, iz2p, p, iz3p);
+-  /* ecc_mod (and ecc_mod_mul) may return a value up to 2p - 1, so
+-     do a conditional subtraction. */
+-  cy = mpn_sub_n (r, iz3p, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, r, iz3p, ecc->p.size);
+-
++  ecc_mod_mul_canonical (&ecc->p, r, iz2p, p, iz3p);
+   if (op)
+     {
+       /* Skip y coordinate */
+       if (op > 1)
+ 	{
++	  mp_limb_t cy;
+ 	  /* Also reduce the x coordinate mod ecc->q. It should
+ 	     already be < 2*ecc->q, so one subtraction should
+ 	     suffice. */
+@@ -83,10 +77,7 @@ ecc_j_to_a (const struct ecc_curve *ecc,
+       return;
+     }
+   ecc_mod_mul (&ecc->p, iz3p, iz2p, izp, iz3p);
+-  ecc_mod_mul (&ecc->p, tp, iz3p, p + ecc->p.size, tp);
+-  /* And a similar subtraction. */
+-  cy = mpn_sub_n (r + ecc->p.size, tp, ecc->p.m, ecc->p.size);
+-  cnd_copy (cy, r + ecc->p.size, tp, ecc->p.size);
++  ecc_mod_mul_canonical (&ecc->p, r + ecc->p.size, iz3p, p + ecc->p.size, tp);
+ 
+ #undef izp
+ #undef iz2p
+diff --git a/ecc-mod-arith.c b/ecc-mod-arith.c
+index 551f2c14..b3021d94 100644
+--- a/ecc-mod-arith.c
++++ b/ecc-mod-arith.c
+@@ -125,6 +125,30 @@ ecc_mod_sqr (const struct ecc_modulo *m, mp_limb_t *rp,
+   m->reduce (m, rp, tp);
+ }
+ 
++void
++ecc_mod_mul_canonical (const struct ecc_modulo *m, mp_limb_t *rp,
++		       const mp_limb_t *ap, const mp_limb_t *bp, mp_limb_t *tp)
++{
++  mp_limb_t cy;
++  mpn_mul_n (tp, ap, bp, m->size);
++  m->reduce (m, tp + m->size, tp);
++
++  cy = mpn_sub_n (rp, tp + m->size, m->m, m->size);
++  cnd_copy (cy, rp, tp + m->size, m->size);
++}
++
++void
++ecc_mod_sqr_canonical (const struct ecc_modulo *m, mp_limb_t *rp,
++		       const mp_limb_t *ap, mp_limb_t *tp)
++{
++  mp_limb_t cy;
++  mpn_sqr (tp, ap, m->size);
++  m->reduce (m, tp + m->size, tp);
++
++  cy = mpn_sub_n (rp, tp + m->size, m->m, m->size);
++  cnd_copy (cy, rp, tp + m->size, m->size);
++}
++
+ void
+ ecc_mod_pow_2k (const struct ecc_modulo *m,
+ 		mp_limb_t *rp, const mp_limb_t *xp,
+diff --git a/ecc-mul-m.c b/ecc-mul-m.c
+index a3355751..f0ceb924 100644
+--- a/ecc-mul-m.c
++++ b/ecc-mul-m.c
+@@ -48,7 +48,7 @@ ecc_mul_m (const struct ecc_modulo *m,
+ 	   mp_limb_t *scratch)
+ {
+   unsigned i;
+-  mp_limb_t cy, swap;
++  mp_limb_t swap;
+ 
+ #define x2 (scratch)
+ #define z2 (scratch + m->size)
+@@ -162,7 +162,5 @@ ecc_mul_m (const struct ecc_modulo *m,
+     }
+   assert (m->invert_itch <= 7 * m->size);
+   m->invert (m, x3, z2, z3 + m->size);
+-  ecc_mod_mul (m, z3, x2, x3, z3);
+-  cy = mpn_sub_n (qx, z3, m->m, m->size);
+-  cnd_copy (cy, qx, z3, m->size);
++  ecc_mod_mul_canonical (m, qx, x2, x3, z3);
+ }

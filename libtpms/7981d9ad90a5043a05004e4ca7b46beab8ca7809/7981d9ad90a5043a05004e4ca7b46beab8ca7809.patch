@@ -1,0 +1,259 @@
+commit 7981d9ad90a5043a05004e4ca7b46beab8ca7809
+Author: Stefan Berger <stefanb@linux.vnet.ibm.com>
+Date:   Mon Jun 21 15:10:14 2021 -0400
+
+    tpm2: Add maxSize parameter to TPM2B_Marshal for sanity checks
+    
+    Add maxSize parameter to TPM2B_Marshal and assert on it checking
+    the size of the data intended to be marshaled versus the maximum
+    buffer size.
+    
+    Signed-off-by: Stefan Berger <stefanb@linux.ibm.com>
+
+diff --git a/src/tpm2/Marshal.c b/src/tpm2/Marshal.c
+index 2a9ce4d..232a9bc 100644
+--- a/src/tpm2/Marshal.c
++++ b/src/tpm2/Marshal.c
+@@ -59,6 +59,7 @@
+ /*										*/
+ /********************************************************************************/
+ 
++#include <assert.h> // libtpms added
+ #include <string.h>
+ 
+ #include "Tpm.h"
+@@ -176,9 +177,10 @@ Array_Marshal(BYTE *sourceBuffer, UINT16 sourceSize, BYTE **buffer, INT32 *size)
+ }
+ 
+ UINT16
+-TPM2B_Marshal(TPM2B *source, BYTE **buffer, INT32 *size)
++TPM2B_Marshal(TPM2B *source, UINT32 maxSize, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
++    assert(source->size <= maxSize); // libtpms added
+     written += UINT16_Marshal(&(source->size), buffer, size);
+     written += Array_Marshal(source->buffer, source->size, buffer, size); 
+     return written;
+@@ -503,7 +505,7 @@ UINT16
+ TPM2B_DIGEST_Marshal(TPM2B_DIGEST *source, BYTE **buffer, INT32 *size)
+ {
+ UINT16 written = 0;
+-written += TPM2B_Marshal(&source->b, buffer, size);
++written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+ return written;
+ }
+ 
+@@ -513,7 +515,7 @@ UINT16
+ TPM2B_DATA_Marshal(TPM2B_DATA *source, BYTE **buffer, INT32 *size)
+ {
+ UINT16 written = 0;
+-written += TPM2B_Marshal(&source->b, buffer, size);
++written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+ return written;
+ }
+ 
+@@ -543,7 +545,7 @@ UINT16
+ TPM2B_MAX_BUFFER_Marshal(TPM2B_MAX_BUFFER *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -553,7 +555,7 @@ UINT16
+ TPM2B_MAX_NV_BUFFER_Marshal(TPM2B_MAX_NV_BUFFER *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -562,7 +564,7 @@ UINT16
+ TPM2B_TIMEOUT_Marshal(TPM2B_TIMEOUT *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -572,7 +574,7 @@ UINT16
+ TPM2B_IV_Marshal(TPM2B_IV *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -582,7 +584,7 @@ UINT16
+ TPM2B_NAME_Marshal(TPM2B_NAME *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.name), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1163,7 +1165,7 @@ UINT16
+ TPM2B_ATTEST_Marshal(TPM2B_ATTEST *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.attestationData), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1294,7 +1296,7 @@ UINT16
+ TPM2B_SYM_KEY_Marshal(TPM2B_SYM_KEY *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1315,7 +1317,7 @@ UINT16
+ TPM2B_SENSITIVE_DATA_Marshal(TPM2B_SENSITIVE_DATA *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1673,7 +1675,7 @@ UINT16
+ TPM2B_PUBLIC_KEY_RSA_Marshal(TPM2B_PUBLIC_KEY_RSA *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1693,7 +1695,7 @@ UINT16
+ TPM2B_PRIVATE_KEY_RSA_Marshal(TPM2B_PRIVATE_KEY_RSA *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1703,7 +1705,7 @@ UINT16
+ TPM2B_ECC_PARAMETER_Marshal(TPM2B_ECC_PARAMETER *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -1937,7 +1939,7 @@ UINT16
+ TPM2B_ENCRYPTED_SECRET_Marshal(TPM2B_ENCRYPTED_SECRET *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.secret), buffer, size); // libtpms changed
+     return written;
+ }
+  
+@@ -2148,7 +2150,7 @@ UINT16
+ TPM2B_PRIVATE_Marshal(TPM2B_PRIVATE *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -2158,7 +2160,7 @@ UINT16
+ TPM2B_ID_OBJECT_Marshal(TPM2B_ID_OBJECT *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.credential), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+@@ -2215,7 +2217,7 @@ UINT16
+ TPM2B_CONTEXT_DATA_Marshal(TPM2B_CONTEXT_DATA  *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size); // libtpms changed
+     return written;
+ }
+ 
+diff --git a/src/tpm2/Marshal_fp.h b/src/tpm2/Marshal_fp.h
+index 3ce6eb3..d52f497 100644
+--- a/src/tpm2/Marshal_fp.h
++++ b/src/tpm2/Marshal_fp.h
+@@ -79,7 +79,7 @@ extern "C" {
+     UINT16
+     Array_Marshal(BYTE *sourceBuffer, UINT16 sourceSize, BYTE **buffer, INT32 *size);
+     UINT16
+-    TPM2B_Marshal(TPM2B *source, BYTE **buffer, INT32 *size);
++    TPM2B_Marshal(TPM2B *source, UINT32 maxSize, BYTE **buffer, INT32 *size); // libtpms changed
+     UINT16
+     TPM_KEY_BITS_Marshal(TPM_KEY_BITS *source, BYTE **buffer, INT32 *size);
+     UINT16
+diff --git a/src/tpm2/NVMarshal.c b/src/tpm2/NVMarshal.c
+index 467f246..8e0ec0b 100644
+--- a/src/tpm2/NVMarshal.c
++++ b/src/tpm2/NVMarshal.c
+@@ -278,7 +278,7 @@ static UINT16
+ TPM2B_PROOF_Marshal(TPM2B_PROOF *source, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written = 0;
+-    written += TPM2B_Marshal(&source->b, buffer, size);
++    written += TPM2B_Marshal(&source->b, sizeof(source->t.buffer), buffer, size);
+     return written;
+ }
+ 
+@@ -1414,7 +1414,7 @@ STATE_RESET_DATA_Marshal(STATE_RESET_DATA *data, BYTE **buffer, INT32 *size)
+                                 STATE_RESET_DATA_VERSION,
+                                 STATE_RESET_DATA_MAGIC, 4);
+     written += TPM2B_PROOF_Marshal(&data->nullProof, buffer, size);
+-    written += TPM2B_Marshal(&data->nullSeed.b, buffer, size);
++    written += TPM2B_Marshal(&data->nullSeed.b, sizeof(data->nullSeed.t.buffer), buffer, size);
+     written += UINT32_Marshal(&data->clearCount, buffer, size);
+     written += UINT64_Marshal(&data->objectContextID, buffer, size);
+ 
+@@ -2203,7 +2203,7 @@ TPM2B_HASH_BLOCK_Marshal(TPM2B_HASH_BLOCK *data, BYTE **buffer, INT32 *size)
+ {
+     UINT16 written;
+ 
+-    written = TPM2B_Marshal(&data->b, buffer, size);
++    written = TPM2B_Marshal(&data->b, sizeof(data->t.buffer), buffer, size);
+ 
+     return written;
+ }
+@@ -3087,9 +3087,9 @@ VolatileState_Marshal(BYTE **buffer, INT32 *size)
+ 
+     /* tie the volatile state to the EP,SP, and PPSeed */
+     NvRead(&pd, NV_PERSISTENT_DATA, sizeof(pd));
+-    written += TPM2B_Marshal(&pd.EPSeed.b, buffer, size);
+-    written += TPM2B_Marshal(&pd.SPSeed.b, buffer, size);
+-    written += TPM2B_Marshal(&pd.PPSeed.b, buffer, size);
++    written += TPM2B_Marshal(&pd.EPSeed.b, sizeof(pd.EPSeed.t.buffer), buffer, size);
++    written += TPM2B_Marshal(&pd.SPSeed.b, sizeof(pd.SPSeed.t.buffer), buffer, size);
++    written += TPM2B_Marshal(&pd.PPSeed.b, sizeof(pd.PPSeed.t.buffer), buffer, size);
+ 
+     written += BLOCK_SKIP_WRITE_PUSH(TRUE, buffer, size); /* v4 */
+ 
+@@ -3906,9 +3906,9 @@ PERSISTENT_DATA_Marshal(PERSISTENT_DATA *data, BYTE **buffer, INT32 *size)
+     written += TPM2B_AUTH_Marshal(&data->ownerAuth, buffer, size);
+     written += TPM2B_AUTH_Marshal(&data->endorsementAuth, buffer, size);
+     written += TPM2B_AUTH_Marshal(&data->lockoutAuth, buffer, size);
+-    written += TPM2B_Marshal(&data->EPSeed.b, buffer, size);
+-    written += TPM2B_Marshal(&data->SPSeed.b, buffer, size);
+-    written += TPM2B_Marshal(&data->PPSeed.b, buffer, size);
++    written += TPM2B_Marshal(&data->EPSeed.b, sizeof(data->EPSeed.t.buffer), buffer, size);
++    written += TPM2B_Marshal(&data->SPSeed.b, sizeof(data->SPSeed.t.buffer), buffer, size);
++    written += TPM2B_Marshal(&data->PPSeed.b, sizeof(data->PPSeed.t.buffer), buffer, size);
+     written += TPM2B_PROOF_Marshal(&data->phProof, buffer, size);
+     written += TPM2B_PROOF_Marshal(&data->shProof, buffer, size);
+     written += TPM2B_PROOF_Marshal(&data->ehProof, buffer, size);

@@ -1,0 +1,94 @@
+commit cfce16449cb815132f829d5a07beb138dfb2cba6
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Mon Feb 15 03:26:04 2021 +0100
+
+    avformat/mpegenc: Ensure packet queue stays valid
+    
+    The MPEG-PS muxer uses a custom queue of custom packets. To keep track
+    of it, it has a pointer (named predecode_packet) to the head of the
+    queue and a pointer to where the next packet is to be added (it points
+    to the next-pointer of the last element of the queue); furthermore,
+    there is also a pointer that points into the queue (called premux_packet).
+    
+    The exact behaviour was as follows: If premux_packet was NULL when a
+    packet is received, it is taken to mean that the old queue is empty and
+    a new queue is started. premux_packet will point to the head of said
+    queue and the next_packet-pointer points to its next pointer. If
+    predecode_packet is NULL, it will also made to point to the newly
+    allocated element.
+    
+    But if premux_packet is NULL and predecode_packet is not, then there
+    will be two queues with head elements premux_packet and
+    predecode_packet. Yet only elements reachable from predecode_packet are
+    ever freed, so the premux_packet queue leaks.
+    Worse yet, when the predecode_packet queue will be eventually exhausted,
+    predecode_packet will be made to point into the other queue and when
+    predecode_packet will be freed, the next pointer of the preceding
+    element of the queue will still point to the element just freed. This
+    element might very well be still reachable from premux_packet which
+    leads to use-after-frees lateron. This happened in the tickets mentioned
+    below.
+    
+    Fix this by never creating two queues in the first place by checking for
+    predecode_packet to know whether the queue is empty. If premux_packet is
+    NULL, then it is set to the newly allocated element of the queue.
+    
+    Fixes tickets #6887, #8188 and #8266.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+
+diff --git a/libavformat/mpegenc.c b/libavformat/mpegenc.c
+index 9bd0a555d4..810dd717ca 100644
+--- a/libavformat/mpegenc.c
++++ b/libavformat/mpegenc.c
+@@ -48,9 +48,9 @@ typedef struct StreamInfo {
+     uint8_t id;
+     int max_buffer_size; /* in bytes */
+     int buffer_index;
+-    PacketDesc *predecode_packet;
++    PacketDesc *predecode_packet; /* start of packet queue */
++    PacketDesc *last_packet;      /* end of packet queue */
+     PacketDesc *premux_packet;
+-    PacketDesc **next_packet;
+     int packet_number;
+     uint8_t lpcm_header[3];
+     int lpcm_align;
+@@ -986,6 +986,8 @@ static int remove_decoded_packets(AVFormatContext *ctx, int64_t scr)
+             }
+             stream->buffer_index    -= pkt_desc->size;
+             stream->predecode_packet = pkt_desc->next;
++            if (!stream->predecode_packet)
++                stream->last_packet = NULL;
+             av_freep(&pkt_desc);
+         }
+     }
+@@ -1177,12 +1179,16 @@ static int mpeg_mux_write_packet(AVFormatContext *ctx, AVPacket *pkt)
+     av_log(ctx, AV_LOG_TRACE, "dts:%f pts:%f flags:%d stream:%d nopts:%d\n",
+             dts / 90000.0, pts / 90000.0, pkt->flags,
+             pkt->stream_index, pts != AV_NOPTS_VALUE);
+-    if (!stream->premux_packet)
+-        stream->next_packet = &stream->premux_packet;
+-    *stream->next_packet     =
+     pkt_desc                 = av_mallocz(sizeof(PacketDesc));
+     if (!pkt_desc)
+         return AVERROR(ENOMEM);
++    if (!stream->predecode_packet) {
++        stream->predecode_packet  = pkt_desc;
++    } else
++        stream->last_packet->next = pkt_desc;
++    stream->last_packet = pkt_desc;
++    if (!stream->premux_packet)
++        stream->premux_packet = pkt_desc;
+     pkt_desc->pts            = pts;
+     pkt_desc->dts            = dts;
+ 
+@@ -1200,9 +1206,6 @@ static int mpeg_mux_write_packet(AVFormatContext *ctx, AVPacket *pkt)
+ 
+     pkt_desc->unwritten_size =
+     pkt_desc->size           = size;
+-    if (!stream->predecode_packet)
+-        stream->predecode_packet = pkt_desc;
+-    stream->next_packet = &pkt_desc->next;
+ 
+     if (av_fifo_realloc2(stream->fifo, av_fifo_size(stream->fifo) + size) < 0)
+         return -1;

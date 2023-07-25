@@ -1,0 +1,8 @@
+commit da940424816e11d624362ce080bc026adffa26e8
+Merge: 31d44f02 893143c8
+Author: Antonin Descampe <antonin@gmail.com>
+Date:   Tue Sep 20 18:59:30 2016 +0200
+
+    Merge pull request #834 from trylab/issue833
+    
+    Fix issue 833.

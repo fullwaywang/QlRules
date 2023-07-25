@@ -1,0 +1,22 @@
+commit 63ac64864c6e0e84355aa3caa5b92208997a9a8d	63ac64864c6e0e84355aa3caa5b92208997a9a8d
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Sat Nov 17 16:26:55 2012 +0100
+
+    eamad: fix out of array accesses
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/eamad.c b/libavcodec/eamad.c
+index 280519518d..e38650ed6e 100644
+--- a/libavcodec/eamad.c
++++ b/libavcodec/eamad.c
+@@ -237,7 +237,7 @@ static int decode_frame(AVCodecContext *avctx,
+     int chunk_type;
+     int inter;
+ 
+-    if (buf_size < 17) {
++    if (buf_size < 26) {
+         av_log(avctx, AV_LOG_ERROR, "Input buffer too small\n");
+         *data_size = 0;
+         return -1;

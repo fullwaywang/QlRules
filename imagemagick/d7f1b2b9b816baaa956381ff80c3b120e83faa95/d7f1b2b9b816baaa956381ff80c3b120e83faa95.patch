@@ -1,0 +1,32 @@
+commit d7f1b2b9b816baaa956381ff80c3b120e83faa95
+Author: Cristy <mikayla-grace@urban-warrior.org>
+Date:   Wed Dec 22 15:59:55 2021 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/4626
+
+diff --git a/ChangeLog b/ChangeLog
+index 231a7a160..5309a09cc 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -3,6 +3,8 @@
+ 
+ 2021-12-19  7.1.0-19  <quetzlzacatenango@image...>
+   * support -integral option.
++  * possible DoS for certain SVG constructs (reference
++    https://github.com/ImageMagick/ImageMagick/issues/4626).
+ 
+ 2021-12-18  7.1.0-18  <quetzlzacatenango@image...>
+   * Release ImageMagick version 7.1.0-18 GIT revision 19447:6c7d62f7d:20211218
+diff --git a/MagickCore/draw.c b/MagickCore/draw.c
+index c98f0764e..a11110b78 100644
+--- a/MagickCore/draw.c
++++ b/MagickCore/draw.c
+@@ -5535,7 +5535,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
+           {
+             (void) CopyMagickString(clone_info->filename,primitive_info->text,
+               MagickPathExtent);
+-            status&=SetImageInfo(clone_info,0,exception);
++            status&=SetImageInfo(clone_info,1,exception);
+             (void) CopyMagickString(clone_info->filename,primitive_info->text,
+               MagickPathExtent);
+             if (clone_info->size != (char *) NULL)

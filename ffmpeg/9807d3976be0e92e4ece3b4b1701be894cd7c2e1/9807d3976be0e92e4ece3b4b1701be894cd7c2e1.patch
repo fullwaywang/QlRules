@@ -1,0 +1,27 @@
+commit 9807d3976be0e92e4ece3b4b1701be894cd7c2e1
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Tue Jul 3 22:14:42 2018 +0200
+
+    avformat/pva: Check for EOF before retrying in read_part_of_packet()
+    
+    Fixes: Infinite loop
+    Fixes: pva-4b1835dbc2027bf3c567005dcc78e85199240d06
+    
+    Found-by: Paul Ch <paulcher@icloud.com>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/pva.c b/libavformat/pva.c
+index 16381db905..04ae8e2800 100644
+--- a/libavformat/pva.c
++++ b/libavformat/pva.c
+@@ -134,6 +134,10 @@ recover:
+             pes_flags              = avio_rb16(pb);
+             pes_header_data_length = avio_r8(pb);
+ 
++            if (avio_feof(pb)) {
++                return AVERROR_EOF;
++            }
++
+             if (pes_signal != 1 || pes_header_data_length == 0) {
+                 pva_log(s, AV_LOG_WARNING, "expected non empty signaled PES packet, "
+                                           "trying to recover\n");

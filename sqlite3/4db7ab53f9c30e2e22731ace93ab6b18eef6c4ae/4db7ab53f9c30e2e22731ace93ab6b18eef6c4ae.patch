@@ -1,0 +1,113 @@
+commit 4db7ab53f9c30e2e22731ace93ab6b18eef6c4ae	4db7ab53f9c30e2e22731ace93ab6b18eef6c4ae
+Author: dan <dan@noemail.net>
+Date:   Fri Apr 3 11:52:59 2020 +0000
+
+    Do not suppress errors when resolving references in an ORDER BY clause belonging to a compound SELECT within a view or trigger within ALTER TABLE. Fix for ticket [a10a14e9b4ba2].
+    
+    FossilOrigin-Name: 684293882c302600e112cf52553c19d84fdb31663d96e5dd7f8ac17dda00a026
+
+diff --git a/manifest b/manifest
+index 7dd9918b9..e13f0135c 100644
+--- a/manifest
++++ b/manifest
+@@ -1,5 +1,5 @@
+-C Fix\sa\scase\swhen\sa\spointer\smight\sbe\sused\safter\sbeing\sfreed\sin\sthe\sALTER\sTABLE\scode.\sFix\sfor\s[4722bdab08cb1].
+-D 2020-04-03T11:20:40.575
++C Do\snot\ssuppress\serrors\swhen\sresolving\sreferences\sin\san\sORDER\sBY\sclause\sbelonging\sto\sa\scompound\sSELECT\swithin\sa\sview\sor\strigger\swithin\sALTER\sTABLE.\sFix\sfor\sticket\s[a10a14e9b4ba2].
++D 2020-04-03T11:52:59.198
+ F .fossil-settings/empty-dirs dbb81e8fc0401ac46a1491ab34a7f2c7c0452f2f06b54ebb845d024ca8283ef1
+ F .fossil-settings/ignore-glob 35175cdfcf539b2318cb04a9901442804be81cd677d8b889fcc9149c21f239ea
+ F LICENSE.md df5091916dbb40e6e9686186587125e1b2ff51f022cc334e886c19a0e9982724
+@@ -529,7 +529,7 @@ F src/pragma.h 9473160d220416456b40f27323bb4b316d4e4e08ffbf8bf88c5f7045d49c38e5
+ F src/prepare.c 8d4d6c8aa6afefc48027c54b41cdf134b4d6bc2fc4badbe483ad7fd9e1728a28
+ F src/printf.c 9be6945837c839ba57837b4bc3af349eba630920fa5532aa518816defe42a7d4
+ F src/random.c 80f5d666f23feb3e6665a6ce04c7197212a88384
+-F src/resolve.c 903a70c48d0f72fdd657b225d499cf99ec01d575cf3fbc8196b43562045319ac
++F src/resolve.c 5c3b3b18e096353ee2794a8f8a6227c301a57ea771814c158546265d9ef2087e
+ F src/rowset.c ba9515a922af32abe1f7d39406b9d35730ed65efab9443dc5702693b60854c92
+ F src/select.c 6908c059e4289149f88bfd641305b96ee34e500855fcd580ff8df1bd0885191a
+ F src/shell.c.in 759bb4a283651955ff2ddb104541b1805b1fff915017083bdd39975cd4e223aa
+@@ -639,7 +639,7 @@ F test/altercol.test 1d6a6fe698b81e626baea4881f5717f9bc53d7d07f1cd23ee7ad1b931f1
+ F test/alterlegacy.test 82022721ce0de29cedc9a7af63bc9fcc078b0ee000f8283b4b6ea9c3eab2f44b
+ F test/altermalloc.test 167a47de41b5c638f5f5c6efb59784002b196fff70f98d9b4ed3cd74a3fb80c9
+ F test/altermalloc2.test fa7b1c1139ea39b8dec407cf1feb032ca8e0076bd429574969b619175ad0174b
+-F test/altertab.test 2c41e347c0b37725d2c27641056f12f136ce43027d3aca664f380183fdd1c610
++F test/altertab.test 523ba6368e0da19f462f7c05563c569675736d946724cac1c4ae848f76783434
+ F test/altertab2.test b0d62f323ca5dab42b0bc028c52e310ebdd13e655e8fac070fe622bad7852c2b
+ F test/altertab3.test 155b8dc225ce484454a7fb4c8ba745680b6fa0fc3e08919cbbc19f9309d128ff
+ F test/amatch1.test b5ae7065f042b7f4c1c922933f4700add50cdb9f
+@@ -1860,7 +1860,7 @@ F vsixtest/vsixtest.tcl 6a9a6ab600c25a91a7acc6293828957a386a8a93
+ F vsixtest/vsixtest.vcxproj.data 2ed517e100c66dc455b492e1a33350c1b20fbcdc
+ F vsixtest/vsixtest.vcxproj.filters 37e51ffedcdb064aad6ff33b6148725226cd608e
+ F vsixtest/vsixtest_TemporaryKey.pfx e5b1b036facdb453873e7084e1cae9102ccc67a0
+-P c9c735e201d7900d8c2b766463a6c90f547d9844352719dc650734e25e635fad
+-R c7d47b4b1d0e3507c385823cf0fb10e9
++P d09f8c3621d5f7f8c6d99d7d82bcaa8421855b3f470bea2b26c858106382b906
++R 800f7c7b57166aa2318c88ff52f2e7ab
+ U dan
+-Z 19dcbc942e2e27035df43e0cc566210a
++Z 369e72d27cf5a202a4749d0a2e3d428e
+diff --git a/manifest.uuid b/manifest.uuid
+index 8a8c03d74..6f6b1c42e 100644
+--- a/manifest.uuid
++++ b/manifest.uuid
+@@ -1 +1 @@
+-d09f8c3621d5f7f8c6d99d7d82bcaa8421855b3f470bea2b26c858106382b906
+\ No newline at end of file
++684293882c302600e112cf52553c19d84fdb31663d96e5dd7f8ac17dda00a026
+\ No newline at end of file
+diff --git a/src/resolve.c b/src/resolve.c
+index e90e8a768..90dde1055 100644
+--- a/src/resolve.c
++++ b/src/resolve.c
+@@ -1193,7 +1193,7 @@ static int resolveOrderByTermToExprList(
+   nc.nErr = 0;
+   db = pParse->db;
+   savedSuppErr = db->suppressErr;
+-  db->suppressErr = 1;
++  if( IN_RENAME_OBJECT==0 ) db->suppressErr = 1;
+   rc = sqlite3ResolveExprNames(&nc, pE);
+   db->suppressErr = savedSuppErr;
+   if( rc ) return 0;
+diff --git a/test/altertab.test b/test/altertab.test
+index 68c52d604..c99010d29 100644
+--- a/test/altertab.test
++++ b/test/altertab.test
+@@ -594,7 +594,6 @@ reset_db
+ do_execsql_test 18.1.0 {
+   CREATE TABLE t0 (c0 INTEGER, PRIMARY KEY(c0)) WITHOUT ROWID;
+ }
+-breakpoint
+ do_execsql_test 18.1.1 {
+   ALTER TABLE t0 RENAME COLUMN c0 TO c1;
+ }
+@@ -636,9 +635,28 @@ do_execsql_test 20.0 {
+   CREATE TABLE a(a);
+   CREATE VIEW b AS SELECT(SELECT *FROM c JOIN a USING(d, a, a, a) JOIN a) IN();
+ }
+-
+ do_execsql_test 20.1 {
+   ALTER TABLE a RENAME a TO e;
+ } {}
+ 
++reset_db
++do_execsql_test 21.0 {
++  CREATE TABLE a(b);
++  CREATE VIEW c AS 
++      SELECT NULL INTERSECT 
++      SELECT NULL ORDER BY
++      likelihood(NULL, (d, (SELECT c)));
++} {}
++do_catchsql_test 21.1 {
++  SELECT likelihood(NULL, (d, (SELECT c)));
++} {1 {second argument to likelihood() must be a constant between 0.0 and 1.0}}
++do_catchsql_test 21.2 {
++  SELECT * FROM c;
++} {1 {1st ORDER BY term does not match any column in the result set}}
++
++do_catchsql_test 21.3 {
++  ALTER TABLE a RENAME TO e;
++} {1 {error in view c: 1st ORDER BY term does not match any column in the result set}}
++
++
+ finish_test

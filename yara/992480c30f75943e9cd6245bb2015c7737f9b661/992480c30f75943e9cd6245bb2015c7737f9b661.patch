@@ -1,0 +1,46 @@
+commit 992480c30f75943e9cd6245bb2015c7737f9b661
+Author: Victor M. Alvarez <plusvic@gmail.com>
+Date:   Tue Jun 6 19:07:27 2017 +0200
+
+    Fix buffer overrun (issue #678). Add assert for detecting this kind of issues earlier.
+
+diff --git a/libyara/re.c b/libyara/re.c
+index 959979ba..1b767ff5 100644
+--- a/libyara/re.c
++++ b/libyara/re.c
+@@ -2320,11 +2320,11 @@ int yr_re_fast_exec(
+ 
+           for (i = repeat_any_args->min + 1; i <= repeat_any_args->max; i++)
+           {
+-            next_input = input + i * input_incr;
+-
+             if (bytes_matched + i >= max_bytes_matched)
+               break;
+ 
++            next_input = input + i * input_incr;
++
+             if ( *(next_opcode) != RE_OPCODE_LITERAL ||
+                 (*(next_opcode) == RE_OPCODE_LITERAL &&
+                  *(next_opcode + 1) == *next_input))
+@@ -2341,6 +2341,7 @@ int yr_re_fast_exec(
+ 
+           input += input_incr * repeat_any_args->min;
+           bytes_matched += repeat_any_args->min;
++          bytes_matched = yr_min(bytes_matched, max_bytes_matched);
+           ip = next_opcode;
+ 
+           break;
+diff --git a/libyara/scan.c b/libyara/scan.c
+index a48c45e6..619e64cb 100644
+--- a/libyara/scan.c
++++ b/libyara/scan.c
+@@ -443,6 +443,9 @@ int _yr_scan_match_callback(
+   // total match length is the sum of backward and forward matches.
+   match_length += callback_args->forward_matches;
+ 
++  // make sure that match fits into the data.
++  assert(match_offset + match_length <= callback_args->data_size);
++
+   if (callback_args->full_word)
+   {
+     if (flags & RE_FLAGS_WIDE)

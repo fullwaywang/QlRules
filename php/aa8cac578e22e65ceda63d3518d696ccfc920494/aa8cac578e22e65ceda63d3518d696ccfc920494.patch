@@ -1,0 +1,42 @@
+commit aa8cac578e22e65ceda63d3518d696ccfc920494
+Author: Bob Weinand <bobwei9@hotmail.com>
+Date:   Sun Dec 6 02:54:28 2015 +0100
+
+    Fix double free in formatted_print.c
+
+diff --git a/NEWS b/NEWS
+index 788aa0fd1a..266b227d6e 100644
+--- a/NEWS
++++ b/NEWS
+@@ -27,6 +27,7 @@ PHP                                                                        NEWS
+   . Fixed bug #70987 (static::class within Closure::call() causes segfault).
+     (Andrea)
+   . Fixed bug #71013 (Incorrect exception handler with yield from). (Bob)
++  . Fixed double free in error condition of format printer. (Bob)
+ 
+ - CLI server:
+   . Fixed bug #71005 (Segfault in php_cli_server_dispatch_router()). (Adam)
+diff --git a/ext/standard/formatted_print.c b/ext/standard/formatted_print.c
+index 081dfc4a07..e206bb9225 100644
+--- a/ext/standard/formatted_print.c
++++ b/ext/standard/formatted_print.c
+@@ -518,9 +518,6 @@ php_formatted_print(zend_execute_data *execute_data, int use_array, int format_o
+ 							efree(newargs);
+ 						}
+ 						php_error_docref(NULL, E_WARNING, "Width must be greater than zero and less than %d", INT_MAX);
+-						if (newargs) {
+-							efree(newargs);
+-						}
+ 						return NULL;
+ 					}
+ 					adjusting |= ADJ_WIDTH;
+@@ -540,9 +537,6 @@ php_formatted_print(zend_execute_data *execute_data, int use_array, int format_o
+ 								efree(newargs);
+ 							}
+ 							php_error_docref(NULL, E_WARNING, "Precision must be greater than zero and less than %d", INT_MAX);
+-							if (newargs) {
+-								efree(newargs);
+-							}
+ 							return NULL;
+ 						}
+ 						adjusting |= ADJ_PRECISION;

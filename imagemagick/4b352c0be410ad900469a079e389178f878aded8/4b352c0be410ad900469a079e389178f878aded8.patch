@@ -1,0 +1,22 @@
+commit 4b352c0be410ad900469a079e389178f878aded8
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Wed Jul 4 14:21:29 2018 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/1191
+
+diff --git a/coders/miff.c b/coders/miff.c
+index 2dd480861..8ba78ca6e 100644
+--- a/coders/miff.c
++++ b/coders/miff.c
+@@ -1221,8 +1221,11 @@ static Image *ReadMIFFImage(const ImageInfo *image_info,
+             switch (image->depth)
+             {
+               default:
++              {
+                 colormap=(unsigned char *) RelinquishMagickMemory(colormap);
+                 ThrowMIFFException(CorruptImageError,"ImageDepthNotSupported");
++                break;
++              }
+               case 8:
+               {
+                 unsigned char

@@ -1,0 +1,25 @@
+commit 9a64e62f0f20c9cf9b2e1609f037060eb2d8eb22
+Author: Etienne Samson <samson.etienne@gmail.com>
+Date:   Wed Dec 21 21:24:33 2016 +0100
+
+    http: check certificate validity before clobbering the error variable
+
+diff --git a/src/transports/http.c b/src/transports/http.c
+index ad28c5889..155fd7b30 100644
+--- a/src/transports/http.c
++++ b/src/transports/http.c
+@@ -624,13 +624,12 @@ static int http_connect(http_subtransport *t)
+ 	if ((!error || error == GIT_ECERTIFICATE) && t->owner->certificate_check_cb != NULL &&
+ 	    git_stream_is_encrypted(t->io)) {
+ 		git_cert *cert;
+-		int is_valid;
++		int is_valid = (error == GIT_OK);
+ 
+ 		if ((error = git_stream_certificate(&cert, t->io)) < 0)
+ 			return error;
+ 
+ 		giterr_clear();
+-		is_valid = error != GIT_ECERTIFICATE;
+ 		error = t->owner->certificate_check_cb(cert, is_valid, t->connection_data.host, t->owner->message_cb_payload);
+ 
+ 		if (error < 0) {

@@ -1,0 +1,30 @@
+commit 6b98dc63701b1da1cc7681cb383dabb0b7007d73
+Author: Gerald Combs <gerald@wireshark.org>
+Date:   Wed Feb 12 12:07:52 2020 -0800
+
+    WiMax DLMAP: Fix a large loop.
+    
+    Make sure we advance our offset.
+    
+    Bug: 16383
+    Ping-Bug: 16368
+    Change-Id: I4949cb0988601dbe545d0bc22de4d654b4e61204
+    Reviewed-on: https://code.wireshark.org/review/36085
+    Reviewed-by: Gerald Combs <gerald@wireshark.org>
+    Petri-Dish: Gerald Combs <gerald@wireshark.org>
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 6dad599a8a1bda8b8e999cc4a7e460140e4ecc0a)
+    Reviewed-on: https://code.wireshark.org/review/36094
+
+diff --git a/plugins/epan/wimax/msg_dlmap.c b/plugins/epan/wimax/msg_dlmap.c
+index c2cdf54f5e..6961d55558 100644
+--- a/plugins/epan/wimax/msg_dlmap.c
++++ b/plugins/epan/wimax/msg_dlmap.c
+@@ -2388,6 +2388,7 @@ gint wimax_decode_dlmapc(tvbuff_t *tvb, packet_info *pinfo, proto_tree *base_tre
+ 	{
+ 		expert_add_info_format(pinfo, ti, &ei_mac_header_invalid_length,
+ 		"Invalid length: %d.", mac_len);
++		return sizeof(mac_crc);
+ 	}
+ 	else if (MIN(tvb_len, tvb_reported_length(tvb)) >= mac_len)
+ 	{

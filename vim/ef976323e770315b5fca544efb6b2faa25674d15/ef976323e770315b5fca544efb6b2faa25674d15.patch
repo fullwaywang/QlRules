@@ -1,0 +1,85 @@
+commit ef976323e770315b5fca544efb6b2faa25674d15
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Wed Sep 28 11:48:30 2022 +0100
+
+    patch 9.0.0614: SpellFileMissing autocmd may delete buffer
+    
+    Problem:    SpellFileMissing autocmd may delete buffer.
+    Solution:   Disallow deleting the current buffer to avoid using freed memory.
+
+diff --git a/src/buffer.c b/src/buffer.c
+index edf71b051..be7f1fa8d 100644
+--- a/src/buffer.c
++++ b/src/buffer.c
+@@ -468,7 +468,12 @@ can_unload_buffer(buf_T *buf)
+ 	    }
+     }
+     if (!can_unload)
+-	semsg(_(e_attempt_to_delete_buffer_that_is_in_use_str), buf->b_fname);
++    {
++	char_u *fname = buf->b_fname != NULL ? buf->b_fname : buf->b_ffname;
++
++	semsg(_(e_attempt_to_delete_buffer_that_is_in_use_str),
++				fname != NULL ? fname : (char_u *)"[No Name]");
++    }
+     return can_unload;
+ }
+ 
+diff --git a/src/spell.c b/src/spell.c
+index 628814fe6..975b5a678 100644
+--- a/src/spell.c
++++ b/src/spell.c
+@@ -1568,6 +1568,10 @@ spell_load_lang(char_u *lang)
+     sl.sl_slang = NULL;
+     sl.sl_nobreak = FALSE;
+ 
++    // Disallow deleting the current buffer.  Autocommands can do weird things
++    // and cause "lang" to be freed.
++    ++curbuf->b_locked;
++
+     // We may retry when no spell file is found for the language, an
+     // autocommand may load it then.
+     for (round = 1; round <= 2; ++round)
+@@ -1621,6 +1625,8 @@ spell_load_lang(char_u *lang)
+ 	STRCPY(fname_enc + STRLEN(fname_enc) - 3, "add.spl");
+ 	do_in_runtimepath(fname_enc, DIP_ALL, spell_load_cb, &sl);
+     }
++
++    --curbuf->b_locked;
+ }
+ 
+ /*
+diff --git a/src/testdir/test_autocmd.vim b/src/testdir/test_autocmd.vim
+index 86732f15d..70f0f553a 100644
+--- a/src/testdir/test_autocmd.vim
++++ b/src/testdir/test_autocmd.vim
+@@ -2880,6 +2880,16 @@ func Test_FileType_spell()
+   setglobal spellfile=
+ endfunc
+ 
++" this was wiping out the current buffer and using freed memory
++func Test_SpellFileMissing_bwipe()
++  next 0
++  au SpellFileMissing 0 bwipe
++  call assert_fails('set spell spelllang=0', 'E937:')
++
++  au! SpellFileMissing
++  bwipe
++endfunc
++
+ " Test closing a window or editing another buffer from a FileChangedRO handler
+ " in a readonly buffer
+ func Test_FileChangedRO_winclose()
+diff --git a/src/version.c b/src/version.c
+index 1621c8141..623fedaf1 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -699,6 +699,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    614,
+ /**/
+     613,
+ /**/

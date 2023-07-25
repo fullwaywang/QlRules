@@ -1,0 +1,23 @@
+commit 78cdab949f098ad7e593d853229fccf57d749d0c
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Mon Nov 30 17:43:03 2020 +0100
+
+    tcos: prevent out of bounds read
+    
+    Thanks oss-fuzz
+    
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=27719
+
+diff --git a/src/libopensc/pkcs15-tcos.c b/src/libopensc/pkcs15-tcos.c
+index 60de1470..1134ac11 100644
+--- a/src/libopensc/pkcs15-tcos.c
++++ b/src/libopensc/pkcs15-tcos.c
+@@ -152,7 +152,7 @@ static int insert_key(
+ 			sc_log(ctx, "No EF_KEYD-Record found\n");
+ 			return 1;
+ 		}
+-		for (i = 0; i < r; i += 2 + buf[i + 1]) {
++		for (i = 0; i + 1 < r; i += 2 + buf[i + 1]) {
+ 			if (buf[i] == 0xB6)
+ 				can_sign++;
+ 			if (buf[i] == 0xB8)

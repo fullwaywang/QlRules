@@ -1,0 +1,19 @@
+commit a7bb158b7bedd1449a34432feb3a67c8f1873bfa
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Sep 30 15:19:06 2016 -0400
+
+    https://github.com/ImageMagick/ImageMagick/issues/280
+
+diff --git a/MagickCore/profile.c b/MagickCore/profile.c
+index ea7605770..4239d558c 100644
+--- a/MagickCore/profile.c
++++ b/MagickCore/profile.c
+@@ -2032,7 +2032,7 @@ MagickBooleanType SyncExifProfile(Image *image,StringInfo *profile)
+         break;  /* corrupt EXIF */
+       tag_value=(ssize_t) ReadProfileShort(endian,q);
+       format=(ssize_t) ReadProfileShort(endian,q+2);
+-      if ((format-1) >= EXIF_NUM_FORMATS)
++      if ((format < 0) || ((format-1) >= EXIF_NUM_FORMATS))
+         break;
+       components=(ssize_t) ReadProfileLong(endian,q+4);
+       if (components < 0)

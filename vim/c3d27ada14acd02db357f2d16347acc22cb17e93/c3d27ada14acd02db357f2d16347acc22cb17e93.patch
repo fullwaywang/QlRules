@@ -1,0 +1,61 @@
+commit c3d27ada14acd02db357f2d16347acc22cb17e93
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Mon Nov 14 20:52:14 2022 +0000
+
+    patch 9.0.0882: using freed memory after SpellFileMissing autocmd uses bwipe
+    
+    Problem:    Using freed memory after SpellFileMissing autocmd uses bwipe.
+    Solution:   Bail out if the window no longer exists.
+
+diff --git a/src/spell.c b/src/spell.c
+index 508c3ba38..7d8ffe63d 100644
+--- a/src/spell.c
++++ b/src/spell.c
+@@ -2110,8 +2110,8 @@ did_set_spelllang(win_T *wp)
+ 	    {
+ 		spell_load_lang(lang);
+ 		// SpellFileMissing autocommands may do anything, including
+-		// destroying the buffer we are using...
+-		if (!bufref_valid(&bufref))
++		// destroying the buffer we are using or closing the window.
++		if (!bufref_valid(&bufref) || !win_valid_any_tab(wp))
+ 		{
+ 		    ret_msg = N_(e_spellfilemising_autocommand_deleted_buffer);
+ 		    goto theend;
+diff --git a/src/testdir/test_spell.vim b/src/testdir/test_spell.vim
+index 4a7a46c5b..bd387f11d 100644
+--- a/src/testdir/test_spell.vim
++++ b/src/testdir/test_spell.vim
+@@ -159,6 +159,19 @@ func Test_spell_file_missing()
+   %bwipe!
+ endfunc
+ 
++func Test_spell_file_missing_bwipe()
++  " this was using a window that was wiped out in a SpellFileMissing autocmd
++  set spelllang=xy
++  au SpellFileMissing * n0
++  set spell
++  au SpellFileMissing * bw
++  snext somefile
++
++  au! SpellFileMissing
++  bwipe!
++  set nospell spelllang=en
++endfunc
++
+ func Test_spelldump()
+   " In case the spell file is not found avoid getting the download dialog, we
+   " would get stuck at the prompt.
+diff --git a/src/version.c b/src/version.c
+index c5e78389a..a35a172ac 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -695,6 +695,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    882,
+ /**/
+     881,
+ /**/

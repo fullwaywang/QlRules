@@ -1,0 +1,33 @@
+commit 097c917c147661f5378dae8fe3f7e46f43236426
+Author: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+Date:   Thu Oct 17 11:11:55 2019 +0200
+
+    avcodec/ac3enc: Fix memleak
+    
+    Fixes ticket #8294.
+    
+    Signed-off-by: Andreas Rheinhardt <andreas.rheinhardt@gmail.com>
+
+diff --git a/libavcodec/ac3enc.c b/libavcodec/ac3enc.c
+index 76872a8fe0..25318f8631 100644
+--- a/libavcodec/ac3enc.c
++++ b/libavcodec/ac3enc.c
+@@ -2051,7 +2051,8 @@ av_cold int ff_ac3_encode_close(AVCodecContext *avctx)
+         av_freep(&block->cpl_coord_mant);
+     }
+ 
+-    s->mdct_end(s);
++    if (s->mdct_end)
++        s->mdct_end(s);
+ 
+     return 0;
+ }
+@@ -2433,7 +2434,7 @@ av_cold int ff_ac3_encode_init(AVCodecContext *avctx)
+ 
+     ret = validate_options(s);
+     if (ret)
+-        return ret;
++        goto init_fail;
+ 
+     avctx->frame_size = AC3_BLOCK_SIZE * s->num_blocks;
+     avctx->initial_padding = AC3_BLOCK_SIZE;

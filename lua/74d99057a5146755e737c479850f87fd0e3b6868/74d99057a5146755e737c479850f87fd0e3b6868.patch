@@ -1,0 +1,62 @@
+commit 74d99057a5146755e737c479850f87fd0e3b6868
+Author: Roberto Ierusalimschy <roberto@inf.puc-rio.br>
+Date:   Wed Nov 3 15:04:18 2021 -0300
+
+    Bug: C stack overflow with coroutines
+    
+    'coroutine.resume' did not increment counter of C calls when
+    continuing execution after a protected error (that is,
+    while running 'precover').
+
+diff --git a/ldo.c b/ldo.c
+index d0edc8b4..66f89036 100644
+--- a/ldo.c
++++ b/ldo.c
+@@ -759,11 +759,10 @@ static void resume (lua_State *L, void *ud) {
+   StkId firstArg = L->top - n;  /* first argument */
+   CallInfo *ci = L->ci;
+   if (L->status == LUA_OK)  /* starting a coroutine? */
+-    ccall(L, firstArg - 1, LUA_MULTRET, 1);  /* just call its body */
++    ccall(L, firstArg - 1, LUA_MULTRET, 0);  /* just call its body */
+   else {  /* resuming from previous yield */
+     lua_assert(L->status == LUA_YIELD);
+     L->status = LUA_OK;  /* mark that it is running (again) */
+-    luaE_incCstack(L);  /* control the C stack */
+     if (isLua(ci)) {  /* yielded inside a hook? */
+       L->top = firstArg;  /* discard arguments */
+       luaV_execute(L, ci);  /* just continue running Lua code */
+@@ -814,6 +813,9 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs,
+   else if (L->status != LUA_YIELD)  /* ended with errors? */
+     return resume_error(L, "cannot resume dead coroutine", nargs);
+   L->nCcalls = (from) ? getCcalls(from) : 0;
++  if (getCcalls(L) >= LUAI_MAXCCALLS)
++    return resume_error(L, "C stack overflow", nargs);
++  L->nCcalls++;
+   luai_userstateresume(L, nargs);
+   api_checknelems(L, (L->status == LUA_OK) ? nargs + 1 : nargs);
+   status = luaD_rawrunprotected(L, resume, &nargs);
+diff --git a/testes/cstack.lua b/testes/cstack.lua
+index 213d15d4..ca76c872 100644
+--- a/testes/cstack.lua
++++ b/testes/cstack.lua
+@@ -103,6 +103,20 @@ do
+ end
+ 
+ 
++do    -- bug in 5.4.2
++  print("nesting coroutines running after recoverable errors")
++  local count = 0
++  local function foo()
++    count = count + 1
++    pcall(1)   -- create an error
++    -- running now inside 'precover' ("protected recover")
++    coroutine.wrap(foo)()   -- call another coroutine
++  end
++  checkerror("C stack overflow", foo)
++  print("final count: ", count)
++end
++
++
+ if T then
+   print("testing stack recovery")
+   local N = 0      -- trace number of calls

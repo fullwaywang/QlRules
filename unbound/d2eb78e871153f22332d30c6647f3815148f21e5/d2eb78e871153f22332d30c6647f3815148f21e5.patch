@@ -1,0 +1,35 @@
+commit d2eb78e871153f22332d30c6647f3815148f21e5
+Author: W.C.A. Wijngaards <wouter@nlnetlabs.nl>
+Date:   Tue Dec 3 15:20:48 2019 +0100
+
+    - Fix Assert Causing DoS in dname_pkt_copy(),
+      reported by X41 D-Sec.
+
+diff --git a/doc/Changelog b/doc/Changelog
+index 67f89849..16b6d53c 100644
+--- a/doc/Changelog
++++ b/doc/Changelog
+@@ -6,6 +6,8 @@
+ 	- Fix Assert Causing DoS in synth_cname(),
+ 	  reported by X41 D-Sec.
+ 	- Fix similar code in auth_zone synth cname to add the extra checks.
++	- Fix Assert Causing DoS in dname_pkt_copy(),
++	  reported by X41 D-Sec.
+ 
+ 2 December 2019: Wouter
+ 	- Merge pull request #122 from he32: In tcp_callback_writer(),
+diff --git a/util/data/dname.c b/util/data/dname.c
+index 71e14180..0cca0a4e 100644
+--- a/util/data/dname.c
++++ b/util/data/dname.c
+@@ -339,6 +339,10 @@ void dname_pkt_copy(sldns_buffer* pkt, uint8_t* to, uint8_t* dname)
+ 			lablen = *dname++;
+ 			continue;
+ 		}
++		if(lablen > LDNS_MAX_LABELLEN) {
++			*to = 0; /* end the result prematurely */
++			return;
++		}
+ 		log_assert(lablen <= LDNS_MAX_LABELLEN);
+ 		len += (size_t)lablen+1;
+ 		if(len >= LDNS_MAX_DOMAINLEN) {

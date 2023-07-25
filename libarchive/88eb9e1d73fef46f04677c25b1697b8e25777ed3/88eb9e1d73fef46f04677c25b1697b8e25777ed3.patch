@@ -1,0 +1,29 @@
+commit 88eb9e1d73fef46f04677c25b1697b8e25777ed3
+Author: Joerg Sonnenberger <joerg@bec.de>
+Date:   Thu Dec 1 19:56:43 2016 +0100
+
+    Reread the CAB header skipping the self-extracting binary code.
+    
+    Fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=15 as found
+    by the "OSS-Fuzz" project.
+
+diff --git a/libarchive/archive_read_support_format_cab.c b/libarchive/archive_read_support_format_cab.c
+index fc70684a..099f4a83 100644
+--- a/libarchive/archive_read_support_format_cab.c
++++ b/libarchive/archive_read_support_format_cab.c
+@@ -645,12 +645,13 @@ cab_read_header(struct archive_read *a)
+ 	cab = (struct cab *)(a->format->data);
+ 	if (cab->found_header == 0 &&
+ 	    p[0] == 'M' && p[1] == 'Z') {
+-		/* This is an executable?  Must be self-extracting... 	*/
++		/* This is an executable?  Must be self-extracting... */
+ 		err = cab_skip_sfx(a);
+ 		if (err < ARCHIVE_WARN)
+ 			return (err);
+ 
+-		if ((p = __archive_read_ahead(a, sizeof(*p), NULL)) == NULL)
++		/* Re-read header after processing the SFX. */
++		if ((p = __archive_read_ahead(a, 42, NULL)) == NULL)
+ 			return (truncated_error(a));
+ 	}
+ 

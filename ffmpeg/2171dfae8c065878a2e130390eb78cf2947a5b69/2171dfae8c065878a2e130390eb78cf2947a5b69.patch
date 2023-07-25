@@ -1,0 +1,25 @@
+commit 2171dfae8c065878a2e130390eb78cf2947a5b69
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat May 13 15:39:32 2017 +0200
+
+    avcodec/scpr: Fix multiple runtime error: index 256 out of bounds for type 'unsigned int [256]'
+    
+    Fixes: 1519/clusterfuzz-testcase-minimized-5286680976162816
+    
+    Found-by: continuous fuzzing process https://github.com/google/oss-fuzz/tree/master/targets/ffmpeg
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/scpr.c b/libavcodec/scpr.c
+index b87c047ab6..46f072c757 100644
+--- a/libavcodec/scpr.c
++++ b/libavcodec/scpr.c
+@@ -261,6 +261,9 @@ static int decode_unit(SCPRContext *s, PixelModel *pixel, unsigned step, unsigne
+             break;
+         c++;
+     }
++    if (x >= 16 || c >= 256) {
++        return AVERROR_INVALIDDATA;
++    }
+ 
+     if ((ret = s->decode(gb, rc, cumfr, cnt_c, totfr)) < 0)
+         return ret;

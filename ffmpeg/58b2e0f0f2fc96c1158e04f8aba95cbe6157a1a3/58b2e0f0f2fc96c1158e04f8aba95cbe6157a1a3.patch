@@ -1,0 +1,32 @@
+commit 58b2e0f0f2fc96c1158e04f8aba95cbe6157a1a3	58b2e0f0f2fc96c1158e04f8aba95cbe6157a1a3
+Author: Mans Rullgard <mans@mansr.com>
+Date:   Mon Apr 23 13:16:33 2012 +0100
+
+    vqavideo: return error if image size is not a multiple of block size
+    
+    The decoder assumes in various places that the image size
+    is a multiple of the block size, and there is no obvious
+    way to support odd sizes.  Bailing out early if the header
+    specifies a bad size avoids various errors later on.
+    
+    Fixes CVE-2012-0947.
+    
+    Signed-off-by: Mans Rullgard <mans@mansr.com>
+
+diff --git a/libavcodec/vqavideo.c b/libavcodec/vqavideo.c
+index 9cca3e743d..dc58b60004 100644
+--- a/libavcodec/vqavideo.c
++++ b/libavcodec/vqavideo.c
+@@ -151,6 +151,12 @@ static av_cold int vqa_decode_init(AVCodecContext *avctx)
+         return -1;
+     }
+ 
++    if (s->width  & (s->vector_width  - 1) ||
++        s->height & (s->vector_height - 1)) {
++        av_log(avctx, AV_LOG_ERROR, "Image size not multiple of block size\n");
++        return AVERROR_INVALIDDATA;
++    }
++
+     /* allocate codebooks */
+     s->codebook_size = MAX_CODEBOOK_SIZE;
+     s->codebook = av_malloc(s->codebook_size);

@@ -1,0 +1,46 @@
+commit 1c66174ec7aa19e2ddc79178cf59f15a654fc4fe
+Author: Martin Kaiser <wireshark@kaiser.cx>
+Date:   Sat Mar 3 19:49:22 2018 +0100
+
+    enip: use wmem for copied addresses
+    
+    When we copy an address from pinfo into connInfo->O2T.ipaddress, a
+    shallow copy is not sufficient. connInfo->O2T.ipaddress is kept across
+    packets whereas pinfo is valid only for the current packet.
+    
+    Use wmem with file scope for the copied address. This fixes a
+    use-after-free error when we access the address in a subsequent packet.
+    
+    Bug: 14470
+    Change-Id: I8b74037020189485485a506af6510cb45828e3c4
+    Reviewed-on: https://code.wireshark.org/review/26248
+    Reviewed-by: Martin Kaiser <wireshark@kaiser.cx>
+    Petri-Dish: Martin Kaiser <wireshark@kaiser.cx>
+    Tested-by: Petri Dish Buildbot
+    Reviewed-by: Anders Broman <a.broman58@gmail.com>
+    (cherry picked from commit 177962a5b4a05759b40fb6fc07a4a6eec306a9bf)
+    Reviewed-on: https://code.wireshark.org/review/30941
+    Petri-Dish: Pascal Quantin <pascal.quantin@gmail.com>
+    Reviewed-by: Pascal Quantin <pascal.quantin@gmail.com>
+
+diff --git a/epan/dissectors/packet-enip.c b/epan/dissectors/packet-enip.c
+index 61455d2969..95f21c4e7d 100644
+--- a/epan/dissectors/packet-enip.c
++++ b/epan/dissectors/packet-enip.c
+@@ -1085,14 +1085,14 @@ enip_open_cip_connection( packet_info *pinfo, cip_conn_info_t* connInfo)
+              ((connInfo->O2T.ipaddress.type == AT_IPv4) && ((*(const guint32*)connInfo->O2T.ipaddress.data)) == 0) ||
+              ((connInfo->O2T.ipaddress.type == AT_IPv6) && (memcmp(connInfo->O2T.ipaddress.data, &ipv6_zero, sizeof(ipv6_zero)) == 0)) ||
+              (connInfo->O2T.type != CONN_TYPE_MULTICAST))
+-            copy_address_shallow(&connInfo->O2T.ipaddress, &pinfo->src);
++            copy_address_wmem(wmem_file_scope(), &connInfo->O2T.ipaddress, &pinfo->src);
+          if ((connInfo->T2O.port == 0) || (connInfo->T2O.type == CONN_TYPE_MULTICAST))
+             connInfo->T2O.port = ENIP_IO_PORT;
+          if ((connInfo->T2O.ipaddress.type == AT_NONE) ||
+              ((connInfo->T2O.ipaddress.type == AT_IPv4) && ((*(const guint32*)connInfo->T2O.ipaddress.data)) == 0) ||
+              ((connInfo->T2O.ipaddress.type == AT_IPv6) && (memcmp(connInfo->T2O.ipaddress.data, &ipv6_zero, sizeof(ipv6_zero)) == 0)) ||
+              (connInfo->T2O.type != CONN_TYPE_MULTICAST))
+-            copy_address_shallow(&connInfo->T2O.ipaddress, &pinfo->dst);
++            copy_address_wmem(wmem_file_scope(), &connInfo->T2O.ipaddress, &pinfo->dst);
+ 
+          if (connInfo->O2T.ipaddress.type == AT_IPv6)
+          {

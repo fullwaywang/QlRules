@@ -1,0 +1,71 @@
+commit 69082916c8b5d321545d60b9f5facad0a2dd5a4e
+Author: Bram Moolenaar <Bram@vim.org>
+Date:   Thu Sep 22 21:35:19 2022 +0100
+
+    patch 9.0.0552: crash when using NUL in buffer that uses :source
+    
+    Problem:    Crash when using NUL in buffer that uses :source.
+    Solution:   Don't get a next line when skipping over NL.
+
+diff --git a/src/eval.c b/src/eval.c
+index 1f439701e..77f0d7fb3 100644
+--- a/src/eval.c
++++ b/src/eval.c
+@@ -253,7 +253,7 @@ eval_expr_typval(typval_T *expr, typval_T *argv, int argc, typval_T *rettv)
+ 	    if (fc == NULL)
+ 		return FAIL;
+ 
+-	    // Shortcut to call a compiled function without overhead.
++	    // Shortcut to call a compiled function with minimal overhead.
+ 	    r = call_def_function(partial->pt_func, argc, argv,
+ 					  DEF_USE_PT_ARGV, partial, fc, rettv);
+ 	    remove_funccal();
+@@ -2291,7 +2291,7 @@ eval_next_non_blank(char_u *arg, evalarg_T *evalarg, int *getnext)
+ 
+ 	if (next != NULL)
+ 	{
+-	    *getnext = TRUE;
++	    *getnext = *p != NL;
+ 	    return skipwhite(next);
+ 	}
+     }
+diff --git a/src/testdir/test_source.vim b/src/testdir/test_source.vim
+index 44cd2fdc7..2becf0817 100644
+--- a/src/testdir/test_source.vim
++++ b/src/testdir/test_source.vim
+@@ -665,5 +665,22 @@ func Test_source_buffer_long_line()
+   call delete('Xtest.vim')
+ endfunc
+ 
++func Test_source_buffer_with_NUL_char()
++  " This was trying to use a line below the buffer.
++  let lines =<< trim END
++      if !exists('g:loaded')
++        let g:loaded = 1
++        source
++      endif
++  END
++  " Can't have a NL in heredoc
++  let lines += ["silent! vim9 echo [0 \<NL> ? 'a' : 'b']"]
++  call writefile(lines, 'XsourceNul', '')
++  edit XsourceNul
++  source
++
++  bwipe!
++endfunc
++
+ 
+ " vim: shiftwidth=2 sts=2 expandtab
+diff --git a/src/version.c b/src/version.c
+index c3b6c1290..505185da5 100644
+--- a/src/version.c
++++ b/src/version.c
+@@ -699,6 +699,8 @@ static char *(features[]) =
+ 
+ static int included_patches[] =
+ {   /* Add new patch number below this line */
++/**/
++    552,
+ /**/
+     551,
+ /**/

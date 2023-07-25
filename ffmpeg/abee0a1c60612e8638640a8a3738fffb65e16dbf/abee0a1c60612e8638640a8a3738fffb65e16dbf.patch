@@ -1,0 +1,28 @@
+commit abee0a1c60612e8638640a8a3738fffb65e16dbf
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sat Nov 28 20:08:46 2015 +0100
+
+    avcodec/utils: Clear dimensions in ff_get_buffer() on failure
+    
+    Fixes out of array access
+    Fixes: 482d8f2fd17c9f532b586458a33f267c/asan_heap-oob_4a52b6_7417_1d08d477736d66cdadd833d146bb8bae.mov
+    
+    Found-by: Mateusz "j00ru" Jurczyk and Gynvael Coldwind
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavcodec/utils.c b/libavcodec/utils.c
+index e018e445f4..d00dfae4ac 100644
+--- a/libavcodec/utils.c
++++ b/libavcodec/utils.c
+@@ -888,8 +888,10 @@ end:
+ int ff_get_buffer(AVCodecContext *avctx, AVFrame *frame, int flags)
+ {
+     int ret = get_buffer_internal(avctx, frame, flags);
+-    if (ret < 0)
++    if (ret < 0) {
+         av_log(avctx, AV_LOG_ERROR, "get_buffer() failed\n");
++        frame->width = frame->height = 0;
++    }
+     return ret;
+ }
+ 

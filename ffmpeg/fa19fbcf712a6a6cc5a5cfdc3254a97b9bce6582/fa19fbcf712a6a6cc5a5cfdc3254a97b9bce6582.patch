@@ -1,0 +1,28 @@
+commit fa19fbcf712a6a6cc5a5cfdc3254a97b9bce6582
+Author: Michael Niedermayer <michael@niedermayer.cc>
+Date:   Sun Jul 8 00:16:42 2018 +0200
+
+    avformat/movenc: Write version 2 of audio atom if channels is not known
+    
+    The version 1 needs the channel count and would divide by 0
+    Fixes: division by 0
+    Fixes: fpe_movenc.c_1108_1.ogg
+    Fixes: fpe_movenc.c_1108_2.ogg
+    Fixes: fpe_movenc.c_1108_3.wav
+    
+    Found-by: #CHEN HONGXU# <HCHEN017@e.ntu.edu.sg>
+    Signed-off-by: Michael Niedermayer <michael@niedermayer.cc>
+
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index 78291a9adc..804deef10a 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -1022,7 +1022,7 @@ static int mov_write_audio_tag(AVFormatContext *s, AVIOContext *pb, MOVMuxContex
+     uint32_t tag = track->tag;
+ 
+     if (track->mode == MODE_MOV) {
+-        if (track->timescale > UINT16_MAX) {
++        if (track->timescale > UINT16_MAX || !track->par->channels) {
+             if (mov_get_lpcm_flags(track->par->codec_id))
+                 tag = AV_RL32("lpcm");
+             version = 2;

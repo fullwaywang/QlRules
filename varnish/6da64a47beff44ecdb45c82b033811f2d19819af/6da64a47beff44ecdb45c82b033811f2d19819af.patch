@@ -1,0 +1,34 @@
+commit 6da64a47beff44ecdb45c82b033811f2d19819af
+Author: Martin Blix Grydeland <martin@varnish-software.com>
+Date:   Fri Aug 23 13:53:42 2019 +0200
+
+    Avoid some code duplication
+    
+    Apply some adjustments to recent patches based off of review by Nils
+    Goroll at UPLEX (@nigoroll)
+
+diff --git a/bin/varnishd/http1/cache_http1_proto.c b/bin/varnishd/http1/cache_http1_proto.c
+index 61563b8ea..31c75ed88 100644
+--- a/bin/varnishd/http1/cache_http1_proto.c
++++ b/bin/varnishd/http1/cache_http1_proto.c
+@@ -128,15 +128,16 @@ http1_dissect_hdrs(struct http *hp, char *p, struct http_conn *htc,
+ 				r++;
+ 				continue;
+ 			}
+-			if (!vct_iscrlf(r, htc->rxbuf_e)) {
++			i = vct_iscrlf(r, htc->rxbuf_e);
++			if (i == 0) {
+ 				VSLb(hp->vsl, SLT_BogoHeader,
+ 				    "Header has ctrl char 0x%02x", *r);
+ 				return (400);
+ 			}
+ 			q = r;
+-			assert(r < htc->rxbuf_e);
+-			r = vct_skipcrlf(r, htc->rxbuf_e);
+-			if (r >= htc->rxbuf_e)
++			r += i;
++			assert(r <= htc->rxbuf_e);
++			if (r == htc->rxbuf_e)
+ 				break;
+ 			if (vct_iscrlf(r, htc->rxbuf_e))
+ 				break;

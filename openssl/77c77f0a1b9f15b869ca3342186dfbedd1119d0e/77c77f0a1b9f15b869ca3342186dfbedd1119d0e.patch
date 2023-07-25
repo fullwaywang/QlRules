@@ -1,0 +1,33 @@
+commit 77c77f0a1b9f15b869ca3342186dfbedd1119d0e
+Author: Matt Caswell <matt@openssl.org>
+Date:   Mon Mar 2 09:27:10 2015 +0000
+
+    Multiblock corrupted pointer fix
+    
+    OpenSSL 1.0.2 introduced the "multiblock" performance improvement. This
+    feature only applies on 64 bit x86 architecture platforms that support AES
+    NI instructions. A defect in the implementation of "multiblock" can cause
+    OpenSSL's internal write buffer to become incorrectly set to NULL when
+    using non-blocking IO. Typically, when the user application is using a
+    socket BIO for writing, this will only result in a failed connection.
+    However if some other BIO is used then it is likely that a segmentation
+    fault will be triggered, thus enabling a potential DoS attack.
+    
+    CVE-2015-0290
+    
+    Reviewed-by: Richard Levitte <levitte@openssl.org>
+    Reviewed-by: Andy Polyakov <appro@openssl.org>
+
+diff --git a/ssl/s3_pkt.c b/ssl/s3_pkt.c
+index 4e6a41bd58..221ae039e9 100644
+--- a/ssl/s3_pkt.c
++++ b/ssl/s3_pkt.c
+@@ -785,7 +785,7 @@ int ssl3_write_bytes(SSL *s, int type, const void *buf_, int len)
+ 
+             i = ssl3_write_pending(s, type, &buf[tot], nw);
+             if (i <= 0) {
+-                if (i < 0) {
++                if (i < 0 && (!s->wbio || !BIO_should_retry(s->wbio))) {
+                     OPENSSL_free(wb->buf);
+                     wb->buf = NULL;
+                 }

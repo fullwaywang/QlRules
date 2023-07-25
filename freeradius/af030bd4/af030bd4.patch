@@ -1,0 +1,112 @@
+commit af030bd4e19c9149e2ffd898ad0c4dfde78c29be
+Author: Alan T. DeKok <aland@freeradius.org>
+Date:   Mon May 8 16:38:56 2017 -0400
+
+    disable internal OpenSSL cache
+
+diff --git a/raddb/mods-available/eap b/raddb/mods-available/eap
+index 427016c66d..04698ceb7e 100644
+--- a/raddb/mods-available/eap
++++ b/raddb/mods-available/eap
+@@ -382,6 +382,12 @@ eap {
+ 			#  Enable it.  The default is "no". Deleting the entire "cache"
+ 			#  subsection also disables caching.
+ 			#
++			#  As of version 3.0.14, the session cache requires the use
++			#  of the "name" and "persist_dir" configuration items, below.
++			#
++			#  The internal OpenSSL session cache has been permanently
++			#  disabled.
++			#
+ 			#  You can disallow resumption for a particular user by adding the
+ 			#  following attribute to the control item list:
+ 			#
+@@ -390,7 +396,7 @@ eap {
+ 			#  If "enable = no" below, you CANNOT enable resumption for just one
+ 			#  user by setting the above attribute to "yes".
+ 			#
+-			enable = yes
++			enable = no
+ 
+ 			#
+ 			#  Lifetime of the cached entries, in hours. The sessions will be
+@@ -398,15 +404,6 @@ eap {
+ 			#
+ 			lifetime = 24 # hours
+ 
+-			#
+-			#  The maximum number of entries in the
+-			#  cache.  Set to "0" for "infinite".
+-			#
+-			#  This could be set to the number of users
+-			#  who are logged in... which can be a LOT.
+-			#
+-			max_entries = 255
+-
+ 			#
+ 			#  Internal "name" of the session cache. Used to
+ 			#  distinguish which TLS context sessions belong to.
+diff --git a/raddb/sites-available/abfab-tls b/raddb/sites-available/abfab-tls
+index 79d74e6fcb..5dbe143da6 100644
+--- a/raddb/sites-available/abfab-tls
++++ b/raddb/sites-available/abfab-tls
+@@ -24,7 +24,8 @@ listen {
+ 		cache {
+ 			enable = no
+ 			lifetime = 24 # hours
+-			max_entries = 255
++			name = "abfab-tls"
++#			persist_dir = ${logdir}/abfab-tls
+ 		}
+ 
+ 		require_client_cert = yes
+diff --git a/raddb/sites-available/tls b/raddb/sites-available/tls
+index c9555e1c7c..cf1cd7a8ad 100644
+--- a/raddb/sites-available/tls
++++ b/raddb/sites-available/tls
+@@ -239,6 +239,13 @@ listen {
+ 		      #  Deleting the entire "cache" subsection
+ 		      #  Also disables caching.
+ 		      #
++			#
++			#  As of version 3.0.14, the session cache requires the use
++			#  of the "name" and "persist_dir" configuration items, below.
++			#
++			#  The internal OpenSSL session cache has been permanently
++			#  disabled.
++			#
+ 		      #  You can disallow resumption for a
+ 		      #  particular user by adding the following
+ 		      #  attribute to the control item list:
+@@ -258,15 +265,6 @@ listen {
+ 		      #
+ 		      lifetime = 24 # hours
+ 
+-		      #
+-		      #  The maximum number of entries in the
+-		      #  cache.  Set to "0" for "infinite".
+-		      #
+-		      #  This could be set to the number of users
+-		      #  who are logged in... which can be a LOT.
+-		      #
+-		      max_entries = 255
+-
+ 		      #
+ 		      #  Internal "name" of the session cache.
+ 		      #  Used to distinguish which TLS context
+diff --git a/src/main/tls.c b/src/main/tls.c
+index 5f04d289bc..845d3bc3f9 100644
+--- a/src/main/tls.c
++++ b/src/main/tls.c
+@@ -3056,9 +3056,9 @@ post_ca:
+ 		}
+ 
+ 		/*
+-		 *	Cache it, and DON'T auto-clear it.
++		 *	Cache it, DON'T auto-clear it, and disable the internal OpenSSL session cache.
+ 		 */
+-		SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | SSL_SESS_CACHE_NO_AUTO_CLEAR);
++		SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER | SSL_SESS_CACHE_NO_AUTO_CLEAR | SSL_SESS_CACHE_NO_INTERNAL);
+ 
+ 		SSL_CTX_set_session_id_context(ctx,
+ 					       (unsigned char *) conf->session_context_id,

@@ -1,0 +1,21 @@
+commit 93b8ac558752d09e1c56d4f1bc82631316fa9c82
+Author: JerikoOne <jeriko.one@gmx.us>
+Date:   Sat Jul 7 15:55:34 2018 -0500
+
+    Ensure UID in fetch_uidl
+
+diff --git a/pop.c b/pop.c
+index 4f3a592a8..c52585abe 100644
+--- a/pop.c
++++ b/pop.c
+@@ -202,6 +202,10 @@ static int fetch_uidl(char *line, void *data)
+     endp++;
+   memmove(line, endp, strlen(endp) + 1);
+ 
++  /* uid must be at least be 1 byte */
++  if (strlen(line) == 0)
++    return -1;
++
+   for (i = 0; i < ctx->msgcount; i++)
+     if (mutt_str_strcmp(line, ctx->hdrs[i]->data) == 0)
+       break;

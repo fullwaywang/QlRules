@@ -1,0 +1,18 @@
+commit 33a0025d1d63ccd05d9dbaa6923d52b1446a62fe
+Author: David Bryant <david@wavpack.com>
+Date:   Tue Mar 5 21:21:48 2019 -0800
+
+    issue #68: clear WaveHeader at start to prevent uninitialized read
+
+diff --git a/cli/wave64.c b/cli/wave64.c
+index 7beffe6..59548b1 100644
+--- a/cli/wave64.c
++++ b/cli/wave64.c
+@@ -56,6 +56,7 @@ int ParseWave64HeaderConfig (FILE *infile, char *infilename, char *fourcc, Wavpa
+     int format_chunk = 0;
+     uint32_t bcount;
+ 
++    CLEAR (WaveHeader);
+     infilesize = DoGetFileSize (infile);
+     memcpy (&filehdr, fourcc, 4);
+ 

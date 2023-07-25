@@ -1,0 +1,24 @@
+commit 7114fb71b54ddfe06ce5dfdab013f4c38f129d14
+Author: Jakub Jelen <jjelen@redhat.com>
+Date:   Wed Mar 24 10:57:27 2021 +0100
+
+    coolkey: Initialize potentially uninitialized memory
+    
+    Thanks oss-fuzz
+    
+    https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=28855
+
+diff --git a/src/libopensc/pkcs15-coolkey.c b/src/libopensc/pkcs15-coolkey.c
+index 373ec7a5..586475dd 100644
+--- a/src/libopensc/pkcs15-coolkey.c
++++ b/src/libopensc/pkcs15-coolkey.c
+@@ -425,7 +425,8 @@ coolkey_get_public_key_from_certificate(sc_pkcs15_card_t *p15card, sc_cardctl_co
+ 	sc_pkcs15_pubkey_t *key = NULL;
+ 	int r;
+ 
+-	cert_info.value.value = NULL;
++	memset(&cert_info, 0, sizeof(cert_info));
++
+ 	r = coolkey_get_certificate(p15card->card, obj, &cert_info.value);
+ 	if (r < 0) {
+ 		goto fail;

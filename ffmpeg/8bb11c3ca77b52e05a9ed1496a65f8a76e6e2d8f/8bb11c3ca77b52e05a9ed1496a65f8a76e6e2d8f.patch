@@ -1,0 +1,28 @@
+commit 8bb11c3ca77b52e05a9ed1496a65f8a76e6e2d8f	8bb11c3ca77b52e05a9ed1496a65f8a76e6e2d8f
+Author: Michael Niedermayer <michaelni@gmx.at>
+Date:   Wed Aug 21 04:40:50 2013 +0200
+
+    avcodec/jpeg2000dec: Check cdx/y values more carefully
+    
+    Some invalid values where not handled correctly in the later pixel
+    format matching code.
+    Fixes out of array accesses
+    Fixes Ticket2848
+    
+    Found-by: Piotr Bandurski <ami_stuff@o2.pl>
+    Signed-off-by: Michael Niedermayer <michaelni@gmx.at>
+
+diff --git a/libavcodec/jpeg2000dec.c b/libavcodec/jpeg2000dec.c
+index 3c14a13f8e..34ac536056 100644
+--- a/libavcodec/jpeg2000dec.c
++++ b/libavcodec/jpeg2000dec.c
+@@ -273,7 +273,8 @@ static int get_siz(Jpeg2000DecoderContext *s)
+         s->sgnd[i]   = !!(x & 0x80);
+         s->cdx[i]    = bytestream2_get_byteu(&s->g);
+         s->cdy[i]    = bytestream2_get_byteu(&s->g);
+-        if (!s->cdx[i] || !s->cdy[i]) {
++        if (   !s->cdx[i] || s->cdx[i] == 3 || s->cdx[i] > 4
++            || !s->cdy[i] || s->cdy[i] == 3 || s->cdy[i] > 4) {
+             av_log(s->avctx, AV_LOG_ERROR, "Invalid sample seperation\n");
+             return AVERROR_INVALIDDATA;
+         }

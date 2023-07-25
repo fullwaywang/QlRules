@@ -1,0 +1,19 @@
+commit bef1e4f637d8f665bc133a9c6d30df08d983bc3a
+Author: Cristy <urban-warrior@imagemagick.org>
+Date:   Fri Feb 5 21:20:42 2016 -0500
+
+    https://github.com/ImageMagick/ImageMagick/issues/120
+
+diff --git a/coders/wpg.c b/coders/wpg.c
+index 964530533..b01dcf9cc 100644
+--- a/coders/wpg.c
++++ b/coders/wpg.c
+@@ -1331,7 +1331,7 @@ static Image *ReadWPGImage(const ImageInfo *image_info,
+                   {
+                     ldblk=(ssize_t) ((bpp*image->columns+7)/8);
+                     BImgBuff=(unsigned char *) AcquireQuantumMemory((size_t)
+-                      ldblk,sizeof(*BImgBuff));
++                      ldblk+1,sizeof(*BImgBuff));
+                     if (BImgBuff == (unsigned char *) NULL)
+                       goto NoMemory;
+ 

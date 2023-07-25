@@ -1,0 +1,54 @@
+commit 30c9234c7fd0dd5e8b1e83ad44370c875a0270ed	30c9234c7fd0dd5e8b1e83ad44370c875a0270ed
+Author: erouault <erouault>
+Date:   Fri Nov 11 20:22:01 2016 +0000
+
+    * libtiff/tif_dirread.c: in TIFFFetchNormalTag(), make sure that
+    values of tags with TIFF_SETGET_C16_ASCII / TIFF_SETGET_C32_ASCII
+    access are null terminated, to avoid potential read outside buffer
+    in _TIFFPrintField().
+    Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2590
+
+diff --git a/ChangeLog b/ChangeLog
+index 079068e0..d4b8e673 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,11 @@
++2016-11-11 Even Rouault <even.rouault at spatialys.com>
++
++	* libtiff/tif_dirread.c: in TIFFFetchNormalTag(), make sure that
++	values of tags with TIFF_SETGET_C16_ASCII / TIFF_SETGET_C32_ASCII
++	access are null terminated, to avoid potential read outside buffer
++	in _TIFFPrintField().
++	Fixes http://bugzilla.maptools.org/show_bug.cgi?id=2590
++
+ 2016-11-11 Even Rouault <even.rouault at spatialys.com>
+ 
+ 	* libtiff/tif_dirread.c: reject images with OJPEG compression that
+diff --git a/libtiff/tif_dirread.c b/libtiff/tif_dirread.c
+index c1474229..068ed4ef 100644
+--- a/libtiff/tif_dirread.c
++++ b/libtiff/tif_dirread.c
+@@ -5000,6 +5000,11 @@ TIFFFetchNormalTag(TIFF* tif, TIFFDirEntry* dp, int recover)
+ 					if (err==TIFFReadDirEntryErrOk)
+ 					{
+ 						int m;
++                        if( data[dp->tdir_count-1] != '\0' )
++                        {
++                            TIFFWarningExt(tif->tif_clientdata,module,"ASCII value for tag \"%s\" does not end in null byte. Forcing it to be null",fip->field_name);
++                            data[dp->tdir_count-1] = '\0';
++                        }
+ 						m=TIFFSetField(tif,dp->tdir_tag,(uint16)(dp->tdir_count),data);
+ 						if (data!=0)
+ 							_TIFFfree(data);
+@@ -5172,6 +5177,11 @@ TIFFFetchNormalTag(TIFF* tif, TIFFDirEntry* dp, int recover)
+ 				if (err==TIFFReadDirEntryErrOk)
+ 				{
+ 					int m;
++                    if( data[dp->tdir_count-1] != '\0' )
++                    {
++                        TIFFWarningExt(tif->tif_clientdata,module,"ASCII value for tag \"%s\" does not end in null byte. Forcing it to be null",fip->field_name);
++                        data[dp->tdir_count-1] = '\0';
++                    }
+ 					m=TIFFSetField(tif,dp->tdir_tag,(uint32)(dp->tdir_count),data);
+ 					if (data!=0)
+ 						_TIFFfree(data);

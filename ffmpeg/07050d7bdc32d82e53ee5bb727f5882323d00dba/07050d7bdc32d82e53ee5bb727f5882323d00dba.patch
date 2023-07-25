@@ -1,0 +1,23 @@
+commit 07050d7bdc32d82e53ee5bb727f5882323d00dba
+Author: Paul B Mahol <onemda@gmail.com>
+Date:   Sun Oct 13 23:10:16 2019 +0200
+
+    avfilter/vf_fieldorder: fix heap-buffer overflow
+    
+    Fixes #8264
+
+diff --git a/libavfilter/vf_fieldorder.c b/libavfilter/vf_fieldorder.c
+index ca55ff1f66..5707151f1b 100644
+--- a/libavfilter/vf_fieldorder.c
++++ b/libavfilter/vf_fieldorder.c
+@@ -108,8 +108,8 @@ static int filter_frame(AVFilterLink *inlink, AVFrame *frame)
+             s->dst_tff ? "up" : "down");
+     h = frame->height;
+     for (plane = 0; plane < 4 && frame->data[plane] && frame->linesize[plane]; plane++) {
+-        dst_line_step = out->linesize[plane];
+-        src_line_step = frame->linesize[plane];
++        dst_line_step = out->linesize[plane] * (h > 2);
++        src_line_step = frame->linesize[plane] * (h > 2);
+         line_size = s->line_size[plane];
+         dst = out->data[plane];
+         src = frame->data[plane];

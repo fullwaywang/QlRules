@@ -1,0 +1,59 @@
+commit c805c1de1141cb22f74c0d94dd5664bda37398e0
+Author: Marcelo Roberto Jimenez <marcelo.jimenez@gmail.com>
+Date:   Thu Jun 4 12:03:03 2020 -0300
+
+    Fixes #177: NULL pointer dereference in FindServiceControlURLPath
+    
+    Also fixes its dual bug in FindServiceEventURLPath.
+
+diff --git a/ChangeLog b/ChangeLog
+index 4e3d6bf4..47a1d4ec 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -2,6 +2,12 @@
+ Version 1.12.2
+ *******************************************************************************
+ 
++2020-06-04 Patrik Lantz pjlantz(at)github
++
++        Fixes #177
++
++        NULL pointer dereference in FindServiceControlURLPath
++
+ *******************************************************************************
+ Version 1.12.1
+ *******************************************************************************
+diff --git a/upnp/src/genlib/service_table/service_table.c b/upnp/src/genlib/service_table/service_table.c
+index 3663fe0b..470863ec 100644
+--- a/upnp/src/genlib/service_table/service_table.c
++++ b/upnp/src/genlib/service_table/service_table.c
+@@ -282,9 +282,11 @@ service_info *FindServiceEventURLPath(
+ 	uri_type parsed_url;
+ 	uri_type parsed_url_in;
+ 
+-	if (table &&
+-		parse_uri(eventURLPath, strlen(eventURLPath), &parsed_url_in) ==
+-			HTTP_SUCCESS) {
++	if (!table || !eventURLPath) {
++		return NULL;
++	}
++	if (parse_uri(eventURLPath, strlen(eventURLPath), &parsed_url_in) ==
++		HTTP_SUCCESS) {
+ 		finger = table->serviceList;
+ 		while (finger) {
+ 			if (finger->eventURL) {
+@@ -327,9 +329,11 @@ service_info *FindServiceControlURLPath(
+ 	uri_type parsed_url;
+ 	uri_type parsed_url_in;
+ 
+-	if (table && parse_uri(controlURLPath,
+-			     strlen(controlURLPath),
+-			     &parsed_url_in) == HTTP_SUCCESS) {
++	if (!table || !controlURLPath) {
++		return NULL;
++	}
++	if (parse_uri(controlURLPath, strlen(controlURLPath), &parsed_url_in) ==
++		HTTP_SUCCESS) {
+ 		finger = table->serviceList;
+ 		while (finger) {
+ 			if (finger->controlURL) {

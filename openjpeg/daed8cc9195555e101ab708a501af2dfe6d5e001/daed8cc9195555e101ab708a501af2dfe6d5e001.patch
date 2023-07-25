@@ -1,0 +1,72 @@
+commit daed8cc9195555e101ab708a501af2dfe6d5e001
+Author: Matthieu Darbois <mayeut@users.noreply.github.com>
+Date:   Tue May 19 20:13:37 2015 +0000
+
+    [trunk] Add check for at most 1 COD marker per tile. 1 COD marker for MH (fixes issue 476)
+
+diff --git a/src/lib/openjp2/j2k.c b/src/lib/openjp2/j2k.c
+index f944ad1a..0be00aa6 100644
+--- a/src/lib/openjp2/j2k.c
++++ b/src/lib/openjp2/j2k.c
+@@ -2431,7 +2431,14 @@ static OPJ_BOOL opj_j2k_read_cod (  opj_j2k_t *p_j2k,
+         l_tcp = (p_j2k->m_specific_param.m_decoder.m_state == J2K_STATE_TPH) ?
+                                 &l_cp->tcps[p_j2k->m_current_tile_number] :
+                                 p_j2k->m_specific_param.m_decoder.m_default_tcp;
+-
++	
++        /* Only one COD per tile */
++        if (l_tcp->cod) {
++                opj_event_msg(p_manager, EVT_ERROR, "COD marker already read. No more than one COD marker per tile.\n");
++                return OPJ_FALSE;
++        }
++        l_tcp->cod = 1;
++	
+         /* Make sure room is sufficient */
+         if (p_header_size < 5) {
+                 opj_event_msg(p_manager, EVT_ERROR, "Error reading COD marker\n");
+@@ -7350,6 +7357,7 @@ static OPJ_BOOL opj_j2k_copy_default_tcp_and_create_tcd (       opj_j2k_t * p_j2
+                 /*Copy default coding parameters into the current tile coding parameters*/
+                 memcpy(l_tcp, l_default_tcp, sizeof(opj_tcp_t));
+                 /* Initialize some values of the current tile coding parameters*/
++                l_tcp->cod = 0;
+                 l_tcp->ppt = 0;
+                 l_tcp->ppt_data = 00;
+                 /* Reconnect the tile-compo coding parameters pointer to the current tile coding parameters*/
+diff --git a/src/lib/openjp2/j2k.h b/src/lib/openjp2/j2k.h
+index 909e3511..10e22aa6 100644
+--- a/src/lib/openjp2/j2k.h
++++ b/src/lib/openjp2/j2k.h
+@@ -293,6 +293,8 @@ typedef struct opj_tcp
+ 
+ 
+ 	/***** FLAGS *******/
++	/** If cod == 1 --> there was a COD marker for the present tile */
++	OPJ_UINT32 cod : 1;
+ 	/** If ppt == 1 --> there was a PPT marker for the present tile */
+ 	OPJ_UINT32 ppt : 1;
+ 	/** indicates if a POC marker has been used O:NO, 1:YES */
+diff --git a/tests/nonregression/CMakeLists.txt b/tests/nonregression/CMakeLists.txt
+index cd068dea..f39d7e46 100644
+--- a/tests/nonregression/CMakeLists.txt
++++ b/tests/nonregression/CMakeLists.txt
+@@ -72,6 +72,7 @@ set(BLACKLIST_JPEG2000
+     issue420.jp2 #kdu_jp2info ok
+     27ac957758a35d00d6765a0c86350d9c.SIGFPE.d25.537.jpc #kdu_jp2info crash
+     3672da2f1f67bbecad27d7181b4e9d7c.SIGFPE.d25.805.jpc #kdu_jp2info crash
++    issue476.jp2 #kdu_jp2info ok
+    )
+ 
+ file(GLOB_RECURSE OPJ_DATA_NR_LIST
+diff --git a/tests/nonregression/test_suite.ctest.in b/tests/nonregression/test_suite.ctest.in
+index 0cd5387f..e248c41a 100644
+--- a/tests/nonregression/test_suite.ctest.in
++++ b/tests/nonregression/test_suite.ctest.in
+@@ -260,6 +260,8 @@ opj_decompress -i @INPUT_NR_PATH@/issue411-ycc420.jp2 -o @TEMP_PATH@/issue411-yc
+ !opj_decompress -i @INPUT_NR_PATH@/issue427-illegal-tile-offset.jp2 -o @TEMP_PATH@/issue427-illegal-tile-offset.jp2.pgx
+ # issue 458 component precision upscaling
+ opj_decompress -i @INPUT_NR_PATH@/issue458.jp2 -o @TEMP_PATH@/issue458.jp2.pgx
++# issue 476 Multiple COD in MH
++!opj_decompress -i @INPUT_NR_PATH@/issue476.jp2 -o @TEMP_PATH@/issue476.jp2.pgx
+ 
+ 
+ # decode with specific area

@@ -1,0 +1,79 @@
+commit ac62c7e7436560cf4f7725ee586364ce95c07804
+Author: Graham Leggett <minfrin@apache.org>
+Date:   Sat Aug 21 21:35:04 2021 +0000
+
+    Backport:
+    
+       *) core: fix ap_escape_quotes substitution logic
+          trunk patch: https://svn.apache.org/r1892418
+          2.4.x patch: svn merge -c 1892418 ^/httpd/httpd/trunk .
+          +1: covener, rpluem, ylavic
+    
+    
+    git-svn-id: https://svn.apache.org/repos/asf/httpd/httpd/branches/2.4.x@1892511 13f79535-47bb-0310-9956-ffa450edef68
+
+diff --git a/CHANGES b/CHANGES
+index f410ed66c7..f33b68e78d 100644
+--- a/CHANGES
++++ b/CHANGES
+@@ -1,6 +1,8 @@
+                                                          -*- coding: utf-8 -*-
+ Changes with Apache 2.4.49
+ 
++  *) core: fix ap_escape_quotes substitution logic. [Eric Covener]
++
+   *) Easy patches: synch 2.4.x and trunk
+      - mod_auth_basic: Use ap_cstr_casecmp instead of strcasecmp.
+      - mod_ldap: log and abort locking errors.
+@@ -14,10 +16,10 @@ Changes with Apache 2.4.49
+      - core: remove extra whitespace in HTTP_NOT_IMPLEMENTED
+     [Christophe Jaillet]
+ 
+-  * core/mpm: add hook 'child_stopping` that gets called when the MPM is
+-    stopping a child process. The additional `graceful` parameter allows
+-    registered hooks to free resources early during a graceful shutdown.
+-    [Yann Ylavic, Stefan Eissing]
++  *) core/mpm: add hook 'child_stopping` that gets called when the MPM is
++     stopping a child process. The additional `graceful` parameter allows
++     registered hooks to free resources early during a graceful shutdown.
++     [Yann Ylavic, Stefan Eissing]
+ 
+   *) mod_proxy: Fix icomplete initialization of BalancerMember(s) from the
+      balancer-manager, which can lead to a crash.  [Yann Ylavic]
+diff --git a/STATUS b/STATUS
+index a7b8bae419..98d9d93a88 100644
+--- a/STATUS
++++ b/STATUS
+@@ -142,11 +142,6 @@ RELEASE SHOWSTOPPERS:
+ PATCHES ACCEPTED TO BACKPORT FROM TRUNK:
+   [ start all new proposals below, under PATCHES PROPOSED. ]
+ 
+-   *) core: fix ap_escape_quotes substitution logic
+-      trunk patch: https://svn.apache.org/r1892418
+-      2.4.x patch: svn merge -c 1892418 ^/httpd/httpd/trunk .
+-      +1: covener, rpluem, ylavic
+-
+   *) Add dav_get_provider(), dav_open_lockdb(), dav_close_lockdb() and
+      dav_get_resource() to mod_dav.h.
+      trunk patch: http://svn.apache.org/r1879305
+diff --git a/server/util.c b/server/util.c
+index 62515facbe..2a7fdda8e9 100644
+--- a/server/util.c
++++ b/server/util.c
+@@ -2542,13 +2542,12 @@ AP_DECLARE(char *) ap_escape_quotes(apr_pool_t *p, const char *instring)
+      * in front of every " that doesn't already have one.
+      */
+     while (*inchr != '\0') {
+-        while ((*inchr == '\\') && (inchr[1] != '\0')) {
+-            *outchr++ = *inchr++;
+-            *outchr++ = *inchr++;
+-        }
+         if (*inchr == '"') {
+             *outchr++ = '\\';
+         }
++        if ((*inchr == '\\') && (inchr[1] != '\0')) {
++            *outchr++ = *inchr++;
++        }
+         if (*inchr != '\0') {
+             *outchr++ = *inchr++;
+         }

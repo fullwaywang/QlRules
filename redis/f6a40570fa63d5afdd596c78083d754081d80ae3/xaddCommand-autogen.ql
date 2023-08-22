@@ -1,7 +1,7 @@
 /**
  * @name redis-f6a40570fa63d5afdd596c78083d754081d80ae3-xaddCommand
  * @id cpp/redis/f6a40570fa63d5afdd596c78083d754081d80ae3/xaddCommand
- * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-xaddCommand CVE-2021-32627 CVE-2021-32628
+ * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-src/t_stream.c-xaddCommand CVE-2021-32627
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -17,6 +17,7 @@ predicate func_0(Parameter vc_1195, EqualityOperation target_2, DivExpr target_3
 		and target_0.getElse().(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("addReplyError")
 		and target_0.getElse().(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vc_1195
 		and target_0.getElse().(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="Elements are too large to be stored"
+		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(0)=target_0
 		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_2
 		and target_3.getLeftOperand().(SubExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_0.getElse().(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_0.getElse().(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_1.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
@@ -60,5 +61,5 @@ and func_1(vc_1195, target_2, target_1)
 and func_2(vc_1195, target_2)
 and func_3(vc_1195, target_3)
 and vc_1195.getType().hasName("client *")
-and vc_1195.getParentScope+() = func
+and vc_1195.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

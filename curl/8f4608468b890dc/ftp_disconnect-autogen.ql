@@ -62,6 +62,6 @@ and func_3(vftpc_4071, vCurl_cfree, target_3)
 and func_4(vftpc_4071, vCurl_cfree, target_4)
 and vftpc_4071.getType().hasName("ftp_conn *")
 and vCurl_cfree.getType().hasName("curl_free_callback")
-and vftpc_4071.getParentScope+() = func
+and vftpc_4071.(LocalVariable).getFunction() = func
 and not vCurl_cfree.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

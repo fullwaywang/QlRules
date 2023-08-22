@@ -1,7 +1,7 @@
 /**
  * @name redis-48e0d4788434833b47892fe9f3d91be7687f25c9-msetGenericCommand
  * @id cpp/redis/48e0d4788434833b47892fe9f3d91be7687f25c9/msetGenericCommand
- * @description redis-48e0d4788434833b47892fe9f3d91be7687f25c9-msetGenericCommand CVE-2023-28425
+ * @description redis-48e0d4788434833b47892fe9f3d91be7687f25c9-src/t_string.c-msetGenericCommand CVE-2023-28425
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -57,7 +57,7 @@ and func_3(vj_561, vsetkey_flags_562, vc_560, target_3)
 and vj_561.getType().hasName("int")
 and vsetkey_flags_562.getType().hasName("int")
 and vc_560.getType().hasName("client *")
-and vj_561.getParentScope+() = func
-and vsetkey_flags_562.getParentScope+() = func
-and vc_560.getParentScope+() = func
+and vj_561.(LocalVariable).getFunction() = func
+and vsetkey_flags_562.(LocalVariable).getFunction() = func
+and vc_560.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

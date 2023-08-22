@@ -1,7 +1,7 @@
 /**
  * @name redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-appendCommand
  * @id cpp/redis/6c25c6b7da116e110e89a5db45eeae743879e7ea/appendCommand
- * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-appendCommand CVE-2022-35977
+ * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-src/t_string.c-appendCommand CVE-2022-35977
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -49,7 +49,7 @@ and func_4(vo_692, target_4)
 and vtotlen_691.getType().hasName("size_t")
 and vo_692.getType().hasName("robj *")
 and vappend_692.getType().hasName("robj *")
-and vtotlen_691.getParentScope+() = func
-and vo_692.getParentScope+() = func
-and vappend_692.getParentScope+() = func
+and vtotlen_691.(LocalVariable).getFunction() = func
+and vo_692.(LocalVariable).getFunction() = func
+and vappend_692.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

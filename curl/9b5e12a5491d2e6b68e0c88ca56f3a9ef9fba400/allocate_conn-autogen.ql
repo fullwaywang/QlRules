@@ -9,626 +9,287 @@
 
 import cpp
 
-predicate func_0(Function func, DeclStmt target_0) {
-		func.getEntryPoint().(BlockStmt).getAStmt()=target_0
+predicate func_0(Variable vCurl_ccalloc, Variable vCurl_ssl, Initializer target_0) {
+		target_0.getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
+		and target_0.getExpr().(VariableCall).getArgument(0).(Literal).getValue()="1"
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(SizeofTypeOperator).getType() instanceof LongType
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(SizeofTypeOperator).getValue()="2000"
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getLeftOperand() instanceof UnaryPlusExpr
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getRightOperand().(SizeofTypeOperator).getType() instanceof LongType
+		and target_0.getExpr().(VariableCall).getArgument(1).(SubExpr).getRightOperand().(SizeofTypeOperator).getValue()="8"
 }
 
-predicate func_1(Variable vconn_1801, Function func, IfStmt target_1) {
-		target_1.getCondition().(NotExpr).getOperand().(VariableAccess).getTarget()=vconn_1801
-		and target_1.getThen().(ReturnStmt).getExpr().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_1
-}
-
-predicate func_2(Variable vconn_1801, Variable vCurl_handler_dummy, Function func, ExprStmt target_2) {
-		target_2.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="handler"
-		and target_2.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_2.getExpr().(AssignExpr).getRValue().(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vCurl_handler_dummy
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_2
-}
-
-predicate func_3(Variable vconn_1801, Function func, ExprStmt target_3) {
-		target_3.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="sock"
-		and target_3.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_3.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
-		and target_3.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_3
-}
-
-predicate func_4(Variable vconn_1801, Function func, ExprStmt target_4) {
-		target_4.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="sock"
-		and target_4.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_4.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
-		and target_4.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_4
-}
-
-predicate func_5(Variable vconn_1801, Function func, ExprStmt target_5) {
-		target_5.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="tempsock"
-		and target_5.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_5.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
-		and target_5.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_5
-}
-
-predicate func_6(Variable vconn_1801, Function func, ExprStmt target_6) {
-		target_6.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="tempsock"
-		and target_6.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_6.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
-		and target_6.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_6
-}
-
-predicate func_7(Variable vconn_1801, Function func, ExprStmt target_7) {
-		target_7.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="connection_id"
-		and target_7.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_7.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_7
-}
-
-predicate func_8(Variable vconn_1801, Function func, ExprStmt target_8) {
-		target_8.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="port"
-		and target_8.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_8.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_8
-}
-
-predicate func_9(Variable vconn_1801, Function func, ExprStmt target_9) {
-		target_9.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="remote_port"
-		and target_9.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_9.getExpr().(AssignExpr).getRValue().(UnaryMinusExpr).getValue()="-1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_9
-}
-
-predicate func_10(Variable vconn_1801, Function func, ExprStmt target_10) {
-		target_10.getExpr().(FunctionCall).getTarget().hasName("Curl_conncontrol")
-		and target_10.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vconn_1801
-		and target_10.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_10
-}
-
-predicate func_11(Variable vconn_1801, Function func, ExprStmt target_11) {
-		target_11.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="created"
-		and target_11.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_11.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_now")
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_11
-}
-
-predicate func_12(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_12) {
-		target_12.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="data"
-		and target_12.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_12.getExpr().(AssignExpr).getRValue().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_12
-}
-
-predicate func_13(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_13) {
-		target_13.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_13.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="http_proxy"
-		and target_13.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_13.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_13.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_13.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_13
-}
-
-predicate func_14(Variable vconn_1801, Function func, ExprStmt target_14) {
-		target_14.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_14.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="socks_proxy"
-		and target_14.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_14
-}
-
-predicate func_15(Variable vconn_1801, Function func, ExprStmt target_15) {
-		target_15.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxy"
-		and target_15.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_15.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_15.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_15.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_15.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(PointerDereferenceExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_15.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_15.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_15
-}
-
-predicate func_16(Variable vconn_1801, Function func, ExprStmt target_16) {
-		target_16.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="httpproxy"
-		and target_16.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_16.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxy"
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(LogicalOrExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_16.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_16
-}
-
-predicate func_17(Variable vconn_1801, Function func, ExprStmt target_17) {
-		target_17.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="socksproxy"
-		and target_17.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_17.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxy"
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(NotExpr).getOperand().(ValueFieldAccess).getTarget().getName()="httpproxy"
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(NotExpr).getOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_17.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_17
-}
-
-predicate func_18(Variable vconn_1801, Parameter vdata_1794, Function func, IfStmt target_18) {
-		target_18.getCondition().(LogicalAndExpr).getAnOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_18.getCondition().(LogicalAndExpr).getAnOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_18.getCondition().(LogicalAndExpr).getAnOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_18.getCondition().(LogicalAndExpr).getAnOperand().(PointerDereferenceExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_18.getCondition().(LogicalAndExpr).getAnOperand().(PointerDereferenceExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_18.getCondition().(LogicalAndExpr).getAnOperand().(PointerDereferenceExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_18.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxy"
-		and target_18.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_18.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_18.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(Literal).getValue()="1"
-		and target_18.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="socksproxy"
-		and target_18.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_18.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_18.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(Literal).getValue()="1"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_18
-}
-
-/*predicate func_19(Variable vconn_1801, LogicalAndExpr target_58, ExprStmt target_19) {
-		target_19.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxy"
-		and target_19.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_19.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_19.getExpr().(AssignExpr).getRValue().(Literal).getValue()="1"
-		and target_19.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_58
+/*predicate func_1(Function func, SizeofTypeOperator target_1) {
+		target_1.getType() instanceof LongType
+		and target_1.getValue()="2000"
+		and target_1.getEnclosingFunction() = func
 }
 
 */
-/*predicate func_20(Variable vconn_1801, LogicalAndExpr target_58, ExprStmt target_20) {
-		target_20.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="socksproxy"
-		and target_20.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_20.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_20.getExpr().(AssignExpr).getRValue().(Literal).getValue()="1"
-		and target_20.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_58
+/*predicate func_2(Function func, SizeofTypeOperator target_2) {
+		target_2.getType() instanceof LongType
+		and target_2.getValue()="8"
+		and target_2.getEnclosingFunction() = func
 }
 
 */
-predicate func_21(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_21) {
-		target_21.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="proxy_user_passwd"
-		and target_21.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_21.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_21.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_21.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_21.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_21.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_21.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_21
+predicate func_3(Variable vconn_1801, Initializer target_3) {
+		target_3.getExpr().(AddressOfExpr).getOperand().(PointerFieldAccess).getTarget().getName()="align_data__do_not_use"
+		and target_3.getExpr().(AddressOfExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
 }
 
-predicate func_22(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_22) {
-		target_22.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="tunnel_proxy"
-		and target_22.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_22.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_22.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="tunnel_thru_httpproxy"
-		and target_22.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_22.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_22
+predicate func_4(Variable vconn_1801, Variable vp_1890, VariableAccess target_4) {
+		target_4.getTarget()=vp_1890
+		and target_4.getParent().(AssignExpr).getRValue() = target_4
+		and target_4.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_4.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
+		and target_4.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_4.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
 }
 
-predicate func_23(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_23) {
-		target_23.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="user_passwd"
-		and target_23.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_23.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_23.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_23.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_23.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_23.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_23.getExpr().(AssignExpr).getRValue().(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_23
+predicate func_5(Variable vp_1890, VariableAccess target_5) {
+		target_5.getTarget()=vp_1890
 }
 
-predicate func_24(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_24) {
-		target_24.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="ftp_use_epsv"
-		and target_24.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_24.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_24.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="ftp_use_epsv"
-		and target_24.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_24.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_24
+predicate func_6(Variable vp_1890, VariableAccess target_6) {
+		target_6.getTarget()=vp_1890
 }
 
-predicate func_25(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_25) {
-		target_25.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="ftp_use_eprt"
-		and target_25.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="bits"
-		and target_25.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_25.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="ftp_use_eprt"
-		and target_25.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_25.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_25
+predicate func_7(Variable vp_1890, VariableAccess target_7) {
+		target_7.getTarget()=vp_1890
 }
 
-predicate func_26(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_26) {
-		target_26.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifystatus"
-		and target_26.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="ssl_config"
-		and target_26.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_26.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifystatus"
-		and target_26.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_26.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="ssl"
-		and target_26.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_26.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_26
+predicate func_8(Function func) {
+	exists(RemExpr target_8 |
+		target_8.getValue()="8"
+		and target_8.getEnclosingFunction() = func)
 }
 
-predicate func_27(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_27) {
-		target_27.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifypeer"
-		and target_27.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="ssl_config"
-		and target_27.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_27.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifypeer"
-		and target_27.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_27.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="ssl"
-		and target_27.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_27.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_27
+predicate func_11(Function func) {
+	exists(ExprStmt target_11 |
+		target_11.getExpr().(AssignAddExpr).getLValue().(VariableAccess).getType().hasName("size_t")
+		and target_11.getExpr().(AssignAddExpr).getRValue().(AddExpr).getAnOperand().(VariableAccess).getType().hasName("size_t")
+		and target_11.getExpr().(AssignAddExpr).getRValue().(AddExpr).getAnOperand().(MulExpr).getLeftOperand() instanceof Literal
+		and target_11.getExpr().(AssignAddExpr).getRValue().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(VariableAccess).getType().hasName("size_t")
+		and (func.getEntryPoint().(BlockStmt).getStmt(5)=target_11 or func.getEntryPoint().(BlockStmt).getStmt(5).getFollowingStmt()=target_11))
 }
 
-predicate func_28(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_28) {
-		target_28.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifyhost"
-		and target_28.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="ssl_config"
-		and target_28.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_28.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifyhost"
-		and target_28.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_28.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="ssl"
-		and target_28.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_28.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_28
+predicate func_14(Variable vconn_1801, Variable vCurl_ccalloc, NotExpr target_37, ExprStmt target_38, Function func) {
+	exists(ExprStmt target_14 |
+		target_14.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vconn_1801
+		and target_14.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
+		and target_14.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(Literal).getValue()="1"
+		and target_14.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(VariableAccess).getType().hasName("size_t")
+		and (func.getEntryPoint().(BlockStmt).getStmt(6)=target_14 or func.getEntryPoint().(BlockStmt).getStmt(6).getFollowingStmt()=target_14)
+		and target_14.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_37.getOperand().(VariableAccess).getLocation())
+		and target_14.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getLocation().isBefore(target_38.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getLocation()))
 }
 
-predicate func_29(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_29) {
-		target_29.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifystatus"
-		and target_29.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="proxy_ssl_config"
-		and target_29.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_29.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifystatus"
-		and target_29.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_29.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_29.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_29.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_29
+predicate func_16(Variable vconn_1801, ExprStmt target_39, ArrayExpr target_40) {
+	exists(Initializer target_16 |
+		target_16.getExpr().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getTarget()=vconn_1801
+		and target_16.getExpr().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getType().hasName("size_t")
+		and target_39.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_16.getExpr().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getLocation())
+		and target_16.getExpr().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getLocation().isBefore(target_40.getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation()))
 }
 
-predicate func_30(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_30) {
-		target_30.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifypeer"
-		and target_30.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="proxy_ssl_config"
-		and target_30.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_30.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifypeer"
-		and target_30.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_30.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_30.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_30.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_30
+predicate func_18(Variable vconn_1801) {
+	exists(PointerArithmeticOperation target_18 |
+		target_18.getLeftOperand().(VariableAccess).getType().hasName("char *")
+		and target_18.getRightOperand().(MulExpr).getLeftOperand().(Literal).getValue()="4"
+		and target_18.getRightOperand().(MulExpr).getRightOperand().(VariableAccess).getType().hasName("size_t")
+		and target_18.getParent().(AssignExpr).getRValue() = target_18
+		and target_18.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_18.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
+		and target_18.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_18.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0")
 }
 
-predicate func_31(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_31) {
-		target_31.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="verifyhost"
-		and target_31.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="proxy_ssl_config"
-		and target_31.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_31.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="verifyhost"
-		and target_31.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="primary"
-		and target_31.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_31.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_31.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_31
+predicate func_21(Variable vconn_1801) {
+	exists(PointerArithmeticOperation target_21 |
+		target_21.getLeftOperand().(VariableAccess).getType().hasName("char *")
+		and target_21.getRightOperand().(MulExpr).getLeftOperand().(Literal).getValue()="3"
+		and target_21.getRightOperand().(MulExpr).getRightOperand().(VariableAccess).getType().hasName("size_t")
+		and target_21.getParent().(AssignExpr).getRValue() = target_21
+		and target_21.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_21.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
+		and target_21.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_21.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1")
 }
 
-predicate func_32(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_32) {
-		target_32.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="ip_version"
-		and target_32.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_32.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="ipver"
-		and target_32.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_32.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_32
+predicate func_23(Variable vconn_1801) {
+	exists(PointerArithmeticOperation target_23 |
+		target_23.getLeftOperand().(VariableAccess).getType().hasName("char *")
+		and target_23.getRightOperand().(MulExpr).getLeftOperand() instanceof Literal
+		and target_23.getRightOperand().(MulExpr).getRightOperand().(VariableAccess).getType().hasName("size_t")
+		and target_23.getParent().(AssignExpr).getRValue() = target_23
+		and target_23.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_23.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
+		and target_23.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_23.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0")
 }
 
-predicate func_34(Variable vconn_1801, Variable vp_1890, ExprStmt target_34) {
-		target_34.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
-		and target_34.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
-		and target_34.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_34.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
-		and target_34.getExpr().(AssignExpr).getRValue().(VariableAccess).getTarget()=vp_1890
+predicate func_24(Variable vconn_1801) {
+	exists(PointerArithmeticOperation target_24 |
+		target_24.getLeftOperand().(VariableAccess).getType().hasName("char *")
+		and target_24.getRightOperand().(MulExpr).getLeftOperand().(Literal).getValue()="1"
+		and target_24.getRightOperand().(MulExpr).getRightOperand().(VariableAccess).getType().hasName("size_t")
+		and target_24.getParent().(AssignExpr).getRValue() = target_24
+		and target_24.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_24.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
+		and target_24.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_24.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1")
 }
 
-predicate func_35(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, ExprStmt target_35) {
-		target_35.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
-		and target_35.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
-		and target_35.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_35.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
-		and target_35.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getTarget()=vp_1890
-		and target_35.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
-		and target_35.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+predicate func_25(Variable vCurl_ccalloc, Variable vCurl_ssl, PointerFieldAccess target_25) {
+		target_25.getTarget().getName()="sizeof_ssl_backend_data"
+		and target_25.getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_25.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
+		and target_25.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getArgument(0).(Literal).getValue()="1"
+		and target_25.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getArgument(1).(SubExpr).getRightOperand() instanceof SizeofTypeOperator
 }
 
-predicate func_36(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, ExprStmt target_36) {
-		target_36.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
-		and target_36.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_36.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_36.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
-		and target_36.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getTarget()=vp_1890
-		and target_36.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
-		and target_36.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
-		and target_36.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getRightOperand().(Literal).getValue()="2"
+predicate func_28(Variable vconn_1801, VariableAccess target_28) {
+		target_28.getTarget()=vconn_1801
 }
 
-predicate func_37(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, ExprStmt target_37) {
-		target_37.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
-		and target_37.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_37.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_37.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
-		and target_37.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getTarget()=vp_1890
-		and target_37.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
-		and target_37.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
-		and target_37.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(MulExpr).getRightOperand().(Literal).getValue()="3"
+predicate func_29(Variable vCurl_ccalloc, UnaryPlusExpr target_29) {
+		target_29.getValue()="4"
+		and target_29.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
+		and target_29.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getArgument(0).(Literal).getValue()="1"
+		and target_29.getParent().(MulExpr).getParent().(AddExpr).getParent().(SubExpr).getParent().(VariableCall).getParent().(Initializer).getExpr().(VariableCall).getArgument(1).(SubExpr).getRightOperand() instanceof SizeofTypeOperator
 }
 
-predicate func_38(Variable vconn_1801, Variable vCurl_ccalloc, Parameter vdata_1794, Function func, IfStmt target_38) {
-		target_38.getCondition().(LogicalAndExpr).getAnOperand().(FunctionCall).getTarget().hasName("Curl_pipeline_wanted")
-		and target_38.getCondition().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="multi"
-		and target_38.getCondition().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_38.getCondition().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(1).(Literal).getValue()="1"
-		and target_38.getCondition().(LogicalAndExpr).getAnOperand().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="master_buffer"
-		and target_38.getCondition().(LogicalAndExpr).getAnOperand().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="master_buffer"
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(Literal).getValue()="16384"
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getType() instanceof LongType
-		and target_38.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getValue()="1"
-		and target_38.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="master_buffer"
-		and target_38.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_38.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(GotoStmt).toString() = "goto ..."
-		and target_38.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(GotoStmt).getName() ="error"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_38
+predicate func_30(Variable vconn_1801, PointerFieldAccess target_30) {
+		target_30.getTarget().getName()="align_data__do_not_use"
+		and target_30.getQualifier().(VariableAccess).getTarget()=vconn_1801
 }
 
-/*predicate func_39(Variable vconn_1801, Variable vCurl_ccalloc, LogicalAndExpr target_59, ExprStmt target_39) {
-		target_39.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="master_buffer"
+predicate func_31(Variable vCurl_ssl, SubExpr target_41, PointerFieldAccess target_31) {
+		target_31.getTarget().getName()="sizeof_ssl_backend_data"
+		and target_31.getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_41.getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_31.getQualifier().(VariableAccess).getLocation())
+}
+
+predicate func_32(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, PointerArithmeticOperation target_32) {
+		target_32.getAnOperand().(VariableAccess).getTarget()=vp_1890
+		and target_32.getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
+		and target_32.getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_32.getAnOperand().(MulExpr).getRightOperand() instanceof Literal
+		and target_32.getParent().(AssignExpr).getRValue() = target_32
+		and target_32.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_32.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
+		and target_32.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_32.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="0"
+}
+
+/*predicate func_33(Variable vCurl_ssl, ExprStmt target_43, PointerFieldAccess target_33) {
+		target_33.getTarget().getName()="sizeof_ssl_backend_data"
+		and target_33.getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_43.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_33.getQualifier().(VariableAccess).getLocation())
+}
+
+*/
+predicate func_34(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, PointerArithmeticOperation target_34) {
+		target_34.getAnOperand().(VariableAccess).getTarget()=vp_1890
+		and target_34.getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
+		and target_34.getAnOperand().(MulExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_34.getAnOperand().(MulExpr).getRightOperand().(Literal).getValue()="3"
+		and target_34.getParent().(AssignExpr).getRValue() = target_34
+		and target_34.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_34.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
+		and target_34.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_34.getParent().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
+}
+
+/*predicate func_35(Variable vCurl_ssl, PointerFieldAccess target_35) {
+		target_35.getTarget().getName()="sizeof_ssl_backend_data"
+		and target_35.getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+}
+
+*/
+predicate func_37(Variable vconn_1801, NotExpr target_37) {
+		target_37.getOperand().(VariableAccess).getTarget()=vconn_1801
+}
+
+predicate func_38(Variable vconn_1801, Variable vCurl_ccalloc, ExprStmt target_38) {
+		target_38.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="master_buffer"
+		and target_38.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_38.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
+		and target_38.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(Literal).getValue()="16384"
+		and target_38.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getType() instanceof LongType
+		and target_38.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getValue()="1"
+}
+
+predicate func_39(Variable vconn_1801, ExprStmt target_39) {
+		target_39.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="ip_version"
 		and target_39.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_39.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_ccalloc
-		and target_39.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(Literal).getValue()="16384"
-		and target_39.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getType() instanceof LongType
-		and target_39.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(SizeofTypeOperator).getValue()="1"
-		and target_39.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_59
+		and target_39.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="ipver"
+		and target_39.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
+		and target_39.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("Curl_easy *")
 }
 
-*/
-/*predicate func_40(Variable vconn_1801, LogicalAndExpr target_59, IfStmt target_40) {
-		target_40.getCondition().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="master_buffer"
-		and target_40.getCondition().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_40.getThen().(GotoStmt).toString() = "goto ..."
-		and target_40.getThen().(GotoStmt).getName() ="error"
-		and target_40.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_59
+predicate func_40(Variable vconn_1801, ArrayExpr target_40) {
+		target_40.getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
+		and target_40.getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_40.getArrayOffset().(Literal).getValue()="0"
 }
 
-*/
-predicate func_41(Variable vconn_1801, Function func, ExprStmt target_41) {
-		target_41.getExpr().(FunctionCall).getTarget().hasName("Curl_llist_init")
-		and target_41.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getTarget().getName()="send_pipe"
-		and target_41.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_41
+predicate func_41(Variable vCurl_ssl, SubExpr target_41) {
+		target_41.getLeftOperand().(AddExpr).getAnOperand() instanceof SizeofTypeOperator
+		and target_41.getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getLeftOperand() instanceof UnaryPlusExpr
+		and target_41.getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
+		and target_41.getLeftOperand().(AddExpr).getAnOperand().(MulExpr).getRightOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
+		and target_41.getRightOperand() instanceof SizeofTypeOperator
 }
 
-predicate func_42(Variable vconn_1801, Function func, ExprStmt target_42) {
-		target_42.getExpr().(FunctionCall).getTarget().hasName("Curl_llist_init")
-		and target_42.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getTarget().getName()="recv_pipe"
-		and target_42.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_42
+predicate func_43(Variable vconn_1801, Variable vCurl_ssl, Variable vp_1890, ExprStmt target_43) {
+		target_43.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getTarget().getName()="backend"
+		and target_43.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="ssl"
+		and target_43.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
+		and target_43.getExpr().(AssignExpr).getLValue().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(Literal).getValue()="1"
+		and target_43.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getTarget()=vp_1890
+		and target_43.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="sizeof_ssl_backend_data"
+		and target_43.getExpr().(AssignExpr).getRValue().(PointerArithmeticOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vCurl_ssl
 }
 
-predicate func_43(Variable vconn_1801, Variable vCurl_cstrdup, Parameter vdata_1794, Function func, IfStmt target_43) {
-		target_43.getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_43.getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_43.getCondition().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_43.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="localdev"
-		and target_43.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_43.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cstrdup
-		and target_43.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_43.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="localdev"
-		and target_43.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_43.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(GotoStmt).toString() = "goto ..."
-		and target_43.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(GotoStmt).getName() ="error"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_43
-}
-
-/*predicate func_44(Variable vconn_1801, Variable vCurl_cstrdup, Parameter vdata_1794, ArrayExpr target_60, ExprStmt target_44) {
-		target_44.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="localdev"
-		and target_44.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_44.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cstrdup
-		and target_44.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="str"
-		and target_44.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_44.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and target_44.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_60
-}
-
-*/
-/*predicate func_45(Variable vconn_1801, ArrayExpr target_60, IfStmt target_45) {
-		target_45.getCondition().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="localdev"
-		and target_45.getCondition().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_45.getThen().(GotoStmt).toString() = "goto ..."
-		and target_45.getThen().(GotoStmt).getName() ="error"
-		and target_45.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_60
-}
-
-*/
-predicate func_46(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_46) {
-		target_46.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="localportrange"
-		and target_46.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_46.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="localportrange"
-		and target_46.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_46.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_46
-}
-
-predicate func_47(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_47) {
-		target_47.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="localport"
-		and target_47.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_47.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="localport"
-		and target_47.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_47.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_47
-}
-
-predicate func_48(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_48) {
-		target_48.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="fclosesocket"
-		and target_48.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_48.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="fclosesocket"
-		and target_48.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_48.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_48
-}
-
-predicate func_49(Variable vconn_1801, Parameter vdata_1794, Function func, ExprStmt target_49) {
-		target_49.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="closesocket_client"
-		and target_49.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_49.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getTarget().getName()="closesocket_client"
-		and target_49.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="set"
-		and target_49.getExpr().(AssignExpr).getRValue().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_1794
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_49
-}
-
-predicate func_50(Variable vconn_1801, Function func, ReturnStmt target_50) {
-		target_50.getExpr().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_50
-}
-
-predicate func_51(Function func, LabelStmt target_51) {
-		target_51.toString() = "label ...:"
-		and target_51.getName() ="error"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_51
-}
-
-predicate func_52(Variable vconn_1801, Function func, ExprStmt target_52) {
-		target_52.getExpr().(FunctionCall).getTarget().hasName("Curl_llist_destroy")
-		and target_52.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getTarget().getName()="send_pipe"
-		and target_52.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_52.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_52
-}
-
-predicate func_53(Variable vconn_1801, Function func, ExprStmt target_53) {
-		target_53.getExpr().(FunctionCall).getTarget().hasName("Curl_llist_destroy")
-		and target_53.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getTarget().getName()="recv_pipe"
-		and target_53.getExpr().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and target_53.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_53
-}
-
-predicate func_54(Variable vconn_1801, Variable vCurl_cfree, Function func, ExprStmt target_54) {
-		target_54.getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cfree
-		and target_54.getExpr().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="master_buffer"
-		and target_54.getExpr().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_54
-}
-
-predicate func_55(Variable vconn_1801, Variable vCurl_cfree, Function func, ExprStmt target_55) {
-		target_55.getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cfree
-		and target_55.getExpr().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="localdev"
-		and target_55.getExpr().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_55
-}
-
-predicate func_56(Variable vconn_1801, Variable vCurl_cfree, Function func, ExprStmt target_56) {
-		target_56.getExpr().(VariableCall).getExpr().(VariableAccess).getTarget()=vCurl_cfree
-		and target_56.getExpr().(VariableCall).getArgument(0).(VariableAccess).getTarget()=vconn_1801
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_56
-}
-
-predicate func_57(Function func, ReturnStmt target_57) {
-		target_57.getExpr().(Literal).getValue()="0"
-		and func.getEntryPoint().(BlockStmt).getAStmt()=target_57
-}
-
-predicate func_58(LogicalAndExpr target_58) {
-		target_58.getAnOperand() instanceof ArrayExpr
-		and target_58.getAnOperand() instanceof PointerDereferenceExpr
-}
-
-predicate func_59(LogicalAndExpr target_59) {
-		target_59.getAnOperand() instanceof FunctionCall
-		and target_59.getAnOperand() instanceof NotExpr
-}
-
-predicate func_60(ArrayExpr target_60) {
-		target_60.getArrayBase() instanceof ValueFieldAccess
-		and target_60.getArrayOffset() instanceof EnumConstantAccess
-}
-
-from Function func, Variable vconn_1801, Variable vCurl_ccalloc, Variable vCurl_ssl, Variable vCurl_handler_dummy, Variable vp_1890, Variable vCurl_cstrdup, Variable vCurl_cfree, Parameter vdata_1794, DeclStmt target_0, IfStmt target_1, ExprStmt target_2, ExprStmt target_3, ExprStmt target_4, ExprStmt target_5, ExprStmt target_6, ExprStmt target_7, ExprStmt target_8, ExprStmt target_9, ExprStmt target_10, ExprStmt target_11, ExprStmt target_12, ExprStmt target_13, ExprStmt target_14, ExprStmt target_15, ExprStmt target_16, ExprStmt target_17, IfStmt target_18, ExprStmt target_21, ExprStmt target_22, ExprStmt target_23, ExprStmt target_24, ExprStmt target_25, ExprStmt target_26, ExprStmt target_27, ExprStmt target_28, ExprStmt target_29, ExprStmt target_30, ExprStmt target_31, ExprStmt target_32, ExprStmt target_34, ExprStmt target_35, ExprStmt target_36, ExprStmt target_37, IfStmt target_38, ExprStmt target_41, ExprStmt target_42, IfStmt target_43, ExprStmt target_46, ExprStmt target_47, ExprStmt target_48, ExprStmt target_49, ReturnStmt target_50, LabelStmt target_51, ExprStmt target_52, ExprStmt target_53, ExprStmt target_54, ExprStmt target_55, ExprStmt target_56, ReturnStmt target_57, LogicalAndExpr target_58, LogicalAndExpr target_59, ArrayExpr target_60
+from Function func, Variable vconn_1801, Variable vCurl_ccalloc, Variable vCurl_ssl, Variable vp_1890, Initializer target_0, Initializer target_3, VariableAccess target_4, VariableAccess target_5, VariableAccess target_6, VariableAccess target_7, PointerFieldAccess target_25, VariableAccess target_28, UnaryPlusExpr target_29, PointerFieldAccess target_30, PointerFieldAccess target_31, PointerArithmeticOperation target_32, PointerArithmeticOperation target_34, NotExpr target_37, ExprStmt target_38, ExprStmt target_39, ArrayExpr target_40, SubExpr target_41, ExprStmt target_43
 where
-func_0(func, target_0)
-and func_1(vconn_1801, func, target_1)
-and func_2(vconn_1801, vCurl_handler_dummy, func, target_2)
-and func_3(vconn_1801, func, target_3)
-and func_4(vconn_1801, func, target_4)
-and func_5(vconn_1801, func, target_5)
-and func_6(vconn_1801, func, target_6)
-and func_7(vconn_1801, func, target_7)
-and func_8(vconn_1801, func, target_8)
-and func_9(vconn_1801, func, target_9)
-and func_10(vconn_1801, func, target_10)
-and func_11(vconn_1801, func, target_11)
-and func_12(vconn_1801, vdata_1794, func, target_12)
-and func_13(vconn_1801, vdata_1794, func, target_13)
-and func_14(vconn_1801, func, target_14)
-and func_15(vconn_1801, func, target_15)
-and func_16(vconn_1801, func, target_16)
-and func_17(vconn_1801, func, target_17)
-and func_18(vconn_1801, vdata_1794, func, target_18)
-and func_21(vconn_1801, vdata_1794, func, target_21)
-and func_22(vconn_1801, vdata_1794, func, target_22)
-and func_23(vconn_1801, vdata_1794, func, target_23)
-and func_24(vconn_1801, vdata_1794, func, target_24)
-and func_25(vconn_1801, vdata_1794, func, target_25)
-and func_26(vconn_1801, vdata_1794, func, target_26)
-and func_27(vconn_1801, vdata_1794, func, target_27)
-and func_28(vconn_1801, vdata_1794, func, target_28)
-and func_29(vconn_1801, vdata_1794, func, target_29)
-and func_30(vconn_1801, vdata_1794, func, target_30)
-and func_31(vconn_1801, vdata_1794, func, target_31)
-and func_32(vconn_1801, vdata_1794, func, target_32)
-and func_34(vconn_1801, vp_1890, target_34)
-and func_35(vconn_1801, vCurl_ssl, vp_1890, target_35)
-and func_36(vconn_1801, vCurl_ssl, vp_1890, target_36)
-and func_37(vconn_1801, vCurl_ssl, vp_1890, target_37)
-and func_38(vconn_1801, vCurl_ccalloc, vdata_1794, func, target_38)
-and func_41(vconn_1801, func, target_41)
-and func_42(vconn_1801, func, target_42)
-and func_43(vconn_1801, vCurl_cstrdup, vdata_1794, func, target_43)
-and func_46(vconn_1801, vdata_1794, func, target_46)
-and func_47(vconn_1801, vdata_1794, func, target_47)
-and func_48(vconn_1801, vdata_1794, func, target_48)
-and func_49(vconn_1801, vdata_1794, func, target_49)
-and func_50(vconn_1801, func, target_50)
-and func_51(func, target_51)
-and func_52(vconn_1801, func, target_52)
-and func_53(vconn_1801, func, target_53)
-and func_54(vconn_1801, vCurl_cfree, func, target_54)
-and func_55(vconn_1801, vCurl_cfree, func, target_55)
-and func_56(vconn_1801, vCurl_cfree, func, target_56)
-and func_57(func, target_57)
-and func_58(target_58)
-and func_59(target_59)
-and func_60(target_60)
+func_0(vCurl_ccalloc, vCurl_ssl, target_0)
+and func_3(vconn_1801, target_3)
+and func_4(vconn_1801, vp_1890, target_4)
+and func_5(vp_1890, target_5)
+and func_6(vp_1890, target_6)
+and func_7(vp_1890, target_7)
+and not func_8(func)
+and not func_11(func)
+and not func_14(vconn_1801, vCurl_ccalloc, target_37, target_38, func)
+and not func_16(vconn_1801, target_39, target_40)
+and not func_18(vconn_1801)
+and not func_21(vconn_1801)
+and not func_23(vconn_1801)
+and not func_24(vconn_1801)
+and func_25(vCurl_ccalloc, vCurl_ssl, target_25)
+and func_28(vconn_1801, target_28)
+and func_29(vCurl_ccalloc, target_29)
+and func_30(vconn_1801, target_30)
+and func_31(vCurl_ssl, target_41, target_31)
+and func_32(vconn_1801, vCurl_ssl, vp_1890, target_32)
+and func_34(vconn_1801, vCurl_ssl, vp_1890, target_34)
+and func_37(vconn_1801, target_37)
+and func_38(vconn_1801, vCurl_ccalloc, target_38)
+and func_39(vconn_1801, target_39)
+and func_40(vconn_1801, target_40)
+and func_41(vCurl_ssl, target_41)
+and func_43(vconn_1801, vCurl_ssl, vp_1890, target_43)
 and vconn_1801.getType().hasName("connectdata *")
 and vCurl_ccalloc.getType().hasName("curl_calloc_callback")
 and vCurl_ssl.getType().hasName("const Curl_ssl *")
-and vCurl_handler_dummy.getType().hasName("const Curl_handler")
 and vp_1890.getType().hasName("char *")
-and vCurl_cstrdup.getType().hasName("curl_strdup_callback")
-and vCurl_cfree.getType().hasName("curl_free_callback")
-and vdata_1794.getType().hasName("Curl_easy *")
-and vconn_1801.getParentScope+() = func
+and vconn_1801.(LocalVariable).getFunction() = func
 and not vCurl_ccalloc.getParentScope+() = func
 and not vCurl_ssl.getParentScope+() = func
-and not vCurl_handler_dummy.getParentScope+() = func
-and vp_1890.getParentScope+() = func
-and not vCurl_cstrdup.getParentScope+() = func
-and not vCurl_cfree.getParentScope+() = func
-and vdata_1794.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vp_1890.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

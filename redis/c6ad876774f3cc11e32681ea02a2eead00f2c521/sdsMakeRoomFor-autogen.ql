@@ -1,7 +1,7 @@
 /**
  * @name redis-c6ad876774f3cc11e32681ea02a2eead00f2c521-sdsMakeRoomFor
  * @id cpp/redis/c6ad876774f3cc11e32681ea02a2eead00f2c521/sdsMakeRoomFor
- * @description redis-c6ad876774f3cc11e32681ea02a2eead00f2c521-sdsMakeRoomFor CVE-2021-41099
+ * @description redis-c6ad876774f3cc11e32681ea02a2eead00f2c521-src/sds.c-sdsMakeRoomFor CVE-2021-41099
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -44,7 +44,7 @@ and func_4(vaddlen_205, vlen_208, vnewlen_208, target_4)
 and vaddlen_205.getType().hasName("size_t")
 and vlen_208.getType().hasName("size_t")
 and vnewlen_208.getType().hasName("size_t")
-and vaddlen_205.getParentScope+() = func
-and vlen_208.getParentScope+() = func
-and vnewlen_208.getParentScope+() = func
+and vaddlen_205.getFunction() = func
+and vlen_208.(LocalVariable).getFunction() = func
+and vnewlen_208.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

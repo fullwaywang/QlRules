@@ -54,11 +54,9 @@ predicate func_3(Parameter vsource_154, Parameter vdest_155, IfStmt target_3) {
 		and target_3.getCondition().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vsource_154
 		and target_3.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="CApath"
 		and target_3.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
+		and target_3.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget().getType().hasName("curl_strdup_callback")
 		and target_3.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="CApath"
 		and target_3.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vsource_154
-		and target_3.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getTarget().getName()="CApath"
-		and target_3.getThen().(BlockStmt).getStmt(1).(IfStmt).getCondition().(NotExpr).getOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
-		and target_3.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(ReturnStmt).getExpr().(Literal).getValue()="0"
 		and target_3.getElse().(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="CApath"
 		and target_3.getElse().(ExprStmt).getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
 		and target_3.getElse().(ExprStmt).getExpr().(AssignExpr).getRValue().(Literal).getValue()="0"
@@ -72,6 +70,7 @@ predicate func_4(Parameter vdest_155, AddressOfExpr target_4) {
 predicate func_5(Parameter vsource_154, Parameter vdest_155, ExprStmt target_5) {
 		target_5.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="CApath"
 		and target_5.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
+		and target_5.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget().getType().hasName("curl_strdup_callback")
 		and target_5.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="CApath"
 		and target_5.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vsource_154
 }
@@ -79,6 +78,7 @@ predicate func_5(Parameter vsource_154, Parameter vdest_155, ExprStmt target_5) 
 predicate func_6(Parameter vsource_154, Parameter vdest_155, ExprStmt target_6) {
 		target_6.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="CAfile"
 		and target_6.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
+		and target_6.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget().getType().hasName("curl_strdup_callback")
 		and target_6.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="CAfile"
 		and target_6.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vsource_154
 }
@@ -86,6 +86,7 @@ predicate func_6(Parameter vsource_154, Parameter vdest_155, ExprStmt target_6) 
 predicate func_7(Parameter vsource_154, Parameter vdest_155, ExprStmt target_7) {
 		target_7.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getTarget().getName()="clientcert"
 		and target_7.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdest_155
+		and target_7.getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(VariableAccess).getTarget().getType().hasName("curl_strdup_callback")
 		and target_7.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="clientcert"
 		and target_7.getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vsource_154
 }
@@ -102,6 +103,6 @@ and func_6(vsource_154, vdest_155, target_6)
 and func_7(vsource_154, vdest_155, target_7)
 and vsource_154.getType().hasName("ssl_primary_config *")
 and vdest_155.getType().hasName("ssl_primary_config *")
-and vsource_154.getParentScope+() = func
-and vdest_155.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vsource_154.getFunction() = func
+and vdest_155.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

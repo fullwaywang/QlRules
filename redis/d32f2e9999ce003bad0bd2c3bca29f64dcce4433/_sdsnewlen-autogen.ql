@@ -1,7 +1,7 @@
 /**
  * @name redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-_sdsnewlen
  * @id cpp/redis/d32f2e9999ce003bad0bd2c3bca29f64dcce4433/-sdsnewlen
- * @description redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-_sdsnewlen CVE-2021-21309
+ * @description redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-src/sds.c-_sdsnewlen CVE-2021-21309
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -46,6 +46,6 @@ and func_1(vinitlen_103, target_1)
 and func_2(vinitlen_103, vhdrlen_110, target_2)
 and vinitlen_103.getType().hasName("size_t")
 and vhdrlen_110.getType().hasName("int")
-and vinitlen_103.getParentScope+() = func
-and vhdrlen_110.getParentScope+() = func
+and vinitlen_103.getFunction() = func
+and vhdrlen_110.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

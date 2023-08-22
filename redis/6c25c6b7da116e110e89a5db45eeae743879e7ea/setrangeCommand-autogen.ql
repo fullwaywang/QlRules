@@ -1,7 +1,7 @@
 /**
  * @name redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-setrangeCommand
  * @id cpp/redis/6c25c6b7da116e110e89a5db45eeae743879e7ea/setrangeCommand
- * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-setrangeCommand CVE-2022-35977
+ * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-src/t_string.c-setrangeCommand CVE-2022-35977
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -12,19 +12,31 @@ import cpp
 predicate func_0(Variable vvalue_440, FunctionCall target_0) {
 		target_0.getTarget().hasName("sdslen")
 		and target_0.getArgument(0).(VariableAccess).getTarget()=vvalue_440
+		and target_0.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getTarget().hasName("checkStringLength")
+		and target_0.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("client *")
+		and target_0.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(1) instanceof AddExpr
 }
 
 predicate func_1(Variable vvalue_440, FunctionCall target_1) {
 		target_1.getTarget().hasName("sdslen")
 		and target_1.getArgument(0).(VariableAccess).getTarget()=vvalue_440
+		and target_1.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getTarget().hasName("checkStringLength")
+		and target_1.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("client *")
+		and target_1.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(1) instanceof AddExpr
 }
 
 predicate func_2(Variable voffset_439, VariableAccess target_2) {
 		target_2.getTarget()=voffset_439
+		and target_2.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getTarget().hasName("checkStringLength")
+		and target_2.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("client *")
+		and target_2.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(1) instanceof AddExpr
 }
 
 predicate func_3(Variable voffset_439, VariableAccess target_3) {
 		target_3.getTarget()=voffset_439
+		and target_3.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getTarget().hasName("checkStringLength")
+		and target_3.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("client *")
+		and target_3.getParent().(AddExpr).getParent().(FunctionCall).getParent().(NEExpr).getAnOperand().(FunctionCall).getArgument(1) instanceof AddExpr
 }
 
 predicate func_4(Variable voffset_439, RelationalOperation target_6, AddExpr target_7, AddExpr target_4) {
@@ -76,6 +88,6 @@ and func_7(voffset_439, vvalue_440, target_7)
 and func_8(voffset_439, vvalue_440, target_8)
 and voffset_439.getType().hasName("long")
 and vvalue_440.getType().hasName("sds")
-and voffset_439.getParentScope+() = func
-and vvalue_440.getParentScope+() = func
+and voffset_439.(LocalVariable).getFunction() = func
+and vvalue_440.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

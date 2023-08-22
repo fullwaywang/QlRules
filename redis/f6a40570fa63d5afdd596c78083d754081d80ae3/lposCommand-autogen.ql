@@ -1,7 +1,7 @@
 /**
  * @name redis-f6a40570fa63d5afdd596c78083d754081d80ae3-lposCommand
  * @id cpp/redis/f6a40570fa63d5afdd596c78083d754081d80ae3/lposCommand
- * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-lposCommand CVE-2021-32627 CVE-2021-32628
+ * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-src/t_list.c-lposCommand CVE-2021-32627
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -18,7 +18,6 @@ predicate func_0(Variable vele_508, Parameter vc_507, ExprStmt target_1, Functio
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("addReplyError")
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vc_507
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="Element too large"
-		and target_0.getThen().(BlockStmt).getStmt(1).(ReturnStmt).toString() = "return ..."
 		and (func.getEntryPoint().(BlockStmt).getStmt(4)=target_0 or func.getEntryPoint().(BlockStmt).getStmt(4).getFollowingStmt()=target_0)
 		and target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_0.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation())
 		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_2.getArgument(1).(VariableAccess).getLocation())
@@ -53,6 +52,6 @@ and func_2(vele_508, target_2)
 and func_3(vc_507, target_3)
 and vele_508.getType().hasName("robj *")
 and vc_507.getType().hasName("client *")
-and vele_508.getParentScope+() = func
-and vc_507.getParentScope+() = func
+and vele_508.(LocalVariable).getFunction() = func
+and vc_507.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

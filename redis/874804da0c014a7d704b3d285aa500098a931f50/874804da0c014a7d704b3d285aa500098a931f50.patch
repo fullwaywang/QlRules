@@ -1,0 +1,87 @@
+commit 874804da0c014a7d704b3d285aa500098a931f50	874804da0c014a7d704b3d285aa500098a931f50
+Author: antirez <antirez@gmail.com>
+Date:   Wed Aug 3 11:12:13 2016 +0200
+
+    Security: Cross Protocol Scripting protection.
+    
+    This is an attempt at mitigating problems due to cross protocol
+    scripting, an attack targeting services using line oriented protocols
+    like Redis that can accept HTTP requests as valid protocol, by
+    discarding the invalid parts and accepting the payloads sent, for
+    example, via a POST request.
+    
+    For this to be effective, when we detect POST and Host: and terminate
+    the connection asynchronously, the networking code was modified in order
+    to never process further input. It was later verified that in a
+    pipelined request containing a POST command, the successive commands are
+    not executed.
+
+diff --git a/src/networking.c b/src/networking.c
+index 90e64cbb7..fb5341eca 100644
+--- a/src/networking.c
++++ b/src/networking.c
+@@ -1269,8 +1269,10 @@ void processInputBuffer(client *c) {
+ 
+         /* CLIENT_CLOSE_AFTER_REPLY closes the connection once the reply is
+          * written to the client. Make sure to not let the reply grow after
+-         * this flag has been set (i.e. don't process more commands). */
+-        if (c->flags & CLIENT_CLOSE_AFTER_REPLY) break;
++         * this flag has been set (i.e. don't process more commands).
++         *
++         * The same applies for clients we want to terminate ASAP. */
++        if (c->flags & (CLIENT_CLOSE_AFTER_REPLY|CLIENT_CLOSE_ASAP)) break;
+ 
+         /* Determine request type when unknown. */
+         if (!c->reqtype) {
+@@ -1637,6 +1639,26 @@ void clientCommand(client *c) {
+     }
+ }
+ 
++/* This callback is bound to POST and "Host:" command names. Those are not
++ * really commands, but are used in security attacks in order to talk to
++ * Redis instances via HTTP, with a technique called "cross protocol scripting"
++ * which exploits the fact that services like Redis will discard invalid
++ * HTTP headers and will process what follows.
++ *
++ * As a protection against this attack, Redis will terminate the connection
++ * when a POST or "Host:" header is seen, and will log the event from
++ * time to time (to avoid creating a DOS as a result of too many logs). */
++void securityWarningCommand(client *c) {
++    static time_t logged_time;
++    time_t now = time(NULL);
++
++    if (labs(now-logged_time) > 60) {
++        serverLog(LL_WARNING,"Possible SECURITY ATTACK detected. It looks like somebody is sending POST or Host: commands to Redis. This is likely due to an attacker attempting to use Cross Protocol Scripting to compromise your Redis instance. Connection aborted.");
++        logged_time = now;
++    }
++    freeClientAsync(c);
++}
++
+ /* Rewrite the command vector of the client. All the new objects ref count
+  * is incremented. The old command vector is freed, and the old objects
+  * ref count is decremented. */
+diff --git a/src/server.c b/src/server.c
+index 408d03fba..71bcda7d5 100644
+--- a/src/server.c
++++ b/src/server.c
+@@ -294,6 +294,8 @@ struct redisCommand redisCommandTable[] = {
+     {"pfcount",pfcountCommand,-2,"r",0,NULL,1,-1,1,0,0},
+     {"pfmerge",pfmergeCommand,-2,"wm",0,NULL,1,-1,1,0,0},
+     {"pfdebug",pfdebugCommand,-3,"w",0,NULL,0,0,0,0,0},
++    {"post",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
++    {"host:",securityWarningCommand,-1,"lt",0,NULL,0,0,0,0,0},
+     {"latency",latencyCommand,-2,"aslt",0,NULL,0,0,0,0,0}
+ };
+ 
+diff --git a/src/server.h b/src/server.h
+index 1a26ec492..3fa7c3ac1 100644
+--- a/src/server.h
++++ b/src/server.h
+@@ -1645,6 +1645,7 @@ void pfcountCommand(client *c);
+ void pfmergeCommand(client *c);
+ void pfdebugCommand(client *c);
+ void latencyCommand(client *c);
++void securityWarningCommand(client *c);
+ 
+ #if defined(__GNUC__)
+ void *calloc(size_t count, size_t size) __attribute__ ((deprecated));

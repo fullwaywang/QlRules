@@ -18,12 +18,12 @@ predicate func_0(Variable vlen_559, MulExpr target_4, ExprStmt target_5, Functio
 		and target_0.getCondition().(RelationalOperation).getGreaterOperand().(VariableAccess).getLocation().isBefore(target_5.getExpr().(FunctionCall).getArgument(2).(VariableAccess).getLocation()))
 }
 
-predicate func_1(Variable vpw_560, NotExpr target_6, Function func) {
+predicate func_1(Variable vpw_560, NotExpr target_7, Function func) {
 	exists(ExprStmt target_1 |
 		target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vpw_560
 		and target_1.getExpr().(AssignExpr).getRValue() instanceof ConditionalExpr
 		and (func.getEntryPoint().(BlockStmt).getStmt(4)=target_1 or func.getEntryPoint().(BlockStmt).getStmt(4).getFollowingStmt()=target_1)
-		and target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_6.getOperand().(VariableAccess).getLocation()))
+		and target_1.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_7.getOperand().(VariableAccess).getLocation()))
 }
 
 predicate func_2(Variable vlen_559, Variable vCurl_cmalloc, Variable vCurl_cstrdup, ConditionalExpr target_2) {
@@ -48,28 +48,29 @@ predicate func_4(Variable vlen_559, MulExpr target_4) {
 predicate func_5(Variable vlen_559, Variable vpw_560, ExprStmt target_5) {
 		target_5.getExpr().(FunctionCall).getTarget().hasName("ascii_to_unicode_le")
 		and target_5.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vpw_560
+		and target_5.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getTarget().getType().hasName("const char *")
 		and target_5.getExpr().(FunctionCall).getArgument(2).(VariableAccess).getTarget()=vlen_559
 }
 
-predicate func_6(Variable vpw_560, NotExpr target_6) {
-		target_6.getOperand().(VariableAccess).getTarget()=vpw_560
+predicate func_7(Variable vpw_560, NotExpr target_7) {
+		target_7.getOperand().(VariableAccess).getTarget()=vpw_560
 }
 
-from Function func, Variable vlen_559, Variable vpw_560, Variable vCurl_cmalloc, Variable vCurl_cstrdup, ConditionalExpr target_2, Initializer target_3, MulExpr target_4, ExprStmt target_5, NotExpr target_6
+from Function func, Variable vlen_559, Variable vpw_560, Variable vCurl_cmalloc, Variable vCurl_cstrdup, ConditionalExpr target_2, Initializer target_3, MulExpr target_4, ExprStmt target_5, NotExpr target_7
 where
 not func_0(vlen_559, target_4, target_5, func)
-and not func_1(vpw_560, target_6, func)
+and not func_1(vpw_560, target_7, func)
 and func_2(vlen_559, vCurl_cmalloc, vCurl_cstrdup, target_2)
 and func_3(func, target_3)
 and func_4(vlen_559, target_4)
 and func_5(vlen_559, vpw_560, target_5)
-and func_6(vpw_560, target_6)
+and func_7(vpw_560, target_7)
 and vlen_559.getType().hasName("size_t")
 and vpw_560.getType().hasName("unsigned char *")
 and vCurl_cmalloc.getType().hasName("curl_malloc_callback")
 and vCurl_cstrdup.getType().hasName("curl_strdup_callback")
-and vlen_559.getParentScope+() = func
-and vpw_560.getParentScope+() = func
+and vlen_559.(LocalVariable).getFunction() = func
+and vpw_560.(LocalVariable).getFunction() = func
 and not vCurl_cmalloc.getParentScope+() = func
 and not vCurl_cstrdup.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

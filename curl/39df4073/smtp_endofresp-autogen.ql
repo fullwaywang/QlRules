@@ -65,7 +65,9 @@ predicate func_6(Parameter vline_195, LogicalAndExpr target_6) {
 		and target_6.getAnOperand().(EqualityOperation).getAnOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="3"
 		and target_6.getAnOperand().(EqualityOperation).getAnOperand().(CharLiteral).getValue()="45"
 		and target_6.getAnOperand().(LogicalOrExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="state"
+		and target_6.getAnOperand().(LogicalOrExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("smtp_conn *")
 		and target_6.getAnOperand().(LogicalOrExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getTarget().getName()="state"
+		and target_6.getAnOperand().(LogicalOrExpr).getAnOperand().(EqualityOperation).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("smtp_conn *")
 }
 
 predicate func_7(Parameter vresp_196, EqualityOperation target_7) {
@@ -85,7 +87,7 @@ and func_7(vresp_196, target_7)
 and vline_195.getType().hasName("char *")
 and vlen_195.getType().hasName("size_t")
 and vresp_196.getType().hasName("int *")
-and vline_195.getParentScope+() = func
-and vlen_195.getParentScope+() = func
-and vresp_196.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vline_195.getFunction() = func
+and vlen_195.getFunction() = func
+and vresp_196.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

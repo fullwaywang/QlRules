@@ -91,5 +91,5 @@ and func_8(vdata_3542, target_8)
 and func_9(vdata_3542, target_9)
 and func_10(vdata_3542, target_10)
 and vdata_3542.getType().hasName("Curl_easy *")
-and vdata_3542.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vdata_3542.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

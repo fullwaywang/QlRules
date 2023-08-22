@@ -1,7 +1,7 @@
 /**
  * @name redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-sortCommandGeneric
  * @id cpp/redis/6c25c6b7da116e110e89a5db45eeae743879e7ea/sortCommandGeneric
- * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-sortCommandGeneric CVE-2022-35977
+ * @description redis-6c25c6b7da116e110e89a5db45eeae743879e7ea-src/sort.c-sortCommandGeneric CVE-2022-35977
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -96,7 +96,7 @@ and func_12(vlimit_count_193, vvectorlen_194, target_12)
 and vlimit_start_193.getType().hasName("long")
 and vlimit_count_193.getType().hasName("long")
 and vvectorlen_194.getType().hasName("int")
-and vlimit_start_193.getParentScope+() = func
-and vlimit_count_193.getParentScope+() = func
-and vvectorlen_194.getParentScope+() = func
+and vlimit_start_193.(LocalVariable).getFunction() = func
+and vlimit_count_193.(LocalVariable).getFunction() = func
+and vvectorlen_194.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

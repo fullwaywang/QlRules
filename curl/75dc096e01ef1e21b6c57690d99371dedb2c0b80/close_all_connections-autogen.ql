@@ -23,6 +23,7 @@ predicate func_1(Variable vconn_2152, ExprStmt target_1) {
 		target_1.getExpr().(FunctionCall).getTarget().hasName("sigpipe_ignore")
 		and target_1.getExpr().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="data"
 		and target_1.getExpr().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2152
+		and target_1.getExpr().(FunctionCall).getArgument(1).(AddressOfExpr).getOperand().(VariableAccess).getTarget().getType().hasName("sigpipe_ignore")
 }
 
 predicate func_2(Variable vconn_2152, ExprStmt target_2) {
@@ -37,5 +38,5 @@ not func_0(vconn_2152, target_1, target_2)
 and func_1(vconn_2152, target_1)
 and func_2(vconn_2152, target_2)
 and vconn_2152.getType().hasName("connectdata *")
-and vconn_2152.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vconn_2152.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

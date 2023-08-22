@@ -17,14 +17,15 @@ predicate func_0(BlockStmt target_4, Function func) {
 		and target_0.getEnclosingFunction() = func)
 }
 
-/*predicate func_1(Parameter vneedle_1077, FunctionCall target_1) {
+predicate func_1(Parameter vneedle_1077, BlockStmt target_4, FunctionCall target_1) {
 		target_1.getTarget().hasName("get_protocol_family")
 		and target_1.getArgument(0).(PointerFieldAccess).getTarget().getName()="handler"
 		and target_1.getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_1077
+		and target_1.getParent().(EQExpr).getAnOperand().(BitwiseOrExpr).getValue()="48"
+		and target_1.getParent().(EQExpr).getParent().(IfStmt).getThen()=target_4
 }
 
-*/
-predicate func_2(Parameter vneedle_1077, BlockStmt target_4, BitwiseOrExpr target_2) {
+/*predicate func_2(Parameter vneedle_1077, BlockStmt target_4, BitwiseOrExpr target_2) {
 		target_2.getValue()="48"
 		and target_2.getParent().(EQExpr).getAnOperand().(FunctionCall).getTarget().hasName("get_protocol_family")
 		and target_2.getParent().(EQExpr).getAnOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="handler"
@@ -32,6 +33,7 @@ predicate func_2(Parameter vneedle_1077, BlockStmt target_4, BitwiseOrExpr targe
 		and target_2.getParent().(EQExpr).getParent().(IfStmt).getThen()=target_4
 }
 
+*/
 predicate func_3(BlockStmt target_4, Function func, EqualityOperation target_3) {
 		target_3.getAnOperand() instanceof FunctionCall
 		and target_3.getAnOperand() instanceof BitwiseOrExpr
@@ -41,15 +43,14 @@ predicate func_3(BlockStmt target_4, Function func, EqualityOperation target_3) 
 
 predicate func_4(BlockStmt target_4) {
 		target_4.getStmt(0).(IfStmt).getCondition().(NotExpr).getValue()="1"
-		and target_4.getStmt(0).(IfStmt).getThen().(ContinueStmt).toString() = "continue;"
 }
 
-from Function func, Parameter vneedle_1077, BitwiseOrExpr target_2, EqualityOperation target_3, BlockStmt target_4
+from Function func, Parameter vneedle_1077, FunctionCall target_1, EqualityOperation target_3, BlockStmt target_4
 where
 not func_0(target_4, func)
-and func_2(vneedle_1077, target_4, target_2)
+and func_1(vneedle_1077, target_4, target_1)
 and func_3(target_4, func, target_3)
 and func_4(target_4)
 and vneedle_1077.getType().hasName("connectdata *")
-and vneedle_1077.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vneedle_1077.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

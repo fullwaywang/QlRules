@@ -42,6 +42,6 @@ and func_2(valloc_150, target_2)
 and func_3(valloc_150, target_3)
 and valloc_150.getType().hasName("size_t")
 and vin_152.getType().hasName("unsigned char")
-and valloc_150.getParentScope+() = func
-and vin_152.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and valloc_150.(LocalVariable).getFunction() = func
+and vin_152.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

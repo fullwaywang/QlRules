@@ -1,7 +1,7 @@
 /**
  * @name redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-ldbReplParseCommand
  * @id cpp/redis/6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd/ldbReplParseCommand
- * @description redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-ldbReplParseCommand CVE-2021-32672
+ * @description redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-src/scripting.c-ldbReplParseCommand CVE-2021-32672
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -13,7 +13,6 @@ predicate func_0(Variable vp_2037, ExprStmt target_4, EqualityOperation target_5
 	exists(IfStmt target_0 |
 		target_0.getCondition().(EqualityOperation).getAnOperand().(PointerDereferenceExpr).getOperand().(VariableAccess).getTarget()=vp_2037
 		and target_0.getCondition().(EqualityOperation).getAnOperand().(CharLiteral).getValue()="0"
-		and target_0.getThen().(GotoStmt).toString() = "goto ..."
 		and target_4.getExpr().(AssignPointerAddExpr).getLValue().(VariableAccess).getLocation().isBefore(target_0.getCondition().(EqualityOperation).getAnOperand().(PointerDereferenceExpr).getOperand().(VariableAccess).getLocation())
 		and target_0.getCondition().(EqualityOperation).getAnOperand().(PointerDereferenceExpr).getOperand().(VariableAccess).getLocation().isBefore(target_5.getAnOperand().(PointerDereferenceExpr).getOperand().(VariableAccess).getLocation()))
 }
@@ -26,7 +25,6 @@ predicate func_1(Variable vcopy_2036, Variable vp_2037, Variable vslen_2059, Exp
 		and target_1.getCondition().(RelationalOperation).getGreaterOperand().(PointerArithmeticOperation).getRightOperand().(VariableAccess).getTarget()=vcopy_2036
 		and target_1.getCondition().(RelationalOperation).getLesserOperand().(FunctionCall).getTarget().hasName("sdslen")
 		and target_1.getCondition().(RelationalOperation).getLesserOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vcopy_2036
-		and target_1.getThen().(GotoStmt).toString() = "goto ..."
 		and target_1.getCondition().(RelationalOperation).getGreaterOperand().(PointerArithmeticOperation).getRightOperand().(VariableAccess).getLocation().isBefore(target_6.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_7.getExpr().(AssignPointerAddExpr).getLValue().(VariableAccess).getLocation().isBefore(target_1.getCondition().(RelationalOperation).getGreaterOperand().(PointerArithmeticOperation).getLeftOperand().(PointerArithmeticOperation).getAnOperand().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getLocation())
 		and target_1.getCondition().(RelationalOperation).getGreaterOperand().(PointerArithmeticOperation).getLeftOperand().(PointerArithmeticOperation).getAnOperand().(PointerArithmeticOperation).getAnOperand().(VariableAccess).getLocation().isBefore(target_8.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
@@ -89,7 +87,7 @@ and func_9(vslen_2059, target_9)
 and vcopy_2036.getType().hasName("sds")
 and vp_2037.getType().hasName("char *")
 and vslen_2059.getType().hasName("int")
-and vcopy_2036.getParentScope+() = func
-and vp_2037.getParentScope+() = func
-and vslen_2059.getParentScope+() = func
+and vcopy_2036.(LocalVariable).getFunction() = func
+and vp_2037.(LocalVariable).getFunction() = func
+and vslen_2059.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

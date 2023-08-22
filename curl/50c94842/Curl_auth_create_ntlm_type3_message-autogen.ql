@@ -42,7 +42,6 @@ predicate func_2(RelationalOperation target_8, Function func) {
 
 predicate func_3(RelationalOperation target_8, Function func, DoStmt target_3) {
 		target_3.getCondition().(Literal).getValue()="0"
-		and target_3.getStmt().(BlockStmt).toString() = "{ ... }"
 		and target_3.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_8
 		and target_3.getEnclosingFunction() = func
 }
@@ -103,8 +102,11 @@ predicate func_12(Variable vntresplen_525, BitwiseAndExpr target_12) {
 }
 
 predicate func_13(Parameter vdata_493, ExprStmt target_13) {
-		target_13.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_ntlm_core_mk_lm_hash")
+		target_13.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget().getType().hasName("CURLcode")
+		and target_13.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_ntlm_core_mk_lm_hash")
 		and target_13.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_493
+		and target_13.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(VariableAccess).getTarget().getType().hasName("const char *")
+		and target_13.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(2).(VariableAccess).getTarget().getType().hasName("unsigned char[24]")
 }
 
 predicate func_14(Parameter vdata_493, ExprStmt target_14) {
@@ -135,9 +137,9 @@ and vsize_519.getType().hasName("size_t")
 and vntlmbuf_520.getType().hasName("unsigned char[1024]")
 and vntresplen_525.getType().hasName("unsigned int")
 and vptr_ntresp_527.getType().hasName("unsigned char *")
-and vdata_493.getParentScope+() = func
-and vsize_519.getParentScope+() = func
-and vntlmbuf_520.getParentScope+() = func
-and vntresplen_525.getParentScope+() = func
-and vptr_ntresp_527.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vdata_493.getFunction() = func
+and vsize_519.(LocalVariable).getFunction() = func
+and vntlmbuf_520.(LocalVariable).getFunction() = func
+and vntresplen_525.(LocalVariable).getFunction() = func
+and vptr_ntresp_527.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

@@ -35,6 +35,7 @@ predicate func_1(Parameter vsize_171, Variable vtarget_info_len_174, Variable vt
 
 predicate func_2(BlockStmt target_2) {
 		target_2.getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
+		and target_2.getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("Curl_easy *")
 		and target_2.getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="NTLM handshake failure (bad type-2 message). Target Info Offset Len is set incorrect by the peer\n"
 }
 
@@ -47,6 +48,7 @@ predicate func_3(Parameter vsize_171, RelationalOperation target_3) {
 predicate func_5(Variable vtarget_info_offset_175, ExprStmt target_5) {
 		target_5.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vtarget_info_offset_175
 		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_read32_le")
+		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(VariableAccess).getTarget().getType().hasName("unsigned char *")
 		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(AddressOfExpr).getOperand().(ArrayExpr).getArrayOffset().(Literal).getValue()="44"
 }
 
@@ -67,7 +69,7 @@ and func_6(vtarget_info_offset_175, target_6)
 and vsize_171.getType().hasName("size_t")
 and vtarget_info_len_174.getType().hasName("unsigned short")
 and vtarget_info_offset_175.getType().hasName("unsigned int")
-and vsize_171.getParentScope+() = func
-and vtarget_info_len_174.getParentScope+() = func
-and vtarget_info_offset_175.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vsize_171.getFunction() = func
+and vtarget_info_len_174.(LocalVariable).getFunction() = func
+and vtarget_info_offset_175.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

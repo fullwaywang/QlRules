@@ -1,0 +1,112 @@
+commit 6d9f8e2462fc2c426d48c941edeb78e5df7d2977	6d9f8e2462fc2c426d48c941edeb78e5df7d2977
+Author: antirez <antirez@gmail.com>
+Date:   Sun Sep 25 22:48:41 2016 +0200
+
+    Security: CONFIG SET client-output-buffer-limit overflow fixed.
+    
+    This commit fixes a vunlerability reported by Cory Duplantis
+    of Cisco Talos, see TALOS-2016-0206 for reference.
+    
+    CONFIG SET client-output-buffer-limit accepts as client class "master"
+    which is actually only used to implement CLIENT KILL. The "master" class
+    has ID 3. What happens is that the global structure:
+    
+        server.client_obuf_limits[class]
+    
+    Is accessed with class = 3. However it is a 3 elements array, so writing
+    the 4th element means to write up to 24 bytes of memory *after* the end
+    of the array, since the structure is defined as:
+    
+        typedef struct clientBufferLimitsConfig {
+            unsigned long long hard_limit_bytes;
+            unsigned long long soft_limit_bytes;
+            time_t soft_limit_seconds;
+        } clientBufferLimitsConfig;
+    
+    EVALUATION OF IMPACT:
+    
+    Checking what's past the boundaries of the array in the global
+    'server' structure, we find AOF state fields:
+    
+        clientBufferLimitsConfig client_obuf_limits[CLIENT_TYPE_OBUF_COUNT];
+        /* AOF persistence */
+        int aof_state;                  /* AOF_(ON|OFF|WAIT_REWRITE) */
+        int aof_fsync;                  /* Kind of fsync() policy */
+        char *aof_filename;             /* Name of the AOF file */
+        int aof_no_fsync_on_rewrite;    /* Don't fsync if a rewrite is in prog. */
+        int aof_rewrite_perc;           /* Rewrite AOF if % growth is > M and... */
+        off_t aof_rewrite_min_size;     /* the AOF file is at least N bytes. */
+        off_t aof_rewrite_base_size;    /* AOF size on latest startup or rewrite. */
+        off_t aof_current_size;         /* AOF current size. */
+    
+    Writing to most of these fields should be harmless and only cause problems in
+    Redis persistence that should not escalate to security problems.
+    However unfortunately writing to "aof_filename" could be potentially a
+    security issue depending on the access pattern.
+    
+    Searching for "aof.filename" accesses in the source code returns many different
+    usages of the field, including using it as input for open(), logging to the
+    Redis log file or syslog, and calling the rename() syscall.
+    
+    It looks possible that attacks could lead at least to informations
+    disclosure of the state and data inside Redis. However note that the
+    attacker must already have access to the server. But, worse than that,
+    it looks possible that being able to change the AOF filename can be used
+    to mount more powerful attacks: like overwriting random files with AOF
+    data (easily a potential security issue as demostrated here:
+    http://antirez.com/news/96), or even more subtle attacks where the
+    AOF filename is changed to a path were a malicious AOF file is loaded
+    in order to exploit other potential issues when the AOF parser is fed
+    with untrusted input (no known issue known currently).
+    
+    The fix checks the places where the 'master' class is specifiedf in
+    order to access configuration data structures, and return an error in
+    this cases.
+    
+    WHO IS AT RISK?
+    
+    The "master" client class was introduced in Redis in Jul 28 2015.
+    Every Redis instance released past this date is not vulnerable
+    while all the releases after this date are. Notably:
+    
+        Redis 3.0.x is NOT vunlerable.
+        Redis 3.2.x IS vulnerable.
+        Redis unstable is vulnerable.
+    
+    In order for the instance to be at risk, at least one of the following
+    conditions must be true:
+    
+        1. The attacker can access Redis remotely and is able to send
+           the CONFIG SET command (often banned in managed Redis instances).
+    
+        2. The attacker is able to control the "redis.conf" file and
+           can wait or trigger a server restart.
+    
+    The problem was fixed 26th September 2016 in all the releases affected.
+
+diff --git a/src/config.c b/src/config.c
+index 1d81180b7..8f3b81a19 100644
+--- a/src/config.c
++++ b/src/config.c
+@@ -616,8 +616,9 @@ void loadServerConfigFromString(char *config) {
+             unsigned long long hard, soft;
+             int soft_seconds;
+ 
+-            if (class == -1) {
+-                err = "Unrecognized client limit class";
++            if (class == -1 || class == CLIENT_TYPE_MASTER) {
++                err = "Unrecognized client limit class: the user specified "
++                "an invalid one, or 'master' which has no buffer limits.";
+                 goto loaderr;
+             }
+             hard = memtoll(argv[2],NULL);
+@@ -906,7 +907,8 @@ void configSetCommand(client *c) {
+             long val;
+ 
+             if ((j % 4) == 0) {
+-                if (getClientTypeByName(v[j]) == -1) {
++                int class = getClientTypeByName(v[j]);
++                if (class == -1 || class == CLIENT_TYPE_MASTER) {
+                     sdsfreesplitres(v,vlen);
+                     goto badfmt;
+                 }

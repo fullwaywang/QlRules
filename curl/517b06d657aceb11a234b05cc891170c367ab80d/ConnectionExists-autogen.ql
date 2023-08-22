@@ -31,6 +31,7 @@ predicate func_2(Parameter vneedle_2899, BlockStmt target_6, LogicalOrExpr targe
 		and target_2.getParent().(LogicalOrExpr).getAnOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="handler"
 		and target_2.getParent().(LogicalOrExpr).getAnOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_2899
 		and target_2.getParent().(LogicalOrExpr).getAnOperand().(BitwiseAndExpr).getRightOperand() instanceof BinaryBitwiseOperation
+		and target_2.getParent().(LogicalOrExpr).getAnOperand().(VariableAccess).getTarget().getType().hasName("bool")
 		and target_2.getParent().(LogicalOrExpr).getParent().(IfStmt).getThen()=target_6
 		and target_2.getOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation()))
 }
@@ -53,10 +54,12 @@ predicate func_5(Parameter vneedle_2899, LogicalOrExpr target_5) {
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="user"
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_2899
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getTarget().getName()="user"
+		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("connectdata *")
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("curl_strequal")
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="passwd"
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_2899
 		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getTarget().getName()="passwd"
+		and target_5.getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("connectdata *")
 }
 
 predicate func_6(Parameter vneedle_2899, BlockStmt target_6) {
@@ -64,11 +67,12 @@ predicate func_6(Parameter vneedle_2899, BlockStmt target_6) {
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="user"
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_2899
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getTarget().getName()="user"
+		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("connectdata *")
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("curl_strequal")
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="passwd"
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vneedle_2899
 		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getTarget().getName()="passwd"
-		and target_6.getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ContinueStmt).toString() = "continue;"
+		and target_6.getStmt(0).(IfStmt).getCondition().(LogicalOrExpr).getAnOperand().(NotExpr).getOperand().(FunctionCall).getArgument(1).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("connectdata *")
 }
 
 from Function func, Parameter vneedle_2899, PointerFieldAccess target_0, BinaryBitwiseOperation target_1, PointerFieldAccess target_4, LogicalOrExpr target_5, BlockStmt target_6
@@ -80,5 +84,5 @@ and func_4(vneedle_2899, target_4)
 and func_5(vneedle_2899, target_5)
 and func_6(vneedle_2899, target_6)
 and vneedle_2899.getType().hasName("connectdata *")
-and vneedle_2899.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vneedle_2899.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

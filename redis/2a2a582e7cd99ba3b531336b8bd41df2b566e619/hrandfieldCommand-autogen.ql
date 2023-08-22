@@ -1,7 +1,7 @@
 /**
  * @name redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-hrandfieldCommand
- * @id cpp/redis/2a2a582e7cd99ba3b531336b8bd41df2b566e619-hrandfieldcommand
- * @description redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-hrandfieldCommand CVE-2023-25155
+ * @id cpp/redis/2a2a582e7cd99ba3b531336b8bd41df2b566e619/hrandfieldCommand
+ * @description redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-src/t_hash.c-hrandfieldCommand CVE-2023-25155
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -47,6 +47,6 @@ and func_2(func, target_2)
 and func_4(func, target_4)
 and vl_1117.getType().hasName("long")
 and vc_1116.getType().hasName("client *")
-and vl_1117.getParentScope+() = func
-and vc_1116.getParentScope+() = func
+and vl_1117.(LocalVariable).getFunction() = func
+and vc_1116.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

@@ -45,6 +45,6 @@ where
 func_0(vCurl_cfree, func, target_0)
 and vdata_1239.getType().hasName("Curl_easy *")
 and vCurl_cfree.getType().hasName("curl_free_callback")
-and vdata_1239.getParentScope+() = func
+and vdata_1239.getFunction() = func
 and not vCurl_cfree.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

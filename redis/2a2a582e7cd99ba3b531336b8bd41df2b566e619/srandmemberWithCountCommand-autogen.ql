@@ -1,7 +1,7 @@
 /**
  * @name redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-srandmemberWithCountCommand
- * @id cpp/redis/2a2a582e7cd99ba3b531336b8bd41df2b566e619-srandmemberwithcountcommand
- * @description redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-srandmemberWithCountCommand CVE-2023-25155
+ * @id cpp/redis/2a2a582e7cd99ba3b531336b8bd41df2b566e619/srandmemberWithCountCommand
+ * @description redis-2a2a582e7cd99ba3b531336b8bd41df2b566e619-src/t_set.c-srandmemberWithCountCommand CVE-2023-25155
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -35,6 +35,6 @@ func_0(vl_658, vc_657, target_0)
 and not func_1(func)
 and vl_658.getType().hasName("long")
 and vc_657.getType().hasName("client *")
-and vl_658.getParentScope+() = func
-and vc_657.getParentScope+() = func
+and vl_658.(LocalVariable).getFunction() = func
+and vc_657.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

@@ -50,6 +50,7 @@ predicate func_3(Variable vexpires_427, Variable vresult_429, Variable vp_430, V
 
 predicate func_4(EqualityOperation target_4) {
 		target_4.getAnOperand().(Literal).getValue()="2"
+		and target_4.getAnOperand().(VariableAccess).getTarget().getType().hasName("int")
 }
 
 predicate func_5(Variable vp_430, ExprStmt target_5) {
@@ -74,9 +75,9 @@ and vresult_429.getType().hasName("CURLcode")
 and vp_430.getType().hasName("char *")
 and vsubdomain_431.getType().hasName("bool")
 and vh_413.getType().hasName("hsts *")
-and vexpires_427.getParentScope+() = func
-and vresult_429.getParentScope+() = func
-and vp_430.getParentScope+() = func
-and vsubdomain_431.getParentScope+() = func
-and vh_413.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vexpires_427.(LocalVariable).getFunction() = func
+and vresult_429.(LocalVariable).getFunction() = func
+and vp_430.(LocalVariable).getFunction() = func
+and vsubdomain_431.(LocalVariable).getFunction() = func
+and vh_413.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

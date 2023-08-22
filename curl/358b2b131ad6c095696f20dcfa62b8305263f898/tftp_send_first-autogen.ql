@@ -73,7 +73,8 @@ predicate func_6(Variable vfilename_453, AddressOfExpr target_6) {
 }
 
 predicate func_7(Variable vfilename_453, Variable vdata_455, ExprStmt target_7) {
-		target_7.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_urldecode")
+		target_7.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget().getType().hasName("CURLcode")
+		and target_7.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("Curl_urldecode")
 		and target_7.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_455
 		and target_7.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getTarget().getName()="path"
 		and target_7.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(AddressOfExpr).getOperand().(ArrayExpr).getArrayBase().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="state"
@@ -106,9 +107,9 @@ and vstate_448.getType().hasName("tftp_state_data_t *")
 and vmode_452.getType().hasName("const char *")
 and vfilename_453.getType().hasName("char *")
 and vdata_455.getType().hasName("Curl_easy *")
-and vevent_448.getParentScope+() = func
-and vstate_448.getParentScope+() = func
-and vmode_452.getParentScope+() = func
-and vfilename_453.getParentScope+() = func
-and vdata_455.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vevent_448.getFunction() = func
+and vstate_448.getFunction() = func
+and vmode_452.(LocalVariable).getFunction() = func
+and vfilename_453.(LocalVariable).getFunction() = func
+and vdata_455.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

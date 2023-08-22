@@ -1,7 +1,7 @@
 /**
  * @name redis-f6a40570fa63d5afdd596c78083d754081d80ae3-zunionInterGenericCommand
  * @id cpp/redis/f6a40570fa63d5afdd596c78083d754081d80ae3/zunionInterGenericCommand
- * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-zunionInterGenericCommand CVE-2021-32627 CVE-2021-32628
+ * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-src/t_zset.c-zunionInterGenericCommand CVE-2021-32627
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -14,6 +14,7 @@ predicate func_1(Variable vtmp_2182, EqualityOperation target_4, ExprStmt target
 		target_1.getExpr().(AssignAddExpr).getLValue().(VariableAccess).getType().hasName("size_t")
 		and target_1.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getTarget().hasName("sdslen")
 		and target_1.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vtmp_2182
+		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(3)=target_1
 		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_4
 		and target_5.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getLocation().isBefore(target_1.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_1.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_6.getGreaterOperand().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
@@ -24,6 +25,7 @@ predicate func_2(Variable vtmp_2182, NotExpr target_7, ExprStmt target_8, Relati
 		target_2.getExpr().(AssignAddExpr).getLValue().(VariableAccess).getType().hasName("size_t")
 		and target_2.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getTarget().hasName("sdslen")
 		and target_2.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vtmp_2182
+		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(1)=target_2
 		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_7
 		and target_8.getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_2.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_2.getExpr().(AssignAddExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_9.getGreaterOperand().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
@@ -78,5 +80,5 @@ and func_7(target_7)
 and func_8(vtmp_2182, target_8)
 and func_9(vtmp_2182, target_9)
 and vtmp_2182.getType().hasName("sds")
-and vtmp_2182.getParentScope+() = func
+and vtmp_2182.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

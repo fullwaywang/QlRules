@@ -1,7 +1,7 @@
 /**
  * @name redis-f6a40570fa63d5afdd596c78083d754081d80ae3-ziplistMerge
  * @id cpp/redis/f6a40570fa63d5afdd596c78083d754081d80ae3/ziplistMerge
- * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-ziplistMerge CVE-2021-326271 CVE-2021-32628
+ * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-src/ziplist.c-ziplistMerge CVE-2021-32627
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -36,5 +36,5 @@ where
 not func_0(vzlbytes_894, target_1, func)
 and func_1(vzlbytes_894, target_1)
 and vzlbytes_894.getType().hasName("size_t")
-and vzlbytes_894.getParentScope+() = func
+and vzlbytes_894.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

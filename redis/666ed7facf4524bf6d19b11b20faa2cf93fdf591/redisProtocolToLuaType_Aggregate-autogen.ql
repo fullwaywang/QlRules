@@ -1,7 +1,7 @@
 /**
  * @name redis-666ed7facf4524bf6d19b11b20faa2cf93fdf591-redisProtocolToLuaType_Aggregate
  * @id cpp/redis/666ed7facf4524bf6d19b11b20faa2cf93fdf591/redisProtocolToLuaType-Aggregate
- * @description redis-666ed7facf4524bf6d19b11b20faa2cf93fdf591-redisProtocolToLuaType_Aggregate CVE-2021-32626
+ * @description redis-666ed7facf4524bf6d19b11b20faa2cf93fdf591-src/scripting.c-redisProtocolToLuaType_Aggregate CVE-2021-32626
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -20,6 +20,7 @@ predicate func_0(Parameter vlua_191, EqualityOperation target_1, ExprStmt target
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(CommaExpr).getLeftOperand().(FunctionCall).getArgument(2).(StringLiteral).getValue()="lua stack limit reach when parsing redis.call reply"
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(CommaExpr).getRightOperand().(FunctionCall).getTarget().hasName("_exit")
 		and target_0.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(CommaExpr).getRightOperand().(FunctionCall).getArgument(0) instanceof Literal
+		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getElse().(BlockStmt).getStmt(0)=target_0
 		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_1
 		and target_2.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_0.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_3.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
@@ -50,5 +51,5 @@ and func_1(target_1)
 and func_2(vlua_191, target_2)
 and func_3(vlua_191, target_3)
 and vlua_191.getType().hasName("lua_State *")
-and vlua_191.getParentScope+() = func
+and vlua_191.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

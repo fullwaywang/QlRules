@@ -22,7 +22,7 @@ predicate func_0(Parameter vsockindex_2575, Parameter vdata_2574, Parameter vcon
 		and target_0.getArgument(1).(VariableAccess).getLocation().isBefore(target_25.getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation()))
 }
 
-/*predicate func_1(Parameter vconn_2575, EqualityOperation target_1) {
+predicate func_1(Parameter vconn_2575, EqualityOperation target_1) {
 		target_1.getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
 		and target_1.getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="http_proxy"
 		and target_1.getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2575
@@ -33,7 +33,6 @@ predicate func_0(Parameter vsockindex_2575, Parameter vdata_2574, Parameter vcon
 		and target_1.getParent().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(ConditionalExpr).getElse().(Literal).getValue()="1"
 }
 
-*/
 /*predicate func_2(Parameter vconn_2575, EqualityOperation target_2) {
 		target_2.getAnOperand().(ValueFieldAccess).getTarget().getName()="state"
 		and target_2.getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
@@ -49,59 +48,59 @@ predicate func_0(Parameter vsockindex_2575, Parameter vdata_2574, Parameter vcon
 }
 
 */
-predicate func_3(ConditionalExpr target_26, Function func, DeclStmt target_3) {
-		target_3.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
-		and target_3.getEnclosingFunction() = func
+predicate func_3(Parameter vconn_2575, LogicalAndExpr target_3) {
+		target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="http_proxy"
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2575
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="state"
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2575
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(ConditionalExpr).getThen().(Literal).getValue()="0"
+		and target_3.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(ConditionalExpr).getElse().(Literal).getValue()="1"
 }
 
-predicate func_4(Parameter vconn_2575, LogicalAndExpr target_4) {
-		target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="http_proxy"
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2575
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="state"
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getTarget().getName()="proxy_ssl"
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayBase().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_2575
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(ConditionalExpr).getThen().(Literal).getValue()="0"
-		and target_4.getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getQualifier().(ArrayExpr).getArrayOffset().(ConditionalExpr).getElse().(Literal).getValue()="1"
+predicate func_4(Parameter vdata_2574, ConditionalExpr target_26, ExprStmt target_4) {
+		target_4.getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_lock")
+		and target_4.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+		and target_4.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
 }
 
-predicate func_5(Parameter vdata_2574, ConditionalExpr target_26, ExprStmt target_5) {
-		target_5.getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_lock")
-		and target_5.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+predicate func_5(Parameter vsockindex_2575, Variable vbackend_2610, Variable vssl_sessionid_3230, Parameter vdata_2574, Parameter vconn_2575, ConditionalExpr target_26, IfStmt target_5) {
+		target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("Curl_ssl_getsessionid")
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vconn_2575
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="state"
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getThen().(Literal).getValue()="1"
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getElse().(Literal).getValue()="0"
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(3).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vssl_sessionid_3230
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(4).(Literal).getValue()="0"
+		and target_5.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vsockindex_2575
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("SSL_set_session")
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="handle"
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vbackend_2610
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vssl_sessionid_3230
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_unlock")
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_failf")
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SSL: SSL_set_session failed: %s"
+		and target_5.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(FunctionCall).getTarget().hasName("ossl_strerror")
+		and target_5.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
+		and target_5.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
+		and target_5.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SSL re-using session ID\n"
 		and target_5.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
 }
 
-predicate func_6(Parameter vsockindex_2575, Variable vbackend_2610, Variable vssl_sessionid_3230, Parameter vdata_2574, Parameter vconn_2575, ConditionalExpr target_26, IfStmt target_6) {
-		target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("Curl_ssl_getsessionid")
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vconn_2575
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="proxytype"
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getCondition().(LogicalAndExpr).getAnOperand().(EqualityOperation).getAnOperand().(ValueFieldAccess).getTarget().getName()="state"
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getThen().(Literal).getValue()="1"
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(2).(ConditionalExpr).getElse().(Literal).getValue()="0"
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(3).(AddressOfExpr).getOperand().(VariableAccess).getTarget()=vssl_sessionid_3230
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(4).(Literal).getValue()="0"
-		and target_6.getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(5).(VariableAccess).getTarget()=vsockindex_2575
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getTarget().hasName("SSL_set_session")
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getTarget().getName()="handle"
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vbackend_2610
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getCondition().(NotExpr).getOperand().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vssl_sessionid_3230
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_unlock")
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_failf")
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SSL: SSL_set_session failed: %s"
-		and target_6.getThen().(BlockStmt).getStmt(0).(IfStmt).getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(2).(FunctionCall).getTarget().hasName("ossl_strerror")
-		and target_6.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("Curl_infof")
-		and target_6.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
-		and target_6.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SSL re-using session ID\n"
+predicate func_6(Parameter vdata_2574, ConditionalExpr target_26, ExprStmt target_6) {
+		target_6.getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_unlock")
+		and target_6.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
 		and target_6.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
 }
 
-predicate func_7(Parameter vdata_2574, ConditionalExpr target_26, ExprStmt target_7) {
-		target_7.getExpr().(FunctionCall).getTarget().hasName("Curl_ssl_sessionid_unlock")
-		and target_7.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vdata_2574
-		and target_7.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
+predicate func_7(ConditionalExpr target_26, Function func, DeclStmt target_7) {
+		target_7.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_26
+		and target_7.getEnclosingFunction() = func
 }
 
 predicate func_8(Parameter vdata_2574, VariableAccess target_8) {
@@ -115,6 +114,7 @@ predicate func_9(Parameter vconn_2575, VariableAccess target_9) {
 
 predicate func_10(Parameter vsockindex_2575, VariableAccess target_10) {
 		target_10.getTarget()=vsockindex_2575
+		and target_10.getParent().(PointerAddExpr).getParent().(FunctionCall).getParent().(ExprStmt).getExpr() instanceof FunctionCall
 }
 
 predicate func_11(Variable vdata_idx_3231, Variable vconnectdata_idx_3232, Variable vsockindex_idx_3233, Variable vproxy_idx_3234, Parameter vdata_2574, Parameter vconn_2575, Function func, IfStmt target_11) {
@@ -308,14 +308,15 @@ predicate func_27(LogicalAndExpr target_27) {
 		and target_27.getAnOperand() instanceof RelationalOperation
 }
 
-from Function func, Parameter vsockindex_2575, Variable vbackend_2610, Variable vssl_sessionid_3230, Variable vdata_idx_3231, Variable vconnectdata_idx_3232, Variable vsockindex_idx_3233, Variable vproxy_idx_3234, Parameter vdata_2574, Parameter vconn_2575, DeclStmt target_3, LogicalAndExpr target_4, ExprStmt target_5, IfStmt target_6, ExprStmt target_7, VariableAccess target_8, VariableAccess target_9, VariableAccess target_10, IfStmt target_11, DeclStmt target_12, DeclStmt target_13, DeclStmt target_14, DeclStmt target_15, AddressOfExpr target_21, NotExpr target_22, ExprStmt target_23, ArrayExpr target_24, PointerArithmeticOperation target_25, ConditionalExpr target_26, LogicalAndExpr target_27
+from Function func, Parameter vsockindex_2575, Variable vbackend_2610, Variable vssl_sessionid_3230, Variable vdata_idx_3231, Variable vconnectdata_idx_3232, Variable vsockindex_idx_3233, Variable vproxy_idx_3234, Parameter vdata_2574, Parameter vconn_2575, EqualityOperation target_1, LogicalAndExpr target_3, ExprStmt target_4, IfStmt target_5, ExprStmt target_6, DeclStmt target_7, VariableAccess target_8, VariableAccess target_9, VariableAccess target_10, IfStmt target_11, DeclStmt target_12, DeclStmt target_13, DeclStmt target_14, DeclStmt target_15, AddressOfExpr target_21, NotExpr target_22, ExprStmt target_23, ArrayExpr target_24, PointerArithmeticOperation target_25, ConditionalExpr target_26, LogicalAndExpr target_27
 where
 not func_0(vsockindex_2575, vdata_2574, vconn_2575, target_21, target_22, target_23, target_24, target_25)
-and func_3(target_26, func, target_3)
-and func_4(vconn_2575, target_4)
-and func_5(vdata_2574, target_26, target_5)
-and func_6(vsockindex_2575, vbackend_2610, vssl_sessionid_3230, vdata_2574, vconn_2575, target_26, target_6)
-and func_7(vdata_2574, target_26, target_7)
+and func_1(vconn_2575, target_1)
+and func_3(vconn_2575, target_3)
+and func_4(vdata_2574, target_26, target_4)
+and func_5(vsockindex_2575, vbackend_2610, vssl_sessionid_3230, vdata_2574, vconn_2575, target_26, target_5)
+and func_6(vdata_2574, target_26, target_6)
+and func_7(target_26, func, target_7)
 and func_8(vdata_2574, target_8)
 and func_9(vconn_2575, target_9)
 and func_10(vsockindex_2575, target_10)
@@ -340,13 +341,13 @@ and vsockindex_idx_3233.getType().hasName("int")
 and vproxy_idx_3234.getType().hasName("int")
 and vdata_2574.getType().hasName("Curl_easy *")
 and vconn_2575.getType().hasName("connectdata *")
-and vsockindex_2575.getParentScope+() = func
-and vbackend_2610.getParentScope+() = func
-and vssl_sessionid_3230.getParentScope+() = func
-and vdata_idx_3231.getParentScope+() = func
-and vconnectdata_idx_3232.getParentScope+() = func
-and vsockindex_idx_3233.getParentScope+() = func
-and vproxy_idx_3234.getParentScope+() = func
-and vdata_2574.getParentScope+() = func
-and vconn_2575.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vsockindex_2575.getFunction() = func
+and vbackend_2610.(LocalVariable).getFunction() = func
+and vssl_sessionid_3230.(LocalVariable).getFunction() = func
+and vdata_idx_3231.(LocalVariable).getFunction() = func
+and vconnectdata_idx_3232.(LocalVariable).getFunction() = func
+and vsockindex_idx_3233.(LocalVariable).getFunction() = func
+and vproxy_idx_3234.(LocalVariable).getFunction() = func
+and vdata_2574.getFunction() = func
+and vconn_2575.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

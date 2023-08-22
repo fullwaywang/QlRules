@@ -1,7 +1,7 @@
 /**
  * @name redis-1ddecf1958924b178b76a31d989ef1e05af81964-stralgoLCS
  * @id cpp/redis/1ddecf1958924b178b76a31d989ef1e05af81964/stralgoLCS
- * @description redis-1ddecf1958924b178b76a31d989ef1e05af81964-stralgoLCS CVE-2021-32625
+ * @description redis-1ddecf1958924b178b76a31d989ef1e05af81964-src/t_string.c-stralgoLCS CVE-2021-32625
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -28,7 +28,6 @@ predicate func_1(Parameter vc_732, Variable va_735, Variable vb_735, ExprStmt ta
 		and target_1.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("addReplyError")
 		and target_1.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vc_732
 		and target_1.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="String too long for LCS"
-		and target_1.getThen().(BlockStmt).getStmt(1).(GotoStmt).toString() = "goto ..."
 		and (func.getEntryPoint().(BlockStmt).getStmt(7)=target_1 or func.getEntryPoint().(BlockStmt).getStmt(7).getFollowingStmt()=target_1)
 		and target_9.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_1.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_10.getAnOperand().(VariableAccess).getLocation().isBefore(target_1.getCondition().(LogicalOrExpr).getAnOperand().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
@@ -57,7 +56,6 @@ predicate func_6(Parameter vc_732, Variable vlcs_811, ExprStmt target_14, ExprSt
 		and target_6.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("addReplyError")
 		and target_6.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vc_732
 		and target_6.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="Insufficient memory"
-		and target_6.getThen().(BlockStmt).getStmt(1).(GotoStmt).toString() = "goto ..."
 		and (func.getEntryPoint().(BlockStmt).getStmt(14)=target_6 or func.getEntryPoint().(BlockStmt).getStmt(14).getFollowingStmt()=target_6)
 		and target_6.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_14.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_6.getCondition().(NotExpr).getOperand().(VariableAccess).getLocation().isBefore(target_15.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(VariableAccess).getLocation()))
@@ -68,6 +66,7 @@ predicate func_7(Variable valen_805, Variable vblen_806, MulExpr target_7) {
 		and target_7.getLeftOperand().(AddExpr).getAnOperand().(Literal).getValue()="1"
 		and target_7.getRightOperand().(AddExpr).getAnOperand().(VariableAccess).getTarget()=vblen_806
 		and target_7.getRightOperand().(AddExpr).getAnOperand().(Literal).getValue()="1"
+		and target_7.getParent().(MulExpr).getParent().(FunctionCall).getParent().(Initializer).getExpr() instanceof FunctionCall
 }
 
 predicate func_8(Function func, SizeofTypeOperator target_8) {
@@ -139,10 +138,10 @@ and vb_735.getType().hasName("sds")
 and valen_805.getType().hasName("uint32_t")
 and vblen_806.getType().hasName("uint32_t")
 and vlcs_811.getType().hasName("uint32_t *")
-and vc_732.getParentScope+() = func
-and va_735.getParentScope+() = func
-and vb_735.getParentScope+() = func
-and valen_805.getParentScope+() = func
-and vblen_806.getParentScope+() = func
-and vlcs_811.getParentScope+() = func
+and vc_732.getFunction() = func
+and va_735.(LocalVariable).getFunction() = func
+and vb_735.(LocalVariable).getFunction() = func
+and valen_805.(LocalVariable).getFunction() = func
+and vblen_806.(LocalVariable).getFunction() = func
+and vlcs_811.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

@@ -1,7 +1,7 @@
 /**
  * @name redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-ldbRepl
  * @id cpp/redis/6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd/ldbRepl
- * @description redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-ldbRepl CVE-2021-32672
+ * @description redis-6ac3c0b7abd35f37201ed2d6298ecef4ea1ae1dd-src/scripting.c-ldbRepl CVE-2021-32672
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -27,7 +27,7 @@ predicate func_1(Parameter vlua_2555) {
 		and target_1.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vlua_2555)
 }
 
-predicate func_2(Parameter vlua_2555, Variable vldb, ExprStmt target_7, ValueFieldAccess target_8) {
+predicate func_2(Variable vldb, Parameter vlua_2555, ValueFieldAccess target_7, ExprStmt target_8) {
 	exists(IfStmt target_2 |
 		target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getTarget().hasName("sdslen")
 		and target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(ValueFieldAccess).getTarget().getName()="cbuf"
@@ -40,8 +40,8 @@ predicate func_2(Parameter vlua_2555, Variable vldb, ExprStmt target_7, ValueFie
 		and target_2.getThen().(BlockStmt).getStmt(2).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(StringLiteral).getValue()="max client buffer reached"
 		and target_2.getThen().(BlockStmt).getStmt(3).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("lua_error")
 		and target_2.getThen().(BlockStmt).getStmt(3).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vlua_2555
-		and target_2.getThen().(BlockStmt).getStmt(2).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_7.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
-		and target_8.getQualifier().(VariableAccess).getLocation().isBefore(target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(ValueFieldAccess).getQualifier().(VariableAccess).getLocation()))
+		and target_7.getQualifier().(VariableAccess).getLocation().isBefore(target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(ValueFieldAccess).getQualifier().(VariableAccess).getLocation())
+		and target_2.getThen().(BlockStmt).getStmt(2).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_8.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
 }
 
 predicate func_4(Variable vldb, ValueFieldAccess target_9) {
@@ -64,14 +64,14 @@ predicate func_6(Variable vldb, ExprStmt target_6) {
 		and target_6.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("sdsempty")
 }
 
-predicate func_7(Parameter vlua_2555, ExprStmt target_7) {
-		target_7.getExpr().(FunctionCall).getTarget().hasName("ldbTrace")
-		and target_7.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vlua_2555
+predicate func_7(Variable vldb, ValueFieldAccess target_7) {
+		target_7.getTarget().getName()="cbuf"
+		and target_7.getQualifier().(VariableAccess).getTarget()=vldb
 }
 
-predicate func_8(Variable vldb, ValueFieldAccess target_8) {
-		target_8.getTarget().getName()="cbuf"
-		and target_8.getQualifier().(VariableAccess).getTarget()=vldb
+predicate func_8(Parameter vlua_2555, ExprStmt target_8) {
+		target_8.getExpr().(FunctionCall).getTarget().hasName("ldbTrace")
+		and target_8.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vlua_2555
 }
 
 predicate func_9(Variable vldb, ValueFieldAccess target_9) {
@@ -79,19 +79,19 @@ predicate func_9(Variable vldb, ValueFieldAccess target_9) {
 		and target_9.getQualifier().(VariableAccess).getTarget()=vldb
 }
 
-from Function func, Parameter vlua_2555, Variable vldb, ExprStmt target_5, ExprStmt target_6, ExprStmt target_7, ValueFieldAccess target_8, ValueFieldAccess target_9
+from Function func, Variable vldb, Parameter vlua_2555, ExprStmt target_5, ExprStmt target_6, ValueFieldAccess target_7, ExprStmt target_8, ValueFieldAccess target_9
 where
 not func_0(func)
 and not func_1(vlua_2555)
-and not func_2(vlua_2555, vldb, target_7, target_8)
+and not func_2(vldb, vlua_2555, target_7, target_8)
 and not func_4(vldb, target_9)
 and func_5(vldb, target_5)
 and func_6(vldb, target_6)
-and func_7(vlua_2555, target_7)
-and func_8(vldb, target_8)
+and func_7(vldb, target_7)
+and func_8(vlua_2555, target_8)
 and func_9(vldb, target_9)
-and vlua_2555.getType().hasName("lua_State *")
 and vldb.getType().hasName("ldbState")
-and vlua_2555.getParentScope+() = func
+and vlua_2555.getType().hasName("lua_State *")
 and not vldb.getParentScope+() = func
+and vlua_2555.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

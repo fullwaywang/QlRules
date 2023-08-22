@@ -1,7 +1,7 @@
 /**
  * @name redis-a30d367a71b7017581cf1ca104242a3c644dec0f-rdbLoadObject
  * @id cpp/redis/a30d367a71b7017581cf1ca104242a3c644dec0f/rdbLoadObject
- * @description redis-a30d367a71b7017581cf1ca104242a3c644dec0f-rdbLoadObject CVE-2021-32687
+ * @description redis-a30d367a71b7017581cf1ca104242a3c644dec0f-src/rdb.c-rdbLoadObject CVE-2021-32687
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -39,6 +39,7 @@ predicate func_2(Variable vo_1488, Variable vlen_1489, EqualityOperation target_
 		and target_2.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(ExprStmt).getExpr().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vo_1488
 		and target_2.getThen().(BlockStmt).getStmt(1).(IfStmt).getThen().(ExprStmt).getExpr().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vlen_1489
 		and target_2.getElse() instanceof BlockStmt
+		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(3)=target_2
 		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_8
 		and target_9.getExpr().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_2.getThen().(BlockStmt).getStmt(0).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getLocation())
 		and target_10.getAnOperand().(AssignExpr).getLValue().(VariableAccess).getLocation().isBefore(target_2.getCondition().(RelationalOperation).getGreaterOperand().(VariableAccess).getLocation())
@@ -117,7 +118,7 @@ and func_11(vlen_1489, target_11)
 and vo_1488.getType().hasName("robj *")
 and vlen_1489.getType().hasName("uint64_t")
 and vserver.getType().hasName("redisServer")
-and vo_1488.getParentScope+() = func
-and vlen_1489.getParentScope+() = func
+and vo_1488.(LocalVariable).getFunction() = func
+and vlen_1489.(LocalVariable).getFunction() = func
 and not vserver.getParentScope+() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

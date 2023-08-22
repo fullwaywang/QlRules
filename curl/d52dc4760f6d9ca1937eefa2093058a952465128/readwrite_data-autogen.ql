@@ -118,23 +118,22 @@ predicate func_11(Parameter vdata_438, Parameter vk_440, Variable vexcess_446, E
 }
 
 predicate func_12(Variable vexcess_446, ExprStmt target_12) {
-		target_12.getExpr().(AssignExpr).getRValue().(VariableAccess).getTarget()=vexcess_446
+		target_12.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget().getType().hasName("ssize_t")
+		and target_12.getExpr().(AssignExpr).getRValue().(VariableAccess).getTarget()=vexcess_446
 }
 
 predicate func_13(Parameter vk_440, ExprStmt target_13) {
 		target_13.getExpr().(AssignPointerAddExpr).getLValue().(PointerFieldAccess).getTarget().getName()="str"
 		and target_13.getExpr().(AssignPointerAddExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vk_440
+		and target_13.getExpr().(AssignPointerAddExpr).getRValue().(VariableAccess).getTarget().getType().hasName("ssize_t")
 }
 
-predicate func_14(Parameter vdata_438, Parameter vconn_439, Parameter vk_440, Variable vexcess_446, BlockStmt target_14) {
+predicate func_14(Parameter vk_440, Variable vexcess_446, BlockStmt target_14) {
 		target_14.getStmt(0).(ExprStmt).getExpr().(AssignPointerAddExpr).getLValue().(PointerFieldAccess).getTarget().getName()="str"
 		and target_14.getStmt(0).(ExprStmt).getExpr().(AssignPointerAddExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vk_440
+		and target_14.getStmt(0).(ExprStmt).getExpr().(AssignPointerAddExpr).getRValue().(VariableAccess).getTarget().getType().hasName("ssize_t")
+		and target_14.getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget().getType().hasName("ssize_t")
 		and target_14.getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableAccess).getTarget()=vexcess_446
-		and target_14.getStmt(2).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(PointerFieldAccess).getTarget().getName()="readwrite"
-		and target_14.getStmt(2).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getTarget().getName()="handler"
-		and target_14.getStmt(2).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getExpr().(PointerFieldAccess).getQualifier().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vconn_439
-		and target_14.getStmt(2).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(0).(VariableAccess).getTarget()=vdata_438
-		and target_14.getStmt(2).(ExprStmt).getExpr().(AssignExpr).getRValue().(VariableCall).getArgument(1).(VariableAccess).getTarget()=vconn_439
 }
 
 from Function func, Parameter vdata_438, Parameter vconn_439, Parameter vk_440, Variable vexcess_446, PointerFieldAccess target_3, LogicalAndExpr target_7, ValueFieldAccess target_8, ExprStmt target_9, ExprStmt target_10, ExprStmt target_11, ExprStmt target_12, ExprStmt target_13, BlockStmt target_14
@@ -148,13 +147,13 @@ and func_10(vk_440, target_10)
 and func_11(vdata_438, vk_440, vexcess_446, target_11)
 and func_12(vexcess_446, target_12)
 and func_13(vk_440, target_13)
-and func_14(vdata_438, vconn_439, vk_440, vexcess_446, target_14)
+and func_14(vk_440, vexcess_446, target_14)
 and vdata_438.getType().hasName("Curl_easy *")
 and vconn_439.getType().hasName("connectdata *")
 and vk_440.getType().hasName("SingleRequest *")
 and vexcess_446.getType().hasName("size_t")
-and vdata_438.getParentScope+() = func
-and vconn_439.getParentScope+() = func
-and vk_440.getParentScope+() = func
-and vexcess_446.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vdata_438.getFunction() = func
+and vconn_439.getFunction() = func
+and vk_440.getFunction() = func
+and vexcess_446.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

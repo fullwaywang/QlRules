@@ -31,7 +31,7 @@ predicate func_2(Variable vptr_110, BlockStmt target_2) {
 		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(0).(SwitchCase).getExpr().(CharLiteral).getValue()="114"
 		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("fputc")
 		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(CharLiteral).getValue()="13"
-		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(2).(BreakStmt).toString() = "break;"
+		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(FunctionCall).getArgument(1).(VariableAccess).getTarget().getType().hasName("FILE *")
 		and target_2.getStmt(0).(BlockStmt).getStmt(0).(SwitchStmt).getStmt().(BlockStmt).getStmt(3).(SwitchCase).getExpr().(CharLiteral).getValue()="110"
 }
 
@@ -47,5 +47,5 @@ and func_1(vptr_110, target_2, target_1)
 and func_2(vptr_110, target_2)
 and func_3(vptr_110, target_3)
 and vptr_110.getType().hasName("const char *")
-and vptr_110.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vptr_110.(LocalVariable).getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

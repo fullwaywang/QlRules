@@ -1,7 +1,7 @@
 /**
  * @name redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-sdsMakeRoomFor
  * @id cpp/redis/d32f2e9999ce003bad0bd2c3bca29f64dcce4433/sdsMakeRoomFor
- * @description redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-sdsMakeRoomFor CVE-2021-21309
+ * @description redis-d32f2e9999ce003bad0bd2c3bca29f64dcce4433-src/sds.c-sdsMakeRoomFor CVE-2021-21309
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -91,7 +91,7 @@ and func_7(vhdrlen_237, target_7)
 and vlen_235.getType().hasName("size_t")
 and vnewlen_235.getType().hasName("size_t")
 and vhdrlen_237.getType().hasName("int")
-and vlen_235.getParentScope+() = func
-and vnewlen_235.getParentScope+() = func
-and vhdrlen_237.getParentScope+() = func
+and vlen_235.(LocalVariable).getFunction() = func
+and vnewlen_235.(LocalVariable).getFunction() = func
+and vhdrlen_237.(LocalVariable).getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

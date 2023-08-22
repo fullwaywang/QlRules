@@ -41,6 +41,7 @@ predicate func_4(Parameter vconn_3368, Parameter vdata_3368, LogicalAndExpr targ
 		target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(PointerFieldAccess).getTarget().getName()="hsts"
 		and target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_3368
 		and target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getTarget().hasName("curl_strnequal")
+		and target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("char *")
 		and target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(1).(StringLiteral).getValue()="Strict-Transport-Security:"
 		and target_4.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(2).(SubExpr).getValue()="26"
 		and target_4.getAnOperand().(LogicalOrExpr).getAnOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="flags"
@@ -54,6 +55,7 @@ predicate func_5(Parameter vconn_3368, Parameter vdata_3368, LogicalAndExpr targ
 		target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(PointerFieldAccess).getTarget().getName()="asi"
 		and target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget()=vdata_3368
 		and target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getTarget().hasName("curl_strnequal")
+		and target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(0).(VariableAccess).getTarget().getType().hasName("char *")
 		and target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(1).(StringLiteral).getValue()="Alt-Svc:"
 		and target_5.getAnOperand().(LogicalAndExpr).getAnOperand().(FunctionCall).getArgument(2).(SubExpr).getValue()="8"
 		and target_5.getAnOperand().(LogicalOrExpr).getAnOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="flags"
@@ -73,6 +75,6 @@ and func_4(vconn_3368, vdata_3368, target_4)
 and func_5(vconn_3368, vdata_3368, target_5)
 and vconn_3368.getType().hasName("connectdata *")
 and vdata_3368.getType().hasName("Curl_easy *")
-and vconn_3368.getParentScope+() = func
-and vdata_3368.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+and vconn_3368.getFunction() = func
+and vdata_3368.getFunction() = func
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

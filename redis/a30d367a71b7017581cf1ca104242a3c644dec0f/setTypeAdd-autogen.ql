@@ -1,7 +1,7 @@
 /**
  * @name redis-a30d367a71b7017581cf1ca104242a3c644dec0f-setTypeAdd
  * @id cpp/redis/a30d367a71b7017581cf1ca104242a3c644dec0f/setTypeAdd
- * @description redis-a30d367a71b7017581cf1ca104242a3c644dec0f-setTypeAdd CVE-2021-32687
+ * @description redis-a30d367a71b7017581cf1ca104242a3c644dec0f-src/t_set.c-setTypeAdd CVE-2021-32687
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -35,6 +35,7 @@ predicate func_2(Parameter vsubject_52, VariableAccess target_7, ExprStmt target
 		and target_2.getThen().(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("setTypeConvert")
 		and target_2.getThen().(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vsubject_52
 		and target_2.getThen().(ExprStmt).getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
+		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getThen().(BlockStmt).getStmt(2)=target_2
 		and target_2.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_7
 		and target_8.getExpr().(AssignExpr).getLValue().(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation())
 		and target_2.getCondition().(RelationalOperation).getGreaterOperand().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_9.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
@@ -79,7 +80,7 @@ predicate func_9(Parameter vsubject_52, ExprStmt target_9) {
 		and target_9.getExpr().(FunctionCall).getArgument(1).(Literal).getValue()="2"
 }
 
-from Function func, Variable vsuccess_64, Parameter vsubject_52, Variable vserver, ValueFieldAccess target_4, ExprStmt target_5, RelationalOperation target_6, VariableAccess target_7, ExprStmt target_8, ExprStmt target_9
+from Function func, Variable vsuccess_64, Variable vserver, Parameter vsubject_52, ValueFieldAccess target_4, ExprStmt target_5, RelationalOperation target_6, VariableAccess target_7, ExprStmt target_8, ExprStmt target_9
 where
 not func_0(target_5, func)
 and not func_1(target_6, func)
@@ -91,9 +92,9 @@ and func_7(vsuccess_64, target_7)
 and func_8(vsuccess_64, vsubject_52, target_8)
 and func_9(vsubject_52, target_9)
 and vsuccess_64.getType().hasName("uint8_t")
-and vsubject_52.getType().hasName("robj *")
 and vserver.getType().hasName("redisServer")
-and vsuccess_64.getParentScope+() = func
-and vsubject_52.getParentScope+() = func
+and vsubject_52.getType().hasName("robj *")
+and vsuccess_64.(LocalVariable).getFunction() = func
 and not vserver.getParentScope+() = func
+and vsubject_52.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

@@ -1,7 +1,7 @@
 /**
  * @name redis-f6a40570fa63d5afdd596c78083d754081d80ae3-_quicklistInsert
  * @id cpp/redis/f6a40570fa63d5afdd596c78083d754081d80ae3/-quicklistInsert
- * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-_quicklistInsert CVE-2021-32627 CVE-2021-32628
+ * @description redis-f6a40570fa63d5afdd596c78083d754081d80ae3-src/quicklist.c-_quicklistInsert CVE-2021-32627
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -39,5 +39,5 @@ where
 not func_0(vsz_850, target_1, func)
 and func_1(vsz_850, target_1)
 and vsz_850.getType().hasName("const size_t")
-and vsz_850.getParentScope+() = func
+and vsz_850.getFunction() = func
 select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()

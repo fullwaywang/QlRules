@@ -9,15 +9,15 @@
 
 import cpp
 
-predicate func_0(Variable vres_48, Variable vconn, FunctionCall target_3, ExprStmt target_4, Function func) {
+predicate func_0(Variable vres_48, Variable vconn, FunctionCall target_4, ExprStmt target_5, Function func) {
 	exists(ExprStmt target_0 |
 		target_0.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vres_48
 		and target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("PQexec")
 		and target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vconn
 		and target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SELECT pg_catalog.set_config('search_path', '', false)"
 		and (func.getEntryPoint().(BlockStmt).getStmt(5)=target_0 or func.getEntryPoint().(BlockStmt).getStmt(5).getFollowingStmt()=target_0)
-		and target_3.getArgument(0).(VariableAccess).getLocation().isBefore(target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
-		and target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_4.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
+		and target_4.getArgument(0).(VariableAccess).getLocation().isBefore(target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
+		and target_0.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation().isBefore(target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getLocation()))
 }
 
 predicate func_1(Variable vres_48, Function func) {
@@ -31,26 +31,26 @@ predicate func_1(Variable vres_48, Function func) {
 		and (func.getEntryPoint().(BlockStmt).getStmt(6)=target_1 or func.getEntryPoint().(BlockStmt).getStmt(6).getFollowingStmt()=target_1))
 }
 
-predicate func_3(Variable vconn, FunctionCall target_3) {
-		target_3.getTarget().hasName("PQerrorMessage")
-		and target_3.getArgument(0).(VariableAccess).getTarget()=vconn
+predicate func_4(Variable vconn, FunctionCall target_4) {
+		target_4.getTarget().hasName("PQerrorMessage")
+		and target_4.getArgument(0).(VariableAccess).getTarget()=vconn
 }
 
-predicate func_4(Variable vres_48, Variable vconn, ExprStmt target_4) {
-		target_4.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vres_48
-		and target_4.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("PQexec")
-		and target_4.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vconn
-		and target_4.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SET synchronous_commit = off"
+predicate func_5(Variable vres_48, Variable vconn, ExprStmt target_5) {
+		target_5.getExpr().(AssignExpr).getLValue().(VariableAccess).getTarget()=vres_48
+		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("PQexec")
+		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vconn
+		and target_5.getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(1).(StringLiteral).getValue()="SET synchronous_commit = off"
 }
 
-from Function func, Variable vres_48, Variable vconn, FunctionCall target_3, ExprStmt target_4
+from Function func, Variable vres_48, Variable vconn, FunctionCall target_4, ExprStmt target_5
 where
-not func_0(vres_48, vconn, target_3, target_4, func)
+not func_0(vres_48, vconn, target_4, target_5, func)
 and not func_1(vres_48, func)
-and func_3(vconn, target_3)
-and func_4(vres_48, vconn, target_4)
+and func_4(vconn, target_4)
+and func_5(vres_48, vconn, target_5)
 and vres_48.getType().hasName("PGresult *")
 and vconn.getType().hasName("PGconn *")
 and vres_48.(LocalVariable).getFunction() = func
 and not vconn.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

@@ -27,4 +27,4 @@ and vconn_896.getType().hasName("PGconn *")
 and vi_898.getType().hasName("int")
 and vconn_896.getFunction() = func
 and vi_898.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

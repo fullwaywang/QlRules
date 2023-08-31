@@ -66,4 +66,4 @@ and vcoll_15487.getType().hasName("CollInfo *")
 and vfout_15466.getFunction() = func
 and vresult_15468.(LocalVariable).getFunction() = func
 and vcoll_15487.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

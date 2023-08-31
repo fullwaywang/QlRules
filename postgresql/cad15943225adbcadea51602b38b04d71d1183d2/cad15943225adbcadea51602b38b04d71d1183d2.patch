@@ -1,0 +1,25 @@
+commit cad15943225adbcadea51602b38b04d71d1183d2	cad15943225adbcadea51602b38b04d71d1183d2
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon May 8 11:18:40 2017 -0400
+
+    Fix possibly-uninitialized variable.
+    
+    Oversight in e2d4ef8de et al (my fault not Peter's).  Per buildfarm.
+    
+    Security: CVE-2017-7484
+
+diff --git a/src/backend/utils/adt/rangetypes_selfuncs.c b/src/backend/utils/adt/rangetypes_selfuncs.c
+index 90c78fc3c2..b06b67010a 100644
+--- a/src/backend/utils/adt/rangetypes_selfuncs.c
++++ b/src/backend/utils/adt/rangetypes_selfuncs.c
+@@ -374,8 +374,8 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ {
+ 	Datum	   *hist_values;
+ 	int			nhist;
+-	Datum	   *length_hist_values;
+-	int			length_nhist;
++	Datum	   *length_hist_values = NULL;
++	int			length_nhist = 0;
+ 	RangeBound *hist_lower;
+ 	RangeBound *hist_upper;
+ 	int			i;

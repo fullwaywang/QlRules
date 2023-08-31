@@ -1,0 +1,961 @@
+commit fcd15f13581f6d75c63d213220d5a94889206c1b	fcd15f13581f6d75c63d213220d5a94889206c1b
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Aug 8 10:07:46 2016 -0400
+
+    Obstruct shell, SQL, and conninfo injection via database and role names.
+    
+    Due to simplistic quoting and confusion of database names with conninfo
+    strings, roles with the CREATEDB or CREATEROLE option could escalate to
+    superuser privileges when a superuser next ran certain maintenance
+    commands.  The new coding rule for PQconnectdbParams() calls, documented
+    at conninfo_array_parse(), is to pass expand_dbname=true and wrap
+    literal database names in a trivial connection string.  Escape
+    zero-length values in appendConnStrVal().  Back-patch to 9.1 (all
+    supported versions).
+    
+    Nathan Bossart, Michael Paquier, and Noah Misch.  Reviewed by Peter
+    Eisentraut.  Reported by Nathan Bossart.
+    
+    Security: CVE-2016-5424
+
+diff --git a/src/bin/pg_basebackup/streamutil.c b/src/bin/pg_basebackup/streamutil.c
+index 4d1ff90ee8..72d8657004 100644
+--- a/src/bin/pg_basebackup/streamutil.c
++++ b/src/bin/pg_basebackup/streamutil.c
+@@ -64,9 +64,15 @@ GetConnection(void)
+ 	PQconninfoOption *conn_opt;
+ 	char	   *err_msg = NULL;
+ 
++	/* pg_recvlogical uses dbname only; others use connection_string only. */
++	Assert(dbname == NULL || connection_string == NULL);
++
+ 	/*
+ 	 * Merge the connection info inputs given in form of connection string,
+ 	 * options and default values (dbname=replication, replication=true, etc.)
++	 * Explicitly discard any dbname value in the connection string;
++	 * otherwise, PQconnectdbParams() would interpret that value as being
++	 * itself a connection string.
+ 	 */
+ 	i = 0;
+ 	if (connection_string)
+@@ -80,7 +86,8 @@ GetConnection(void)
+ 
+ 		for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
+ 		{
+-			if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
++			if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
++				strcmp(conn_opt->keyword, "dbname") != 0)
+ 				argcount++;
+ 		}
+ 
+@@ -89,7 +96,8 @@ GetConnection(void)
+ 
+ 		for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
+ 		{
+-			if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
++			if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
++				strcmp(conn_opt->keyword, "dbname") != 0)
+ 			{
+ 				keywords[i] = conn_opt->keyword;
+ 				values[i] = conn_opt->val;
+diff --git a/src/bin/pg_dump/pg_backup.h b/src/bin/pg_dump/pg_backup.h
+index f94caa3cd4..4afa92f5f6 100644
+--- a/src/bin/pg_dump/pg_backup.h
++++ b/src/bin/pg_dump/pg_backup.h
+@@ -103,7 +103,7 @@ typedef struct _restoreOptions
+ 	SimpleStringList tableNames;
+ 
+ 	int			useDB;
+-	char	   *dbname;
++	char	   *dbname;			/* subject to expand_dbname */
+ 	char	   *pgport;
+ 	char	   *pghost;
+ 	char	   *username;
+@@ -121,7 +121,7 @@ typedef struct _restoreOptions
+ 
+ typedef struct _dumpOptions
+ {
+-	const char *dbname;
++	const char *dbname;			/* subject to expand_dbname */
+ 	const char *pghost;
+ 	const char *pgport;
+ 	const char *username;
+diff --git a/src/bin/pg_dump/pg_backup_archiver.c b/src/bin/pg_dump/pg_backup_archiver.c
+index 17a3050c30..05bdbdbf02 100644
+--- a/src/bin/pg_dump/pg_backup_archiver.c
++++ b/src/bin/pg_dump/pg_backup_archiver.c
+@@ -771,9 +771,16 @@ restore_toc_entry(ArchiveHandle *AH, TocEntry *te, bool is_parallel)
+ 		/* If we created a DB, connect to it... */
+ 		if (strcmp(te->desc, "DATABASE") == 0)
+ 		{
++			PQExpBufferData connstr;
++
++			initPQExpBuffer(&connstr);
++			appendPQExpBufferStr(&connstr, "dbname=");
++			appendConnStrVal(&connstr, te->tag);
++			/* Abandon struct, but keep its buffer until process exit. */
++
+ 			ahlog(AH, 1, "connecting to new database \"%s\"\n", te->tag);
+ 			_reconnectToDB(AH, te->tag);
+-			ropt->dbname = pg_strdup(te->tag);
++			ropt->dbname = connstr.data;
+ 		}
+ 	}
+ 
+@@ -2984,12 +2991,17 @@ _reconnectToDB(ArchiveHandle *AH, const char *dbname)
+ 		ReconnectToServer(AH, dbname, NULL);
+ 	else
+ 	{
+-		PQExpBuffer qry = createPQExpBuffer();
++		if (dbname)
++		{
++			PQExpBufferData connectbuf;
+ 
+-		appendPQExpBuffer(qry, "\\connect %s\n\n",
+-						  dbname ? fmtId(dbname) : "-");
+-		ahprintf(AH, "%s", qry->data);
+-		destroyPQExpBuffer(qry);
++			initPQExpBuffer(&connectbuf);
++			appendPsqlMetaConnect(&connectbuf, dbname);
++			ahprintf(AH, "%s\n", connectbuf.data);
++			termPQExpBuffer(&connectbuf);
++		}
++		else
++			ahprintf(AH, "%s\n", "\\connect -\n");
+ 	}
+ 
+ 	/*
+@@ -4463,7 +4475,7 @@ CloneArchive(ArchiveHandle *AH)
+ 	}
+ 	else
+ 	{
+-		char	   *dbname;
++		PQExpBufferData connstr;
+ 		char	   *pghost;
+ 		char	   *pgport;
+ 		char	   *username;
+@@ -4476,14 +4488,18 @@ CloneArchive(ArchiveHandle *AH)
+ 		 * because all just return a pointer and do not actually send/receive
+ 		 * any data to/from the database.
+ 		 */
+-		dbname = PQdb(AH->connection);
++		initPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, PQdb(AH->connection));
+ 		pghost = PQhost(AH->connection);
+ 		pgport = PQport(AH->connection);
+ 		username = PQuser(AH->connection);
+ 
+ 		/* this also sets clone->connection */
+-		ConnectDatabase((Archive *) clone, dbname, pghost, pgport, username, TRI_NO);
++		ConnectDatabase((Archive *) clone, connstr.data,
++						pghost, pgport, username, TRI_NO);
+ 
++		termPQExpBuffer(&connstr);
+ 		/* setupDumpWorker will fix up connection state */
+ 	}
+ 
+diff --git a/src/bin/pg_dump/pg_backup_db.c b/src/bin/pg_dump/pg_backup_db.c
+index 352595e49f..d2a3de3c5d 100644
+--- a/src/bin/pg_dump/pg_backup_db.c
++++ b/src/bin/pg_dump/pg_backup_db.c
+@@ -12,6 +12,7 @@
+ #include "postgres_fe.h"
+ 
+ #include "dumputils.h"
++#include "fe_utils/string_utils.h"
+ #include "parallel.h"
+ #include "pg_backup_archiver.h"
+ #include "pg_backup_db.h"
+@@ -128,6 +129,7 @@ ReconnectToServer(ArchiveHandle *AH, const char *dbname, const char *username)
+ static PGconn *
+ _connectDB(ArchiveHandle *AH, const char *reqdb, const char *requser)
+ {
++	PQExpBufferData connstr;
+ 	PGconn	   *newConn;
+ 	const char *newdb;
+ 	const char *newuser;
+@@ -156,6 +158,10 @@ _connectDB(ArchiveHandle *AH, const char *reqdb, const char *requser)
+ 			exit_horribly(modulename, "out of memory\n");
+ 	}
+ 
++	initPQExpBuffer(&connstr);
++	appendPQExpBuffer(&connstr, "dbname=");
++	appendConnStrVal(&connstr, newdb);
++
+ 	do
+ 	{
+ 		const char *keywords[7];
+@@ -170,7 +176,7 @@ _connectDB(ArchiveHandle *AH, const char *reqdb, const char *requser)
+ 		keywords[3] = "password";
+ 		values[3] = password;
+ 		keywords[4] = "dbname";
+-		values[4] = newdb;
++		values[4] = connstr.data;
+ 		keywords[5] = "fallback_application_name";
+ 		values[5] = progname;
+ 		keywords[6] = NULL;
+@@ -222,6 +228,8 @@ _connectDB(ArchiveHandle *AH, const char *reqdb, const char *requser)
+ 	if (password)
+ 		free(password);
+ 
++	termPQExpBuffer(&connstr);
++
+ 	/* check for version mismatch */
+ 	_check_database_version(AH);
+ 
+diff --git a/src/bin/pg_dump/pg_dumpall.c b/src/bin/pg_dump/pg_dumpall.c
+index 0318f961b9..fdbaa9dffb 100644
+--- a/src/bin/pg_dump/pg_dumpall.c
++++ b/src/bin/pg_dump/pg_dumpall.c
+@@ -1507,7 +1507,7 @@ dumpCreateDB(PGconn *conn)
+ 							  fdbname, fmtId(dbtablespace));
+ 
+ 			/* connect to original database */
+-			appendPQExpBuffer(buf, "\\connect %s\n", fdbname);
++			appendPsqlMetaConnect(buf, dbname);
+ 		}
+ 
+ 		if (binary_upgrade)
+@@ -1740,11 +1740,15 @@ dumpDatabases(PGconn *conn)
+ 		int			ret;
+ 
+ 		char	   *dbname = PQgetvalue(res, i, 0);
++		PQExpBufferData connectbuf;
+ 
+ 		if (verbose)
+ 			fprintf(stderr, _("%s: dumping database \"%s\"...\n"), progname, dbname);
+ 
+-		fprintf(OPF, "\\connect %s\n\n", fmtId(dbname));
++		initPQExpBuffer(&connectbuf);
++		appendPsqlMetaConnect(&connectbuf, dbname);
++		fprintf(OPF, "%s\n", connectbuf.data);
++		termPQExpBuffer(&connectbuf);
+ 
+ 		/*
+ 		 * Restore will need to write to the target cluster.  This connection
+@@ -1900,7 +1904,9 @@ connectDatabase(const char *dbname, const char *connection_string,
+ 
+ 		/*
+ 		 * Merge the connection info inputs given in form of connection string
+-		 * and other options.
++		 * and other options.  Explicitly discard any dbname value in the
++		 * connection string; otherwise, PQconnectdbParams() would interpret
++		 * that value as being itself a connection string.
+ 		 */
+ 		if (connection_string)
+ 		{
+@@ -1913,7 +1919,8 @@ connectDatabase(const char *dbname, const char *connection_string,
+ 
+ 			for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
+ 			{
+-				if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
++				if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
++					strcmp(conn_opt->keyword, "dbname") != 0)
+ 					argcount++;
+ 			}
+ 
+@@ -1922,7 +1929,8 @@ connectDatabase(const char *dbname, const char *connection_string,
+ 
+ 			for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
+ 			{
+-				if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
++				if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
++					strcmp(conn_opt->keyword, "dbname") != 0)
+ 				{
+ 					keywords[i] = conn_opt->keyword;
+ 					values[i] = conn_opt->val;
+diff --git a/src/bin/pg_upgrade/Makefile b/src/bin/pg_upgrade/Makefile
+index 0c882d9145..8823288708 100644
+--- a/src/bin/pg_upgrade/Makefile
++++ b/src/bin/pg_upgrade/Makefile
+@@ -12,11 +12,12 @@ OBJS = check.o controldata.o dump.o exec.o file.o function.o info.o \
+        tablespace.o util.o version.o $(WIN32RES)
+ 
+ override CPPFLAGS := -DDLSUFFIX=\"$(DLSUFFIX)\" -I$(srcdir) -I$(libpq_srcdir) $(CPPFLAGS)
++LDFLAGS += -L$(top_builddir)/src/fe_utils -lpgfeutils -lpq
+ 
+ 
+ all: pg_upgrade
+ 
+-pg_upgrade: $(OBJS) | submake-libpq submake-libpgport
++pg_upgrade: $(OBJS) | submake-libpq submake-libpgport submake-libpgfeutils
+ 	$(CC) $(CFLAGS) $^ $(libpq_pgport) $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
+ 
+ install: all installdirs
+diff --git a/src/bin/pg_upgrade/check.c b/src/bin/pg_upgrade/check.c
+index 324760b074..f901e3c512 100644
+--- a/src/bin/pg_upgrade/check.c
++++ b/src/bin/pg_upgrade/check.c
+@@ -10,6 +10,7 @@
+ #include "postgres_fe.h"
+ 
+ #include "catalog/pg_authid.h"
++#include "fe_utils/string_utils.h"
+ #include "mb/pg_wchar.h"
+ #include "pg_upgrade.h"
+ 
+@@ -414,12 +415,17 @@ void
+ create_script_for_cluster_analyze(char **analyze_script_file_name)
+ {
+ 	FILE	   *script = NULL;
+-	char	   *user_specification = "";
++	PQExpBufferData user_specification;
+ 
+ 	prep_status("Creating script to analyze new cluster");
+ 
++	initPQExpBuffer(&user_specification);
+ 	if (os_info.user_specified)
+-		user_specification = psprintf("-U \"%s\" ", os_info.user);
++	{
++		appendPQExpBufferStr(&user_specification, "-U ");
++		appendShellString(&user_specification, os_info.user);
++		appendPQExpBufferChar(&user_specification, ' ');
++	}
+ 
+ 	*analyze_script_file_name = psprintf("%sanalyze_new_cluster.%s",
+ 										 SCRIPT_PREFIX, SCRIPT_EXT);
+@@ -459,18 +465,18 @@ create_script_for_cluster_analyze(char **analyze_script_file_name)
+ 	fprintf(script, "echo %sthis script and run:%s\n",
+ 			ECHO_QUOTE, ECHO_QUOTE);
+ 	fprintf(script, "echo %s    \"%s/vacuumdb\" %s--all %s%s\n", ECHO_QUOTE,
+-			new_cluster.bindir, user_specification,
++			new_cluster.bindir, user_specification.data,
+ 	/* Did we copy the free space files? */
+ 			(GET_MAJOR_VERSION(old_cluster.major_version) >= 804) ?
+ 			"--analyze-only" : "--analyze", ECHO_QUOTE);
+ 	fprintf(script, "echo%s\n\n", ECHO_BLANK);
+ 
+ 	fprintf(script, "\"%s/vacuumdb\" %s--all --analyze-in-stages\n",
+-			new_cluster.bindir, user_specification);
++			new_cluster.bindir, user_specification.data);
+ 	/* Did we copy the free space files? */
+ 	if (GET_MAJOR_VERSION(old_cluster.major_version) < 804)
+ 		fprintf(script, "\"%s/vacuumdb\" %s--all\n", new_cluster.bindir,
+-				user_specification);
++				user_specification.data);
+ 
+ 	fprintf(script, "echo%s\n\n", ECHO_BLANK);
+ 	fprintf(script, "echo %sDone%s\n",
+@@ -484,8 +490,7 @@ create_script_for_cluster_analyze(char **analyze_script_file_name)
+ 				 *analyze_script_file_name, getErrorText());
+ #endif
+ 
+-	if (os_info.user_specified)
+-		pg_free(user_specification);
++	termPQExpBuffer(&user_specification);
+ 
+ 	check_ok();
+ }
+diff --git a/src/bin/pg_upgrade/dump.c b/src/bin/pg_upgrade/dump.c
+index 98034ddb61..81fb725338 100644
+--- a/src/bin/pg_upgrade/dump.c
++++ b/src/bin/pg_upgrade/dump.c
+@@ -12,6 +12,7 @@
+ #include "pg_upgrade.h"
+ 
+ #include <sys/types.h>
++#include "fe_utils/string_utils.h"
+ 
+ 
+ void
+@@ -46,6 +47,15 @@ generate_old_dump(void)
+ 		char		sql_file_name[MAXPGPATH],
+ 					log_file_name[MAXPGPATH];
+ 		DbInfo	   *old_db = &old_cluster.dbarr.dbs[dbnum];
++		PQExpBufferData connstr,
++					escaped_connstr;
++
++		initPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, old_db->db_name);
++		initPQExpBuffer(&escaped_connstr);
++		appendShellString(&escaped_connstr, connstr.data);
++		termPQExpBuffer(&connstr);
+ 
+ 		pg_log(PG_STATUS, "%s", old_db->db_name);
+ 		snprintf(sql_file_name, sizeof(sql_file_name), DB_DUMP_FILE_MASK, old_db->db_oid);
+@@ -53,10 +63,12 @@ generate_old_dump(void)
+ 
+ 		parallel_exec_prog(log_file_name, NULL,
+ 				   "\"%s/pg_dump\" %s --schema-only --quote-all-identifiers "
+-				  "--binary-upgrade --format=custom %s --file=\"%s\" \"%s\"",
++					  "--binary-upgrade --format=custom %s --file=\"%s\" %s",
+ 						 new_cluster.bindir, cluster_conn_opts(&old_cluster),
+ 						   log_opts.verbose ? "--verbose" : "",
+-						   sql_file_name, old_db->db_name);
++						   sql_file_name, escaped_connstr.data);
++
++		termPQExpBuffer(&escaped_connstr);
+ 	}
+ 
+ 	/* reap all children */
+diff --git a/src/bin/pg_upgrade/pg_upgrade.c b/src/bin/pg_upgrade/pg_upgrade.c
+index 4d9f496ed3..fa118e9e4f 100644
+--- a/src/bin/pg_upgrade/pg_upgrade.c
++++ b/src/bin/pg_upgrade/pg_upgrade.c
+@@ -38,6 +38,7 @@
+ 
+ #include "pg_upgrade.h"
+ #include "common/restricted_token.h"
++#include "fe_utils/string_utils.h"
+ 
+ #ifdef HAVE_LANGINFO_H
+ #include <langinfo.h>
+@@ -305,6 +306,15 @@ create_new_objects(void)
+ 		char		sql_file_name[MAXPGPATH],
+ 					log_file_name[MAXPGPATH];
+ 		DbInfo	   *old_db = &old_cluster.dbarr.dbs[dbnum];
++		PQExpBufferData connstr,
++					escaped_connstr;
++
++		initPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, old_db->db_name);
++		initPQExpBuffer(&escaped_connstr);
++		appendShellString(&escaped_connstr, connstr.data);
++		termPQExpBuffer(&connstr);
+ 
+ 		pg_log(PG_STATUS, "%s", old_db->db_name);
+ 		snprintf(sql_file_name, sizeof(sql_file_name), DB_DUMP_FILE_MASK, old_db->db_oid);
+@@ -316,11 +326,13 @@ create_new_objects(void)
+ 		 */
+ 		parallel_exec_prog(log_file_name,
+ 						   NULL,
+-						   "\"%s/pg_restore\" %s --exit-on-error --verbose --dbname \"%s\" \"%s\"",
++		 "\"%s/pg_restore\" %s --exit-on-error --verbose --dbname %s \"%s\"",
+ 						   new_cluster.bindir,
+ 						   cluster_conn_opts(&new_cluster),
+-						   old_db->db_name,
++						   escaped_connstr.data,
+ 						   sql_file_name);
++
++		termPQExpBuffer(&escaped_connstr);
+ 	}
+ 
+ 	/* reap all children */
+diff --git a/src/bin/pg_upgrade/server.c b/src/bin/pg_upgrade/server.c
+index 02b736dbd0..830335f501 100644
+--- a/src/bin/pg_upgrade/server.c
++++ b/src/bin/pg_upgrade/server.c
+@@ -9,6 +9,7 @@
+ 
+ #include "postgres_fe.h"
+ 
++#include "fe_utils/string_utils.h"
+ #include "pg_upgrade.h"
+ 
+ 
+@@ -51,18 +52,25 @@ connectToServer(ClusterInfo *cluster, const char *db_name)
+ static PGconn *
+ get_db_conn(ClusterInfo *cluster, const char *db_name)
+ {
+-	char		conn_opts[2 * NAMEDATALEN + MAXPGPATH + 100];
++	PQExpBufferData conn_opts;
++	PGconn	   *conn;
+ 
++	/* Build connection string with proper quoting */
++	initPQExpBuffer(&conn_opts);
++	appendPQExpBufferStr(&conn_opts, "dbname=");
++	appendConnStrVal(&conn_opts, db_name);
++	appendPQExpBufferStr(&conn_opts, " user=");
++	appendConnStrVal(&conn_opts, os_info.user);
++	appendPQExpBuffer(&conn_opts, " port=%d", cluster->port);
+ 	if (cluster->sockdir)
+-		snprintf(conn_opts, sizeof(conn_opts),
+-				 "dbname = '%s' user = '%s' host = '%s' port = %d",
+-				 db_name, os_info.user, cluster->sockdir, cluster->port);
+-	else
+-		snprintf(conn_opts, sizeof(conn_opts),
+-				 "dbname = '%s' user = '%s' port = %d",
+-				 db_name, os_info.user, cluster->port);
++	{
++		appendPQExpBufferStr(&conn_opts, " host=");
++		appendConnStrVal(&conn_opts, cluster->sockdir);
++	}
+ 
+-	return PQconnectdb(conn_opts);
++	conn = PQconnectdb(conn_opts.data);
++	termPQExpBuffer(&conn_opts);
++	return conn;
+ }
+ 
+ 
+@@ -74,23 +82,28 @@ get_db_conn(ClusterInfo *cluster, const char *db_name)
+  * sets, but the utilities we need aren't very consistent about the treatment
+  * of database name options, so we leave that out.
+  *
+- * Note result is in static storage, so use it right away.
++ * Result is valid until the next call to this function.
+  */
+ char *
+ cluster_conn_opts(ClusterInfo *cluster)
+ {
+-	static char conn_opts[MAXPGPATH + NAMEDATALEN + 100];
++	static PQExpBuffer buf;
+ 
+-	if (cluster->sockdir)
+-		snprintf(conn_opts, sizeof(conn_opts),
+-				 "--host \"%s\" --port %d --username \"%s\"",
+-				 cluster->sockdir, cluster->port, os_info.user);
++	if (buf == NULL)
++		buf = createPQExpBuffer();
+ 	else
+-		snprintf(conn_opts, sizeof(conn_opts),
+-				 "--port %d --username \"%s\"",
+-				 cluster->port, os_info.user);
++		resetPQExpBuffer(buf);
++
++	if (cluster->sockdir)
++	{
++		appendPQExpBufferStr(buf, "--host ");
++		appendShellString(buf, cluster->sockdir);
++		appendPQExpBufferChar(buf, ' ');
++	}
++	appendPQExpBuffer(buf, "--port %d --username ", cluster->port);
++	appendShellString(buf, os_info.user);
+ 
+-	return conn_opts;
++	return buf->data;
+ }
+ 
+ 
+diff --git a/src/bin/pg_upgrade/test.sh b/src/bin/pg_upgrade/test.sh
+index ba79fb319f..d417932301 100644
+--- a/src/bin/pg_upgrade/test.sh
++++ b/src/bin/pg_upgrade/test.sh
+@@ -153,6 +153,20 @@ set -x
+ 
+ standard_initdb "$oldbindir"/initdb
+ "$oldbindir"/pg_ctl start -l "$logdir/postmaster1.log" -o "$POSTMASTER_OPTS" -w
++
++# Create databases with names covering the ASCII bytes other than NUL, BEL,
++# LF, or CR.  BEL would ring the terminal bell in the course of this test, and
++# it is not otherwise a special case.  PostgreSQL doesn't support the rest.
++dbname1=`awk 'BEGIN { for (i= 1; i < 46; i++)
++	if (i != 7 && i != 10 && i != 13) printf "%c", i }' </dev/null`
++# Exercise backslashes adjacent to double quotes, a Windows special case.
++dbname1='\"\'$dbname1'\\"\\\'
++dbname2=`awk 'BEGIN { for (i = 46; i <  91; i++) printf "%c", i }' </dev/null`
++dbname3=`awk 'BEGIN { for (i = 91; i < 128; i++) printf "%c", i }' </dev/null`
++createdb "$dbname1" || createdb_status=$?
++createdb "$dbname2" || createdb_status=$?
++createdb "$dbname3" || createdb_status=$?
++
+ if "$MAKE" -C "$oldsrc" installcheck; then
+ 	pg_dumpall -f "$temp_root"/dump1.sql || pg_dumpall1_status=$?
+ 	if [ "$newsrc" != "$oldsrc" ]; then
+@@ -178,6 +192,9 @@ else
+ 	make_installcheck_status=$?
+ fi
+ "$oldbindir"/pg_ctl -m fast stop
++if [ -n "$createdb_status" ]; then
++	exit 1
++fi
+ if [ -n "$make_installcheck_status" ]; then
+ 	exit 1
+ fi
+diff --git a/src/bin/pg_upgrade/version.c b/src/bin/pg_upgrade/version.c
+index 4e49e9a0f9..36c299c101 100644
+--- a/src/bin/pg_upgrade/version.c
++++ b/src/bin/pg_upgrade/version.c
+@@ -10,6 +10,7 @@
+ #include "postgres_fe.h"
+ 
+ #include "pg_upgrade.h"
++#include "fe_utils/string_utils.h"
+ 
+ 
+ 
+@@ -48,10 +49,16 @@ new_9_0_populate_pg_largeobject_metadata(ClusterInfo *cluster, bool check_mode)
+ 			found = true;
+ 			if (!check_mode)
+ 			{
++				PQExpBufferData connectbuf;
++
+ 				if (script == NULL && (script = fopen_priv(output_path, "w")) == NULL)
+ 					pg_fatal("could not open file \"%s\": %s\n", output_path, getErrorText());
+-				fprintf(script, "\\connect %s\n",
+-						quote_identifier(active_db->db_name));
++
++				initPQExpBuffer(&connectbuf);
++				appendPsqlMetaConnect(&connectbuf, active_db->db_name);
++				fputs(connectbuf.data, script);
++				termPQExpBuffer(&connectbuf);
++
+ 				fprintf(script,
+ 						"SELECT pg_catalog.lo_create(t.loid)\n"
+ 						"FROM (SELECT DISTINCT loid FROM pg_catalog.pg_largeobject) AS t;\n");
+diff --git a/src/bin/psql/command.c b/src/bin/psql/command.c
+index 1608bf414c..9c0af4e848 100644
+--- a/src/bin/psql/command.c
++++ b/src/bin/psql/command.c
+@@ -1785,6 +1785,7 @@ do_connect(enum trivalue reuse_previous_specification,
+ 	bool		keep_password;
+ 	bool		has_connection_string;
+ 	bool		reuse_previous;
++	PQExpBufferData connstr;
+ 
+ 	if (!o_conn && (!dbname || !user || !host || !port))
+ 	{
+@@ -1846,7 +1847,15 @@ do_connect(enum trivalue reuse_previous_specification,
+ 	 * changes: passwords aren't (usually) database-specific.
+ 	 */
+ 	if (!dbname && reuse_previous)
+-		dbname = PQdb(o_conn);
++	{
++		initPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, PQdb(o_conn));
++		dbname = connstr.data;
++		/* has_connection_string=true would be a dead store */
++	}
++	else
++		connstr.data = NULL;
+ 
+ 	/*
+ 	 * If the user asked to be prompted for a password, ask for one now. If
+@@ -1955,8 +1964,12 @@ do_connect(enum trivalue reuse_previous_specification,
+ 		}
+ 
+ 		PQfinish(n_conn);
++		if (connstr.data)
++			termPQExpBuffer(&connstr);
+ 		return false;
+ 	}
++	if (connstr.data)
++		termPQExpBuffer(&connstr);
+ 
+ 	/*
+ 	 * Replace the old connection with the new one, and update
+diff --git a/src/bin/scripts/clusterdb.c b/src/bin/scripts/clusterdb.c
+index 9b816d9c66..0b16f34d1e 100644
+--- a/src/bin/scripts/clusterdb.c
++++ b/src/bin/scripts/clusterdb.c
+@@ -12,6 +12,7 @@
+ #include "postgres_fe.h"
+ #include "common.h"
+ #include "fe_utils/simple_list.h"
++#include "fe_utils/string_utils.h"
+ 
+ 
+ static void cluster_one_database(const char *dbname, bool verbose, const char *table,
+@@ -229,6 +230,7 @@ cluster_all_databases(bool verbose, const char *maintenance_db,
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
++	PQExpBufferData connstr;
+ 	int			i;
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+@@ -236,6 +238,7 @@ cluster_all_databases(bool verbose, const char *maintenance_db,
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", progname, echo);
+ 	PQfinish(conn);
+ 
++	initPQExpBuffer(&connstr);
+ 	for (i = 0; i < PQntuples(result); i++)
+ 	{
+ 		char	   *dbname = PQgetvalue(result, i, 0);
+@@ -246,10 +249,15 @@ cluster_all_databases(bool verbose, const char *maintenance_db,
+ 			fflush(stdout);
+ 		}
+ 
+-		cluster_one_database(dbname, verbose, NULL,
++		resetPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, dbname);
++
++		cluster_one_database(connstr.data, verbose, NULL,
+ 							 host, port, username, prompt_password,
+ 							 progname, echo);
+ 	}
++	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }
+diff --git a/src/bin/scripts/reindexdb.c b/src/bin/scripts/reindexdb.c
+index 43f61013ef..293522c902 100644
+--- a/src/bin/scripts/reindexdb.c
++++ b/src/bin/scripts/reindexdb.c
+@@ -331,6 +331,7 @@ reindex_all_databases(const char *maintenance_db,
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
++	PQExpBufferData connstr;
+ 	int			i;
+ 
+ 	conn = connectMaintenanceDatabase(maintenance_db, host, port, username,
+@@ -338,6 +339,7 @@ reindex_all_databases(const char *maintenance_db,
+ 	result = executeQuery(conn, "SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1;", progname, echo);
+ 	PQfinish(conn);
+ 
++	initPQExpBuffer(&connstr);
+ 	for (i = 0; i < PQntuples(result); i++)
+ 	{
+ 		char	   *dbname = PQgetvalue(result, i, 0);
+@@ -348,9 +350,15 @@ reindex_all_databases(const char *maintenance_db,
+ 			fflush(stdout);
+ 		}
+ 
+-		reindex_one_database(dbname, dbname, "DATABASE", host, port, username,
+-							 prompt_password, progname, echo, verbose);
++		resetPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, dbname);
++
++		reindex_one_database(NULL, connstr.data, "DATABASE", host,
++							 port, username, prompt_password,
++							 progname, echo, verbose);
+ 	}
++	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }
+@@ -373,7 +381,7 @@ reindex_system_catalogs(const char *dbname, const char *host, const char *port,
+ 	if (verbose)
+ 		appendPQExpBuffer(&sql, " (VERBOSE)");
+ 
+-	appendPQExpBuffer(&sql, " SYSTEM %s;", PQdb(conn));
++	appendPQExpBuffer(&sql, " SYSTEM %s;", fmtId(PQdb(conn)));
+ 
+ 	if (!executeMaintenanceCommand(conn, sql.data, echo))
+ 	{
+diff --git a/src/bin/scripts/vacuumdb.c b/src/bin/scripts/vacuumdb.c
+index a6bb135e25..c10b58bf0f 100644
+--- a/src/bin/scripts/vacuumdb.c
++++ b/src/bin/scripts/vacuumdb.c
+@@ -540,6 +540,7 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ {
+ 	PGconn	   *conn;
+ 	PGresult   *result;
++	PQExpBufferData connstr;
+ 	int			stage;
+ 	int			i;
+ 
+@@ -550,6 +551,7 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 						  progname, echo);
+ 	PQfinish(conn);
+ 
++	initPQExpBuffer(&connstr);
+ 	if (analyze_in_stages)
+ 	{
+ 		/*
+@@ -564,10 +566,11 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 		{
+ 			for (i = 0; i < PQntuples(result); i++)
+ 			{
+-				const char *dbname;
++				resetPQExpBuffer(&connstr);
++				appendPQExpBuffer(&connstr, "dbname=");
++				appendConnStrVal(&connstr, PQgetvalue(result, i, 0));
+ 
+-				dbname = PQgetvalue(result, i, 0);
+-				vacuum_one_database(dbname, vacopts,
++				vacuum_one_database(connstr.data, vacopts,
+ 									stage,
+ 									NULL,
+ 									host, port, username, prompt_password,
+@@ -580,10 +583,11 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 	{
+ 		for (i = 0; i < PQntuples(result); i++)
+ 		{
+-			const char *dbname;
++			resetPQExpBuffer(&connstr);
++			appendPQExpBuffer(&connstr, "dbname=");
++			appendConnStrVal(&connstr, PQgetvalue(result, i, 0));
+ 
+-			dbname = PQgetvalue(result, i, 0);
+-			vacuum_one_database(dbname, vacopts,
++			vacuum_one_database(connstr.data, vacopts,
+ 								ANALYZE_NO_STAGE,
+ 								NULL,
+ 								host, port, username, prompt_password,
+@@ -591,6 +595,7 @@ vacuum_all_databases(vacuumingOptions *vacopts,
+ 								progname, echo, quiet);
+ 		}
+ 	}
++	termPQExpBuffer(&connstr);
+ 
+ 	PQclear(result);
+ }
+diff --git a/src/fe_utils/string_utils.c b/src/fe_utils/string_utils.c
+index 4cf08dbdca..f986dbcf39 100644
+--- a/src/fe_utils/string_utils.c
++++ b/src/fe_utils/string_utils.c
+@@ -488,10 +488,10 @@ appendConnStrVal(PQExpBuffer buf, const char *str)
+ 	bool		needquotes;
+ 
+ 	/*
+-	 * If the string consists entirely of plain ASCII characters, no need to
+-	 * quote it. This is quite conservative, but better safe than sorry.
++	 * If the string is one or more plain ASCII characters, no need to quote
++	 * it. This is quite conservative, but better safe than sorry.
+ 	 */
+-	needquotes = false;
++	needquotes = true;
+ 	for (s = str; *s; s++)
+ 	{
+ 		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') ||
+@@ -500,6 +500,7 @@ appendConnStrVal(PQExpBuffer buf, const char *str)
+ 			needquotes = true;
+ 			break;
+ 		}
++		needquotes = false;
+ 	}
+ 
+ 	if (needquotes)
+@@ -521,6 +522,66 @@ appendConnStrVal(PQExpBuffer buf, const char *str)
+ }
+ 
+ 
++/*
++ * Append a psql meta-command that connects to the given database with the
++ * then-current connection's user, host and port.
++ */
++void
++appendPsqlMetaConnect(PQExpBuffer buf, const char *dbname)
++{
++	const char *s;
++	bool		complex;
++
++	/*
++	 * If the name is plain ASCII characters, emit a trivial "\connect "foo"".
++	 * For other names, even many not technically requiring it, skip to the
++	 * general case.  No database has a zero-length name.
++	 */
++	complex = false;
++	for (s = dbname; *s; s++)
++	{
++		if (*s == '\n' || *s == '\r')
++		{
++			fprintf(stderr,
++					_("database name contains a newline or carriage return: \"%s\"\n"),
++					dbname);
++			exit(EXIT_FAILURE);
++		}
++
++		if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z') ||
++			  (*s >= '0' && *s <= '9') || *s == '_' || *s == '.'))
++		{
++			complex = true;
++		}
++	}
++
++	appendPQExpBufferStr(buf, "\\connect ");
++	if (complex)
++	{
++		PQExpBufferData connstr;
++
++		initPQExpBuffer(&connstr);
++		appendPQExpBuffer(&connstr, "dbname=");
++		appendConnStrVal(&connstr, dbname);
++
++		appendPQExpBuffer(buf, "-reuse-previous=on ");
++
++		/*
++		 * As long as the name does not contain a newline, SQL identifier
++		 * quoting satisfies the psql meta-command parser.  Prefer not to
++		 * involve psql-interpreted single quotes, which behaved differently
++		 * before PostgreSQL 9.2.
++		 */
++		appendPQExpBufferStr(buf, fmtId(connstr.data));
++
++		termPQExpBuffer(&connstr);
++	}
++	else
++		appendPQExpBufferStr(buf, fmtId(dbname));
++	appendPQExpBufferChar(buf, '\n');
++}
++
++
+ /*
+  * Deconstruct the text representation of a 1-dimensional Postgres array
+  * into individual items.
+diff --git a/src/include/fe_utils/string_utils.h b/src/include/fe_utils/string_utils.h
+index c709406628..7bbed360a3 100644
+--- a/src/include/fe_utils/string_utils.h
++++ b/src/include/fe_utils/string_utils.h
+@@ -42,6 +42,7 @@ extern void appendByteaLiteral(PQExpBuffer buf,
+ 
+ extern void appendShellString(PQExpBuffer buf, const char *str);
+ extern void appendConnStrVal(PQExpBuffer buf, const char *str);
++extern void appendPsqlMetaConnect(PQExpBuffer buf, const char *dbname);
+ 
+ extern bool parsePGArray(const char *atext, char ***itemarray, int *nitems);
+ 
+diff --git a/src/interfaces/libpq/fe-connect.c b/src/interfaces/libpq/fe-connect.c
+index 9b2839b96c..76b61bdc25 100644
+--- a/src/interfaces/libpq/fe-connect.c
++++ b/src/interfaces/libpq/fe-connect.c
+@@ -4423,7 +4423,11 @@ conninfo_parse(const char *conninfo, PQExpBuffer errorMessage,
+  * of "dbname" keyword is a connection string (as indicated by
+  * recognized_connection_string) then parse and process it, overriding any
+  * previously processed conflicting keywords. Subsequent keywords will take
+- * precedence, however.
++ * precedence, however. In-tree programs generally specify expand_dbname=true,
++ * so command-line arguments naming a database can use a connection string.
++ * Some code acquires arbitrary database names from known-literal sources like
++ * PQdb(), PQconninfoParse() and pg_database.datname.  When connecting to such
++ * a database, in-tree code first wraps the name in a connection string.
+  */
+ static PQconninfoOption *
+ conninfo_array_parse(const char *const * keywords, const char *const * values,
+diff --git a/src/tools/msvc/vcregress.pl b/src/tools/msvc/vcregress.pl
+index 19108896f5..35c0158830 100644
+--- a/src/tools/msvc/vcregress.pl
++++ b/src/tools/msvc/vcregress.pl
+@@ -381,6 +381,41 @@ sub standard_initdb
+ 			$ENV{PGDATA}) == 0);
+ }
+ 
++# This is similar to appendShellString().  Perl system(@args) bypasses
++# cmd.exe, so omit the caret escape layer.
++sub quote_system_arg
++{
++	my $arg = shift;
++
++	# Change N >= 0 backslashes before a double quote to 2N+1 backslashes.
++	$arg =~ s/(\\*)"/${\($1 . $1)}\\"/gs;
++
++	# Change N >= 1 backslashes at end of argument to 2N backslashes.
++	$arg =~ s/(\\+)$/${\($1 . $1)}/gs;
++
++	# Wrap the whole thing in unescaped double quotes.
++	return "\"$arg\"";
++}
++
++# Generate a database with a name made of a range of ASCII characters, useful
++# for testing pg_upgrade.
++sub generate_db
++{
++	my ($prefix, $from_char, $to_char, $suffix) = @_;
++
++	my $dbname = $prefix;
++	for my $i ($from_char .. $to_char)
++	{
++		next if $i == 7 || $i == 10 || $i == 13;    # skip BEL, LF, and CR
++		$dbname = $dbname . sprintf('%c', $i);
++	}
++	$dbname .= $suffix;
++
++	system('createdb', quote_system_arg($dbname));
++	my $status = $? >> 8;
++	exit $status if $status;
++}
++
+ sub upgradecheck
+ {
+ 	my $status;
+@@ -414,6 +449,12 @@ sub upgradecheck
+ 	print "\nStarting old cluster\n\n";
+ 	my @args = ('pg_ctl', 'start', '-l', "$logdir/postmaster1.log", '-w');
+ 	system(@args) == 0 or exit 1;
++
++	print "\nCreating databases with names covering most ASCII bytes\n\n";
++	generate_db("\\\"\\", 1,  45,  "\\\\\"\\\\\\");
++	generate_db('',       46, 90,  '');
++	generate_db('',       91, 127, '');
++
+ 	print "\nSetting up data for upgrading\n\n";
+ 	installcheck();
+ 

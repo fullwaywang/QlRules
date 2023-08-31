@@ -1,0 +1,124 @@
+commit 677a494789062ca88e0142a17bedd5415f6ab0aa	677a494789062ca88e0142a17bedd5415f6ab0aa
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon May 9 08:35:08 2022 -0700
+
+    In REFRESH MATERIALIZED VIEW, set user ID before running user code.
+    
+    It intended to, but did not, achieve this.  Adopt the new standard of
+    setting user ID just after locking the relation.  Back-patch to v10 (all
+    supported versions).
+    
+    Reviewed by Simon Riggs.  Reported by Alvaro Herrera.
+    
+    Security: CVE-2022-1552
+
+diff --git a/src/backend/commands/matview.c b/src/backend/commands/matview.c
+index eaa333be85..3fc50e8b53 100644
+--- a/src/backend/commands/matview.c
++++ b/src/backend/commands/matview.c
+@@ -167,6 +167,17 @@ ExecRefreshMatView(RefreshMatViewStmt *stmt, const char *queryString,
+ 										  lockmode, 0,
+ 										  RangeVarCallbackOwnsTable, NULL);
+ 	matviewRel = table_open(matviewOid, NoLock);
++	relowner = matviewRel->rd_rel->relowner;
++
++	/*
++	 * Switch to the owner's userid, so that any functions are run as that
++	 * user.  Also lock down security-restricted operations and arrange to
++	 * make GUC variable changes local to this command.
++	 */
++	GetUserIdAndSecContext(&save_userid, &save_sec_context);
++	SetUserIdAndSecContext(relowner,
++						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
++	save_nestlevel = NewGUCNestLevel();
+ 
+ 	/* Make sure it is a materialized view. */
+ 	if (matviewRel->rd_rel->relkind != RELKIND_MATVIEW)
+@@ -269,19 +280,6 @@ ExecRefreshMatView(RefreshMatViewStmt *stmt, const char *queryString,
+ 	 */
+ 	SetMatViewPopulatedState(matviewRel, !stmt->skipData);
+ 
+-	relowner = matviewRel->rd_rel->relowner;
+-
+-	/*
+-	 * Switch to the owner's userid, so that any functions are run as that
+-	 * user.  Also arrange to make GUC variable changes local to this command.
+-	 * Don't lock it down too tight to create a temporary table just yet.  We
+-	 * will switch modes when we are about to execute user code.
+-	 */
+-	GetUserIdAndSecContext(&save_userid, &save_sec_context);
+-	SetUserIdAndSecContext(relowner,
+-						   save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
+-	save_nestlevel = NewGUCNestLevel();
+-
+ 	/* Concurrent refresh builds new data in temp tablespace, and does diff. */
+ 	if (concurrent)
+ 	{
+@@ -304,12 +302,6 @@ ExecRefreshMatView(RefreshMatViewStmt *stmt, const char *queryString,
+ 	LockRelationOid(OIDNewHeap, AccessExclusiveLock);
+ 	dest = CreateTransientRelDestReceiver(OIDNewHeap);
+ 
+-	/*
+-	 * Now lock down security-restricted operations.
+-	 */
+-	SetUserIdAndSecContext(relowner,
+-						   save_sec_context | SECURITY_RESTRICTED_OPERATION);
+-
+ 	/* Generate the data, if wanted. */
+ 	if (!stmt->skipData)
+ 		processed = refresh_matview_datafill(dest, dataQuery, queryString);
+diff --git a/src/test/regress/expected/privileges.out b/src/test/regress/expected/privileges.out
+index 8eb0fc3480..b3c3b257d1 100644
+--- a/src/test/regress/expected/privileges.out
++++ b/src/test/regress/expected/privileges.out
+@@ -1564,6 +1564,22 @@ CONTEXT:  SQL function "unwanted_grant" statement 1
+ SQL statement "SELECT unwanted_grant()"
+ PL/pgSQL function sro_trojan() line 1 at PERFORM
+ SQL function "mv_action" statement 1
++-- REFRESH MATERIALIZED VIEW CONCURRENTLY use of eval_const_expressions()
++SET SESSION AUTHORIZATION regress_sro_user;
++CREATE FUNCTION unwanted_grant_nofail(int) RETURNS int
++	IMMUTABLE LANGUAGE plpgsql AS $$
++BEGIN
++	PERFORM unwanted_grant();
++	RAISE WARNING 'owned';
++	RETURN 1;
++EXCEPTION WHEN OTHERS THEN
++	RETURN 2;
++END$$;
++CREATE MATERIALIZED VIEW sro_index_mv AS SELECT 1 AS c;
++CREATE UNIQUE INDEX ON sro_index_mv (c) WHERE unwanted_grant_nofail(1) > 0;
++\c -
++REFRESH MATERIALIZED VIEW CONCURRENTLY sro_index_mv;
++REFRESH MATERIALIZED VIEW sro_index_mv;
+ DROP OWNED BY regress_sro_user;
+ DROP ROLE regress_sro_user;
+ -- Admin options
+diff --git a/src/test/regress/sql/privileges.sql b/src/test/regress/sql/privileges.sql
+index f3d960a079..af05f95113 100644
+--- a/src/test/regress/sql/privileges.sql
++++ b/src/test/regress/sql/privileges.sql
+@@ -979,6 +979,23 @@ REFRESH MATERIALIZED VIEW sro_mv;
+ REFRESH MATERIALIZED VIEW sro_mv;
+ BEGIN; SET CONSTRAINTS ALL IMMEDIATE; REFRESH MATERIALIZED VIEW sro_mv; COMMIT;
+ 
++-- REFRESH MATERIALIZED VIEW CONCURRENTLY use of eval_const_expressions()
++SET SESSION AUTHORIZATION regress_sro_user;
++CREATE FUNCTION unwanted_grant_nofail(int) RETURNS int
++	IMMUTABLE LANGUAGE plpgsql AS $$
++BEGIN
++	PERFORM unwanted_grant();
++	RAISE WARNING 'owned';
++	RETURN 1;
++EXCEPTION WHEN OTHERS THEN
++	RETURN 2;
++END$$;
++CREATE MATERIALIZED VIEW sro_index_mv AS SELECT 1 AS c;
++CREATE UNIQUE INDEX ON sro_index_mv (c) WHERE unwanted_grant_nofail(1) > 0;
++\c -
++REFRESH MATERIALIZED VIEW CONCURRENTLY sro_index_mv;
++REFRESH MATERIALIZED VIEW sro_index_mv;
++
+ DROP OWNED BY regress_sro_user;
+ DROP ROLE regress_sro_user;
+ 

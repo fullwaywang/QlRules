@@ -48,4 +48,4 @@ and not func_1(target_2, func)
 and func_2(vexisting_relid_173, target_2)
 and vexisting_relid_173.getType().hasName("Oid")
 and vexisting_relid_173.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

@@ -70,4 +70,4 @@ and vconnstr_835.getType().hasName("PQExpBufferData")
 and vte_752.getFunction() = func
 and vropt_754.(LocalVariable).getFunction() = func
 and vconnstr_835.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

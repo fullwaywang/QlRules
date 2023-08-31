@@ -1,0 +1,128 @@
+commit 935e77d527a018b652f247c7374c558871210db6	935e77d527a018b652f247c7374c558871210db6
+Author: Tom Lane <tgl@sss.pgh.pa.us>
+Date:   Mon May 8 15:02:57 2017 -0400
+
+    Further patch rangetypes_selfuncs.c's statistics slot management.
+    
+    Values in a STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM slot are float8,
+    not of the type of the column the statistics are for.
+    
+    This bug is at least partly the fault of sloppy specification comments
+    for get_attstatsslot()/free_attstatsslot(): the type OID they want is that
+    of the stavalues entries, not of the underlying column.  (I double-checked
+    other callers and they seem to get this right.)  Adjust the comments to be
+    more correct.
+    
+    Per buildfarm.
+    
+    Security: CVE-2017-7484
+
+diff --git a/src/backend/utils/adt/rangetypes_selfuncs.c b/src/backend/utils/adt/rangetypes_selfuncs.c
+index b06b67010a..965153108b 100644
+--- a/src/backend/utils/adt/rangetypes_selfuncs.c
++++ b/src/backend/utils/adt/rangetypes_selfuncs.c
+@@ -20,6 +20,7 @@
+ #include "access/htup_details.h"
+ #include "catalog/pg_operator.h"
+ #include "catalog/pg_statistic.h"
++#include "catalog/pg_type.h"
+ #include "utils/builtins.h"
+ #include "utils/lsyscache.h"
+ #include "utils/rangetypes.h"
+@@ -246,8 +247,9 @@ calc_rangesel(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 
+ 		/* Try to get fraction of empty ranges */
+ 		if (get_attstatsslot(vardata->statsTuple,
+-							 vardata->atttype, vardata->atttypmod,
+-						   STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM, InvalidOid,
++							 FLOAT8OID, -1,
++							 STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM,
++							 InvalidOid,
+ 							 NULL,
+ 							 NULL, NULL,
+ 							 &numbers, &nnumbers))
+@@ -255,7 +257,7 @@ calc_rangesel(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 			if (nnumbers != 1)
+ 				elog(ERROR, "invalid empty fraction statistic");		/* shouldn't happen */
+ 			empty_frac = numbers[0];
+-			free_attstatsslot(vardata->atttype, NULL, 0, numbers, nnumbers);
++			free_attstatsslot(FLOAT8OID, NULL, 0, numbers, nnumbers);
+ 		}
+ 		else
+ 		{
+@@ -424,7 +426,7 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 	{
+ 		if (!(HeapTupleIsValid(vardata->statsTuple) &&
+ 			  get_attstatsslot(vardata->statsTuple,
+-							   vardata->atttype, vardata->atttypmod,
++							   FLOAT8OID, -1,
+ 							   STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM,
+ 							   InvalidOid,
+ 							   NULL,
+@@ -438,7 +440,7 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 		/* check that it's a histogram, not just a dummy entry */
+ 		if (length_nhist < 2)
+ 		{
+-			free_attstatsslot(vardata->atttype,
++			free_attstatsslot(FLOAT8OID,
+ 							  length_hist_values, length_nhist, NULL, 0);
+ 			free_attstatsslot(vardata->atttype, hist_values, nhist, NULL, 0);
+ 			return -1.0;
+@@ -578,7 +580,7 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 			break;
+ 	}
+ 
+-	free_attstatsslot(vardata->atttype,
++	free_attstatsslot(FLOAT8OID,
+ 					  length_hist_values, length_nhist, NULL, 0);
+ 	free_attstatsslot(vardata->atttype, hist_values, nhist, NULL, 0);
+ 
+diff --git a/src/backend/utils/cache/lsyscache.c b/src/backend/utils/cache/lsyscache.c
+index 13ae6add03..84464eeaa9 100644
+--- a/src/backend/utils/cache/lsyscache.c
++++ b/src/backend/utils/cache/lsyscache.c
+@@ -2832,9 +2832,9 @@ get_attavgwidth(Oid relid, AttrNumber attnum)
+  * that have been provided by a stats hook and didn't really come from
+  * pg_statistic.
+  *
+- * statstuple: pg_statistics tuple to be examined.
+- * atttype: type OID of attribute (can be InvalidOid if values == NULL).
+- * atttypmod: typmod of attribute (can be 0 if values == NULL).
++ * statstuple: pg_statistic tuple to be examined.
++ * atttype: type OID of slot's stavalues (can be InvalidOid if values == NULL).
++ * atttypmod: typmod of slot's stavalues (can be 0 if values == NULL).
+  * reqkind: STAKIND code for desired statistics slot kind.
+  * reqop: STAOP value wanted, or InvalidOid if don't care.
+  * actualop: if not NULL, *actualop receives the actual STAOP value.
+@@ -2842,7 +2842,7 @@ get_attavgwidth(Oid relid, AttrNumber attnum)
+  * numbers, nnumbers: if not NULL, the slot's stanumbers are extracted.
+  *
+  * If assigned, values and numbers are set to point to palloc'd arrays.
+- * If the attribute type is pass-by-reference, the values referenced by
++ * If the stavalues datatype is pass-by-reference, the values referenced by
+  * the values array are themselves palloc'd.  The palloc'd stuff can be
+  * freed by calling free_attstatsslot.
+  *
+@@ -2972,7 +2972,8 @@ get_attstatsslot(HeapTuple statstuple,
+  * free_attstatsslot
+  *		Free data allocated by get_attstatsslot
+  *
+- * atttype need be valid only if values != NULL.
++ * atttype is the type of the individual values in values[].
++ * It need be valid only if values != NULL.
+  */
+ void
+ free_attstatsslot(Oid atttype,
+diff --git a/src/include/catalog/pg_statistic.h b/src/include/catalog/pg_statistic.h
+index c1a624d979..ec85702a29 100644
+--- a/src/include/catalog/pg_statistic.h
++++ b/src/include/catalog/pg_statistic.h
+@@ -275,7 +275,7 @@ typedef FormData_pg_statistic *Form_pg_statistic;
+  * fraction of empty ranges. stavalues is a histogram of non-empty lengths, in
+  * a format similar to STATISTIC_KIND_HISTOGRAM: it contains M (>=2) range
+  * values that divide the column data values into M-1 bins of approximately
+- * equal population. The lengths are stores as float8s, as measured by the
++ * equal population. The lengths are stored as float8s, as measured by the
+  * range type's subdiff function. Only non-null rows are considered.
+  */
+ #define STATISTIC_KIND_RANGE_LENGTH_HISTOGRAM  6

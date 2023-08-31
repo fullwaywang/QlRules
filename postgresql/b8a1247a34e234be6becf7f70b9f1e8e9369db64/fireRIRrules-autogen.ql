@@ -56,4 +56,4 @@ and vrt_index_1722.getType().hasName("int")
 and vparsetree_1719.getType().hasName("Query *")
 and vrt_index_1722.(LocalVariable).getFunction() = func
 and vparsetree_1719.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

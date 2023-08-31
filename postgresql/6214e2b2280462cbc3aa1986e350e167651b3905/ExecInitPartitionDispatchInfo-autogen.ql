@@ -51,4 +51,4 @@ and func_3(vproute_1057, target_3)
 and func_4(vproute_1057, target_4)
 and vproute_1057.getType().hasName("PartitionTupleRouting *")
 and vproute_1057.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

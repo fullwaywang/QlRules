@@ -31,4 +31,4 @@ not func_0(vAH_82, target_1, func)
 and func_1(vAH_82, target_1)
 and vAH_82.getType().hasName("ArchiveHandle *")
 and vAH_82.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

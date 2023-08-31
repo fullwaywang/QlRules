@@ -21,4 +21,4 @@ where
 func_0(vfout_17773, func, target_0)
 and vfout_17773.getType().hasName("Archive *")
 and vfout_17773.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

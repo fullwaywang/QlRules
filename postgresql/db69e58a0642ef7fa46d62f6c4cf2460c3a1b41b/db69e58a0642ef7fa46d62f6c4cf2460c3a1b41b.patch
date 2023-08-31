@@ -1,0 +1,203 @@
+commit db69e58a0642ef7fa46d62f6c4cf2460c3a1b41b	db69e58a0642ef7fa46d62f6c4cf2460c3a1b41b
+Author: Stephen Frost <sfrost@snowman.net>
+Date:   Mon Mar 28 09:03:41 2016 -0400
+
+    Reset plan->row_security_env and planUserId
+    
+    In the plancache, we check if the environment we planned the query under
+    has changed in a way which requires us to re-plan, such as when the user
+    for whom the plan was prepared changes and RLS is being used (and,
+    therefore, there may be different policies to apply).
+    
+    Unfortunately, while those values were set and checked, they were not
+    being reset when the query was re-planned and therefore, in cases where
+    we change role, re-plan, and then change role again, we weren't
+    re-planning again.  This leads to potentially incorrect policies being
+    applied in cases where role-specific policies are used and a given query
+    is planned under one role and then executed under other roles, which
+    could happen under security definer functions or when a common user and
+    query is planned initially and then re-used across multiple SET ROLEs.
+    
+    Further, extensions which made use of CopyCachedPlan() may suffer from
+    similar issues as the RLS-related fields were not properly copied as
+    part of the plan and therefore RevalidateCachedQuery() would copy in the
+    current settings without invalidating the query.
+    
+    Fix by using the same approach used for 'search_path', where we set the
+    correct values in CompleteCachedPlan(), check them early on in
+    RevalidateCachedQuery() and then properly reset them if re-planning.
+    Also, copy through the values during CopyCachedPlan().
+    
+    Pointed out by Ashutosh Bapat.  Reviewed by Michael Paquier.
+    
+    Back-patch to 9.5 where RLS was introduced.
+    
+    Security: CVE-2016-2193
+
+diff --git a/src/backend/utils/cache/plancache.c b/src/backend/utils/cache/plancache.c
+index 1be20fcd9a..5eefa74a61 100644
+--- a/src/backend/utils/cache/plancache.c
++++ b/src/backend/utils/cache/plancache.c
+@@ -16,7 +16,8 @@
+  * if it has one.  When (and if) the next demand for a cached plan occurs,
+  * parse analysis and rewrite is repeated to build a new valid query tree,
+  * and then planning is performed as normal.  We also force re-analysis and
+- * re-planning if the active search_path is different from the previous time.
++ * re-planning if the active search_path is different from the previous time
++ * or, if RLS is involved, if the user changes or the RLS environment changes.
+  *
+  * Note that if the sinval was a result of user DDL actions, parse analysis
+  * could throw an error, for example if a column referenced by the query is
+@@ -204,8 +205,8 @@ CreateCachedPlan(Node *raw_parse_tree,
+ 	plansource->total_custom_cost = 0;
+ 	plansource->num_custom_plans = 0;
+ 	plansource->hasRowSecurity = false;
+-	plansource->row_security_env = row_security;
+ 	plansource->planUserId = InvalidOid;
++	plansource->row_security_env = false;
+ 
+ 	MemoryContextSwitchTo(oldcxt);
+ 
+@@ -271,6 +272,8 @@ CreateOneShotCachedPlan(Node *raw_parse_tree,
+ 	plansource->generic_cost = -1;
+ 	plansource->total_custom_cost = 0;
+ 	plansource->num_custom_plans = 0;
++	plansource->planUserId = InvalidOid;
++	plansource->row_security_env = false;
+ 
+ 	return plansource;
+ }
+@@ -409,6 +412,8 @@ CompleteCachedPlan(CachedPlanSource *plansource,
+ 	plansource->cursor_options = cursor_options;
+ 	plansource->fixed_result = fixed_result;
+ 	plansource->resultDesc = PlanCacheComputeResultDesc(querytree_list);
++	plansource->planUserId = GetUserId();
++	plansource->row_security_env = row_security;
+ 
+ 	MemoryContextSwitchTo(oldcxt);
+ 
+@@ -571,24 +576,15 @@ RevalidateCachedQuery(CachedPlanSource *plansource)
+ 		return NIL;
+ 	}
+ 
+-	/*
+-	 * If this is a new cached plan, then set the user id it was planned by
+-	 * and under what row security settings; these are needed to determine
+-	 * plan invalidation when RLS is involved.
+-	 */
+-	if (!OidIsValid(plansource->planUserId))
+-	{
+-		plansource->planUserId = GetUserId();
+-		plansource->row_security_env = row_security;
+-	}
+-
+ 	/*
+ 	 * If the query is currently valid, we should have a saved search_path ---
+ 	 * check to see if that matches the current environment.  If not, we want
+-	 * to force replan.
++	 * to force replan.  We should also have a valid planUserId.
+ 	 */
+ 	if (plansource->is_valid)
+ 	{
++		Assert(OidIsValid(plansource->planUserId));
++
+ 		Assert(plansource->search_path != NULL);
+ 		if (!OverrideSearchPathMatchesCurrent(plansource->search_path))
+ 		{
+@@ -643,6 +639,14 @@ RevalidateCachedQuery(CachedPlanSource *plansource)
+ 	plansource->invalItems = NIL;
+ 	plansource->search_path = NULL;
+ 
++	/*
++	 * The plan is invalid, possibly due to row security, so we need to reset
++	 * row_security_env and planUserId as we're about to re-plan with the
++	 * current settings.
++	 */
++	plansource->row_security_env = row_security;
++	plansource->planUserId = GetUserId();
++
+ 	/*
+ 	 * Free the query_context.  We don't really expect MemoryContextDelete to
+ 	 * fail, but just in case, make sure the CachedPlanSource is left in a
+@@ -1380,6 +1384,14 @@ CopyCachedPlan(CachedPlanSource *plansource)
+ 	newsource->total_custom_cost = plansource->total_custom_cost;
+ 	newsource->num_custom_plans = plansource->num_custom_plans;
+ 
++	/*
++	 * Copy over the user the query was planned as, and under what RLS
++	 * environment.  We will check during RevalidateCachedQuery() if the user
++	 * or environment has changed and, if so, will force a re-plan.
++	 */
++	newsource->planUserId = plansource->planUserId;
++	newsource->row_security_env = plansource->row_security_env;
++
+ 	MemoryContextSwitchTo(oldcxt);
+ 
+ 	return newsource;
+diff --git a/src/test/regress/expected/rowsecurity.out b/src/test/regress/expected/rowsecurity.out
+index 4aaa88f2c3..067aa8d5fb 100644
+--- a/src/test/regress/expected/rowsecurity.out
++++ b/src/test/regress/expected/rowsecurity.out
+@@ -2334,8 +2334,10 @@ GRANT SELECT ON t1 TO rls_regress_user1, rls_regress_user2;
+ CREATE POLICY p1 ON t1 TO rls_regress_user1 USING ((a % 2) = 0);
+ CREATE POLICY p2 ON t1 TO rls_regress_user2 USING ((a % 4) = 0);
+ ALTER TABLE t1 ENABLE ROW LEVEL SECURITY;
++-- Prepare as rls_regress_user1
+ SET ROLE rls_regress_user1;
+ PREPARE role_inval AS SELECT * FROM t1;
++-- Check plan
+ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+        QUERY PLAN        
+ -------------------------
+@@ -2343,7 +2345,9 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+    Filter: ((a % 2) = 0)
+ (2 rows)
+ 
++-- Change to rls_regress_user2
+ SET ROLE rls_regress_user2;
++-- Check plan- should be different
+ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+        QUERY PLAN        
+ -------------------------
+@@ -2351,6 +2355,16 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+    Filter: ((a % 4) = 0)
+ (2 rows)
+ 
++-- Change back to rls_regress_user1
++SET ROLE rls_regress_user1;
++-- Check plan- should be back to original
++EXPLAIN (COSTS OFF) EXECUTE role_inval;
++       QUERY PLAN        
++-------------------------
++ Seq Scan on t1
++   Filter: ((a % 2) = 0)
++(2 rows)
++
+ --
+ -- CTE and RLS
+ --
+diff --git a/src/test/regress/sql/rowsecurity.sql b/src/test/regress/sql/rowsecurity.sql
+index b5f5bcf8de..18d0a38652 100644
+--- a/src/test/regress/sql/rowsecurity.sql
++++ b/src/test/regress/sql/rowsecurity.sql
+@@ -852,11 +852,20 @@ CREATE POLICY p2 ON t1 TO rls_regress_user2 USING ((a % 4) = 0);
+ 
+ ALTER TABLE t1 ENABLE ROW LEVEL SECURITY;
+ 
++-- Prepare as rls_regress_user1
+ SET ROLE rls_regress_user1;
+ PREPARE role_inval AS SELECT * FROM t1;
++-- Check plan
+ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+ 
++-- Change to rls_regress_user2
+ SET ROLE rls_regress_user2;
++-- Check plan- should be different
++EXPLAIN (COSTS OFF) EXECUTE role_inval;
++
++-- Change back to rls_regress_user1
++SET ROLE rls_regress_user1;
++-- Check plan- should be back to original
+ EXPLAIN (COSTS OFF) EXECUTE role_inval;
+ 
+ --

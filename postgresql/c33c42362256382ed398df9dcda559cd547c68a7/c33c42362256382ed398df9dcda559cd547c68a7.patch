@@ -1,0 +1,713 @@
+commit c33c42362256382ed398df9dcda559cd547c68a7	c33c42362256382ed398df9dcda559cd547c68a7
+Author: Peter Eisentraut <peter_e@gmx.net>
+Date:   Fri May 5 12:18:48 2017 -0400
+
+    Add security checks to selectivity estimation functions
+    
+    Some selectivity estimation functions run user-supplied operators over
+    data obtained from pg_statistic without security checks, which allows
+    those operators to leak pg_statistic data without having privileges on
+    the underlying tables.  Fix by checking that one of the following is
+    satisfied: (1) the user has table or column privileges on the table
+    underlying the pg_statistic data, or (2) the function implementing the
+    user-supplied operator is leak-proof.  If neither is satisfied, planning
+    will proceed as if there are no statistics available.
+    
+    At least one of these is satisfied in most cases in practice.  The only
+    situations that are negatively impacted are user-defined or
+    not-leak-proof operators on a security-barrier view.
+    
+    Reported-by: Robert Haas <robertmhaas@gmail.com>
+    Author: Peter Eisentraut <peter_e@gmx.net>
+    Author: Tom Lane <tgl@sss.pgh.pa.us>
+    
+    Security: CVE-2017-7484
+
+diff --git a/doc/src/sgml/planstats.sgml b/doc/src/sgml/planstats.sgml
+index 1a482d37f4..c667899e28 100644
+--- a/doc/src/sgml/planstats.sgml
++++ b/doc/src/sgml/planstats.sgml
+@@ -448,4 +448,64 @@ rows = (outer_cardinality * inner_cardinality) * selectivity
+ 
+  </sect1>
+ 
++ <sect1 id="planner-stats-security">
++  <title>Planner Statistics and Security</title>
++
++  <para>
++   Access to the table <structname>pg_statistic</structname> is restricted to
++   superusers, so that ordinary users cannot learn about the contents of the
++   tables of other users from it.  Some selectivity estimation functions will
++   use a user-provided operator (either the operator appearing in the query or
++   a related operator) to analyze the stored statistics.  For example, in order
++   to determine whether a stored most common value is applicable, the
++   selectivity estimator will have to run the appropriate <literal>=</literal>
++   operator to compare the constant in the query to the stored value.
++   Thus the data in <structname>pg_statistic</structname> is potentially
++   passed to user-defined operators.  An appropriately crafted operator can
++   intentionally leak the passed operands (for example, by logging them
++   or writing them to a different table), or accidentally leak them by showing
++   their values in error messages, in either case possibly exposing data from
++   <structname>pg_statistic</structname> to a user who should not be able to
++   see it.
++  </para>
++
++  <para>
++   In order to prevent this, the following applies to all built-in selectivity
++   estimation functions.  When planning a query, in order to be able to use
++   stored statistics, the current user must either
++   have <literal>SELECT</literal> privilege on the table or the involved
++   columns, or the operator used must be <literal>LEAKPROOF</literal> (more
++   accurately, the function that the operator is based on).  If not, then the
++   selectivity estimator will behave as if no statistics are available, and
++   the planner will proceed with default or fall-back assumptions.
++  </para>
++
++  <para>
++   If a user does not have the required privilege on the table or columns,
++   then in many cases the query will ultimately receive a permission-denied
++   error, in which case this mechanism is invisible in practice.  But if the
++   user is reading from a security-barrier view, then the planner might wish
++   to check the statistics of an underlying table that is otherwise
++   inaccessible to the user.  In that case, the operator should be leak-proof
++   or the statistics will not be used.  There is no direct feedback about
++   that, except that the plan might be suboptimal.  If one suspects that this
++   is the case, one could try running the query as a more privileged user,
++   to see if a different plan results.
++  </para>
++
++  <para>
++   This restriction applies only to cases where the planner would need to
++   execute a user-defined operator on one or more values
++   from <structname>pg_statistic</structname>.  Thus the planner is permitted
++   to use generic statistical information, such as the fraction of null values
++   or the number of distinct values in a column, regardless of access
++   privileges.
++  </para>
++
++  <para>
++   Selectivity estimation functions contained in third-party extensions that
++   potentially operate on statistics with user-defined operators should follow
++   the same security rules.  Consult the PostgreSQL source code for guidance.
++  </para>
++ </sect1>
+ </chapter>
+diff --git a/src/backend/utils/adt/array_selfuncs.c b/src/backend/utils/adt/array_selfuncs.c
+index dd44d57e20..a306477397 100644
+--- a/src/backend/utils/adt/array_selfuncs.c
++++ b/src/backend/utils/adt/array_selfuncs.c
+@@ -132,7 +132,8 @@ scalararraysel_containment(PlannerInfo *root,
+ 		useOr = !useOr;
+ 
+ 	/* Get array element stats for var, if available */
+-	if (HeapTupleIsValid(vardata.statsTuple))
++	if (HeapTupleIsValid(vardata.statsTuple) &&
++		statistic_proc_security_check(&vardata, cmpfunc->fn_oid))
+ 	{
+ 		Form_pg_statistic stats;
+ 		Datum	   *values;
+@@ -363,7 +364,8 @@ calc_arraycontsel(VariableStatData *vardata, Datum constval,
+ 	 */
+ 	array = DatumGetArrayTypeP(constval);
+ 
+-	if (HeapTupleIsValid(vardata->statsTuple))
++	if (HeapTupleIsValid(vardata->statsTuple) &&
++		statistic_proc_security_check(vardata, cmpfunc->fn_oid))
+ 	{
+ 		Form_pg_statistic stats;
+ 		Datum	   *values;
+diff --git a/src/backend/utils/adt/rangetypes_selfuncs.c b/src/backend/utils/adt/rangetypes_selfuncs.c
+index 1aab4fe277..90c78fc3c2 100644
+--- a/src/backend/utils/adt/rangetypes_selfuncs.c
++++ b/src/backend/utils/adt/rangetypes_selfuncs.c
+@@ -255,6 +255,7 @@ calc_rangesel(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 			if (nnumbers != 1)
+ 				elog(ERROR, "invalid empty fraction statistic");		/* shouldn't happen */
+ 			empty_frac = numbers[0];
++			free_attstatsslot(vardata->atttype, NULL, 0, numbers, nnumbers);
+ 		}
+ 		else
+ 		{
+@@ -383,6 +384,15 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 	bool		empty;
+ 	double		hist_selec;
+ 
++	/* Can't use the histogram with insecure range support functions */
++	if (!statistic_proc_security_check(vardata,
++									   typcache->rng_cmp_proc_finfo.fn_oid))
++		return -1;
++	if (OidIsValid(typcache->rng_subdiff_finfo.fn_oid) &&
++		!statistic_proc_security_check(vardata,
++									   typcache->rng_subdiff_finfo.fn_oid))
++		return -1;
++
+ 	/* Try to get histogram of ranges */
+ 	if (!(HeapTupleIsValid(vardata->statsTuple) &&
+ 		  get_attstatsslot(vardata->statsTuple,
+@@ -420,11 +430,19 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 							   NULL,
+ 							   &length_hist_values, &length_nhist,
+ 							   NULL, NULL)))
++		{
++			free_attstatsslot(vardata->atttype, hist_values, nhist, NULL, 0);
+ 			return -1.0;
++		}
+ 
+ 		/* check that it's a histogram, not just a dummy entry */
+ 		if (length_nhist < 2)
++		{
++			free_attstatsslot(vardata->atttype,
++							  length_hist_values, length_nhist, NULL, 0);
++			free_attstatsslot(vardata->atttype, hist_values, nhist, NULL, 0);
+ 			return -1.0;
++		}
+ 	}
+ 
+ 	/* Extract the bounds of the constant value. */
+@@ -560,6 +578,10 @@ calc_hist_selectivity(TypeCacheEntry *typcache, VariableStatData *vardata,
+ 			break;
+ 	}
+ 
++	free_attstatsslot(vardata->atttype,
++					  length_hist_values, length_nhist, NULL, 0);
++	free_attstatsslot(vardata->atttype, hist_values, nhist, NULL, 0);
++
+ 	return hist_selec;
+ }
+ 
+diff --git a/src/backend/utils/adt/selfuncs.c b/src/backend/utils/adt/selfuncs.c
+index 56943f2a87..6a4f7b19eb 100644
+--- a/src/backend/utils/adt/selfuncs.c
++++ b/src/backend/utils/adt/selfuncs.c
+@@ -112,6 +112,7 @@
+ #include "catalog/pg_type.h"
+ #include "executor/executor.h"
+ #include "mb/pg_wchar.h"
++#include "miscadmin.h"
+ #include "nodes/makefuncs.h"
+ #include "nodes/nodeFuncs.h"
+ #include "optimizer/clauses.h"
+@@ -125,6 +126,7 @@
+ #include "parser/parse_clause.h"
+ #include "parser/parse_coerce.h"
+ #include "parser/parsetree.h"
++#include "utils/acl.h"
+ #include "utils/builtins.h"
+ #include "utils/bytea.h"
+ #include "utils/date.h"
+@@ -266,6 +268,7 @@ var_eq_const(VariableStatData *vardata, Oid operator,
+ {
+ 	double		selec;
+ 	bool		isdefault;
++	Oid			opfuncoid;
+ 
+ 	/*
+ 	 * If the constant is NULL, assume operator is strict and return zero, ie,
+@@ -284,7 +287,9 @@ var_eq_const(VariableStatData *vardata, Oid operator,
+ 	if (vardata->isunique && vardata->rel && vardata->rel->tuples >= 1.0)
+ 		return 1.0 / vardata->rel->tuples;
+ 
+-	if (HeapTupleIsValid(vardata->statsTuple))
++	if (HeapTupleIsValid(vardata->statsTuple) &&
++		statistic_proc_security_check(vardata,
++									  (opfuncoid = get_opcode(operator))))
+ 	{
+ 		Form_pg_statistic stats;
+ 		Datum	   *values;
+@@ -312,7 +317,7 @@ var_eq_const(VariableStatData *vardata, Oid operator,
+ 		{
+ 			FmgrInfo	eqproc;
+ 
+-			fmgr_info(get_opcode(operator), &eqproc);
++			fmgr_info(opfuncoid, &eqproc);
+ 
+ 			for (i = 0; i < nvalues; i++)
+ 			{
+@@ -618,6 +623,7 @@ mcv_selectivity(VariableStatData *vardata, FmgrInfo *opproc,
+ 	sumcommon = 0.0;
+ 
+ 	if (HeapTupleIsValid(vardata->statsTuple) &&
++		statistic_proc_security_check(vardata, opproc->fn_oid) &&
+ 		get_attstatsslot(vardata->statsTuple,
+ 						 vardata->atttype, vardata->atttypmod,
+ 						 STATISTIC_KIND_MCV, InvalidOid,
+@@ -694,6 +700,7 @@ histogram_selectivity(VariableStatData *vardata, FmgrInfo *opproc,
+ 	Assert(min_hist_size > 2 * n_skip);
+ 
+ 	if (HeapTupleIsValid(vardata->statsTuple) &&
++		statistic_proc_security_check(vardata, opproc->fn_oid) &&
+ 		get_attstatsslot(vardata->statsTuple,
+ 						 vardata->atttype, vardata->atttypmod,
+ 						 STATISTIC_KIND_HISTOGRAM, InvalidOid,
+@@ -771,6 +778,7 @@ ineq_histogram_selectivity(PlannerInfo *root,
+ 	 * the reverse way if isgt is TRUE.
+ 	 */
+ 	if (HeapTupleIsValid(vardata->statsTuple) &&
++		statistic_proc_security_check(vardata, opproc->fn_oid) &&
+ 		get_attstatsslot(vardata->statsTuple,
+ 						 vardata->atttype, vardata->atttypmod,
+ 						 STATISTIC_KIND_HISTOGRAM, InvalidOid,
+@@ -2255,6 +2263,7 @@ eqjoinsel_inner(Oid operator,
+ 	double		nd2;
+ 	bool		isdefault1;
+ 	bool		isdefault2;
++	Oid			opfuncoid;
+ 	Form_pg_statistic stats1 = NULL;
+ 	Form_pg_statistic stats2 = NULL;
+ 	bool		have_mcvs1 = false;
+@@ -2271,30 +2280,36 @@ eqjoinsel_inner(Oid operator,
+ 	nd1 = get_variable_numdistinct(vardata1, &isdefault1);
+ 	nd2 = get_variable_numdistinct(vardata2, &isdefault2);
+ 
++	opfuncoid = get_opcode(operator);
++
+ 	if (HeapTupleIsValid(vardata1->statsTuple))
+ 	{
++		/* note we allow use of nullfrac regardless of security check */
+ 		stats1 = (Form_pg_statistic) GETSTRUCT(vardata1->statsTuple);
+-		have_mcvs1 = get_attstatsslot(vardata1->statsTuple,
+-									  vardata1->atttype,
+-									  vardata1->atttypmod,
+-									  STATISTIC_KIND_MCV,
+-									  InvalidOid,
+-									  NULL,
+-									  &values1, &nvalues1,
+-									  &numbers1, &nnumbers1);
++		if (statistic_proc_security_check(vardata1, opfuncoid))
++			have_mcvs1 = get_attstatsslot(vardata1->statsTuple,
++										  vardata1->atttype,
++										  vardata1->atttypmod,
++										  STATISTIC_KIND_MCV,
++										  InvalidOid,
++										  NULL,
++										  &values1, &nvalues1,
++										  &numbers1, &nnumbers1);
+ 	}
+ 
+ 	if (HeapTupleIsValid(vardata2->statsTuple))
+ 	{
++		/* note we allow use of nullfrac regardless of security check */
+ 		stats2 = (Form_pg_statistic) GETSTRUCT(vardata2->statsTuple);
+-		have_mcvs2 = get_attstatsslot(vardata2->statsTuple,
+-									  vardata2->atttype,
+-									  vardata2->atttypmod,
+-									  STATISTIC_KIND_MCV,
+-									  InvalidOid,
+-									  NULL,
+-									  &values2, &nvalues2,
+-									  &numbers2, &nnumbers2);
++		if (statistic_proc_security_check(vardata2, opfuncoid))
++			have_mcvs2 = get_attstatsslot(vardata2->statsTuple,
++										  vardata2->atttype,
++										  vardata2->atttypmod,
++										  STATISTIC_KIND_MCV,
++										  InvalidOid,
++										  NULL,
++										  &values2, &nvalues2,
++										  &numbers2, &nnumbers2);
+ 	}
+ 
+ 	if (have_mcvs1 && have_mcvs2)
+@@ -2328,7 +2343,7 @@ eqjoinsel_inner(Oid operator,
+ 		int			i,
+ 					nmatches;
+ 
+-		fmgr_info(get_opcode(operator), &eqproc);
++		fmgr_info(opfuncoid, &eqproc);
+ 		hasmatch1 = (bool *) palloc0(nvalues1 * sizeof(bool));
+ 		hasmatch2 = (bool *) palloc0(nvalues2 * sizeof(bool));
+ 
+@@ -2471,6 +2486,7 @@ eqjoinsel_inner(Oid operator,
+  *
+  * (Also used for anti join, which we are supposed to estimate the same way.)
+  * Caller has ensured that vardata1 is the LHS variable.
++ * Unlike eqjoinsel_inner, we have to cope with operator being InvalidOid.
+  */
+ static double
+ eqjoinsel_semi(Oid operator,
+@@ -2482,6 +2498,7 @@ eqjoinsel_semi(Oid operator,
+ 	double		nd2;
+ 	bool		isdefault1;
+ 	bool		isdefault2;
++	Oid			opfuncoid;
+ 	Form_pg_statistic stats1 = NULL;
+ 	bool		have_mcvs1 = false;
+ 	Datum	   *values1 = NULL;
+@@ -2497,6 +2514,8 @@ eqjoinsel_semi(Oid operator,
+ 	nd1 = get_variable_numdistinct(vardata1, &isdefault1);
+ 	nd2 = get_variable_numdistinct(vardata2, &isdefault2);
+ 
++	opfuncoid = OidIsValid(operator) ? get_opcode(operator) : InvalidOid;
++
+ 	/*
+ 	 * We clamp nd2 to be not more than what we estimate the inner relation's
+ 	 * size to be.  This is intuitively somewhat reasonable since obviously
+@@ -2518,18 +2537,21 @@ eqjoinsel_semi(Oid operator,
+ 
+ 	if (HeapTupleIsValid(vardata1->statsTuple))
+ 	{
++		/* note we allow use of nullfrac regardless of security check */
+ 		stats1 = (Form_pg_statistic) GETSTRUCT(vardata1->statsTuple);
+-		have_mcvs1 = get_attstatsslot(vardata1->statsTuple,
+-									  vardata1->atttype,
+-									  vardata1->atttypmod,
+-									  STATISTIC_KIND_MCV,
+-									  InvalidOid,
+-									  NULL,
+-									  &values1, &nvalues1,
+-									  &numbers1, &nnumbers1);
++		if (statistic_proc_security_check(vardata1, opfuncoid))
++			have_mcvs1 = get_attstatsslot(vardata1->statsTuple,
++										  vardata1->atttype,
++										  vardata1->atttypmod,
++										  STATISTIC_KIND_MCV,
++										  InvalidOid,
++										  NULL,
++										  &values1, &nvalues1,
++										  &numbers1, &nnumbers1);
+ 	}
+ 
+-	if (HeapTupleIsValid(vardata2->statsTuple))
++	if (HeapTupleIsValid(vardata2->statsTuple) &&
++		statistic_proc_security_check(vardata2, opfuncoid))
+ 	{
+ 		have_mcvs2 = get_attstatsslot(vardata2->statsTuple,
+ 									  vardata2->atttype,
+@@ -2571,7 +2593,7 @@ eqjoinsel_semi(Oid operator,
+ 		 */
+ 		clamped_nvalues2 = Min(nvalues2, nd2);
+ 
+-		fmgr_info(get_opcode(operator), &eqproc);
++		fmgr_info(opfuncoid, &eqproc);
+ 		hasmatch1 = (bool *) palloc0(nvalues1 * sizeof(bool));
+ 		hasmatch2 = (bool *) palloc0(clamped_nvalues2 * sizeof(bool));
+ 
+@@ -4387,6 +4409,9 @@ get_join_variables(PlannerInfo *root, List *args, SpecialJoinInfo *sjinfo,
+  *		this query.  (Caution: this should be trusted for statistical
+  *		purposes only, since we do not check indimmediate nor verify that
+  *		the exact same definition of equality applies.)
++ *	acl_ok: TRUE if current user has permission to read the column(s)
++ *		underlying the pg_statistic entry.  This is consulted by
++ *		statistic_proc_security_check().
+  *
+  * Caller is responsible for doing ReleaseVariableStats() before exiting.
+  */
+@@ -4555,6 +4580,30 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
+ 												Int16GetDatum(pos + 1),
+ 												BoolGetDatum(false));
+ 							vardata->freefunc = ReleaseSysCache;
++
++							if (HeapTupleIsValid(vardata->statsTuple))
++							{
++								/* Get index's table for permission check */
++								RangeTblEntry *rte;
++
++								rte = planner_rt_fetch(index->rel->relid, root);
++								Assert(rte->rtekind == RTE_RELATION);
++
++								/*
++								 * For simplicity, we insist on the whole
++								 * table being selectable, rather than trying
++								 * to identify which column(s) the index
++								 * depends on.
++								 */
++								vardata->acl_ok =
++									(pg_class_aclcheck(rte->relid, GetUserId(),
++												 ACL_SELECT) == ACLCHECK_OK);
++							}
++							else
++							{
++								/* suppress leakproofness checks later */
++								vardata->acl_ok = true;
++							}
+ 						}
+ 						if (vardata->statsTuple)
+ 							break;
+@@ -4607,6 +4656,21 @@ examine_simple_variable(PlannerInfo *root, Var *var,
+ 											  Int16GetDatum(var->varattno),
+ 											  BoolGetDatum(rte->inh));
+ 		vardata->freefunc = ReleaseSysCache;
++
++		if (HeapTupleIsValid(vardata->statsTuple))
++		{
++			/* check if user has permission to read this column */
++			vardata->acl_ok =
++				(pg_class_aclcheck(rte->relid, GetUserId(),
++								   ACL_SELECT) == ACLCHECK_OK) ||
++				(pg_attribute_aclcheck(rte->relid, var->varattno, GetUserId(),
++									   ACL_SELECT) == ACLCHECK_OK);
++		}
++		else
++		{
++			/* suppress any possible leakproofness checks later */
++			vardata->acl_ok = true;
++		}
+ 	}
+ 	else if (rte->rtekind == RTE_SUBQUERY && !rte->inh)
+ 	{
+@@ -4723,6 +4787,30 @@ examine_simple_variable(PlannerInfo *root, Var *var,
+ 	}
+ }
+ 
++/*
++ * Check whether it is permitted to call func_oid passing some of the
++ * pg_statistic data in vardata.  We allow this either if the user has SELECT
++ * privileges on the table or column underlying the pg_statistic data or if
++ * the function is marked leak-proof.
++ */
++bool
++statistic_proc_security_check(VariableStatData *vardata, Oid func_oid)
++{
++	if (vardata->acl_ok)
++		return true;
++
++	if (!OidIsValid(func_oid))
++		return false;
++
++	if (get_func_leakproof(func_oid))
++		return true;
++
++	ereport(DEBUG2,
++			(errmsg_internal("not using statistics because function \"%s\" is not leak-proof",
++							 get_func_name(func_oid))));
++	return false;
++}
++
+ /*
+  * get_variable_numdistinct
+  *	  Estimate the number of distinct values of a variable.
+@@ -4865,6 +4953,7 @@ get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop,
+ 	bool		have_data = false;
+ 	int16		typLen;
+ 	bool		typByVal;
++	Oid			opfuncoid;
+ 	Datum	   *values;
+ 	int			nvalues;
+ 	int			i;
+@@ -4887,6 +4976,17 @@ get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop,
+ 		return false;
+ 	}
+ 
++	/*
++	 * If we can't apply the sortop to the stats data, just fail.  In
++	 * principle, if there's a histogram and no MCVs, we could return the
++	 * histogram endpoints without ever applying the sortop ... but it's
++	 * probably not worth trying, because whatever the caller wants to do with
++	 * the endpoints would likely fail the security check too.
++	 */
++	if (!statistic_proc_security_check(vardata,
++									   (opfuncoid = get_opcode(sortop))))
++		return false;
++
+ 	get_typlenbyval(vardata->atttype, &typLen, &typByVal);
+ 
+ 	/*
+@@ -4939,7 +5039,7 @@ get_variable_range(PlannerInfo *root, VariableStatData *vardata, Oid sortop,
+ 		bool		tmax_is_mcv = false;
+ 		FmgrInfo	opproc;
+ 
+-		fmgr_info(get_opcode(sortop), &opproc);
++		fmgr_info(opfuncoid, &opproc);
+ 
+ 		for (i = 0; i < nvalues; i++)
+ 		{
+diff --git a/src/include/utils/selfuncs.h b/src/include/utils/selfuncs.h
+index 8e0d317468..61233aed7a 100644
+--- a/src/include/utils/selfuncs.h
++++ b/src/include/utils/selfuncs.h
+@@ -75,6 +75,7 @@ typedef struct VariableStatData
+ 	Oid			atttype;		/* type to pass to get_attstatsslot */
+ 	int32		atttypmod;		/* typmod to pass to get_attstatsslot */
+ 	bool		isunique;		/* matches unique index or DISTINCT clause */
++	bool		acl_ok;			/* result of ACL check on table or column */
+ } VariableStatData;
+ 
+ #define ReleaseVariableStats(vardata)  \
+@@ -153,6 +154,7 @@ extern PGDLLIMPORT get_index_stats_hook_type get_index_stats_hook;
+ 
+ extern void examine_variable(PlannerInfo *root, Node *node, int varRelid,
+ 				 VariableStatData *vardata);
++extern bool statistic_proc_security_check(VariableStatData *vardata, Oid func_oid);
+ extern bool get_restriction_variable(PlannerInfo *root, List *args,
+ 						 int varRelid,
+ 						 VariableStatData *vardata, Node **other,
+diff --git a/src/test/regress/expected/privileges.out b/src/test/regress/expected/privileges.out
+index 8ac46ecef2..52ba77f822 100644
+--- a/src/test/regress/expected/privileges.out
++++ b/src/test/regress/expected/privileges.out
+@@ -184,6 +184,103 @@ SELECT * FROM atest1; -- ok
+  1 | two
+ (2 rows)
+ 
++-- test leaky-function protections in selfuncs
++-- regress_user1 will own a table and provide a view for it.
++SET SESSION AUTHORIZATION regress_user1;
++CREATE TABLE atest12 as
++  SELECT x AS a, 10001 - x AS b FROM generate_series(1,10000) x;
++CREATE INDEX ON atest12 (a);
++CREATE INDEX ON atest12 (abs(a));
++VACUUM ANALYZE atest12;
++CREATE FUNCTION leak(integer,integer) RETURNS boolean
++  AS $$begin return $1 < $2; end$$
++  LANGUAGE plpgsql immutable;
++CREATE OPERATOR <<< (procedure = leak, leftarg = integer, rightarg = integer,
++                     restrict = scalarltsel);
++-- view with leaky operator
++CREATE VIEW atest12v AS
++  SELECT * FROM atest12 WHERE b <<< 5;
++GRANT SELECT ON atest12v TO PUBLIC;
++-- This plan should use nestloop, knowing that few rows will be selected.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++                   QUERY PLAN                    
++-------------------------------------------------
++ Nested Loop
++   ->  Seq Scan on atest12 atest12_1
++         Filter: (b <<< 5)
++   ->  Index Scan using atest12_a_idx on atest12
++         Index Cond: (a = atest12_1.b)
++         Filter: (b <<< 5)
++(6 rows)
++
++-- And this one.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
++  WHERE x.a = y.b and abs(y.a) <<< 5;
++                    QUERY PLAN                     
++---------------------------------------------------
++ Nested Loop
++   ->  Seq Scan on atest12 y
++         Filter: (abs(a) <<< 5)
++   ->  Index Scan using atest12_a_idx on atest12 x
++         Index Cond: (a = y.b)
++(5 rows)
++
++-- Check if regress_user2 can break security.
++SET SESSION AUTHORIZATION regress_user2;
++CREATE FUNCTION leak2(integer,integer) RETURNS boolean
++  AS $$begin raise notice 'leak % %', $1, $2; return $1 > $2; end$$
++  LANGUAGE plpgsql immutable;
++CREATE OPERATOR >>> (procedure = leak2, leftarg = integer, rightarg = integer,
++                     restrict = scalargtsel);
++-- This should not show any "leak" notices before failing.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
++ERROR:  permission denied for relation atest12
++-- This plan should use hashjoin, as it will expect many rows to be selected.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++                QUERY PLAN                 
++-------------------------------------------
++ Hash Join
++   Hash Cond: (atest12.a = atest12_1.b)
++   ->  Seq Scan on atest12
++         Filter: (b <<< 5)
++   ->  Hash
++         ->  Seq Scan on atest12 atest12_1
++               Filter: (b <<< 5)
++(7 rows)
++
++-- Now regress_user1 grants sufficient access to regress_user2.
++SET SESSION AUTHORIZATION regress_user1;
++GRANT SELECT (a, b) ON atest12 TO PUBLIC;
++SET SESSION AUTHORIZATION regress_user2;
++-- Now regress_user2 will also get a good row estimate.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++                   QUERY PLAN                    
++-------------------------------------------------
++ Nested Loop
++   ->  Seq Scan on atest12 atest12_1
++         Filter: (b <<< 5)
++   ->  Index Scan using atest12_a_idx on atest12
++         Index Cond: (a = atest12_1.b)
++         Filter: (b <<< 5)
++(6 rows)
++
++-- But not for this, due to lack of table-wide permissions needed
++-- to make use of the expression index's statistics.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
++  WHERE x.a = y.b and abs(y.a) <<< 5;
++              QUERY PLAN              
++--------------------------------------
++ Hash Join
++   Hash Cond: (x.a = y.b)
++   ->  Seq Scan on atest12 x
++   ->  Hash
++         ->  Seq Scan on atest12 y
++               Filter: (abs(a) <<< 5)
++(6 rows)
++
++-- clean up (regress_user1's objects are all dropped later)
++DROP FUNCTION leak2(integer, integer) CASCADE;
++NOTICE:  drop cascades to operator >>>(integer,integer)
+ -- groups
+ SET SESSION AUTHORIZATION regress_user3;
+ CREATE TABLE atest3 (one int, two int, three int);
+diff --git a/src/test/regress/sql/privileges.sql b/src/test/regress/sql/privileges.sql
+index 3d74abf043..5622f7e4a8 100644
+--- a/src/test/regress/sql/privileges.sql
++++ b/src/test/regress/sql/privileges.sql
+@@ -127,6 +127,67 @@ bar	true
+ SELECT * FROM atest1; -- ok
+ 
+ 
++-- test leaky-function protections in selfuncs
++
++-- regress_user1 will own a table and provide a view for it.
++SET SESSION AUTHORIZATION regress_user1;
++
++CREATE TABLE atest12 as
++  SELECT x AS a, 10001 - x AS b FROM generate_series(1,10000) x;
++CREATE INDEX ON atest12 (a);
++CREATE INDEX ON atest12 (abs(a));
++VACUUM ANALYZE atest12;
++
++CREATE FUNCTION leak(integer,integer) RETURNS boolean
++  AS $$begin return $1 < $2; end$$
++  LANGUAGE plpgsql immutable;
++CREATE OPERATOR <<< (procedure = leak, leftarg = integer, rightarg = integer,
++                     restrict = scalarltsel);
++
++-- view with leaky operator
++CREATE VIEW atest12v AS
++  SELECT * FROM atest12 WHERE b <<< 5;
++GRANT SELECT ON atest12v TO PUBLIC;
++
++-- This plan should use nestloop, knowing that few rows will be selected.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++
++-- And this one.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
++  WHERE x.a = y.b and abs(y.a) <<< 5;
++
++-- Check if regress_user2 can break security.
++SET SESSION AUTHORIZATION regress_user2;
++
++CREATE FUNCTION leak2(integer,integer) RETURNS boolean
++  AS $$begin raise notice 'leak % %', $1, $2; return $1 > $2; end$$
++  LANGUAGE plpgsql immutable;
++CREATE OPERATOR >>> (procedure = leak2, leftarg = integer, rightarg = integer,
++                     restrict = scalargtsel);
++
++-- This should not show any "leak" notices before failing.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
++
++-- This plan should use hashjoin, as it will expect many rows to be selected.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++
++-- Now regress_user1 grants sufficient access to regress_user2.
++SET SESSION AUTHORIZATION regress_user1;
++GRANT SELECT (a, b) ON atest12 TO PUBLIC;
++SET SESSION AUTHORIZATION regress_user2;
++
++-- Now regress_user2 will also get a good row estimate.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
++
++-- But not for this, due to lack of table-wide permissions needed
++-- to make use of the expression index's statistics.
++EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
++  WHERE x.a = y.b and abs(y.a) <<< 5;
++
++-- clean up (regress_user1's objects are all dropped later)
++DROP FUNCTION leak2(integer, integer) CASCADE;
++
++
+ -- groups
+ 
+ SET SESSION AUTHORIZATION regress_user3;

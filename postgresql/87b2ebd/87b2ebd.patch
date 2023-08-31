@@ -1,0 +1,348 @@
+commit 87b2ebd352c4afe1ded0841604b59a3afbae97d1	87b2ebd
+Author: Dean Rasheed <dean.a.rasheed@gmail.com>
+Date:   Mon Nov 6 09:19:22 2017 +0000
+
+    Always require SELECT permission for ON CONFLICT DO UPDATE.
+    
+    The update path of an INSERT ... ON CONFLICT DO UPDATE requires SELECT
+    permission on the columns of the arbiter index, but it failed to check
+    for that in the case of an arbiter specified by constraint name.
+    
+    In addition, for a table with row level security enabled, it failed to
+    check updated rows against the table's SELECT policies when the update
+    path was taken (regardless of how the arbiter index was specified).
+    
+    Backpatch to 9.5 where ON CONFLICT DO UPDATE and RLS were introduced.
+    
+    Security: CVE-2017-15099
+
+diff --git a/src/backend/catalog/pg_constraint.c b/src/backend/catalog/pg_constraint.c
+index 1336c46d3f..104e930a6f 100644
+--- a/src/backend/catalog/pg_constraint.c
++++ b/src/backend/catalog/pg_constraint.c
+@@ -805,6 +805,104 @@ get_relation_constraint_oid(Oid relid, const char *conname, bool missing_ok)
+ 	return conOid;
+ }
+ 
++/*
++ * get_relation_constraint_attnos
++ *		Find a constraint on the specified relation with the specified name
++ *		and return the constrained columns.
++ *
++ * Returns a Bitmapset of the column attnos of the constrained columns, with
++ * attnos being offset by FirstLowInvalidHeapAttributeNumber so that system
++ * columns can be represented.
++ *
++ * *constraintOid is set to the OID of the constraint, or InvalidOid on
++ * failure.
++ */
++Bitmapset *
++get_relation_constraint_attnos(Oid relid, const char *conname,
++							   bool missing_ok, Oid *constraintOid)
++{
++	Bitmapset  *conattnos = NULL;
++	Relation	pg_constraint;
++	HeapTuple	tuple;
++	SysScanDesc scan;
++	ScanKeyData skey[1];
++
++	/* Set *constraintOid, to avoid complaints about uninitialized vars */
++	*constraintOid = InvalidOid;
++
++	/*
++	 * Fetch the constraint tuple from pg_constraint.  There may be more than
++	 * one match, because constraints are not required to have unique names;
++	 * if so, error out.
++	 */
++	pg_constraint = heap_open(ConstraintRelationId, AccessShareLock);
++
++	ScanKeyInit(&skey[0],
++				Anum_pg_constraint_conrelid,
++				BTEqualStrategyNumber, F_OIDEQ,
++				ObjectIdGetDatum(relid));
++
++	scan = systable_beginscan(pg_constraint, ConstraintRelidIndexId, true,
++							  NULL, 1, skey);
++
++	while (HeapTupleIsValid(tuple = systable_getnext(scan)))
++	{
++		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(tuple);
++		Datum		adatum;
++		bool		isNull;
++		ArrayType  *arr;
++		int16	   *attnums;
++		int			numcols;
++		int			i;
++
++		/* Check the constraint name */
++		if (strcmp(NameStr(con->conname), conname) != 0)
++			continue;
++		if (OidIsValid(*constraintOid))
++			ereport(ERROR,
++					(errcode(ERRCODE_DUPLICATE_OBJECT),
++					 errmsg("table \"%s\" has multiple constraints named \"%s\"",
++							get_rel_name(relid), conname)));
++
++		*constraintOid = HeapTupleGetOid(tuple);
++
++		/* Extract the conkey array, ie, attnums of constrained columns */
++		adatum = heap_getattr(tuple, Anum_pg_constraint_conkey,
++							  RelationGetDescr(pg_constraint), &isNull);
++		if (isNull)
++			continue;			/* no constrained columns */
++
++		arr = DatumGetArrayTypeP(adatum);	/* ensure not toasted */
++		numcols = ARR_DIMS(arr)[0];
++		if (ARR_NDIM(arr) != 1 ||
++			numcols < 0 ||
++			ARR_HASNULL(arr) ||
++			ARR_ELEMTYPE(arr) != INT2OID)
++			elog(ERROR, "conkey is not a 1-D smallint array");
++		attnums = (int16 *) ARR_DATA_PTR(arr);
++
++		/* Construct the result value */
++		for (i = 0; i < numcols; i++)
++		{
++			conattnos = bms_add_member(conattnos,
++									   attnums[i] - FirstLowInvalidHeapAttributeNumber);
++		}
++	}
++
++	systable_endscan(scan);
++
++	/* If no such constraint exists, complain */
++	if (!OidIsValid(*constraintOid) && !missing_ok)
++		ereport(ERROR,
++				(errcode(ERRCODE_UNDEFINED_OBJECT),
++				 errmsg("constraint \"%s\" for table \"%s\" does not exist",
++						conname, get_rel_name(relid))));
++
++	heap_close(pg_constraint, AccessShareLock);
++
++	return conattnos;
++}
++
+ /*
+  * get_domain_constraint_oid
+  *		Find a constraint on the specified domain with the specified name.
+diff --git a/src/backend/parser/parse_clause.c b/src/backend/parser/parse_clause.c
+index af99e65aa7..ed26517c26 100644
+--- a/src/backend/parser/parse_clause.c
++++ b/src/backend/parser/parse_clause.c
+@@ -3164,9 +3164,26 @@ transformOnConflictArbiter(ParseState *pstate,
+ 
+ 		pstate->p_namespace = save_namespace;
+ 
++		/*
++		 * If the arbiter is specified by constraint name, get the constraint
++		 * OID and mark the constrained columns as requiring SELECT privilege,
++		 * in the same way as would have happened if the arbiter had been
++		 * specified by explicit reference to the constraint's index columns.
++		 */
+ 		if (infer->conname)
+-			*constraint = get_relation_constraint_oid(RelationGetRelid(pstate->p_target_relation),
+-													  infer->conname, false);
++		{
++			Oid			relid = RelationGetRelid(pstate->p_target_relation);
++			RangeTblEntry *rte = pstate->p_target_rangetblentry;
++			Bitmapset  *conattnos;
++
++			conattnos = get_relation_constraint_attnos(relid, infer->conname,
++													   false, constraint);
++
++			/* Make sure the rel as a whole is marked for SELECT access */
++			rte->requiredPerms |= ACL_SELECT;
++			/* Mark the constrained columns as requiring SELECT access */
++			rte->selectedCols = bms_add_members(rte->selectedCols, conattnos);
++		}
+ 	}
+ 
+ 	/*
+diff --git a/src/backend/rewrite/rowsecurity.c b/src/backend/rewrite/rowsecurity.c
+index 9e7e54db67..a0cd6b1075 100644
+--- a/src/backend/rewrite/rowsecurity.c
++++ b/src/backend/rewrite/rowsecurity.c
+@@ -310,6 +310,8 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 		{
+ 			List	   *conflict_permissive_policies;
+ 			List	   *conflict_restrictive_policies;
++			List	   *conflict_select_permissive_policies = NIL;
++			List	   *conflict_select_restrictive_policies = NIL;
+ 
+ 			/* Get the policies that apply to the auxiliary UPDATE */
+ 			get_policies_for_relation(rel, CMD_UPDATE, user_id,
+@@ -339,9 +341,6 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 			 */
+ 			if (rte->requiredPerms & ACL_SELECT)
+ 			{
+-				List	   *conflict_select_permissive_policies = NIL;
+-				List	   *conflict_select_restrictive_policies = NIL;
+-
+ 				get_policies_for_relation(rel, CMD_SELECT, user_id,
+ 										  &conflict_select_permissive_policies,
+ 										  &conflict_select_restrictive_policies);
+@@ -362,6 +361,21 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 								   withCheckOptions,
+ 								   hasSubLinks,
+ 								   false);
++
++			/*
++			 * Add ALL/SELECT policies as WCO_RLS_UPDATE_CHECK WCOs, to ensure
++			 * that the final updated row is visible when taking the UPDATE
++			 * path of an INSERT .. ON CONFLICT DO UPDATE, if SELECT rights
++			 * are required for this relation.
++			 */
++			if (rte->requiredPerms & ACL_SELECT)
++				add_with_check_options(rel, rt_index,
++									   WCO_RLS_UPDATE_CHECK,
++									   conflict_select_permissive_policies,
++									   conflict_select_restrictive_policies,
++									   withCheckOptions,
++									   hasSubLinks,
++									   true);
+ 		}
+ 	}
+ 
+diff --git a/src/include/catalog/pg_constraint_fn.h b/src/include/catalog/pg_constraint_fn.h
+index a4c46897ed..37b0b4ba82 100644
+--- a/src/include/catalog/pg_constraint_fn.h
++++ b/src/include/catalog/pg_constraint_fn.h
+@@ -69,6 +69,8 @@ extern char *ChooseConstraintName(const char *name1, const char *name2,
+ extern void AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
+ 						  Oid newNspId, bool isType, ObjectAddresses *objsMoved);
+ extern Oid	get_relation_constraint_oid(Oid relid, const char *conname, bool missing_ok);
++extern Bitmapset *get_relation_constraint_attnos(Oid relid, const char *conname,
++							   bool missing_ok, Oid *constraintOid);
+ extern Oid	get_domain_constraint_oid(Oid typid, const char *conname, bool missing_ok);
+ 
+ extern Bitmapset *get_primary_key_attnos(Oid relid, bool deferrableOk,
+diff --git a/src/test/regress/expected/privileges.out b/src/test/regress/expected/privileges.out
+index f37df6c709..65d950f15b 100644
+--- a/src/test/regress/expected/privileges.out
++++ b/src/test/regress/expected/privileges.out
+@@ -488,10 +488,22 @@ ERROR:  permission denied for relation atest5
+ INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10; -- fails (due to INSERT)
+ ERROR:  permission denied for relation atest5
+ -- Check that the columns in the inference require select privileges
+--- Error. No privs on four
+-INSERT INTO atest5(three) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 10;
++INSERT INTO atest5(four) VALUES (4); -- fail
+ ERROR:  permission denied for relation atest5
+ SET SESSION AUTHORIZATION regress_user1;
++GRANT INSERT (four) ON atest5 TO regress_user4;
++SET SESSION AUTHORIZATION regress_user4;
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 3; -- fails (due to SELECT)
++ERROR:  permission denied for relation atest5
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT ON CONSTRAINT atest5_four_key DO UPDATE set three = 3; -- fails (due to SELECT)
++ERROR:  permission denied for relation atest5
++INSERT INTO atest5(four) VALUES (4); -- ok
++SET SESSION AUTHORIZATION regress_user1;
++GRANT SELECT (four) ON atest5 TO regress_user4;
++SET SESSION AUTHORIZATION regress_user4;
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 3; -- ok
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT ON CONSTRAINT atest5_four_key DO UPDATE set three = 3; -- ok
++SET SESSION AUTHORIZATION regress_user1;
+ REVOKE ALL (one) ON atest5 FROM regress_user4;
+ GRANT SELECT (one,two,blue) ON atest6 TO regress_user4;
+ SET SESSION AUTHORIZATION regress_user4;
+diff --git a/src/test/regress/expected/rowsecurity.out b/src/test/regress/expected/rowsecurity.out
+index de2ee4d2c9..b8dcf51a30 100644
+--- a/src/test/regress/expected/rowsecurity.out
++++ b/src/test/regress/expected/rowsecurity.out
+@@ -3807,9 +3807,10 @@ DROP TABLE r1;
+ --
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SET row_security = on;
+-CREATE TABLE r1 (a int);
++CREATE TABLE r1 (a int PRIMARY KEY);
+ CREATE POLICY p1 ON r1 FOR SELECT USING (a < 20);
+ CREATE POLICY p2 ON r1 FOR UPDATE USING (a < 20) WITH CHECK (true);
++CREATE POLICY p3 ON r1 FOR INSERT WITH CHECK (true);
+ INSERT INTO r1 VALUES (10);
+ ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
+ ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
+@@ -3836,6 +3837,18 @@ ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
+ -- Error
+ UPDATE r1 SET a = 30 RETURNING *;
+ ERROR:  new row violates row-level security policy for table "r1"
++-- UPDATE path of INSERT ... ON CONFLICT DO UPDATE should also error out
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT (a) DO UPDATE SET a = 30 RETURNING *;
++ERROR:  new row violates row-level security policy for table "r1"
++-- Should still error out without RETURNING (use of arbiter always requires
++-- SELECT permissions)
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT (a) DO UPDATE SET a = 30;
++ERROR:  new row violates row-level security policy for table "r1"
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT ON CONSTRAINT r1_pkey DO UPDATE SET a = 30;
++ERROR:  new row violates row-level security policy for table "r1"
+ DROP TABLE r1;
+ -- Check dependency handling
+ RESET SESSION AUTHORIZATION;
+diff --git a/src/test/regress/sql/privileges.sql b/src/test/regress/sql/privileges.sql
+index e2c13e08a4..902f64c747 100644
+--- a/src/test/regress/sql/privileges.sql
++++ b/src/test/regress/sql/privileges.sql
+@@ -320,9 +320,24 @@ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLU
+ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.three;
+ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8; -- fails (due to UPDATE)
+ INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10; -- fails (due to INSERT)
++
+ -- Check that the columns in the inference require select privileges
+--- Error. No privs on four
+-INSERT INTO atest5(three) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 10;
++INSERT INTO atest5(four) VALUES (4); -- fail
++
++SET SESSION AUTHORIZATION regress_user1;
++GRANT INSERT (four) ON atest5 TO regress_user4;
++SET SESSION AUTHORIZATION regress_user4;
++
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 3; -- fails (due to SELECT)
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT ON CONSTRAINT atest5_four_key DO UPDATE set three = 3; -- fails (due to SELECT)
++INSERT INTO atest5(four) VALUES (4); -- ok
++
++SET SESSION AUTHORIZATION regress_user1;
++GRANT SELECT (four) ON atest5 TO regress_user4;
++SET SESSION AUTHORIZATION regress_user4;
++
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 3; -- ok
++INSERT INTO atest5(four) VALUES (4) ON CONFLICT ON CONSTRAINT atest5_four_key DO UPDATE set three = 3; -- ok
+ 
+ SET SESSION AUTHORIZATION regress_user1;
+ REVOKE ALL (one) ON atest5 FROM regress_user4;
+diff --git a/src/test/regress/sql/rowsecurity.sql b/src/test/regress/sql/rowsecurity.sql
+index e03a7ab65f..f3a31dbee0 100644
+--- a/src/test/regress/sql/rowsecurity.sql
++++ b/src/test/regress/sql/rowsecurity.sql
+@@ -1674,10 +1674,11 @@ DROP TABLE r1;
+ --
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SET row_security = on;
+-CREATE TABLE r1 (a int);
++CREATE TABLE r1 (a int PRIMARY KEY);
+ 
+ CREATE POLICY p1 ON r1 FOR SELECT USING (a < 20);
+ CREATE POLICY p2 ON r1 FOR UPDATE USING (a < 20) WITH CHECK (true);
++CREATE POLICY p3 ON r1 FOR INSERT WITH CHECK (true);
+ INSERT INTO r1 VALUES (10);
+ ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
+ ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
+@@ -1699,6 +1700,17 @@ ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
+ -- Error
+ UPDATE r1 SET a = 30 RETURNING *;
+ 
++-- UPDATE path of INSERT ... ON CONFLICT DO UPDATE should also error out
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT (a) DO UPDATE SET a = 30 RETURNING *;
++
++-- Should still error out without RETURNING (use of arbiter always requires
++-- SELECT permissions)
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT (a) DO UPDATE SET a = 30;
++INSERT INTO r1 VALUES (10)
++    ON CONFLICT ON CONSTRAINT r1_pkey DO UPDATE SET a = 30;
++
+ DROP TABLE r1;
+ 
+ -- Check dependency handling

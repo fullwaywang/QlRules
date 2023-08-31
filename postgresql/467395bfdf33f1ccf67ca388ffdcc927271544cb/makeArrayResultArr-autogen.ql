@@ -63,4 +63,4 @@ and func_3(vastate_5406, target_3)
 and func_4(vastate_5406, target_4)
 and vastate_5406.getType().hasName("ArrayBuildStateArr *")
 and vastate_5406.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

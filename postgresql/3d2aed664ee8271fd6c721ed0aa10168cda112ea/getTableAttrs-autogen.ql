@@ -31,4 +31,4 @@ and vfout_8093.getType().hasName("Archive *")
 and vtbinfo_8122.getType().hasName("TableInfo *")
 and vfout_8093.getFunction() = func
 and vtbinfo_8122.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

@@ -1,0 +1,436 @@
+commit cb2ae5741f2458a474ed3c31458d242e678ff229	cb2ae5741f2458a474ed3c31458d242e678ff229
+Author: Dean Rasheed <dean.a.rasheed@gmail.com>
+Date:   Mon Aug 7 09:24:27 2023 +0100
+
+    Fix RLS policy usage in MERGE.
+    
+    If MERGE executes an UPDATE action on a table with row-level security,
+    the code incorrectly applied the WITH CHECK clauses from the target
+    table's INSERT policies to new rows, instead of the clauses from the
+    table's UPDATE policies. In addition, it failed to check new rows
+    against the target table's SELECT policies, if SELECT permissions were
+    required (likely to always be the case).
+    
+    In addition, if MERGE executes a DO NOTHING action for matched rows,
+    the code incorrectly applied the USING clauses from the target table's
+    DELETE policies to existing target tuples. These policies were applied
+    as checks that would throw an error, if they did not pass.
+    
+    Fix this, so that a MERGE UPDATE action applies the same RLS policies
+    as a plain UPDATE query with a WHERE clause, and a DO NOTHING action
+    does not apply any RLS checks (other than adding clauses from SELECT
+    policies to the join).
+    
+    Back-patch to v15, where MERGE was introduced.
+    
+    Dean Rasheed, reviewed by Stephen Frost.
+    
+    Security: CVE-2023-39418
+
+diff --git a/src/backend/executor/nodeModifyTable.c b/src/backend/executor/nodeModifyTable.c
+index ca62cb707a..daf48dc0f0 100644
+--- a/src/backend/executor/nodeModifyTable.c
++++ b/src/backend/executor/nodeModifyTable.c
+@@ -2842,13 +2842,14 @@ lmerge_matched:;
+ 		 * UPDATE/DELETE RLS policies. If those checks fail, we throw an
+ 		 * error.
+ 		 *
+-		 * The WITH CHECK quals are applied in ExecUpdate() and hence we need
+-		 * not do anything special to handle them.
++		 * The WITH CHECK quals for UPDATE RLS policies are applied in
++		 * ExecUpdateAct() and hence we need not do anything special to handle
++		 * them.
+ 		 *
+ 		 * NOTE: We must do this after WHEN quals are evaluated, so that we
+ 		 * check policies only when they matter.
+ 		 */
+-		if (resultRelInfo->ri_WithCheckOptions)
++		if (resultRelInfo->ri_WithCheckOptions && commandType != CMD_NOTHING)
+ 		{
+ 			ExecWithCheckOptions(commandType == CMD_UPDATE ?
+ 								 WCO_RLS_MERGE_UPDATE_CHECK : WCO_RLS_MERGE_DELETE_CHECK,
+diff --git a/src/backend/rewrite/rowsecurity.c b/src/backend/rewrite/rowsecurity.c
+index a233dd4758..a0f7b22f13 100644
+--- a/src/backend/rewrite/rowsecurity.c
++++ b/src/backend/rewrite/rowsecurity.c
+@@ -387,7 +387,11 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 	 * and set them up so that we can enforce the appropriate policy depending
+ 	 * on the final action we take.
+ 	 *
+-	 * We already fetched the SELECT policies above.
++	 * We already fetched the SELECT policies above, to check existing rows,
++	 * but we must also check that new rows created by UPDATE actions are
++	 * visible, if SELECT rights are required for this relation. We don't do
++	 * this for INSERT actions, since an INSERT command would only do this
++	 * check if it had a RETURNING list, and MERGE does not support RETURNING.
+ 	 *
+ 	 * We don't push the UPDATE/DELETE USING quals to the RTE because we don't
+ 	 * really want to apply them while scanning the relation since we don't
+@@ -403,16 +407,20 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 	 */
+ 	if (commandType == CMD_MERGE)
+ 	{
+-		List	   *merge_permissive_policies;
+-		List	   *merge_restrictive_policies;
++		List	   *merge_update_permissive_policies;
++		List	   *merge_update_restrictive_policies;
++		List	   *merge_delete_permissive_policies;
++		List	   *merge_delete_restrictive_policies;
++		List	   *merge_insert_permissive_policies;
++		List	   *merge_insert_restrictive_policies;
+ 
+ 		/*
+ 		 * Fetch the UPDATE policies and set them up to execute on the
+ 		 * existing target row before doing UPDATE.
+ 		 */
+ 		get_policies_for_relation(rel, CMD_UPDATE, user_id,
+-								  &merge_permissive_policies,
+-								  &merge_restrictive_policies);
++								  &merge_update_permissive_policies,
++								  &merge_update_restrictive_policies);
+ 
+ 		/*
+ 		 * WCO_RLS_MERGE_UPDATE_CHECK is used to check UPDATE USING quals on
+@@ -420,23 +428,59 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 		 */
+ 		add_with_check_options(rel, rt_index,
+ 							   WCO_RLS_MERGE_UPDATE_CHECK,
+-							   merge_permissive_policies,
+-							   merge_restrictive_policies,
++							   merge_update_permissive_policies,
++							   merge_update_restrictive_policies,
+ 							   withCheckOptions,
+ 							   hasSubLinks,
+ 							   true);
+ 
++		/* Enforce the WITH CHECK clauses of the UPDATE policies */
++		add_with_check_options(rel, rt_index,
++							   WCO_RLS_UPDATE_CHECK,
++							   merge_update_permissive_policies,
++							   merge_update_restrictive_policies,
++							   withCheckOptions,
++							   hasSubLinks,
++							   false);
++
++		/*
++		 * Add ALL/SELECT policies as WCO_RLS_UPDATE_CHECK WCOs, to ensure
++		 * that the updated row is visible when executing an UPDATE action, if
++		 * SELECT rights are required for this relation.
++		 */
++		if (rte->requiredPerms & ACL_SELECT)
++		{
++			List	   *merge_select_permissive_policies;
++			List	   *merge_select_restrictive_policies;
++
++			get_policies_for_relation(rel, CMD_SELECT, user_id,
++									  &merge_select_permissive_policies,
++									  &merge_select_restrictive_policies);
++			add_with_check_options(rel, rt_index,
++								   WCO_RLS_UPDATE_CHECK,
++								   merge_select_permissive_policies,
++								   merge_select_restrictive_policies,
++								   withCheckOptions,
++								   hasSubLinks,
++								   true);
++		}
++
+ 		/*
+-		 * Same with DELETE policies.
++		 * Fetch the DELETE policies and set them up to execute on the
++		 * existing target row before doing DELETE.
+ 		 */
+ 		get_policies_for_relation(rel, CMD_DELETE, user_id,
+-								  &merge_permissive_policies,
+-								  &merge_restrictive_policies);
++								  &merge_delete_permissive_policies,
++								  &merge_delete_restrictive_policies);
+ 
++		/*
++		 * WCO_RLS_MERGE_DELETE_CHECK is used to check DELETE USING quals on
++		 * the existing target row.
++		 */
+ 		add_with_check_options(rel, rt_index,
+ 							   WCO_RLS_MERGE_DELETE_CHECK,
+-							   merge_permissive_policies,
+-							   merge_restrictive_policies,
++							   merge_delete_permissive_policies,
++							   merge_delete_restrictive_policies,
+ 							   withCheckOptions,
+ 							   hasSubLinks,
+ 							   true);
+@@ -447,22 +491,13 @@ get_row_security_policies(Query *root, RangeTblEntry *rte, int rt_index,
+ 		 * withCheckOptions.
+ 		 */
+ 		get_policies_for_relation(rel, CMD_INSERT, user_id,
+-								  &merge_permissive_policies,
+-								  &merge_restrictive_policies);
++								  &merge_insert_permissive_policies,
++								  &merge_insert_restrictive_policies);
+ 
+ 		add_with_check_options(rel, rt_index,
+ 							   WCO_RLS_INSERT_CHECK,
+-							   merge_permissive_policies,
+-							   merge_restrictive_policies,
+-							   withCheckOptions,
+-							   hasSubLinks,
+-							   false);
+-
+-		/* Enforce the WITH CHECK clauses of the UPDATE policies */
+-		add_with_check_options(rel, rt_index,
+-							   WCO_RLS_UPDATE_CHECK,
+-							   merge_permissive_policies,
+-							   merge_restrictive_policies,
++							   merge_insert_permissive_policies,
++							   merge_insert_restrictive_policies,
+ 							   withCheckOptions,
+ 							   hasSubLinks,
+ 							   false);
+diff --git a/src/test/regress/expected/rowsecurity.out b/src/test/regress/expected/rowsecurity.out
+index 1fec044c49..2d99b89759 100644
+--- a/src/test/regress/expected/rowsecurity.out
++++ b/src/test/regress/expected/rowsecurity.out
+@@ -2127,10 +2127,10 @@ ALTER TABLE document ADD COLUMN dnotes text DEFAULT '';
+ CREATE POLICY p1 ON document FOR SELECT USING (true);
+ -- one may insert documents only authored by them
+ CREATE POLICY p2 ON document FOR INSERT WITH CHECK (dauthor = current_user);
+--- one may only update documents in 'novel' category
++-- one may only update documents in 'novel' category and new dlevel must be > 0
+ CREATE POLICY p3 ON document FOR UPDATE
+   USING (cid = (SELECT cid from category WHERE cname = 'novel'))
+-  WITH CHECK (dauthor = current_user);
++  WITH CHECK (dlevel > 0);
+ -- one may only delete documents in 'manga' category
+ CREATE POLICY p4 ON document FOR DELETE
+   USING (cid = (SELECT cid from category WHERE cname = 'manga'));
+@@ -2154,12 +2154,12 @@ SELECT * FROM document;
+ (14 rows)
+ 
+ SET SESSION AUTHORIZATION regress_rls_bob;
+--- Fails, since update violates WITH CHECK qual on dauthor
++-- Fails, since update violates WITH CHECK qual on dlevel
+ MERGE INTO document d
+ USING (SELECT 1 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+-	UPDATE SET dnotes = dnotes || ' notes added by merge1 ', dauthor = 'regress_rls_alice';
++	UPDATE SET dnotes = dnotes || ' notes added by merge1 ', dlevel = 0;
+ ERROR:  new row violates row-level security policy for table "document"
+ -- Should be OK since USING and WITH CHECK quals pass
+ MERGE INTO document d
+@@ -2167,12 +2167,12 @@ USING (SELECT 1 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+ 	UPDATE SET dnotes = dnotes || ' notes added by merge2 ';
+--- Even when dauthor is updated explicitly, but to the existing value
++-- Even when dlevel is updated explicitly, but to the existing value
+ MERGE INTO document d
+ USING (SELECT 1 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+-	UPDATE SET dnotes = dnotes || ' notes added by merge3 ', dauthor = 'regress_rls_bob';
++	UPDATE SET dnotes = dnotes || ' notes added by merge3 ', dlevel = 1;
+ -- There is a MATCH for did = 3, but UPDATE's USING qual does not allow
+ -- updating an item in category 'science fiction'
+ MERGE INTO document d
+@@ -2211,6 +2211,14 @@ WHEN MATCHED AND dnotes <> '' THEN
+ WHEN MATCHED THEN
+ 	DELETE;
+ ERROR:  target row violates row-level security policy (USING expression) for table "document"
++-- OK if DELETE is replaced with DO NOTHING
++MERGE INTO document d
++USING (SELECT 4 as sdid) s
++ON did = s.sdid
++WHEN MATCHED AND dnotes <> '' THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge '
++WHEN MATCHED THEN
++	DO NOTHING;
+ SELECT * FROM document WHERE did = 4;
+  did | cid | dlevel |     dauthor     |     dtitle     | dnotes 
+ -----+-----+--------+-----------------+----------------+--------
+@@ -2259,30 +2267,53 @@ WHEN MATCHED THEN
+ WHEN NOT MATCHED THEN
+ 	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel');
+ -- drop and create a new SELECT policy which prevents us from reading
+--- any document except with category 'magna'
++-- any document except with category 'novel'
+ RESET SESSION AUTHORIZATION;
+ DROP POLICY p1 ON document;
+ CREATE POLICY p1 ON document FOR SELECT
+-  USING (cid = (SELECT cid from category WHERE cname = 'manga'));
++  USING (cid = (SELECT cid from category WHERE cname = 'novel'));
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ -- MERGE can no longer see the matching row and hence attempts the
+ -- NOT MATCHED action, which results in unique key violation
+ MERGE INTO document d
+-USING (SELECT 1 as sdid) s
++USING (SELECT 7 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+ 	UPDATE SET dnotes = dnotes || ' notes added by merge5 '
+ WHEN NOT MATCHED THEN
+ 	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel');
+ ERROR:  duplicate key value violates unique constraint "document_pkey"
++-- UPDATE action fails if new row is not visible
++MERGE INTO document d
++USING (SELECT 1 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge6 ',
++			   cid = (SELECT cid from category WHERE cname = 'technology');
++ERROR:  new row violates row-level security policy for table "document"
++-- but OK if new row is visible
++MERGE INTO document d
++USING (SELECT 1 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge7 ',
++			   cid = (SELECT cid from category WHERE cname = 'novel');
++-- OK to insert a new row that is not visible
++MERGE INTO document d
++USING (SELECT 13 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge8 '
++WHEN NOT MATCHED THEN
++	INSERT VALUES (13, 44, 1, 'regress_rls_bob', 'new manga');
+ RESET SESSION AUTHORIZATION;
+ -- drop the restrictive SELECT policy so that we can look at the
+ -- final state of the table
+ DROP POLICY p1 ON document;
+ -- Just check everything went per plan
+ SELECT * FROM document;
+- did | cid | dlevel |      dauthor      |              dtitle              |                                dnotes                                 
+------+-----+--------+-------------------+----------------------------------+-----------------------------------------------------------------------
++ did | cid | dlevel |      dauthor      |              dtitle              |                                            dnotes                                            
++-----+-----+--------+-------------------+----------------------------------+----------------------------------------------------------------------------------------------
+    3 |  22 |      2 | regress_rls_bob   | my science fiction               | 
+    5 |  44 |      2 | regress_rls_bob   | my second manga                  | 
+    6 |  22 |      1 | regress_rls_carol | great science fiction            | 
+@@ -2296,8 +2327,9 @@ SELECT * FROM document;
+   78 |  33 |      1 | regress_rls_bob   | some technology novel            | 
+   79 |  33 |      1 | regress_rls_bob   | technology book, can only insert | 
+   12 |  11 |      1 | regress_rls_bob   | another novel                    | 
+-   1 |  11 |      1 | regress_rls_bob   | my first novel                   |  notes added by merge2  notes added by merge3  notes added by merge4 
+-(14 rows)
++   1 |  11 |      1 | regress_rls_bob   | my first novel                   |  notes added by merge2  notes added by merge3  notes added by merge4  notes added by merge7 
++  13 |  44 |      1 | regress_rls_bob   | new manga                        | 
++(15 rows)
+ 
+ --
+ -- ROLE/GROUP
+diff --git a/src/test/regress/sql/rowsecurity.sql b/src/test/regress/sql/rowsecurity.sql
+index faad37ec81..34ea204560 100644
+--- a/src/test/regress/sql/rowsecurity.sql
++++ b/src/test/regress/sql/rowsecurity.sql
+@@ -821,10 +821,10 @@ ALTER TABLE document ADD COLUMN dnotes text DEFAULT '';
+ CREATE POLICY p1 ON document FOR SELECT USING (true);
+ -- one may insert documents only authored by them
+ CREATE POLICY p2 ON document FOR INSERT WITH CHECK (dauthor = current_user);
+--- one may only update documents in 'novel' category
++-- one may only update documents in 'novel' category and new dlevel must be > 0
+ CREATE POLICY p3 ON document FOR UPDATE
+   USING (cid = (SELECT cid from category WHERE cname = 'novel'))
+-  WITH CHECK (dauthor = current_user);
++  WITH CHECK (dlevel > 0);
+ -- one may only delete documents in 'manga' category
+ CREATE POLICY p4 ON document FOR DELETE
+   USING (cid = (SELECT cid from category WHERE cname = 'manga'));
+@@ -833,12 +833,12 @@ SELECT * FROM document;
+ 
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ 
+--- Fails, since update violates WITH CHECK qual on dauthor
++-- Fails, since update violates WITH CHECK qual on dlevel
+ MERGE INTO document d
+ USING (SELECT 1 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+-	UPDATE SET dnotes = dnotes || ' notes added by merge1 ', dauthor = 'regress_rls_alice';
++	UPDATE SET dnotes = dnotes || ' notes added by merge1 ', dlevel = 0;
+ 
+ -- Should be OK since USING and WITH CHECK quals pass
+ MERGE INTO document d
+@@ -847,12 +847,12 @@ ON did = s.sdid
+ WHEN MATCHED THEN
+ 	UPDATE SET dnotes = dnotes || ' notes added by merge2 ';
+ 
+--- Even when dauthor is updated explicitly, but to the existing value
++-- Even when dlevel is updated explicitly, but to the existing value
+ MERGE INTO document d
+ USING (SELECT 1 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+-	UPDATE SET dnotes = dnotes || ' notes added by merge3 ', dauthor = 'regress_rls_bob';
++	UPDATE SET dnotes = dnotes || ' notes added by merge3 ', dlevel = 1;
+ 
+ -- There is a MATCH for did = 3, but UPDATE's USING qual does not allow
+ -- updating an item in category 'science fiction'
+@@ -892,6 +892,15 @@ WHEN MATCHED AND dnotes <> '' THEN
+ WHEN MATCHED THEN
+ 	DELETE;
+ 
++-- OK if DELETE is replaced with DO NOTHING
++MERGE INTO document d
++USING (SELECT 4 as sdid) s
++ON did = s.sdid
++WHEN MATCHED AND dnotes <> '' THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge '
++WHEN MATCHED THEN
++	DO NOTHING;
++
+ SELECT * FROM document WHERE did = 4;
+ 
+ -- Switch to regress_rls_carol role and try the DELETE again. It should succeed
+@@ -941,24 +950,49 @@ WHEN NOT MATCHED THEN
+ 	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel');
+ 
+ -- drop and create a new SELECT policy which prevents us from reading
+--- any document except with category 'magna'
++-- any document except with category 'novel'
+ RESET SESSION AUTHORIZATION;
+ DROP POLICY p1 ON document;
+ CREATE POLICY p1 ON document FOR SELECT
+-  USING (cid = (SELECT cid from category WHERE cname = 'manga'));
++  USING (cid = (SELECT cid from category WHERE cname = 'novel'));
+ 
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ 
+ -- MERGE can no longer see the matching row and hence attempts the
+ -- NOT MATCHED action, which results in unique key violation
+ MERGE INTO document d
+-USING (SELECT 1 as sdid) s
++USING (SELECT 7 as sdid) s
+ ON did = s.sdid
+ WHEN MATCHED THEN
+ 	UPDATE SET dnotes = dnotes || ' notes added by merge5 '
+ WHEN NOT MATCHED THEN
+ 	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel');
+ 
++-- UPDATE action fails if new row is not visible
++MERGE INTO document d
++USING (SELECT 1 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge6 ',
++			   cid = (SELECT cid from category WHERE cname = 'technology');
++
++-- but OK if new row is visible
++MERGE INTO document d
++USING (SELECT 1 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge7 ',
++			   cid = (SELECT cid from category WHERE cname = 'novel');
++
++-- OK to insert a new row that is not visible
++MERGE INTO document d
++USING (SELECT 13 as sdid) s
++ON did = s.sdid
++WHEN MATCHED THEN
++	UPDATE SET dnotes = dnotes || ' notes added by merge8 '
++WHEN NOT MATCHED THEN
++	INSERT VALUES (13, 44, 1, 'regress_rls_bob', 'new manga');
++
+ RESET SESSION AUTHORIZATION;
+ -- drop the restrictive SELECT policy so that we can look at the
+ -- final state of the table

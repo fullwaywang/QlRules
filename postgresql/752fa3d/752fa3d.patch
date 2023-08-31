@@ -1,0 +1,227 @@
+commit 752fa3dbfc36c70a692986b56daac41410fca3f6	752fa3d
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Aug 5 07:48:41 2019 -0700
+
+    Require the schema qualification in pg_temp.type_name(arg).
+    
+    Commit aa27977fe21a7dfa4da4376ad66ae37cb8f0d0b5 introduced this
+    restriction for pg_temp.function_name(arg); do likewise for types
+    created in temporary schemas.  Programs that this breaks should add
+    "pg_temp." schema qualification or switch to arg::type_name syntax.
+    Back-patch to 9.4 (all supported versions).
+    
+    Reviewed by Tom Lane.  Reported by Tom Lane.
+    
+    Security: CVE-2019-10208
+
+diff --git a/doc/src/sgml/config.sgml b/doc/src/sgml/config.sgml
+index 66b331bce2..9aa1e83ecf 100644
+--- a/doc/src/sgml/config.sgml
++++ b/doc/src/sgml/config.sgml
+@@ -5524,6 +5524,10 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
+         be searched <emphasis>before</> searching any of the path items.
+        </para>
+ 
++       <!-- To further split hairs, funcname('foo') does not use the temporary
++            schema, even when it considers typname='funcname'.  This paragraph
++            refers to function names in a loose sense, "pg_proc.proname or
++            func_name grammar production". -->
+        <para>
+         Likewise, the current session's temporary-table schema,
+         <literal>pg_temp_<replaceable>nnn</></>, is always searched if it
+diff --git a/src/backend/catalog/namespace.c b/src/backend/catalog/namespace.c
+index ac30f77f02..53ba8a3141 100644
+--- a/src/backend/catalog/namespace.c
++++ b/src/backend/catalog/namespace.c
+@@ -753,13 +753,23 @@ RelationIsVisible(Oid relid)
+ 
+ /*
+  * TypenameGetTypid
++ *		Wrapper for binary compatibility.
++ */
++Oid
++TypenameGetTypid(const char *typname)
++{
++	return TypenameGetTypidExtended(typname, true);
++}
++
++/*
++ * TypenameGetTypidExtended
+  *		Try to resolve an unqualified datatype name.
+  *		Returns OID if type found in search path, else InvalidOid.
+  *
+  * This is essentially the same as RelnameGetRelid.
+  */
+ Oid
+-TypenameGetTypid(const char *typname)
++TypenameGetTypidExtended(const char *typname, bool temp_ok)
+ {
+ 	Oid			typid;
+ 	ListCell   *l;
+@@ -770,6 +780,9 @@ TypenameGetTypid(const char *typname)
+ 	{
+ 		Oid			namespaceId = lfirst_oid(l);
+ 
++		if (!temp_ok && namespaceId == myTempNamespace)
++			continue;			/* do not look in temp namespace */
++
+ 		typid = GetSysCacheOid2(TYPENAMENSP,
+ 								PointerGetDatum(typname),
+ 								ObjectIdGetDatum(namespaceId));
+diff --git a/src/backend/parser/parse_func.c b/src/backend/parser/parse_func.c
+index 554ca9d8c4..044addd250 100644
+--- a/src/backend/parser/parse_func.c
++++ b/src/backend/parser/parse_func.c
+@@ -1743,7 +1743,12 @@ FuncNameAsType(List *funcname)
+ 	Oid			result;
+ 	Type		typtup;
+ 
+-	typtup = LookupTypeName(NULL, makeTypeNameFromNameList(funcname), NULL, false);
++	/*
++	 * temp_ok=false protects the <refsect1 id="sql-createfunction-security">
++	 * contract for writing SECURITY DEFINER functions safely.
++	 */
++	typtup = LookupTypeNameExtended(NULL, makeTypeNameFromNameList(funcname),
++									NULL, false, false);
+ 	if (typtup == NULL)
+ 		return InvalidOid;
+ 
+diff --git a/src/backend/parser/parse_type.c b/src/backend/parser/parse_type.c
+index 9db3553d80..640cb1e153 100644
+--- a/src/backend/parser/parse_type.c
++++ b/src/backend/parser/parse_type.c
+@@ -33,6 +33,18 @@ static int32 typenameTypeMod(ParseState *pstate, const TypeName *typeName,
+ 
+ /*
+  * LookupTypeName
++ *		Wrapper for typical case.
++ */
++Type
++LookupTypeName(ParseState *pstate, const TypeName *typeName,
++			   int32 *typmod_p, bool missing_ok)
++{
++	return LookupTypeNameExtended(pstate,
++								  typeName, typmod_p, true, missing_ok);
++}
++
++/*
++ * LookupTypeNameExtended
+  *		Given a TypeName object, lookup the pg_type syscache entry of the type.
+  *		Returns NULL if no such type can be found.  If the type is found,
+  *		the typmod value represented in the TypeName struct is computed and
+@@ -51,11 +63,17 @@ static int32 typenameTypeMod(ParseState *pstate, const TypeName *typeName,
+  * found but is a shell, and there is typmod decoration, an error will be
+  * thrown --- this is intentional.
+  *
++ * If temp_ok is false, ignore types in the temporary namespace.  Pass false
++ * when the caller will decide, using goodness of fit criteria, whether the
++ * typeName is actually a type or something else.  If typeName always denotes
++ * a type (or denotes nothing), pass true.
++ *
+  * pstate is only used for error location info, and may be NULL.
+  */
+ Type
+-LookupTypeName(ParseState *pstate, const TypeName *typeName,
+-			   int32 *typmod_p, bool missing_ok)
++LookupTypeNameExtended(ParseState *pstate,
++					   const TypeName *typeName, int32 *typmod_p,
++					   bool temp_ok, bool missing_ok)
+ {
+ 	Oid			typoid;
+ 	HeapTuple	tup;
+@@ -172,7 +190,7 @@ LookupTypeName(ParseState *pstate, const TypeName *typeName,
+ 		else
+ 		{
+ 			/* Unqualified type name, so search the search path */
+-			typoid = TypenameGetTypid(typname);
++			typoid = TypenameGetTypidExtended(typname, temp_ok);
+ 		}
+ 
+ 		/* If an array reference, return the array type instead */
+diff --git a/src/backend/utils/adt/ruleutils.c b/src/backend/utils/adt/ruleutils.c
+index bef01cde86..9f7eb2ba9f 100644
+--- a/src/backend/utils/adt/ruleutils.c
++++ b/src/backend/utils/adt/ruleutils.c
+@@ -8583,6 +8583,14 @@ get_coercion_expr(Node *arg, deparse_context *context,
+ 		if (!PRETTY_PAREN(context))
+ 			appendStringInfoChar(buf, ')');
+ 	}
++
++	/*
++	 * Never emit resulttype(arg) functional notation. A pg_proc entry could
++	 * take precedence, and a resulttype in pg_temp would require schema
++	 * qualification that format_type_with_typemod() would usually omit. We've
++	 * standardized on arg::resulttype, but CAST(arg AS resulttype) notation
++	 * would work fine.
++	 */
+ 	appendStringInfo(buf, "::%s",
+ 					 format_type_with_typemod(resulttype, resulttypmod));
+ }
+diff --git a/src/include/catalog/namespace.h b/src/include/catalog/namespace.h
+index f3b005fa9d..e2a11c65aa 100644
+--- a/src/include/catalog/namespace.h
++++ b/src/include/catalog/namespace.h
+@@ -66,6 +66,7 @@ extern Oid	RelnameGetRelid(const char *relname);
+ extern bool RelationIsVisible(Oid relid);
+ 
+ extern Oid	TypenameGetTypid(const char *typname);
++extern Oid	TypenameGetTypidExtended(const char *typname, bool temp_ok);
+ extern bool TypeIsVisible(Oid typid);
+ 
+ extern FuncCandidateList FuncnameGetCandidates(List *names,
+diff --git a/src/include/parser/parse_type.h b/src/include/parser/parse_type.h
+index f95bfe78ea..6f1a7b993e 100644
+--- a/src/include/parser/parse_type.h
++++ b/src/include/parser/parse_type.h
+@@ -21,6 +21,9 @@ typedef HeapTuple Type;
+ 
+ extern Type LookupTypeName(ParseState *pstate, const TypeName *typeName,
+ 			   int32 *typmod_p, bool missing_ok);
++extern Type LookupTypeNameExtended(ParseState *pstate,
++								   const TypeName *typeName, int32 *typmod_p,
++								   bool temp_ok, bool missing_ok);
+ extern Oid LookupTypeNameOid(ParseState *pstate, const TypeName *typeName,
+ 				  bool missing_ok);
+ extern Type typenameType(ParseState *pstate, const TypeName *typeName,
+diff --git a/src/test/regress/expected/temp.out b/src/test/regress/expected/temp.out
+index addf1ec444..0df7ba3ae1 100644
+--- a/src/test/regress/expected/temp.out
++++ b/src/test/regress/expected/temp.out
+@@ -199,3 +199,18 @@ select pg_temp.whoami();
+ (1 row)
+ 
+ drop table public.whereami;
++-- types in temp schema
++set search_path = pg_temp, public;
++create domain pg_temp.nonempty as text check (value <> '');
++-- function-syntax invocation of types matches rules for functions
++select nonempty('');
++ERROR:  function nonempty(unknown) does not exist
++LINE 1: select nonempty('');
++               ^
++HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
++select pg_temp.nonempty('');
++ERROR:  value for domain nonempty violates check constraint "nonempty_check"
++-- other syntax matches rules for tables
++select ''::nonempty;
++ERROR:  value for domain nonempty violates check constraint "nonempty_check"
++reset search_path;
+diff --git a/src/test/regress/sql/temp.sql b/src/test/regress/sql/temp.sql
+index 5183c727f5..6936b99929 100644
+--- a/src/test/regress/sql/temp.sql
++++ b/src/test/regress/sql/temp.sql
+@@ -151,3 +151,14 @@ select whoami();
+ select pg_temp.whoami();
+ 
+ drop table public.whereami;
++
++-- types in temp schema
++set search_path = pg_temp, public;
++create domain pg_temp.nonempty as text check (value <> '');
++-- function-syntax invocation of types matches rules for functions
++select nonempty('');
++select pg_temp.nonempty('');
++-- other syntax matches rules for tables
++select ''::nonempty;
++
++reset search_path;

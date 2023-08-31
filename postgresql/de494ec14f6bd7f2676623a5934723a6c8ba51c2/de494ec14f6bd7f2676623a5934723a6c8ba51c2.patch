@@ -1,0 +1,223 @@
+commit de494ec14f6bd7f2676623a5934723a6c8ba51c2	de494ec14f6bd7f2676623a5934723a6c8ba51c2
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon Aug 7 06:05:56 2023 -0700
+
+    Reject substituting extension schemas or owners matching ["$'\].
+    
+    Substituting such values in extension scripts facilitated SQL injection
+    when @extowner@, @extschema@, or @extschema:...@ appeared inside a
+    quoting construct (dollar quoting, '', or "").  No bundled extension was
+    vulnerable.  Vulnerable uses do appear in a documentation example and in
+    non-bundled extensions.  Hence, the attack prerequisite was an
+    administrator having installed files of a vulnerable, trusted,
+    non-bundled extension.  Subject to that prerequisite, this enabled an
+    attacker having database-level CREATE privilege to execute arbitrary
+    code as the bootstrap superuser.  By blocking this attack in the core
+    server, there's no need to modify individual extensions.  Back-patch to
+    v11 (all supported versions).
+    
+    Reported by Micah Gate, Valerie Woolard, Tim Carey-Smith, and Christoph
+    Berg.
+    
+    Security: CVE-2023-39417
+
+diff --git a/src/backend/commands/extension.c b/src/backend/commands/extension.c
+index a395479b68..df6f021c30 100644
+--- a/src/backend/commands/extension.c
++++ b/src/backend/commands/extension.c
+@@ -973,6 +973,16 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
+ 		char	   *c_sql = read_extension_script_file(control, filename);
+ 		Datum		t_sql;
+ 
++		/*
++		 * We filter each substitution through quote_identifier().  When the
++		 * arg contains one of the following characters, no one collection of
++		 * quoting can work inside $$dollar-quoted string literals$$,
++		 * 'single-quoted string literals', and outside of any literal.  To
++		 * avoid a security snare for extension authors, error on substitution
++		 * for arguments containing these.
++		 */
++		const char *quoting_relevant_chars = "\"$'\\";
++
+ 		/* We use various functions that want to operate on text datums */
+ 		t_sql = CStringGetTextDatum(c_sql);
+ 
+@@ -1002,6 +1012,11 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
+ 											t_sql,
+ 											CStringGetTextDatum("@extowner@"),
+ 											CStringGetTextDatum(qUserName));
++			if (strpbrk(userName, quoting_relevant_chars))
++				ereport(ERROR,
++						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
++						 errmsg("invalid character in extension owner: must not contain any of \"%s\"",
++								quoting_relevant_chars)));
+ 		}
+ 
+ 		/*
+@@ -1013,6 +1028,7 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
+ 		 */
+ 		if (!control->relocatable)
+ 		{
++			Datum		old = t_sql;
+ 			const char *qSchemaName = quote_identifier(schemaName);
+ 
+ 			t_sql = DirectFunctionCall3Coll(replace_text,
+@@ -1020,6 +1036,11 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
+ 											t_sql,
+ 											CStringGetTextDatum("@extschema@"),
+ 											CStringGetTextDatum(qSchemaName));
++			if (t_sql != old && strpbrk(schemaName, quoting_relevant_chars))
++				ereport(ERROR,
++						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
++						 errmsg("invalid character in extension \"%s\" schema: must not contain any of \"%s\"",
++								control->name, quoting_relevant_chars)));
+ 		}
+ 
+ 		/*
+diff --git a/src/test/modules/test_extensions/Makefile b/src/test/modules/test_extensions/Makefile
+index c3139ab0fc..6796c6b4ca 100644
+--- a/src/test/modules/test_extensions/Makefile
++++ b/src/test/modules/test_extensions/Makefile
+@@ -6,6 +6,7 @@ PGFILEDESC = "test_extensions - regression testing for EXTENSION support"
+ EXTENSION = test_ext1 test_ext2 test_ext3 test_ext4 test_ext5 test_ext6 \
+             test_ext7 test_ext8 test_ext_cine test_ext_cor \
+             test_ext_cyclic1 test_ext_cyclic2 \
++            test_ext_extschema \
+             test_ext_evttrig
+ DATA = test_ext1--1.0.sql test_ext2--1.0.sql test_ext3--1.0.sql \
+        test_ext4--1.0.sql test_ext5--1.0.sql test_ext6--1.0.sql \
+@@ -13,6 +14,7 @@ DATA = test_ext1--1.0.sql test_ext2--1.0.sql test_ext3--1.0.sql \
+        test_ext_cine--1.0.sql test_ext_cine--1.0--1.1.sql \
+        test_ext_cor--1.0.sql \
+        test_ext_cyclic1--1.0.sql test_ext_cyclic2--1.0.sql \
++       test_ext_extschema--1.0.sql \
+        test_ext_evttrig--1.0.sql test_ext_evttrig--1.0--2.0.sql
+ 
+ REGRESS = test_extensions test_extdepend
+diff --git a/src/test/modules/test_extensions/expected/test_extensions.out b/src/test/modules/test_extensions/expected/test_extensions.out
+index 821fed38d1..4ed9eba201 100644
+--- a/src/test/modules/test_extensions/expected/test_extensions.out
++++ b/src/test/modules/test_extensions/expected/test_extensions.out
+@@ -1,3 +1,4 @@
++CREATE SCHEMA has$dollar;
+ -- test some errors
+ CREATE EXTENSION test_ext1;
+ ERROR:  required extension "test_ext2" is not installed
+@@ -6,35 +7,35 @@ CREATE EXTENSION test_ext1 SCHEMA test_ext1;
+ ERROR:  schema "test_ext1" does not exist
+ CREATE EXTENSION test_ext1 SCHEMA test_ext;
+ ERROR:  schema "test_ext" does not exist
+-CREATE SCHEMA test_ext;
+-CREATE EXTENSION test_ext1 SCHEMA test_ext;
++CREATE EXTENSION test_ext1 SCHEMA has$dollar;
+ ERROR:  extension "test_ext1" must be installed in schema "test_ext1"
+ -- finally success
+-CREATE EXTENSION test_ext1 SCHEMA test_ext CASCADE;
++CREATE EXTENSION test_ext1 SCHEMA has$dollar CASCADE;
+ NOTICE:  installing required extension "test_ext2"
+ NOTICE:  installing required extension "test_ext3"
+ NOTICE:  installing required extension "test_ext5"
+ NOTICE:  installing required extension "test_ext4"
+ SELECT extname, nspname, extversion, extrelocatable FROM pg_extension e, pg_namespace n WHERE extname LIKE 'test_ext%' AND e.extnamespace = n.oid ORDER BY 1;
+-  extname  |  nspname  | extversion | extrelocatable 
+------------+-----------+------------+----------------
+- test_ext1 | test_ext1 | 1.0        | f
+- test_ext2 | test_ext  | 1.0        | t
+- test_ext3 | test_ext  | 1.0        | t
+- test_ext4 | test_ext  | 1.0        | t
+- test_ext5 | test_ext  | 1.0        | t
++  extname  |  nspname   | extversion | extrelocatable 
++-----------+------------+------------+----------------
++ test_ext1 | test_ext1  | 1.0        | f
++ test_ext2 | has$dollar | 1.0        | t
++ test_ext3 | has$dollar | 1.0        | t
++ test_ext4 | has$dollar | 1.0        | t
++ test_ext5 | has$dollar | 1.0        | t
+ (5 rows)
+ 
+ CREATE EXTENSION test_ext_cyclic1 CASCADE;
+ NOTICE:  installing required extension "test_ext_cyclic2"
+ ERROR:  cyclic dependency detected between extensions "test_ext_cyclic1" and "test_ext_cyclic2"
+-DROP SCHEMA test_ext CASCADE;
++DROP SCHEMA has$dollar CASCADE;
+ NOTICE:  drop cascades to 5 other objects
+ DETAIL:  drop cascades to extension test_ext3
+ drop cascades to extension test_ext5
+ drop cascades to extension test_ext2
+ drop cascades to extension test_ext4
+ drop cascades to extension test_ext1
++CREATE SCHEMA has$dollar;
+ CREATE EXTENSION test_ext6;
+ DROP EXTENSION test_ext6;
+ CREATE EXTENSION test_ext6;
+@@ -312,3 +313,10 @@ Objects in extension "test_ext_cine"
+  table ext_cine_tab3
+ (9 rows)
+ 
++--
++-- Test @extschema@ syntax.
++--
++CREATE SCHEMA "has space";
++CREATE EXTENSION test_ext_extschema SCHEMA has$dollar;
++ERROR:  invalid character in extension "test_ext_extschema" schema: must not contain any of ""$'\"
++CREATE EXTENSION test_ext_extschema SCHEMA "has space";
+diff --git a/src/test/modules/test_extensions/sql/test_extensions.sql b/src/test/modules/test_extensions/sql/test_extensions.sql
+index 41b6cddf0b..212fd9b429 100644
+--- a/src/test/modules/test_extensions/sql/test_extensions.sql
++++ b/src/test/modules/test_extensions/sql/test_extensions.sql
+@@ -1,18 +1,20 @@
++CREATE SCHEMA has$dollar;
++
+ -- test some errors
+ CREATE EXTENSION test_ext1;
+ CREATE EXTENSION test_ext1 SCHEMA test_ext1;
+ CREATE EXTENSION test_ext1 SCHEMA test_ext;
+-CREATE SCHEMA test_ext;
+-CREATE EXTENSION test_ext1 SCHEMA test_ext;
++CREATE EXTENSION test_ext1 SCHEMA has$dollar;
+ 
+ -- finally success
+-CREATE EXTENSION test_ext1 SCHEMA test_ext CASCADE;
++CREATE EXTENSION test_ext1 SCHEMA has$dollar CASCADE;
+ 
+ SELECT extname, nspname, extversion, extrelocatable FROM pg_extension e, pg_namespace n WHERE extname LIKE 'test_ext%' AND e.extnamespace = n.oid ORDER BY 1;
+ 
+ CREATE EXTENSION test_ext_cyclic1 CASCADE;
+ 
+-DROP SCHEMA test_ext CASCADE;
++DROP SCHEMA has$dollar CASCADE;
++CREATE SCHEMA has$dollar;
+ 
+ CREATE EXTENSION test_ext6;
+ DROP EXTENSION test_ext6;
+@@ -209,3 +211,10 @@ CREATE EXTENSION test_ext_cine;
+ ALTER EXTENSION test_ext_cine UPDATE TO '1.1';
+ 
+ \dx+ test_ext_cine
++
++--
++-- Test @extschema@ syntax.
++--
++CREATE SCHEMA "has space";
++CREATE EXTENSION test_ext_extschema SCHEMA has$dollar;
++CREATE EXTENSION test_ext_extschema SCHEMA "has space";
+diff --git a/src/test/modules/test_extensions/test_ext_extschema--1.0.sql b/src/test/modules/test_extensions/test_ext_extschema--1.0.sql
+new file mode 100644
+index 0000000000..aed53830aa
+--- /dev/null
++++ b/src/test/modules/test_extensions/test_ext_extschema--1.0.sql
+@@ -0,0 +1,5 @@
++/* src/test/modules/test_extensions/test_ext_extschema--1.0.sql */
++-- complain if script is sourced in psql, rather than via CREATE EXTENSION
++\echo Use "CREATE EXTENSION test_ext_extschema" to load this file. \quit
++
++SELECT 1 AS @extschema@;
+diff --git a/src/test/modules/test_extensions/test_ext_extschema.control b/src/test/modules/test_extensions/test_ext_extschema.control
+new file mode 100644
+index 0000000000..b124d492c0
+--- /dev/null
++++ b/src/test/modules/test_extensions/test_ext_extschema.control
+@@ -0,0 +1,3 @@
++comment = 'test @extschema@'
++default_version = '1.0'
++relocatable = false

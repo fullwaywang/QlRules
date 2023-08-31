@@ -44,4 +44,4 @@ and vtables_335.getType().hasName("SimpleStringList *")
 and vdbtables_345.getType().hasName("SimpleStringList")
 and vtables_335.getFunction() = func
 and vdbtables_345.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

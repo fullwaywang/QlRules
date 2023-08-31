@@ -1,0 +1,98 @@
+commit aafbd1df969135c185947c596c46608fc9f4a67c	aafbd1df969135c185947c596c46608fc9f4a67c
+Author: Noah Misch <noah@leadboat.com>
+Date:   Mon May 8 07:24:24 2017 -0700
+
+    Restore PGREQUIRESSL recognition in libpq.
+    
+    Commit 65c3bf19fd3e1f6a591618e92eb4c54d0b217564 moved handling of the,
+    already then, deprecated requiressl parameter into conninfo_storeval().
+    The default PGREQUIRESSL environment variable was however lost in the
+    change resulting in a potentially silent accept of a non-SSL connection
+    even when set.  Its documentation remained.  Restore its implementation.
+    Also amend the documentation to mark PGREQUIRESSL as deprecated for
+    those not following the link to requiressl.  Back-patch to 9.3, where
+    commit 65c3bf1 first appeared.
+    
+    Behavior has been more complex when the user provides both deprecated
+    and non-deprecated settings.  Before commit 65c3bf1, libpq operated
+    according to the first of these found:
+    
+      requiressl=1
+      PGREQUIRESSL=1
+      sslmode=*
+      PGSSLMODE=*
+    
+    (Note requiressl=0 didn't override sslmode=*; it would only suppress
+    PGREQUIRESSL=1 or a previous requiressl=1.  PGREQUIRESSL=0 had no effect
+    whatsoever.)  Starting with commit 65c3bf1, libpq ignored PGREQUIRESSL,
+    and order of precedence changed to this:
+    
+      last of requiressl=* or sslmode=*
+      PGSSLMODE=*
+    
+    Starting now, adopt the following order of precedence:
+    
+      last of requiressl=* or sslmode=*
+      PGSSLMODE=*
+      PGREQUIRESSL=1
+    
+    This retains the 65c3bf1 behavior for connection strings that contain
+    both requiressl=* and sslmode=*.  It retains the 65c3bf1 change that
+    either connection string option overrides both environment variables.
+    For the first time, PGSSLMODE has precedence over PGREQUIRESSL; this
+    avoids reducing security of "PGREQUIRESSL=1 PGSSLMODE=verify-full"
+    configurations originating under v9.3 and later.
+    
+    Daniel Gustafsson
+    
+    Security: CVE-2017-7485
+
+diff --git a/doc/src/sgml/libpq.sgml b/doc/src/sgml/libpq.sgml
+index 2f9350b10e..3a470fefac 100644
+--- a/doc/src/sgml/libpq.sgml
++++ b/doc/src/sgml/libpq.sgml
+@@ -6944,6 +6944,9 @@ myEventProc(PGEventId evtId, void *evtInfo, void *passThrough)
+       </indexterm>
+       <envar>PGREQUIRESSL</envar> behaves the same as the <xref
+       linkend="libpq-connect-requiressl"> connection parameter.
++      This environment variable is deprecated in favor of the
++      <envar>PGSSLMODE</envar> variable; setting both variables suppresses the
++      effect of this one.
+      </para>
+     </listitem>
+ 
+diff --git a/src/interfaces/libpq/fe-connect.c b/src/interfaces/libpq/fe-connect.c
+index 4f13624017..8c7169e171 100644
+--- a/src/interfaces/libpq/fe-connect.c
++++ b/src/interfaces/libpq/fe-connect.c
+@@ -4635,6 +4635,30 @@ conninfo_add_defaults(PQconninfoOption *options, PQExpBuffer errorMessage)
+ 			}
+ 		}
+ 
++		/*
++		 * Interpret the deprecated PGREQUIRESSL environment variable.  Per
++		 * tradition, translate values starting with "1" to sslmode=require,
++		 * and ignore other values.  Given both PGREQUIRESSL=1 and PGSSLMODE,
++		 * PGSSLMODE takes precedence; the opposite was true before v9.3.
++		 */
++		if (strcmp(option->keyword, "sslmode") == 0)
++		{
++			const char *requiresslenv = getenv("PGREQUIRESSL");
++
++			if (requiresslenv != NULL && requiresslenv[0] == '1')
++			{
++				option->val = strdup("require");
++				if (!option->val)
++				{
++					if (errorMessage)
++						printfPQExpBuffer(errorMessage,
++										  libpq_gettext("out of memory\n"));
++					return false;
++				}
++				continue;
++			}
++		}
++
+ 		/*
+ 		 * No environment variable specified or the variable isn't set - try
+ 		 * compiled-in default

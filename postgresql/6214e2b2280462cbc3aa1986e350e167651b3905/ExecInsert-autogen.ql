@@ -56,4 +56,4 @@ and func_3(vresultRelInfo_386, target_3)
 and func_4(vresultRelInfo_386, target_4)
 and vresultRelInfo_386.getType().hasName("ResultRelInfo *")
 and vresultRelInfo_386.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()

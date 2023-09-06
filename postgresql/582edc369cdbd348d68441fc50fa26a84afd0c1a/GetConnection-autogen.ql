@@ -11,8 +11,8 @@ import cpp
 
 predicate func_0(Variable vtmpconn_56, Variable vstderr, Variable vprogname, Variable vdbname, ExprStmt target_1, ExprStmt target_2, ExprStmt target_3, ExprStmt target_4, ExprStmt target_5, Function func) {
 	exists(IfStmt target_0 |
-		target_0.getCondition().(EqualityOperation).getAnOperand().(VariableAccess).getTarget()=vdbname
-		and target_0.getCondition().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
+		target_0.getCondition().getAChild*().(EqualityOperation).getAnOperand().(VariableAccess).getTarget()=vdbname
+		and target_0.getCondition().getAChild*().(EqualityOperation).getAnOperand().(Literal).getValue()="0"
 		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getLValue().(VariableAccess).getType().hasName("PGresult *")
 		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getTarget().hasName("PQexec")
 		and target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vtmpconn_56

@@ -24,7 +24,6 @@ predicate func_0(Parameter vlogical_124, Variable vconn_127, IfStmt target_1, Ex
 		and target_0.getThen().(BlockStmt).getStmt(2).(IfStmt).getThen().(BlockStmt).getStmt(1).(DoStmt).getCondition() instanceof Literal
 		and target_0.getThen().(BlockStmt).getStmt(3).(ExprStmt).getExpr().(FunctionCall).getTarget().hasName("PQclear")
 		and target_0.getThen().(BlockStmt).getStmt(3).(ExprStmt).getExpr().(FunctionCall).getArgument(0).(VariableAccess).getType().hasName("PGresult *")
-		and (func.getEntryPoint().(BlockStmt).getStmt(22)=target_0 or func.getEntryPoint().(BlockStmt).getStmt(22).getFollowingStmt()=target_0)
 		and target_1.getCondition().(VariableAccess).getLocation().isBefore(target_0.getCondition().(VariableAccess).getLocation())
 		and target_0.getCondition().(VariableAccess).getLocation().isBefore(target_2.getExpr().(AssignExpr).getRValue().(VariableAccess).getLocation())
 		and target_3.getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation().isBefore(target_0.getThen().(BlockStmt).getStmt(1).(ExprStmt).getExpr().(AssignExpr).getRValue().(FunctionCall).getArgument(0).(PointerFieldAccess).getQualifier().(VariableAccess).getLocation()))

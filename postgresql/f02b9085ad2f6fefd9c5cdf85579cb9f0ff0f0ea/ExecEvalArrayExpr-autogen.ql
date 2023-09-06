@@ -14,7 +14,7 @@ predicate func_0(Variable vndims_2673, Variable vdims_2674, NotExpr target_2, Re
 		target_0.getExpr().(FunctionCall).getTarget().hasName("ArrayGetNItems")
 		and target_0.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vndims_2673
 		and target_0.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vdims_2674
-		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getElse().(BlockStmt).getStmt(25)=target_0
+		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getElse().(BlockStmt).getAStmt()=target_0
 		and target_0.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_2
 		and target_3.getGreaterOperand().(VariableAccess).getLocation().isBefore(target_0.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getLocation())
 		and target_4.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(VariableAccess).getLocation().isBefore(target_0.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getLocation()))
@@ -26,7 +26,7 @@ predicate func_1(Variable vndims_2673, Variable vdims_2674, Variable vlbs_2675, 
 		and target_1.getExpr().(FunctionCall).getArgument(0).(VariableAccess).getTarget()=vndims_2673
 		and target_1.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getTarget()=vdims_2674
 		and target_1.getExpr().(FunctionCall).getArgument(2).(VariableAccess).getTarget()=vlbs_2675
-		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getElse().(BlockStmt).getStmt(26)=target_1
+		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getElse().(BlockStmt).getAStmt()=target_1
 		and target_1.getParent().(BlockStmt).getParent().(IfStmt).getCondition()=target_2
 		and target_1.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getLocation().isBefore(target_6.getExpr().(FunctionCall).getArgument(1).(VariableAccess).getLocation())
 		and target_7.getExpr().(AssignExpr).getLValue().(ArrayExpr).getArrayBase().(VariableAccess).getLocation().isBefore(target_1.getExpr().(FunctionCall).getArgument(2).(VariableAccess).getLocation())

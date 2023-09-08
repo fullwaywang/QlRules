@@ -27,7 +27,7 @@ predicate func_1(NotExpr target_1) {
 		target_1.getOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getTarget().getName()="options"
 		and target_1.getOperand().(BitwiseAndExpr).getLeftOperand().(PointerFieldAccess).getQualifier().(VariableAccess).getTarget().getType().hasName("DeclareCursorStmt *")
 		and target_1.getOperand().(BitwiseAndExpr).getRightOperand().(Literal).getValue()="16"
-        and target_1.getParent().(IfStmt).getThen().GetAChild*().(FunctionCall).getTarget().hasName("RequireTransactionBlock")
+        and target_1.getParent().(IfStmt).getThen().getAChild*().(FunctionCall).getTarget().hasName("RequireTransactionBlock")
 }
 
 from Function func, NotExpr target_1

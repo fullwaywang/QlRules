@@ -58,4 +58,4 @@ and vchild_779.getType().hasName("child_process *")
 and vsuc_780.getType().hasName("submodule_update_clone *")
 and vchild_779.getParentScope+() = func
 and vsuc_780.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

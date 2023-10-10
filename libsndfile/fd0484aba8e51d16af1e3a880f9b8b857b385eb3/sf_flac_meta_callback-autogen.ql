@@ -136,4 +136,4 @@ and vmetadata_431.getType().hasName("const FLAC__StreamMetadata *")
 and vpsf_432.getType().hasName("SF_PRIVATE *")
 and vmetadata_431.getParentScope+() = func
 and vpsf_432.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

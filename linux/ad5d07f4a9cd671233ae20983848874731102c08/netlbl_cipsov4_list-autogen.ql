@@ -29,4 +29,4 @@ and vdoi_def_457.getType().hasName("cipso_v4_doi *")
 and func_3(vdoi_def_457)
 and vnlsze_mult_452.getParentScope+() = func
 and vdoi_def_457.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

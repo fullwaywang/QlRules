@@ -47,4 +47,4 @@ and func_2(vatom_4773, target_3, target_2)
 and func_3(target_3)
 and vatom_4773.getType().hasName("MOVAtom")
 and vatom_4773.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -115,4 +115,4 @@ and vtag_777.(LocalVariable).getFunction() = func
 and vcount_777.(LocalVariable).getFunction() = func
 and vvalue_777.(LocalVariable).getFunction() = func
 and vs_775.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

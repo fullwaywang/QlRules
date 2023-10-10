@@ -350,4 +350,4 @@ and vsockindex_idx_3233.(LocalVariable).getFunction() = func
 and vproxy_idx_3234.(LocalVariable).getFunction() = func
 and vdata_2574.getFunction() = func
 and vconn_2575.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

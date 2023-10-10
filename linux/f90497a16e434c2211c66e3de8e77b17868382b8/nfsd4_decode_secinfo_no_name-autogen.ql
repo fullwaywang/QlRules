@@ -29,4 +29,4 @@ not func_0(vsin_1772, func)
 and vsin_1772.getType().hasName("nfsd4_secinfo_no_name *")
 and func_1(vsin_1772)
 and vsin_1772.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

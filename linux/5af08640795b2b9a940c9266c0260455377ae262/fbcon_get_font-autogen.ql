@@ -119,4 +119,4 @@ and vvc_2460.getParentScope+() = func
 and vfont_2460.getParentScope+() = func
 and vfontdata_2462.getParentScope+() = func
 and vj_2464.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

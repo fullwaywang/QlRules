@@ -136,4 +136,4 @@ and vsamplesperblock_118.getType().hasName("int")
 and vpsf_118.getParentScope+() = func
 and vblockalign_118.getParentScope+() = func
 and vsamplesperblock_118.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

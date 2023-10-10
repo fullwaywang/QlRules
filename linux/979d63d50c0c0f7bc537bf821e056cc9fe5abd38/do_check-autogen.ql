@@ -89,4 +89,4 @@ and venv_5688.getType().hasName("bpf_verifier_env *")
 and func_7(venv_5688)
 and vstate_5690.getParentScope+() = func
 and venv_5688.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

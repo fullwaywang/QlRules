@@ -48,4 +48,4 @@ and vmsg_body_2390.getType().hasName("wcn36xx_hal_feat_caps_msg")
 and vwcn_2388.getType().hasName("wcn36xx *")
 and vmsg_body_2390.getParentScope+() = func
 and vwcn_2388.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

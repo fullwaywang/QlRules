@@ -63,4 +63,4 @@ and vsh_486.getType().hasName("SliceHeader *")
 and vs_483.getType().hasName("HEVCContext *")
 and vsh_486.getParentScope+() = func
 and vs_483.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -34,4 +34,4 @@ not func_0(valt_1435, func)
 and valt_1435.getType().hasName("usb_host_interface *")
 and func_1(valt_1435)
 and valt_1435.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

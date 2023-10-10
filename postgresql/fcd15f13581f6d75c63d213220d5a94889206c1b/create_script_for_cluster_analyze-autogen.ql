@@ -196,4 +196,4 @@ and vuser_specification_1_417.getType().hasName("char *")
 and vos_info.getType().hasName("OSInfo")
 and vuser_specification_1_417.(LocalVariable).getFunction() = func
 and not vos_info.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -44,4 +44,4 @@ and func_1(vs_424, target_1)
 and func_2(vs_424, target_2)
 and vs_424.getType().hasName("J2kDecoderContext *")
 and vs_424.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

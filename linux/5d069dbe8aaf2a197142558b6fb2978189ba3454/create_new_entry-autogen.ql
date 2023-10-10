@@ -23,4 +23,4 @@ where
 not func_0(vdir_653, func)
 and vdir_653.getType().hasName("inode *")
 and vdir_653.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

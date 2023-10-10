@@ -122,4 +122,4 @@ and vfout_15055.getType().hasName("Archive *")
 and vtbinfo_15055.getType().hasName("TableInfo *")
 and vfout_15055.getFunction() = func
 and vtbinfo_15055.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -69,4 +69,4 @@ and vrate_flags_270.getType().hasName("u32")
 and vmvm_264.getParentScope+() = func
 and vrate_idx_268.getParentScope+() = func
 and vrate_flags_270.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

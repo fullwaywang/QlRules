@@ -28,4 +28,4 @@ not func_0(vcc_537, func)
 and vcc_537.getType().hasName("cuse_conn *")
 and func_1(vcc_537)
 and vcc_537.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

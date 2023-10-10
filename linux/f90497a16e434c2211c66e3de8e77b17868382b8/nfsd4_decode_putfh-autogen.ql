@@ -28,4 +28,4 @@ not func_0(vputfh_1204, func)
 and vputfh_1204.getType().hasName("nfsd4_putfh *")
 and func_1(vputfh_1204)
 and vputfh_1204.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

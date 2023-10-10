@@ -87,4 +87,4 @@ and vzDb_98.(LocalVariable).getFunction() = func
 and vpTab_99.(LocalVariable).getFunction() = func
 and vzName_100.(LocalVariable).getFunction() = func
 and vdb_101.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

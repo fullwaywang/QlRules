@@ -30,4 +30,4 @@ not func_0(vL_288, target_1, func)
 and func_1(vL_288, target_1)
 and vL_288.getType().hasName("lua_State *")
 and vL_288.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

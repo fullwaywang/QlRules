@@ -61,4 +61,4 @@ and vctx_133.getType().hasName("timerfd_ctx *")
 and vflags_133.getType().hasName("int")
 and vctx_133.getParentScope+() = func
 and vflags_133.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

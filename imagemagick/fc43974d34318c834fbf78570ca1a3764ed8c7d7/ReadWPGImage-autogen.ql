@@ -124,4 +124,4 @@ and vstatus_937.getType().hasName("unsigned int")
 and vexception_853.getParentScope+() = func
 and vimage_934.getParentScope+() = func
 and vstatus_937.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

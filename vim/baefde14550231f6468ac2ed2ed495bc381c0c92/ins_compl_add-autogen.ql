@@ -68,4 +68,4 @@ and vmatch_768.getType().hasName("compl_T *")
 and vlen_760.getType().hasName("int")
 and vmatch_768.getParentScope+() = func
 and vlen_760.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -370,4 +370,4 @@ and vnewSize_734.getType().hasName("unsigned int")
 and vbuf_732.getFunction() = func
 and vsize_732.getFunction() = func
 and vnewSize_734.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

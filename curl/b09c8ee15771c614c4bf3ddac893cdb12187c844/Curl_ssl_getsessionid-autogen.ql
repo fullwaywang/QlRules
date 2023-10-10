@@ -47,4 +47,4 @@ and vsockindex_372.getType().hasName("int")
 and vconn_369.getType().hasName("connectdata *")
 and vsockindex_372.getParentScope+() = func
 and vconn_369.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -51,4 +51,4 @@ and func_5(vimage_7230, target_5)
 and func_6(vimage_7230, target_6)
 and vimage_7230.getType().hasName("image_data *")
 and vimage_7230.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

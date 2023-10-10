@@ -26,4 +26,4 @@ and vbuf_209.getType().hasName("char *")
 and vretry_limit_214.getType().hasName("u32")
 and vbuf_209.getParentScope+() = func
 and vretry_limit_214.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

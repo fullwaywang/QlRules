@@ -62,4 +62,4 @@ and vdws_277.getType().hasName("dw_spi *")
 and func_10(vdws_277)
 and func_11(vdws_277)
 and vdws_277.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -82,4 +82,4 @@ and vpinfo_907.getType().hasName("packet_info *")
 and vti_909.getType().hasName("proto_item *")
 and vpinfo_907.getParentScope+() = func
 and vti_909.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

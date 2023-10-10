@@ -1,7 +1,7 @@
 /**
  * @name openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_copy
  * @id cpp/openssl/8aed2a7548362e88e84a7feb795a3a97e8395008/EC-GROUP-copy
- * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_copy NULL
+ * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_copy CVE-2016-7056
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -72,4 +72,4 @@ and vdest_171.getParentScope+() = func
 and vsrc_171.getParentScope+() = func
 and vd_173.getParentScope+() = func
 and vt_192.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

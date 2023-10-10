@@ -30,4 +30,4 @@ func_0(vcurwin, target_1, target_0)
 and func_1(vcurwin, target_1)
 and vcurwin.getType().hasName("win_T *")
 and not vcurwin.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -105,4 +105,4 @@ and vinlink_236.getType().hasName("AVFilterLink *")
 and vs_240.getParentScope+() = func
 and vnb_planes_241.getParentScope+() = func
 and vinlink_236.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

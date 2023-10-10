@@ -153,4 +153,4 @@ and func_26(vs_229)
 and vitem_231.getType().hasName("pitem *")
 and vs_229.getParentScope+() = func
 and vitem_231.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

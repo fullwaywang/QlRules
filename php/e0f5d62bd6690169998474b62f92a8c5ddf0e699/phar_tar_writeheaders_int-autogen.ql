@@ -154,4 +154,4 @@ and vfp_702.getType().hasName("_phar_pass_tar_info *")
 and ventry_698.getParentScope+() = func
 and vheader_700.getParentScope+() = func
 and vfp_702.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

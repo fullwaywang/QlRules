@@ -30,4 +30,4 @@ and vn_2265.getType().hasName("size_t")
 and vssl_2262.getParentScope+() = func
 and vi_2265.getParentScope+() = func
 and vn_2265.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

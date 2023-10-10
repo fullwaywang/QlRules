@@ -171,4 +171,4 @@ and vlen_807.getFunction() = func
 and vcore_811.(LocalVariable).getFunction() = func
 and vbuffer_812.(LocalVariable).getFunction() = func
 and vrlen_813.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -40,4 +40,4 @@ and vtick_hmac_2304.getParentScope+() = func
 and vctx_2306.getParentScope+() = func
 and vetick_2296.getParentScope+() = func
 and veticklen_2296.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

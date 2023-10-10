@@ -216,4 +216,4 @@ and vfdest_2028.getParentScope+() = func
 and vdestname_2030.getParentScope+() = func
 and not vstderr.getParentScope+() = func
 and vdotpos_2213.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -50,4 +50,4 @@ and vqnamelen_212.getType().hasName("size_t")
 and vdname_rrset_212.getType().hasName("rrset_parse *")
 and vqnamelen_212.getParentScope+() = func
 and vdname_rrset_212.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

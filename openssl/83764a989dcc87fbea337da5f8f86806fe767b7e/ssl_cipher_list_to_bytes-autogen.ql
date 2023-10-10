@@ -46,4 +46,4 @@ and func_1(vs_1378, vc_1382)
 and vc_1382.getType().hasName("SSL_CIPHER *")
 and vs_1378.getParentScope+() = func
 and vc_1382.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

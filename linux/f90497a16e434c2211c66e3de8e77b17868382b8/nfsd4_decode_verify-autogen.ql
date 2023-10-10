@@ -24,4 +24,4 @@ where
 not func_0(vverify_1368, func)
 and vverify_1368.getType().hasName("nfsd4_verify *")
 and vverify_1368.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

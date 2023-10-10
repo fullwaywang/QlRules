@@ -71,4 +71,4 @@ and vpParent_3768.getType().hasName("Select *")
 and vpSub_3769.getType().hasName("Select *")
 and vpParent_3768.(LocalVariable).getFunction() = func
 and vpSub_3769.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

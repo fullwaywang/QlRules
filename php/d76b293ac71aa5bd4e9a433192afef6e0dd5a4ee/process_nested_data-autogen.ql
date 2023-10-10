@@ -34,4 +34,4 @@ and vdata_328.getType().hasName("zval *")
 and vvar_hash_325.getType().hasName("php_unserialize_data_t *")
 and vdata_328.(LocalVariable).getFunction() = func
 and vvar_hash_325.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

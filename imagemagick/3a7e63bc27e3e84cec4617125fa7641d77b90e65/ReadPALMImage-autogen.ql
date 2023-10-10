@@ -111,4 +111,4 @@ and vone_row_282.getType().hasName("unsigned char *")
 and vcompressionType_265.getParentScope+() = func
 and vlastrow_281.getParentScope+() = func
 and vone_row_282.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

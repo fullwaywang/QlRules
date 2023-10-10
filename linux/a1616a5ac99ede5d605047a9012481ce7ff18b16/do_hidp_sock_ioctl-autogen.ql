@@ -25,4 +25,4 @@ where
 not func_0(vca_51)
 and vca_51.getType().hasName("hidp_connadd_req")
 and vca_51.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

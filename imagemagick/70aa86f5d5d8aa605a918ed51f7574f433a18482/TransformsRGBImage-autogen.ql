@@ -101,4 +101,4 @@ and vgamma_2473.getParentScope+() = func
 and vreference_black_2474.getParentScope+() = func
 and vreference_white_2475.getParentScope+() = func
 and vi_2035.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

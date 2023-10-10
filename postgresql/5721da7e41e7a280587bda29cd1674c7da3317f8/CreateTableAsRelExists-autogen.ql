@@ -81,4 +81,4 @@ and vnspid_395.getType().hasName("Oid")
 and vinto_396.getType().hasName("IntoClause *")
 and vnspid_395.(LocalVariable).getFunction() = func
 and vinto_396.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

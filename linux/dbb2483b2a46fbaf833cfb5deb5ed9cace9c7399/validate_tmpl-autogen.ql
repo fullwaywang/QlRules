@@ -60,4 +60,4 @@ and vut_1470.getType().hasName("xfrm_user_tmpl *")
 and vi_1473.getType().hasName("int")
 and vut_1470.getParentScope+() = func
 and vi_1473.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

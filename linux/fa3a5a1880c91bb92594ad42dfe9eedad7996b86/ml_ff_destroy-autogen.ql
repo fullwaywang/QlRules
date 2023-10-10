@@ -21,4 +21,4 @@ where
 not func_0(vml_490, func)
 and vml_490.getType().hasName("ml_device *")
 and vml_490.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

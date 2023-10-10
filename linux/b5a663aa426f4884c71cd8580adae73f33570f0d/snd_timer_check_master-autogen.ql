@@ -62,4 +62,4 @@ and func_3(vmaster_208)
 and vslave_210.getType().hasName("snd_timer_instance *")
 and vmaster_208.getParentScope+() = func
 and vslave_210.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -49,4 +49,4 @@ and vconf_2841.getType().hasName("proxy_dir_conf *")
 and vcmd_2835.getType().hasName("cmd_parms *")
 and vconf_2841.(LocalVariable).getFunction() = func
 and vcmd_2835.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

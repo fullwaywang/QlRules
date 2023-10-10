@@ -46,4 +46,4 @@ and func_4(vskb_1268, vl_1268)
 and vl_1268.getType().hasName("tipc_link *")
 and vskb_1268.getParentScope+() = func
 and vl_1268.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

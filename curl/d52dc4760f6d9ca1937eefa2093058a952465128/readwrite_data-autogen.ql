@@ -156,4 +156,4 @@ and vdata_438.getFunction() = func
 and vconn_439.getFunction() = func
 and vk_440.getFunction() = func
 and vexcess_446.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

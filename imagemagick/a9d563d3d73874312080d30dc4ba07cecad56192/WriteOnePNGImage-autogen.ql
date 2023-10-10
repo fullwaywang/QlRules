@@ -91,4 +91,4 @@ and vrowbytes_8515.getType().hasName("size_t")
 and vimage_8396.getType().hasName("Image *")
 and vrowbytes_8515.getParentScope+() = func
 and vimage_8396.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

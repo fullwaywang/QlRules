@@ -159,4 +159,4 @@ and vdata_4358.getFunction() = func
 and vconn_4359.getFunction() = func
 and vftp_4362.(LocalVariable).getFunction() = func
 and not vCurl_ccalloc.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -74,4 +74,4 @@ and vbrush_781.getType().hasName("rdpBrush *")
 and vBMF_BPP.getType() instanceof ArrayType
 and vbrush_781.getParentScope+() = func
 and not vBMF_BPP.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

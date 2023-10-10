@@ -60,4 +60,4 @@ and func_3(vmtstate_3663, target_3)
 and func_4(vmtstate_3663, target_4)
 and vmtstate_3663.getType().hasName("ModifyTableState *")
 and vmtstate_3663.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

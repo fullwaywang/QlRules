@@ -83,4 +83,4 @@ and vs_116.getType().hasName("SSL *")
 and vitem_118.getParentScope+() = func
 and vfrag_119.getParentScope+() = func
 and vs_116.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

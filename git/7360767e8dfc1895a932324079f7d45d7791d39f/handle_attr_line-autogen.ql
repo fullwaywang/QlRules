@@ -231,4 +231,4 @@ and vres_652.getType().hasName("attr_stack *")
 and va_658.getType().hasName("match_attr *")
 and vres_652.getParentScope+() = func
 and va_658.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

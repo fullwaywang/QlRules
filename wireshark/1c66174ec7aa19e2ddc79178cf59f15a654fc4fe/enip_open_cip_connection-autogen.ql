@@ -37,4 +37,4 @@ and vpinfo_1034.getType().hasName("packet_info *")
 and vconnInfo_1034.getType().hasName("cip_conn_info_t *")
 and vpinfo_1034.getParentScope+() = func
 and vconnInfo_1034.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

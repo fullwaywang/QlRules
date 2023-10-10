@@ -20,4 +20,4 @@ where
 func_0(vprocp_1178)
 and vprocp_1178.getType().hasName("const svc_procedure *")
 and vprocp_1178.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -35,4 +35,4 @@ and not func_1(vconn_135)
 and vconn_135.getType().hasName("connectdata *")
 and func_2(vconn_135)
 and vconn_135.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

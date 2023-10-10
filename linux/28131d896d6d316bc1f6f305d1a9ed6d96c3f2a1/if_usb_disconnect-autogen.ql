@@ -28,4 +28,4 @@ not func_0(vcardp_307, func)
 and vcardp_307.getType().hasName("if_usb_card *")
 and func_1(vcardp_307)
 and vcardp_307.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

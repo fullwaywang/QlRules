@@ -21,4 +21,4 @@ where
 func_0(vcps_994)
 and vcps_994.getType().hasName("nfs4_cpntf_state *")
 and vcps_994.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

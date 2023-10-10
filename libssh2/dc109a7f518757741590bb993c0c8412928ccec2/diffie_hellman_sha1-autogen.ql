@@ -130,4 +130,4 @@ and vsession_122.getType().hasName("LIBSSH2_SESSION *")
 and vexchange_state_130.getParentScope+() = func
 and vret_132.getParentScope+() = func
 and vsession_122.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

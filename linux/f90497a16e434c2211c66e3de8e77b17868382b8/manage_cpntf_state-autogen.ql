@@ -29,4 +29,4 @@ func_0(vstate_6265)
 and func_1(vstate_6265)
 and vstate_6265.getType().hasName("nfs4_cpntf_state *")
 and vstate_6265.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

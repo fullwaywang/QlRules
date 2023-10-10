@@ -153,4 +153,4 @@ and vs_712.getType().hasName("PNGEncContext *")
 and vdiffFrame_715.getType().hasName("AVFrame *")
 and vs_712.getParentScope+() = func
 and vdiffFrame_715.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

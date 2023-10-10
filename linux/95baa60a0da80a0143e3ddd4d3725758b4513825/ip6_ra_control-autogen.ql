@@ -39,4 +39,4 @@ and vsel_62.getType().hasName("int")
 and func_2(vsel_62)
 and vnew_ra_64.getParentScope+() = func
 and vsel_62.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ func_0(func)
 and func_1(vinfo_371)
 and vinfo_371.getType().hasName("blkfront_info *")
 and vinfo_371.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

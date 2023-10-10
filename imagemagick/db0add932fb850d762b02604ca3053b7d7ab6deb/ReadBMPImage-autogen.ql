@@ -108,4 +108,4 @@ and voffset_522.getType().hasName("MagickOffsetType")
 and vbmp_info_513.getParentScope+() = func
 and vimage_516.getParentScope+() = func
 and voffset_522.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

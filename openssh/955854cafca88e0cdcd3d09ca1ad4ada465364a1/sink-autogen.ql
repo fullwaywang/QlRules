@@ -73,4 +73,4 @@ and vtv_1246.getType().hasName("timeval[2]")
 and vsetimes_1242.getParentScope+() = func
 and vvect_1243.getParentScope+() = func
 and vtv_1246.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

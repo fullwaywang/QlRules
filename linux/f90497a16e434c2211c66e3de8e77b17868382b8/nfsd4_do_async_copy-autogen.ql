@@ -25,4 +25,4 @@ and vnfserr_1763.getType().hasName("__be32")
 and vfilp_1766.getType().hasName("file *")
 and vnfserr_1763.getParentScope+() = func
 and vfilp_1766.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

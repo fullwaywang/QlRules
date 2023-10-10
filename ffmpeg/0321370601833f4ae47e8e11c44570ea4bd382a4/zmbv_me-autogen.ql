@@ -91,4 +91,4 @@ and vmx0_103.getType().hasName("int")
 and vc_99.getParentScope+() = func
 and vdx_102.getParentScope+() = func
 and vmx0_103.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

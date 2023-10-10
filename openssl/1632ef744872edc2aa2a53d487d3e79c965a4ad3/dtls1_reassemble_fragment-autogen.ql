@@ -67,4 +67,4 @@ and func_7(vfrag_594, vitem_595)
 and vmsg_hdr_592.getParentScope+() = func
 and vfrag_594.getParentScope+() = func
 and vitem_595.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

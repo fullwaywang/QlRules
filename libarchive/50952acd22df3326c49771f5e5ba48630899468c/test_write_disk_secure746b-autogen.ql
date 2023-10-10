@@ -122,4 +122,4 @@ and vae_88.getType().hasName("archive_entry *")
 and va_87.getType().hasName("archive *")
 and vae_88.getParentScope+() = func
 and va_87.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

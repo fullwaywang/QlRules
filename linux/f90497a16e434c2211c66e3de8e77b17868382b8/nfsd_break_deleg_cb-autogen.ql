@@ -26,4 +26,4 @@ func_1(func)
 and func_2(vret_4802)
 and vret_4802.getType().hasName("bool")
 and vret_4802.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

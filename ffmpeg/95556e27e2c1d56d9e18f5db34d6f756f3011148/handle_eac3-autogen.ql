@@ -46,4 +46,4 @@ and vtrack_391.getType().hasName("MOVTrack *")
 and vmov_391.getType().hasName("MOVMuxContext *")
 and vtrack_391.getParentScope+() = func
 and vmov_391.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

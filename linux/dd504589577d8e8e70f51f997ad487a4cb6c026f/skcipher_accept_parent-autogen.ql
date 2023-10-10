@@ -47,4 +47,4 @@ and vprivate_791.getType().hasName("void *")
 and vctx_793.getType().hasName("skcipher_ctx *")
 and vprivate_791.getParentScope+() = func
 and vctx_793.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

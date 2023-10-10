@@ -66,4 +66,4 @@ and vretval_4594.getType().hasName("lys_node *")
 and vr_4598.getType().hasName("int")
 and vretval_4594.getParentScope+() = func
 and vr_4598.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

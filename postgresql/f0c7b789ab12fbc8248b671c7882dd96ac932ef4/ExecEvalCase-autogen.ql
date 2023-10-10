@@ -149,4 +149,4 @@ and vecontext_2960.getFunction() = func
 and visNull_2961.getFunction() = func
 and vwclause_2995.(LocalVariable).getFunction() = func
 and vclause_value_2996.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

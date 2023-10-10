@@ -90,4 +90,4 @@ and vslen_2059.getType().hasName("int")
 and vcopy_2036.(LocalVariable).getFunction() = func
 and vp_2037.(LocalVariable).getFunction() = func
 and vslen_2059.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

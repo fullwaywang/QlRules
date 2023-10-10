@@ -48,4 +48,4 @@ and not func_2(vlist_249, func)
 and vlist_249.getType().hasName("hiddev_list *")
 and func_3(vlist_249)
 and vlist_249.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

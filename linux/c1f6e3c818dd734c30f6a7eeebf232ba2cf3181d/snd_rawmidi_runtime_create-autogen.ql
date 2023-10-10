@@ -19,4 +19,4 @@ where
 func_0(vruntime_125)
 and vruntime_125.getType().hasName("snd_rawmidi_runtime *")
 and vruntime_125.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

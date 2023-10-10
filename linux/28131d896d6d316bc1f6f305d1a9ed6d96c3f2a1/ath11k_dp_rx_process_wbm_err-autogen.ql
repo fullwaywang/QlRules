@@ -40,4 +40,4 @@ and vab_4058.getParentScope+() = func
 and vrx_ring_4063.getParentScope+() = func
 and vnum_buffs_reaped_4071.getParentScope+() = func
 and vi_4073.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

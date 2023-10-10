@@ -280,4 +280,4 @@ and vnesting_inline_666.getParentScope+() = func
 and vnesting_667.getParentScope+() = func
 and vskip_until_670.getParentScope+() = func
 and veap_653.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

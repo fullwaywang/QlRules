@@ -88,4 +88,4 @@ and func_6(vimage_656, target_6)
 and func_7(vimage_656, target_7)
 and vimage_656.getType().hasName("const Image *")
 and vimage_656.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

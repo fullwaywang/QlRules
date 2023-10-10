@@ -175,4 +175,4 @@ and vprogname_330.getFunction() = func
 and vecho_330.getFunction() = func
 and vverbose_330.getFunction() = func
 and vdbname_343.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

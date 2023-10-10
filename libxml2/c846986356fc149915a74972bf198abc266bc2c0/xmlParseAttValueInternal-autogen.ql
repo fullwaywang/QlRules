@@ -63,4 +63,4 @@ and vstart_8954.getType().hasName("const xmlChar *")
 and vctxt_8950.getParentScope+() = func
 and vin_8954.getParentScope+() = func
 and vstart_8954.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

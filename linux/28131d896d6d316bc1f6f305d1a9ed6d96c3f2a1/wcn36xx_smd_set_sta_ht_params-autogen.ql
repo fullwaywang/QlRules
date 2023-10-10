@@ -32,4 +32,4 @@ and vsta_params_257.getType().hasName("wcn36xx_hal_config_sta_params *")
 and vcaps_260.getType().hasName("unsigned long")
 and vsta_params_257.getParentScope+() = func
 and vcaps_260.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

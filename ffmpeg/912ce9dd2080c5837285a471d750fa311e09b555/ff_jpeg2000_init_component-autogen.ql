@@ -39,4 +39,4 @@ func_0(vreslevel_233, target_0)
 and func_1(vreslevel_233, target_1)
 and vreslevel_233.getType().hasName("Jpeg2000ResLevel *")
 and vreslevel_233.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

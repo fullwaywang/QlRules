@@ -445,4 +445,4 @@ and vfirst_pass_110.(LocalVariable).getFunction() = func
 and vlast_pass_111.(LocalVariable).getFunction() = func
 and vy_passes_112.(LocalVariable).getFunction() = func
 and vy_step_114.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

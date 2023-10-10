@@ -25,4 +25,4 @@ and vbuf_132.getType().hasName("char *")
 and vpriv_134.getType().hasName("iscsi_internal *")
 and vbuf_132.getParentScope+() = func
 and vpriv_134.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ not func_0(vtarget_452, target_1)
 and func_1(vtarget_452, target_1)
 and vtarget_452.getType().hasName("TPMA_ALGORITHM *")
 and vtarget_452.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

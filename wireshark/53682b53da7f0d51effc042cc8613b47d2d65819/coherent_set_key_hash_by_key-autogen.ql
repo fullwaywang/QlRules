@@ -56,4 +56,4 @@ and vcoherent_set_object_key_bytes_4328.getType().hasName("GBytes *")
 and vkey_4327.getType().hasName("gconstpointer")
 and vcoherent_set_object_key_bytes_4328.getParentScope+() = func
 and vkey_4327.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

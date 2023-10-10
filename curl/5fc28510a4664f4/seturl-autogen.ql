@@ -37,4 +37,4 @@ and func_1(vurllen_634, target_1)
 and func_2(vurllen_634, target_2)
 and vurllen_634.getType().hasName("size_t")
 and vurllen_634.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

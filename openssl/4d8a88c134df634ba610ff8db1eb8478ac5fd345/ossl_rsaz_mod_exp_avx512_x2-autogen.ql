@@ -1,7 +1,7 @@
 /**
  * @name openssl-4d8a88c134df634ba610ff8db1eb8478ac5fd345-ossl_rsaz_mod_exp_avx512_x2
  * @id cpp/openssl/4d8a88c134df634ba610ff8db1eb8478ac5fd345/ossl-rsaz-mod-exp-avx512-x2
- * @description openssl-4d8a88c134df634ba610ff8db1eb8478ac5fd345-ossl_rsaz_mod_exp_avx512_x2 
+ * @description openssl-4d8a88c134df634ba610ff8db1eb8478ac5fd345-ossl_rsaz_mod_exp_avx512_x2 CVE-2022-2274
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -37,4 +37,4 @@ and vm1_142.getParentScope+() = func
 and vfactor_size_151.getParentScope+() = func
 and vstorage_172.getParentScope+() = func
 and vres1_139.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

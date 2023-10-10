@@ -22,4 +22,4 @@ where
 func_0(vrate_520)
 and vrate_520.getType().hasName("const rs_rate *")
 and vrate_520.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

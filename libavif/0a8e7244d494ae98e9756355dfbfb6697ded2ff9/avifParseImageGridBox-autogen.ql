@@ -35,4 +35,4 @@ not func_0(vgrid_953, target_1, func)
 and func_1(vgrid_953, target_1)
 and vgrid_953.getType().hasName("avifImageGrid *")
 and vgrid_953.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

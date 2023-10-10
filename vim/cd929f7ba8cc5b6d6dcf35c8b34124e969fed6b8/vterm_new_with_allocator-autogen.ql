@@ -94,4 +94,4 @@ and func_6(vvt_42, target_6)
 and func_7(vvt_42, target_7)
 and vvt_42.getType().hasName("VTerm *")
 and vvt_42.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

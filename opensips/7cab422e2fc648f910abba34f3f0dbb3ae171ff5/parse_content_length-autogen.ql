@@ -82,4 +82,4 @@ and func_7(vnumber_229, target_7)
 and func_8(vnumber_229, target_8)
 and vnumber_229.getType().hasName("int")
 and vnumber_229.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

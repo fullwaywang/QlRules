@@ -45,4 +45,4 @@ and not func_1(vtraffic_class_2627)
 and func_3(vtraffic_class_2627)
 and vtraffic_class_2627.getType().hasName("u8")
 and vtraffic_class_2627.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

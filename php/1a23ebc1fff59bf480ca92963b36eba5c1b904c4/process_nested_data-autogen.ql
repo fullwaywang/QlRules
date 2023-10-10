@@ -97,4 +97,4 @@ and vvar_hash_339.getFunction() = func
 and vht_339.getFunction() = func
 and vkey_342.(LocalVariable).getFunction() = func
 and vdata_342.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

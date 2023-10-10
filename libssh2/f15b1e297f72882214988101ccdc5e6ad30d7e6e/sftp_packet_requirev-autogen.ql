@@ -74,4 +74,4 @@ and vdata_len_547.getType().hasName("size_t *")
 and vsftp_544.getParentScope+() = func
 and vdata_546.getParentScope+() = func
 and vdata_len_547.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

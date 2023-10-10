@@ -32,4 +32,4 @@ and func_1(vdentry_57, vinode_58)
 and vinode_58.getType().hasName("inode *")
 and vdentry_57.getParentScope+() = func
 and vinode_58.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

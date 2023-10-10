@@ -492,4 +492,4 @@ and vpassword_len_199.getParentScope+() = func
 and vpasswd_change_cb_200.getParentScope+() = func
 and vs_202.getParentScope+() = func
 and vrc_207.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

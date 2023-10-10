@@ -28,4 +28,4 @@ and vrequest_1342.getType().hasName("REQUEST *")
 and vfd_1353.getType().hasName("int")
 and vrequest_1342.getParentScope+() = func
 and vfd_1353.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

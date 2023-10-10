@@ -74,4 +74,4 @@ and vntlmbuf_520.getParentScope+() = func
 and vntresplen_525.getParentScope+() = func
 and vptr_ntresp_527.getParentScope+() = func
 and vlmbuffer_646.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

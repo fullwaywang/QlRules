@@ -113,4 +113,4 @@ and vtypid_762.(LocalVariable).getFunction() = func
 and vl_763.(LocalVariable).getFunction() = func
 and not vactiveSearchPath.getParentScope+() = func
 and vnamespaceId_769.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

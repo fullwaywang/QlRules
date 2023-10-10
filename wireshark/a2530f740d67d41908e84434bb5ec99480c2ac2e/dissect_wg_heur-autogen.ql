@@ -164,4 +164,4 @@ and vtvb_1635.getType().hasName("tvbuff_t *")
 and vmessage_type_1647.getParentScope+() = func
 and vreserved_is_zeroes_1648.getParentScope+() = func
 and vtvb_1635.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

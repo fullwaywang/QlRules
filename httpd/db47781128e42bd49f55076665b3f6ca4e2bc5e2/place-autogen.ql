@@ -50,4 +50,4 @@ and vsp_693.getType().hasName("char *")
 and vreqsize_695.getParentScope+() = func
 and veval_691.getParentScope+() = func
 and vsp_693.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

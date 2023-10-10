@@ -161,4 +161,4 @@ and vpos_190.getParentScope+() = func
 and vjmp_191.getParentScope+() = func
 and not vcurwin.getParentScope+() = func
 and vcount_188.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

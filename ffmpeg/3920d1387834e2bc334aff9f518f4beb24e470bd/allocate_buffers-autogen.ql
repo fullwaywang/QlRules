@@ -70,4 +70,4 @@ and vbuf_size_545.getType().hasName("int")
 and valac_542.getType().hasName("ALACContext *")
 and vbuf_size_545.(LocalVariable).getFunction() = func
 and valac_542.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

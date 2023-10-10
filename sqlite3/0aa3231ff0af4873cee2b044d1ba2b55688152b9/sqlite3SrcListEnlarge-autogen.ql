@@ -64,4 +64,4 @@ and vpSrc_3879.getType().hasName("SrcList *")
 and vnExtra_3880.getType().hasName("int")
 and vpSrc_3879.getFunction() = func
 and vnExtra_3880.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

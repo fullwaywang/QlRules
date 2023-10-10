@@ -57,4 +57,4 @@ and vsc_2068.getType().hasName("MXFStreamContext *")
 and vi_2069.getType().hasName("int")
 and vsc_2068.getParentScope+() = func
 and vi_2069.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

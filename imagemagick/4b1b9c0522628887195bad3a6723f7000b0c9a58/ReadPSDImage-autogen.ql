@@ -62,4 +62,4 @@ and vlength_1770.getType().hasName("MagickSizeType")
 and vcount_1782.getType().hasName("ssize_t")
 and vlength_1770.getParentScope+() = func
 and vcount_1782.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

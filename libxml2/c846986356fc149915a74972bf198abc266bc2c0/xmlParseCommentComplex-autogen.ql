@@ -47,4 +47,4 @@ and vlen_4740.getType().hasName("size_t")
 and vctxt_4739.getType().hasName("xmlParserCtxtPtr")
 and vlen_4740.getParentScope+() = func
 and vctxt_4739.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

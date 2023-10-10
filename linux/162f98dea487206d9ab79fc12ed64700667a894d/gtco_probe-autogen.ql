@@ -40,4 +40,4 @@ and func_4(vusbinterface_816)
 and verror_825.getType().hasName("int")
 and vusbinterface_816.getParentScope+() = func
 and verror_825.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

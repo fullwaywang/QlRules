@@ -24,4 +24,4 @@ where
 not func_0(vbcts_1440, func)
 and vbcts_1440.getType().hasName("nfsd4_bind_conn_to_session *")
 and vbcts_1440.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

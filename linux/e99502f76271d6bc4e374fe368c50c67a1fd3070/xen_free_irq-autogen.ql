@@ -78,4 +78,4 @@ and not func_6(vinfo_493, func)
 and vinfo_493.getType().hasName("irq_info *")
 and func_7(vinfo_493)
 and vinfo_493.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -49,4 +49,4 @@ and func_3(vmc_1380)
 and vmut.getType().hasName("mutex")
 and vmc_1380.getParentScope+() = func
 and not vmut.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

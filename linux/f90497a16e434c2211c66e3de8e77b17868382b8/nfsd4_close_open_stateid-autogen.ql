@@ -61,4 +61,4 @@ and func_8(vclp_6684)
 and vreaplist_6686.getType().hasName("list_head")
 and vclp_6684.getParentScope+() = func
 and vreaplist_6686.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

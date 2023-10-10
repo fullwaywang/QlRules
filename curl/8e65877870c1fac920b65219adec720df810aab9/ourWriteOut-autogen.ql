@@ -48,4 +48,4 @@ and func_2(vptr_110, target_2)
 and func_3(vptr_110, target_3)
 and vptr_110.getType().hasName("const char *")
 and vptr_110.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

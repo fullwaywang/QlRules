@@ -110,4 +110,4 @@ and vdomlen_653.getFunction() = func
 and videntity_len_658.(LocalVariable).getFunction() = func
 and videntity_659.(LocalVariable).getFunction() = func
 and not vCurl_cmalloc.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

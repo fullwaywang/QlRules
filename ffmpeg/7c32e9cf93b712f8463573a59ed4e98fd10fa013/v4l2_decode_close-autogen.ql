@@ -47,4 +47,4 @@ and vs_220.getType().hasName("V4L2m2mContext *")
 and vavctx_217.getParentScope+() = func
 and vpriv_219.getParentScope+() = func
 and vs_220.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -75,4 +75,4 @@ and vtupleDesc_1458.getType().hasName("TupleDesc")
 and vexpr_1462.getType().hasName("Node *")
 and vtupleDesc_1458.(LocalVariable).getFunction() = func
 and vexpr_1462.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

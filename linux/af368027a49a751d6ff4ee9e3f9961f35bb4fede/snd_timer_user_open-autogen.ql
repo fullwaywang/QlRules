@@ -27,4 +27,4 @@ func_0(vtu_1244)
 and func_1(func)
 and vtu_1244.getType().hasName("snd_timer_user *")
 and vtu_1244.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

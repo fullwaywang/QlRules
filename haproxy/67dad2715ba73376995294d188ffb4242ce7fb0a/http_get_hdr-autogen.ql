@@ -34,4 +34,4 @@ and func_1(vocc_8124, target_1)
 and func_2(vocc_8124, target_2)
 and vocc_8124.getType().hasName("int")
 and vocc_8124.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -33,4 +33,4 @@ func_0(vrate_n_flags_654)
 and func_1(vrate_n_flags_654)
 and vrate_n_flags_654.getType().hasName("u32")
 and vrate_n_flags_654.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

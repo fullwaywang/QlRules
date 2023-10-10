@@ -260,4 +260,4 @@ and vend_error_2386.getParentScope+() = func
 and vnl_2399.getParentScope+() = func
 and not ve_trailing_characters_str.getParentScope+() = func
 and not ve_invalid_expression_str.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

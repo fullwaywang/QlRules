@@ -292,4 +292,4 @@ and vconn_1801.(LocalVariable).getFunction() = func
 and not vCurl_ccalloc.getParentScope+() = func
 and not vCurl_ssl.getParentScope+() = func
 and vp_1890.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

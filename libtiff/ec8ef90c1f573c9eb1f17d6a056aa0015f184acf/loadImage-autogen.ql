@@ -197,4 +197,4 @@ and vbuffsize_6769.(LocalVariable).getFunction() = func
 and vread_buff_6773.(LocalVariable).getFunction() = func
 and vnew_buff_6774.(LocalVariable).getFunction() = func
 and vprev_readsize_6776.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

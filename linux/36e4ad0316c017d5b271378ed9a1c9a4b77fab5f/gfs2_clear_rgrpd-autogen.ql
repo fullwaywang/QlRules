@@ -28,4 +28,4 @@ not func_0(vrgd_706)
 and vrgd_706.getType().hasName("gfs2_rgrpd *")
 and func_1(vrgd_706)
 and vrgd_706.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

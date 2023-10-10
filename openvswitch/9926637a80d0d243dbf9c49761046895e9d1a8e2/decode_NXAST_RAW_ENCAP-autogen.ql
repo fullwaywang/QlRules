@@ -52,4 +52,4 @@ and vout_4345.getType().hasName("ofpbuf *")
 and vencap_4347.getType().hasName("ofpact_encap *")
 and vout_4345.getParentScope+() = func
 and vencap_4347.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

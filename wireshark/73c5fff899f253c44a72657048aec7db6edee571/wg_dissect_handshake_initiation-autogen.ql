@@ -66,4 +66,4 @@ and func_5(vwg_pinfo_1364, target_5)
 and func_6(vwg_pinfo_1364, target_6)
 and vwg_pinfo_1364.getType().hasName("wg_packet_info_t *")
 and vwg_pinfo_1364.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -40,4 +40,4 @@ and vcap_701.getType().hasName("v4l2_capability *")
 and vcam_703.getType().hasName("zr364xx_camera *")
 and vcap_701.getParentScope+() = func
 and vcam_703.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

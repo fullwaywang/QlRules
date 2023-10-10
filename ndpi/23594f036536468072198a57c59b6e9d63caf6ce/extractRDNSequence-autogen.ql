@@ -37,4 +37,4 @@ and vrdnSeqBuf_offset_192.getType().hasName("u_int *")
 and vrdnSeqBuf_len_193.getType().hasName("u_int")
 and vrdnSeqBuf_offset_192.getParentScope+() = func
 and vrdnSeqBuf_len_193.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

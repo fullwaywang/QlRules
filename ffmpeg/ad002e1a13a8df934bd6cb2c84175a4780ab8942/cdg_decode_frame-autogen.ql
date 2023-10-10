@@ -51,4 +51,4 @@ and vcdg_data_268.getType().hasName("uint8_t[16]")
 and vbuf_264.(LocalVariable).getFunction() = func
 and vbuf_size_265.(LocalVariable).getFunction() = func
 and vcdg_data_268.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -24,4 +24,4 @@ where
 not func_0(vdbg_kdb_mode)
 and vdbg_kdb_mode.getType().hasName("int")
 and not vdbg_kdb_mode.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -54,4 +54,4 @@ and func_4(vsession_145, target_4)
 and func_5(vsession_145, target_5)
 and vsession_145.getType().hasName("ssh_session")
 and vsession_145.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

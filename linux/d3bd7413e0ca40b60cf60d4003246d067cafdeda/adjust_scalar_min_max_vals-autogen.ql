@@ -75,4 +75,4 @@ and vinsn_3411.getType().hasName("bpf_insn *")
 and func_11(vinsn_3411)
 and venv_3410.getParentScope+() = func
 and vinsn_3411.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

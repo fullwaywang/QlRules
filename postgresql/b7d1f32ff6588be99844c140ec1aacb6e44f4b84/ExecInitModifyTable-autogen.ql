@@ -223,4 +223,4 @@ and vrelationDesc_2537.(LocalVariable).getFunction() = func
 and vtupDesc_2538.(LocalVariable).getFunction() = func
 and v_result_2565.(LocalVariable).getFunction() = func
 and vnode_2294.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

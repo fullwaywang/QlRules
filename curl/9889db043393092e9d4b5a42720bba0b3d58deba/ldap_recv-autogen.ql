@@ -124,4 +124,4 @@ and vbvp_476.getType().hasName("berval **")
 and vrc_450.(LocalVariable).getFunction() = func
 and vbvals_476.(LocalVariable).getFunction() = func
 and vbvp_476.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

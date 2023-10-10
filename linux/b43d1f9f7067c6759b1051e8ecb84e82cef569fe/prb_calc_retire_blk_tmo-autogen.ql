@@ -20,4 +20,4 @@ where
 not func_0(verr_525)
 and verr_525.getType().hasName("int")
 and verr_525.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

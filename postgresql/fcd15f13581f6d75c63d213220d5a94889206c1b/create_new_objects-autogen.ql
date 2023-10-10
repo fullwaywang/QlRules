@@ -142,4 +142,4 @@ and vsql_file_name_305.(LocalVariable).getFunction() = func
 and vlog_file_name_306.(LocalVariable).getFunction() = func
 and vold_db_307.(LocalVariable).getFunction() = func
 and not vnew_cluster.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

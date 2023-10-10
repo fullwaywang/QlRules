@@ -284,4 +284,4 @@ and func_27(vneedle_131)
 and func_28(vneedle_131)
 and vdata_130.getParentScope+() = func
 and vneedle_131.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

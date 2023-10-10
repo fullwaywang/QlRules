@@ -230,4 +230,4 @@ and vlabel_len_865.getParentScope+() = func
 and voffs_865.getParentScope+() = func
 and not v__FUNCTION__.getParentScope+() = func
 and v_ret_911.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

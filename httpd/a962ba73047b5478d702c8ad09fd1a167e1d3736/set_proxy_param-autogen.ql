@@ -47,4 +47,4 @@ and vname_2736.getType().hasName("char *")
 and vcmd_2731.getType().hasName("cmd_parms *")
 and vname_2736.(LocalVariable).getFunction() = func
 and vcmd_2731.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

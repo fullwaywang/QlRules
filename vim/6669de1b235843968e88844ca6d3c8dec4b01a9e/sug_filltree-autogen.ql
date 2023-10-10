@@ -53,4 +53,4 @@ and vbyts_5566.getType().hasName("char_u *")
 and vidxs_5567.getType().hasName("idx_T *")
 and vbyts_5566.getParentScope+() = func
 and vidxs_5567.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

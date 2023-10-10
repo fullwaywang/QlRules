@@ -51,4 +51,4 @@ and not func_2(vwrite_1393, func)
 and vwrite_1393.getType().hasName("nfsd4_write *")
 and func_3(vwrite_1393)
 and vwrite_1393.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

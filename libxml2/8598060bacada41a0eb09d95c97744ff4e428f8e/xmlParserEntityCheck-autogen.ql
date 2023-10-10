@@ -54,4 +54,4 @@ and func_11(vctxt_139)
 and vconsumed_142.getType().hasName("size_t")
 and vctxt_139.getParentScope+() = func
 and vconsumed_142.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

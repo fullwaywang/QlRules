@@ -21,4 +21,4 @@ where
 func_0(vnet_342)
 and vnet_342.getType().hasName("net *")
 and vnet_342.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -51,4 +51,4 @@ and vavc_190.getType().hasName("anon_vma_chain *")
 and vvma_186.getParentScope+() = func
 and vanon_vma_189.getParentScope+() = func
 and vavc_190.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -47,4 +47,4 @@ and func_2(vs_1892, target_2)
 and func_3(vs_1892, target_3)
 and vs_1892.getType().hasName("MP3On4DecodeContext *")
 and vs_1892.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

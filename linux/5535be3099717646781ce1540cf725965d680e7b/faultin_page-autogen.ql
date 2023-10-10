@@ -28,4 +28,4 @@ and vvma_925.getType().hasName("vm_area_struct *")
 and vflags_926.getParentScope+() = func
 and vret_930.getParentScope+() = func
 and vvma_925.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

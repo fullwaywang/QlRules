@@ -29,4 +29,4 @@ not func_0(vbd_450, func)
 and vbd_450.getType().hasName("wcn36xx_tx_bd *")
 and func_1(vbd_450)
 and vbd_450.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

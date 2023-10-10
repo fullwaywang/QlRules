@@ -67,4 +67,4 @@ and vdec_448.getType().hasName("VP8Decoder *const")
 and videc_447.getType().hasName("WebPIDecoder *const")
 and vdec_448.getParentScope+() = func
 and videc_447.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

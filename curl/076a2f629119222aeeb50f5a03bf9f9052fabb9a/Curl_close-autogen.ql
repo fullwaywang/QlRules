@@ -58,4 +58,4 @@ and func_3(vdata_372, target_3)
 and func_4(vdata_372, target_4)
 and vdata_372.getType().hasName("Curl_easy *")
 and vdata_372.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

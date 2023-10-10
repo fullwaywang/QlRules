@@ -126,4 +126,4 @@ and vin_5279.getType().hasName("htmlParserInputPtr")
 and vcur_5281.getType().hasName("xmlChar")
 and vin_5279.(LocalVariable).getFunction() = func
 and vcur_5281.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

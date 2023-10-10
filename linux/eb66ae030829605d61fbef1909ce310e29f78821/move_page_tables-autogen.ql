@@ -73,4 +73,4 @@ and vold_end_199.getParentScope+() = func
 and vold_pmd_200.getParentScope+() = func
 and vnew_pmd_200.getParentScope+() = func
 and vneed_flush_201.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

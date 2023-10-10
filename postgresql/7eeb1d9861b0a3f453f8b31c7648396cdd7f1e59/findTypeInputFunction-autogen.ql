@@ -113,4 +113,4 @@ and vargList_1628.getType().hasName("Oid[3]")
 and vprocOid_1629.getType().hasName("Oid")
 and vargList_1628.(LocalVariable).getFunction() = func
 and vprocOid_1629.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

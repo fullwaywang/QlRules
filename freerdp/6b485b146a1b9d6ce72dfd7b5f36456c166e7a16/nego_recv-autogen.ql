@@ -68,4 +68,4 @@ and vnego_605.getType().hasName("rdpNego *")
 and vs_600.getParentScope+() = func
 and vtype_603.getParentScope+() = func
 and vnego_605.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

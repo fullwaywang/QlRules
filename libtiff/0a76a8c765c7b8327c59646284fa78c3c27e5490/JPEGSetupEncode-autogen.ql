@@ -89,4 +89,4 @@ and vmodule_1581.getType().hasName("const char[]")
 and vtif_1577.getFunction() = func
 and vtd_1580.(LocalVariable).getFunction() = func
 and vmodule_1581.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

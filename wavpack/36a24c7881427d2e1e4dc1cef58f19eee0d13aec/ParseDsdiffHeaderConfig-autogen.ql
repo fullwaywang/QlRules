@@ -136,4 +136,4 @@ and vdff_chunk_header_84.getParentScope+() = func
 and not vdebug_logging_mode.getParentScope+() = func
 and vprop_chunk_156.getParentScope+() = func
 and vinfilename_80.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

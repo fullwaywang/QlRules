@@ -42,4 +42,4 @@ and func_1(vazCol_3767, target_1)
 and func_2(vazCol_3767, target_2)
 and vazCol_3767.getType().hasName("char **")
 and vazCol_3767.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

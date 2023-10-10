@@ -29,4 +29,4 @@ func_0(vvctxt_28085, target_0)
 and func_1(vvctxt_28085, func, target_1)
 and vvctxt_28085.getType().hasName("xmlSchemaValidCtxtPtr")
 and vvctxt_28085.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

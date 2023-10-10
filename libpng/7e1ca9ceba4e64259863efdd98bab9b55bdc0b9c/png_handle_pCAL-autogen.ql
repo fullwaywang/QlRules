@@ -53,4 +53,4 @@ and vslength_1670.getType().hasName("png_size_t")
 and vbuf_1668.getParentScope+() = func
 and vendptr_1668.getParentScope+() = func
 and vslength_1670.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

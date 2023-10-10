@@ -57,4 +57,4 @@ and vconn_1081.getType().hasName("connectdata *")
 and vchunk_1123.getType().hasName("size_t")
 and vconn_1081.getFunction() = func
 and vchunk_1123.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

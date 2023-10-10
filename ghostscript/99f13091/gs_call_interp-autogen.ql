@@ -60,4 +60,4 @@ and func_4(target_4)
 and func_5(vcode_493, target_5)
 and vcode_493.getType().hasName("int")
 and vcode_493.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

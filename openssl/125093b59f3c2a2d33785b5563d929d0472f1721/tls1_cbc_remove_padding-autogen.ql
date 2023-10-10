@@ -1,7 +1,7 @@
 /**
  * @name openssl-125093b59f3c2a2d33785b5563d929d0472f1721-tls1_cbc_remove_padding
  * @id cpp/openssl/125093b59f3c2a2d33785b5563d929d0472f1721/tls1-cbc-remove-padding
- * @description openssl-125093b59f3c2a2d33785b5563d929d0472f1721-tls1_cbc_remove_padding NULL
+ * @description openssl-125093b59f3c2a2d33785b5563d929d0472f1721-tls1_cbc_remove_padding CVE-2012-2686
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -59,4 +59,4 @@ and vpadding_length_141.getType().hasName("unsigned int")
 and vrec_137.getParentScope+() = func
 and vs_136.getParentScope+() = func
 and vpadding_length_141.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

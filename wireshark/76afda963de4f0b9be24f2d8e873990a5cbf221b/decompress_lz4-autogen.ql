@@ -130,4 +130,4 @@ and vdecompressed_tvb_1300.getParentScope+() = func
 and vdecompressed_offset_1300.getParentScope+() = func
 and vcomposite_tvb_1307.getParentScope+() = func
 and vret_1309.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

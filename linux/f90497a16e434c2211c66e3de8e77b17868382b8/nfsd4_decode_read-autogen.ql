@@ -24,4 +24,4 @@ where
 not func_0(vread_1231, func)
 and vread_1231.getType().hasName("nfsd4_read *")
 and vread_1231.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

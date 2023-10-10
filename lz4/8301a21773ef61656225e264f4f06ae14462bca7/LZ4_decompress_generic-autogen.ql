@@ -42,4 +42,4 @@ and voutputSize_1742.getType().hasName("int")
 and vsrc_1739.getType().hasName("const char *const")
 and voutputSize_1742.getParentScope+() = func
 and vsrc_1739.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -158,4 +158,4 @@ and vsp_187.(LocalVariable).getFunction() = func
 and vnpixels_190.(LocalVariable).getFunction() = func
 and not v__PRETTY_FUNCTION__.getParentScope+() = func
 and vtif_184.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

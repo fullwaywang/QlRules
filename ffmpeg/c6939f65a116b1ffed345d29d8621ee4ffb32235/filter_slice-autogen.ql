@@ -92,4 +92,4 @@ and vplane_273.getType().hasName("int")
 and vs_269.getParentScope+() = func
 and vout_271.getParentScope+() = func
 and vplane_273.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

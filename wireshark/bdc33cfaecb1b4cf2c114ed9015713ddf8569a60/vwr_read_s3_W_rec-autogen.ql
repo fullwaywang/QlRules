@@ -62,4 +62,4 @@ and vrec_1819.getType().hasName("const guint8 *")
 and vstats_offset_1826.getType().hasName("int")
 and vrec_1819.getParentScope+() = func
 and vstats_offset_1826.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

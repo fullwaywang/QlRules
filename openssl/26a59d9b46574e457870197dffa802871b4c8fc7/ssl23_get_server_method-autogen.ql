@@ -30,4 +30,4 @@ where
 func_0(vver_124)
 and vver_124.getType().hasName("int")
 and vver_124.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -56,4 +56,4 @@ and func_6(vlstatus_2543)
 and vskb_2535.getParentScope+() = func
 and vrx_queue_2528.getParentScope+() = func
 and vlstatus_2543.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

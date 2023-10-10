@@ -43,4 +43,4 @@ and vp_total_data_size_4605.getType().hasName("OPJ_UINT32")
 and vp_manager_4607.getType().hasName("opj_event_mgr_t *")
 and vp_total_data_size_4605.getParentScope+() = func
 and vp_manager_4607.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

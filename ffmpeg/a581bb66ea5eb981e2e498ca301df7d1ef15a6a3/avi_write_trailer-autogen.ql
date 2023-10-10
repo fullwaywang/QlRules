@@ -50,4 +50,4 @@ and vj_912.getType().hasName("int")
 and vavist_964.getType().hasName("AVIStream *")
 and vj_912.getParentScope+() = func
 and vavist_964.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

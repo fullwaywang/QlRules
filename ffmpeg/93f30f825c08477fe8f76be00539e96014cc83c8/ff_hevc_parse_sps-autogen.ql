@@ -70,4 +70,4 @@ and vavctx_797.getType().hasName("AVCodecContext *")
 and vsps_796.getType().hasName("HEVCSPS *")
 and vavctx_797.getParentScope+() = func
 and vsps_796.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

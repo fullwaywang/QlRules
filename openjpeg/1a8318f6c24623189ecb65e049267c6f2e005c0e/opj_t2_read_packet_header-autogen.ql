@@ -82,4 +82,4 @@ and vl_band_857.getType().hasName("opj_tcd_band_t *")
 and vp_pi_839.getParentScope+() = func
 and vp_manager_845.getParentScope+() = func
 and vl_band_857.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

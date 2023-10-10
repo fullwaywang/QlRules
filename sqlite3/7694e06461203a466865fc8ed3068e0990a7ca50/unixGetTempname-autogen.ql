@@ -63,4 +63,4 @@ and vzBuf_5434.getType().hasName("char *")
 and vzDir_5435.getType().hasName("const char *")
 and vzBuf_5434.getFunction() = func
 and vzDir_5435.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

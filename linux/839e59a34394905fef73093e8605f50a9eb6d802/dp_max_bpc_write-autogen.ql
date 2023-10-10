@@ -37,4 +37,4 @@ and vwr_buf_2373.getParentScope+() = func
 and vmax_param_num_2375.getParentScope+() = func
 and vparam_2376.getParentScope+() = func
 and vparam_nums_2377.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

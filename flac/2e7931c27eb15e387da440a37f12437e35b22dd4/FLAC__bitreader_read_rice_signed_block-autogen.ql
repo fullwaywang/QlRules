@@ -52,4 +52,4 @@ and vbr_749.getType().hasName("FLAC__BitReader *")
 and vcwords_754.getType().hasName("uint32_t")
 and vbr_749.getParentScope+() = func
 and vcwords_754.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

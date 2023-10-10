@@ -42,4 +42,4 @@ and func_2(vg_232, target_2)
 and func_3(vg_232, target_3)
 and vg_232.getType().hasName("global_State *")
 and vg_232.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -59,4 +59,4 @@ and not func_3(vbuffer_182, func)
 and func_4(vbuffer_182, target_4)
 and vbuffer_182.getType().hasName("const unsigned char *")
 and vbuffer_182.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

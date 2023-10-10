@@ -36,4 +36,4 @@ and func_3(vsbuf_72)
 and verror_77.getType().hasName("int")
 and vsbuf_72.getParentScope+() = func
 and verror_77.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

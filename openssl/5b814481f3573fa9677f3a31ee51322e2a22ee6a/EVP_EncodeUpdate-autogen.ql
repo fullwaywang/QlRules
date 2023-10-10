@@ -87,4 +87,4 @@ and vinl_151.getType().hasName("int")
 and vctx_150.getType().hasName("EVP_ENCODE_CTX *")
 and vinl_151.getParentScope+() = func
 and vctx_150.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

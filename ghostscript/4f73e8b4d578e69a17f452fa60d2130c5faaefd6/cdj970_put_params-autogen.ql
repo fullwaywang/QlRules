@@ -373,4 +373,4 @@ and vgammavalk_644.(LocalVariable).getFunction() = func
 and vblackcorrect_645.(LocalVariable).getFunction() = func
 and vbpp_647.(LocalVariable).getFunction() = func
 and vcode_648.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

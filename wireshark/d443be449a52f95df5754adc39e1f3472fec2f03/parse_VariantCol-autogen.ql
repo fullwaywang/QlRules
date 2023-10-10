@@ -358,4 +358,4 @@ and vstrbuf_5372.getParentScope+() = func
 and vdesc_5375.getParentScope+() = func
 and not vhf_mswsp_rowvariant_item_value.getParentScope+() = func
 and vlen_5385.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

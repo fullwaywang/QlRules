@@ -52,4 +52,4 @@ and vconn_2083.getType().hasName("connectdata *")
 and vresult_2089.getType().hasName("CURLcode")
 and vconn_2083.getParentScope+() = func
 and vresult_2089.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

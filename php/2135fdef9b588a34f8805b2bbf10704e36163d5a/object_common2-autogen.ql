@@ -181,4 +181,4 @@ and vfname_456.(LocalVariable).getFunction() = func
 and not vbasic_globals.getParentScope+() = func
 and v__s_472.(LocalVariable).getFunction() = func
 and not vcompiler_globals.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

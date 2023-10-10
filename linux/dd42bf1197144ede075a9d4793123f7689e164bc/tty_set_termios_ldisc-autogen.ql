@@ -37,4 +37,4 @@ and not func_1(vtty_423, func)
 and vtty_423.getType().hasName("tty_struct *")
 and func_2(vtty_423)
 and vtty_423.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

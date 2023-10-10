@@ -196,4 +196,4 @@ and voldrunning_1169.getType().hasName("lu_byte")
 and vL_1136.getFunction() = func
 and vg_1139.(LocalVariable).getFunction() = func
 and voldrunning_1169.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -32,4 +32,4 @@ and vppcm_105.getType().hasName("uint8_t *[4]")
 and vpcm_111.(LocalVariable).getFunction() = func
 and vipcm_111.(LocalVariable).getFunction() = func
 and vppcm_105.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

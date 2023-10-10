@@ -51,4 +51,4 @@ and vfrag_599.getType().hasName("hm_fragment *")
 and vitem_600.getType().hasName("pitem *")
 and vfrag_599.getParentScope+() = func
 and vitem_600.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

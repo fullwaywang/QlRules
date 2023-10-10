@@ -23,4 +23,4 @@ and vvc_cons.getType().hasName("vc[63]")
 and vfg_console.getType().hasName("int")
 and not vvc_cons.getParentScope+() = func
 and not vfg_console.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

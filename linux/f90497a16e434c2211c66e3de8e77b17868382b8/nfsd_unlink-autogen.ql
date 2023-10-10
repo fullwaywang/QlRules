@@ -41,4 +41,4 @@ and vrdentry_1721.getParentScope+() = func
 and vdirp_1722.getParentScope+() = func
 and vhost_err_1725.getParentScope+() = func
 and not vinit_user_ns.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

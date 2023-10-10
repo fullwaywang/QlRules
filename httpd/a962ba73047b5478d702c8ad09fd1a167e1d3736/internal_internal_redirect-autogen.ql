@@ -30,4 +30,4 @@ func_0(vnew_531, target_1, target_0)
 and func_1(vnew_531, target_1)
 and vnew_531.getType().hasName("request_rec *")
 and vnew_531.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

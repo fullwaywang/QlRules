@@ -65,4 +65,4 @@ and vname_601.getType().hasName("const char **")
 and vci_600.getType().hasName("CallInfo *")
 and vname_601.getFunction() = func
 and vci_600.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -39,4 +39,4 @@ and not func_1(func)
 and not func_2(vhw_1009, func)
 and vhw_1009.getType().hasName("ieee80211_hw *")
 and vhw_1009.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

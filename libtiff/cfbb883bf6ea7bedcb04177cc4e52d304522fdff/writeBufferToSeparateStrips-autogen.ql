@@ -127,4 +127,4 @@ and vscanlinesize_1194.getType().hasName("tsize_t")
 and vdump_1185.getFunction() = func
 and vrowstripsize_1194.(LocalVariable).getFunction() = func
 and vscanlinesize_1194.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

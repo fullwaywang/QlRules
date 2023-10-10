@@ -68,4 +68,4 @@ and vis_may_replicate_command_3996.getType().hasName("int")
 and vc_3946.getFunction() = func
 and vis_write_command_3988.(LocalVariable).getFunction() = func
 and vis_may_replicate_command_3996.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

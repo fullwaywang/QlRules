@@ -68,4 +68,4 @@ and vavctx_534.getType().hasName("AVCodecContext *")
 and vs_534.getType().hasName("PNGDecContext *")
 and vavctx_534.getFunction() = func
 and vs_534.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

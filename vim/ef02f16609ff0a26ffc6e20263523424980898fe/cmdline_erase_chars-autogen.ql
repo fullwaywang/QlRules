@@ -97,4 +97,4 @@ and vp_1063.getType().hasName("char_u *")
 and vi_1046.getParentScope+() = func
 and not vccline.getParentScope+() = func
 and vp_1063.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

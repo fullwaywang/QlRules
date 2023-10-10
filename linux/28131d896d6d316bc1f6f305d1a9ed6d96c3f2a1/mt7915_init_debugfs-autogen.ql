@@ -77,4 +77,4 @@ and vdir_452.getType().hasName("dentry *")
 and vdev_450.getParentScope+() = func
 and vdir_452.getParentScope+() = func
 and not vfops_fw_debug.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

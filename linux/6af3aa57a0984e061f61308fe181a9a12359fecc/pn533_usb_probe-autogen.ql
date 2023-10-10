@@ -80,4 +80,4 @@ and func_6(vinterface_442, vphy_446)
 and func_7(vphy_446)
 and vinterface_442.getParentScope+() = func
 and vphy_446.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

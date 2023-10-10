@@ -93,4 +93,4 @@ and vuserName_981.getType().hasName("const char *")
 and vschemaName_839.getFunction() = func
 and vt_sql_958.(LocalVariable).getFunction() = func
 and vuserName_981.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -45,4 +45,4 @@ and func_2(target_2)
 and func_3(vformat_2027, target_3)
 and vformat_2027.getType().hasName("ssize_t")
 and vformat_2027.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

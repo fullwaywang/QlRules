@@ -38,4 +38,4 @@ and func_1(vconf_3847, target_1)
 and func_2(vconf_3847, target_1, target_2)
 and vconf_3847.getType().hasName("core_dir_config *")
 and vconf_3847.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

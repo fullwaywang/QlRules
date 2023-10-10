@@ -99,4 +99,4 @@ and vmxf_h264_codec_uls.getType() instanceof ArrayType
 and vsc_2242.getParentScope+() = func
 and vi_2250.getParentScope+() = func
 and not vmxf_h264_codec_uls.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -129,4 +129,4 @@ and vi_ctx_p_492.getType().hasName("i_ctx_t *")
 and vpexit_code_484.getFunction() = func
 and vperror_object_484.getFunction() = func
 and vi_ctx_p_492.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

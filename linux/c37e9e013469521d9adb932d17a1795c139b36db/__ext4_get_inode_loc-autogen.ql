@@ -54,4 +54,4 @@ and func_4(vinode_4499)
 and vsb_4504.getType().hasName("super_block *")
 and vinode_4499.getParentScope+() = func
 and vsb_4504.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

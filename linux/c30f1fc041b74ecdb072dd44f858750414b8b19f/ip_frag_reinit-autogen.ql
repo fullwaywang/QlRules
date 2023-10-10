@@ -77,4 +77,4 @@ and vqp_246.getParentScope+() = func
 and vfp_248.getParentScope+() = func
 and vsum_truesize_249.getParentScope+() = func
 and vxp_258.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

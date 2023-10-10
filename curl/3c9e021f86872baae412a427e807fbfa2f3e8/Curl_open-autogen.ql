@@ -48,4 +48,4 @@ and func_2(vdata_607)
 and func_3(func)
 and vdata_607.getType().hasName("Curl_easy *")
 and vdata_607.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

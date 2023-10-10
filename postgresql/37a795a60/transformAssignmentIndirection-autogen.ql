@@ -155,4 +155,4 @@ and vtargetTypeId_680.getFunction() = func
 and vtargetTypMod_681.getFunction() = func
 and vlocation_685.getFunction() = func
 and vfstore_727.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

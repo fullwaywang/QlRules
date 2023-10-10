@@ -65,4 +65,4 @@ and vopj_dwt_norms_real.getType() instanceof ArrayType
 and vlevel_1969.getParentScope+() = func
 and vorient_1969.getParentScope+() = func
 and not vopj_dwt_norms_real.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

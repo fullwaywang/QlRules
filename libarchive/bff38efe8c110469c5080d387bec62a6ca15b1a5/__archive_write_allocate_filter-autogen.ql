@@ -35,4 +35,4 @@ and func_1(vf_201, target_1)
 and func_2(vf_201, target_2)
 and vf_201.getType().hasName("archive_write_filter *")
 and vf_201.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

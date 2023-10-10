@@ -36,4 +36,4 @@ and vusage_inconsistent_648.getType().hasName("int *")
 and verr_655.getType().hasName("errcode_t")
 and vusage_inconsistent_648.getParentScope+() = func
 and verr_655.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

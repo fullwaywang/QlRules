@@ -1070,4 +1070,4 @@ and vAvTimestamp_374.getParentScope+() = func
 and vmessage_375.getParentScope+() = func
 and vcbAvTimestamp_459.getParentScope+() = func
 and vptr_474.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

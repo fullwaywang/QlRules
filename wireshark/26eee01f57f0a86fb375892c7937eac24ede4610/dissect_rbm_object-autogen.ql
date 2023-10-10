@@ -46,4 +46,4 @@ and vsubtype_410.getType().hasName("guint8")
 and vtvb_408.getParentScope+() = func
 and voffset_408.getParentScope+() = func
 and vsubtype_410.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -226,4 +226,4 @@ and vi_3309.getParentScope+() = func
 and vj_3309.getParentScope+() = func
 and vtpdf_3310.getParentScope+() = func
 and vmatch_3310.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

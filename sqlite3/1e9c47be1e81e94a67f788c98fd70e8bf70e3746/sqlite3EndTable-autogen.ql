@@ -80,4 +80,4 @@ and vpSelect_1859.getType().hasName("Select *")
 and vpParse_1855.getType().hasName("Parse *")
 and vpSelect_1859.getFunction() = func
 and vpParse_1855.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

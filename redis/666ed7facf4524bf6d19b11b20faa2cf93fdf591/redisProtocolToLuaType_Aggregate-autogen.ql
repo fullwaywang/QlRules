@@ -52,4 +52,4 @@ and func_2(vlua_191, target_2)
 and func_3(vlua_191, target_3)
 and vlua_191.getType().hasName("lua_State *")
 and vlua_191.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

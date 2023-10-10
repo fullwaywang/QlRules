@@ -121,4 +121,4 @@ and func_20(vagf_2841)
 and func_21(vagf_2841)
 and vmp_2840.getParentScope+() = func
 and vagf_2841.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

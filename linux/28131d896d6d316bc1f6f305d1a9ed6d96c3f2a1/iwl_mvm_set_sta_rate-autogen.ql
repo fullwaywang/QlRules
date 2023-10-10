@@ -367,4 +367,4 @@ and vgi_ltf_4907.getType().hasName("u32")
 and vrate_n_flags_4874.getParentScope+() = func
 and vrinfo_4874.getParentScope+() = func
 and vgi_ltf_4907.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

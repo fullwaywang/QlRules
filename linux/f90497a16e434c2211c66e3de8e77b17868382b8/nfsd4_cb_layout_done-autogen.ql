@@ -26,4 +26,4 @@ and vtask_653.getType().hasName("rpc_task *")
 and vls_655.getType().hasName("nfs4_layout_stateid *")
 and vtask_653.getParentScope+() = func
 and vls_655.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

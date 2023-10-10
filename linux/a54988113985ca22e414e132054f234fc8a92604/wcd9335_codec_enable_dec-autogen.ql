@@ -29,4 +29,4 @@ where
 func_0(vw_2723)
 and vw_2723.getType().hasName("snd_soc_dapm_widget *")
 and vw_2723.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

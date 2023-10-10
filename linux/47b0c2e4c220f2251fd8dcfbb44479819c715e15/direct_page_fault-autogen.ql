@@ -56,4 +56,4 @@ and vvcpu_4223.getParentScope+() = func
 and vfault_4223.getParentScope+() = func
 and vis_tdp_mmu_fault_4225.getParentScope+() = func
 and vr_4228.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

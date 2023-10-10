@@ -53,4 +53,4 @@ and vinfo_137.getType().hasName("subprocess_info *")
 and vumd_info_139.getType().hasName("umd_info *")
 and vinfo_137.getParentScope+() = func
 and vumd_info_139.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -50,4 +50,4 @@ and func_4(vv_1580, target_4)
 and func_5(vv_1580, target_5)
 and vv_1580.getType().hasName("vars *")
 and vv_1580.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

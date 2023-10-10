@@ -120,4 +120,4 @@ and vdelay_1035.getParentScope+() = func
 and not vsystem_power_efficient_wq.getParentScope+() = func
 and v__key_1235.getParentScope+() = func
 and v__key_1_1235.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

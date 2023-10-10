@@ -28,4 +28,4 @@ func_0(vvga_init_done)
 and func_1(vvga_init_done, func)
 and vvga_init_done.getType().hasName("bool")
 and not vvga_init_done.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

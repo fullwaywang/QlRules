@@ -180,4 +180,4 @@ and vtotal_tag_len_161.getParentScope+() = func
 and vtag_len_162.getParentScope+() = func
 and voffset_end_166.getParentScope+() = func
 and vtag_166.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -73,4 +73,4 @@ and vbpp_38.getType().hasName("uint32_t")
 and vpixdepth_39.getType().hasName("uint32_t")
 and vbpp_38.getParentScope+() = func
 and vpixdepth_39.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

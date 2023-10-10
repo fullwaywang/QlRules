@@ -64,4 +64,4 @@ and vnewPower_6794.getType().hasName("unsigned char")
 and vnewSize_6795.getType().hasName("size_t")
 and vnewPower_6794.getParentScope+() = func
 and vnewSize_6795.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

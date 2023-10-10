@@ -520,4 +520,4 @@ and vquiet_745.getFunction() = func
 and vresult_748.(LocalVariable).getFunction() = func
 and vconnstr_749.(LocalVariable).getFunction() = func
 and vi_751.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

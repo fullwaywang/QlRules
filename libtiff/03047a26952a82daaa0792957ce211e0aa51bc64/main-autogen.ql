@@ -130,4 +130,4 @@ and varg_index_93.(LocalVariable).getFunction() = func
 and not vstderr.getParentScope+() = func
 and vfip_137.(LocalVariable).getFunction() = func
 and vargv_90.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -56,4 +56,4 @@ and func_1(vtrak_1854, target_1)
 and func_2(vtrak_1854, target_2)
 and vtrak_1854.getType().hasName("ngx_http_mp4_trak_t *")
 and vtrak_1854.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

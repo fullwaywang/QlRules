@@ -197,4 +197,4 @@ and vpixel_info_154.getParentScope+() = func
 and vnumber_planes_filled_176.getParentScope+() = func
 and vpixel_info_length_179.getParentScope+() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -77,4 +77,4 @@ and vconn_3368.getType().hasName("connectdata *")
 and vdata_3368.getType().hasName("Curl_easy *")
 and vconn_3368.getFunction() = func
 and vdata_3368.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

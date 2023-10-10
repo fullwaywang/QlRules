@@ -55,4 +55,4 @@ and vl_tilec_657.getType().hasName("opj_tcd_tilecomp_t *")
 and vl_data_size_681.getType().hasName("OPJ_UINT32")
 and vl_tilec_657.getParentScope+() = func
 and vl_data_size_681.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

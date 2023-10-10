@@ -137,4 +137,4 @@ and vevtinfo_17402.getType().hasName("EventTriggerInfo *")
 and vlabelq_17407.getType().hasName("PQExpBuffer")
 and vevtinfo_17402.getFunction() = func
 and vlabelq_17407.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -45,4 +45,4 @@ and func_2(vl_current_pi_1003, target_2)
 and func_3(vl_current_pi_1003, target_3)
 and vl_current_pi_1003.getType().hasName("opj_pi_iterator_t *")
 and vl_current_pi_1003.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and vma_2400.getType().hasName("double *")
 and vmb_2401.getType().hasName("float *")
 and vma_2400.(LocalVariable).getFunction() = func
 and vmb_2401.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

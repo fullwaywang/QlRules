@@ -54,4 +54,4 @@ and vtiledp_2139.getType().hasName("OPJ_INT32 *__restrict__")
 and vtileIndex_2143.getType().hasName("OPJ_SIZE_T")
 and vtiledp_2139.getParentScope+() = func
 and vtileIndex_2143.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

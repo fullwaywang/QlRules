@@ -293,4 +293,4 @@ and vrowsperstrip_921.(LocalVariable).getFunction() = func
 and vscanline_924.(LocalVariable).getFunction() = func
 and vret_926.(LocalVariable).getFunction() = func
 and vmaxstripsize_927.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

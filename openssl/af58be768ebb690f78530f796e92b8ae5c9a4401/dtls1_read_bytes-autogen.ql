@@ -1,7 +1,7 @@
 /**
  * @name openssl-af58be768ebb690f78530f796e92b8ae5c9a4401-dtls1_read_bytes
  * @id cpp/openssl/af58be768ebb690f78530f796e92b8ae5c9a4401/dtls1-read-bytes
- * @description openssl-af58be768ebb690f78530f796e92b8ae5c9a4401-dtls1_read_bytes 
+ * @description openssl-af58be768ebb690f78530f796e92b8ae5c9a4401-dtls1_read_bytes CVE-2016-8610
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -165,4 +165,4 @@ and vbio_679.getParentScope+() = func
 and valert_level_703.getParentScope+() = func
 and valert_descr_704.getParentScope+() = func
 and vtmp_773.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

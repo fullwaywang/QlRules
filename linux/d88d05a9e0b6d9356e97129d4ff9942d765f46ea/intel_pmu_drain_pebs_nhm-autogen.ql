@@ -43,4 +43,4 @@ and vpebs_status_1990.getType().hasName("u64")
 and vcpuc_1959.getParentScope+() = func
 and vp_1989.getParentScope+() = func
 and vpebs_status_1990.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -36,4 +36,4 @@ not func_0(vline6pcm_537, func)
 and vline6pcm_537.getType().hasName("snd_line6_pcm *")
 and func_3(vline6pcm_537)
 and vline6pcm_537.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -147,4 +147,4 @@ and vtif_622.(LocalVariable).getFunction() = func
 and vy_624.(LocalVariable).getFunction() = func
 and vtw_626.(LocalVariable).getFunction() = func
 and vtoskew_628.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

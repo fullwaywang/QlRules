@@ -100,4 +100,4 @@ and vsubscribe_1704.getParentScope+() = func
 and vmbox_1708.getParentScope+() = func
 and not vImapCheckSubscribed.getParentScope+() = func
 and vpath_1704.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

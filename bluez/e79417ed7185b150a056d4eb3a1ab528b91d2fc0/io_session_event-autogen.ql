@@ -136,4 +136,4 @@ and vbuf_141.getType().hasName("uint8_t *")
 and vsk_142.getType().hasName("int")
 and vbuf_141.getParentScope+() = func
 and vsk_142.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

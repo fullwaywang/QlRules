@@ -84,4 +84,4 @@ and vadata_1249.getType().hasName("ImapAccountData *")
 and vflags_1249.getType().hasName("ImapCmdFlags")
 and vadata_1249.getParentScope+() = func
 and vflags_1249.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

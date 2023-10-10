@@ -111,4 +111,4 @@ and func_10(vret_292, target_10)
 and func_14(vret_292, target_14)
 and vret_292.getType().hasName("stun_buffer_list_elem *")
 and vret_292.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

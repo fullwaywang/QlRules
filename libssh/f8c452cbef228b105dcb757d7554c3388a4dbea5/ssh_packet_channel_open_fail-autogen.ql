@@ -78,4 +78,4 @@ and vsession_202.getType().hasName("ssh_session")
 and vchannel_204.getParentScope+() = func
 and not v__func__.getParentScope+() = func
 and vsession_202.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

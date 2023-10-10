@@ -156,4 +156,4 @@ and vdbname_4466.(LocalVariable).getFunction() = func
 and vpghost_4467.(LocalVariable).getFunction() = func
 and vpgport_4468.(LocalVariable).getFunction() = func
 and vusername_4469.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

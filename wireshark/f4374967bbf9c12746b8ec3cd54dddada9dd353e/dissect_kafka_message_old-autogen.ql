@@ -27,4 +27,4 @@ and vlength_1916.getType().hasName("guint32")
 and voffset_1905.getType().hasName("int")
 and vlength_1916.getParentScope+() = func
 and voffset_1905.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

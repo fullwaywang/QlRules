@@ -38,4 +38,4 @@ and func_1(vterm_5845, target_1)
 and func_2(func, target_2)
 and vterm_5845.getType().hasName("term_T *")
 and vterm_5845.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

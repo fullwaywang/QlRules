@@ -117,4 +117,4 @@ and func_8(vpidinst_55, target_8)
 and func_9(vpidinst_55, target_9)
 and vpidinst_55.getType().hasName("GF_FilterPidInst *")
 and vpidinst_55.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -25,4 +25,4 @@ and vdata_552.getType().hasName("SessionHandle *")
 and vmulti_553.getType().hasName("void *")
 and vdata_552.getParentScope+() = func
 and vmulti_553.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -142,4 +142,4 @@ and vsize_519.(LocalVariable).getFunction() = func
 and vntlmbuf_520.(LocalVariable).getFunction() = func
 and vntresplen_525.(LocalVariable).getFunction() = func
 and vptr_ntresp_527.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -107,4 +107,4 @@ and vattrno_1509.getType().hasName("AttrNumber")
 and vnew_tlist_1506.(LocalVariable).getFunction() = func
 and vattrMap_1508.(LocalVariable).getFunction() = func
 and vattrno_1509.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

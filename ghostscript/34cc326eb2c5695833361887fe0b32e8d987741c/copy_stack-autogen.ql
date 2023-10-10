@@ -57,4 +57,4 @@ and vsize_762.getType().hasName("uint")
 and vi_ctx_p_760.getFunction() = func
 and vpstack_760.getFunction() = func
 and vsize_762.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

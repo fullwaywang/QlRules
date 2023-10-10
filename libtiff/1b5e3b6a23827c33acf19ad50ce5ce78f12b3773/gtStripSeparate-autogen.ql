@@ -94,4 +94,4 @@ and valpha_1017.getType().hasName("int")
 and vtif_1005.(LocalVariable).getFunction() = func
 and vstripsize_1014.(LocalVariable).getFunction() = func
 and valpha_1017.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

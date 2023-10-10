@@ -52,4 +52,4 @@ and not func_1(vmb_386, func)
 and not func_2(func)
 and vmb_386.getType().hasName("char *")
 and vmb_386.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

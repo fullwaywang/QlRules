@@ -88,4 +88,4 @@ and vout_1213.getFunction() = func
 and vimagewidth_1214.getFunction() = func
 and vspp_1214.getFunction() = func
 and vbps_1217.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

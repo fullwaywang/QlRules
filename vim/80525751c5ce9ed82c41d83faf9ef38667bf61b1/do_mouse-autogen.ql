@@ -72,4 +72,4 @@ and not vTabPageIdxs.getParentScope+() = func
 and not vfirstwin.getParentScope+() = func
 and not vcmdwin_type.getParentScope+() = func
 and not vColumns.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

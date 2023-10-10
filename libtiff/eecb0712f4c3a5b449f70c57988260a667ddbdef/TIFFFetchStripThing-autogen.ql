@@ -65,4 +65,4 @@ and vresizeddata_5758.getType().hasName("uint64_t *")
 and vdir_5744.getFunction() = func
 and vdata_5748.(LocalVariable).getFunction() = func
 and vresizeddata_5758.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

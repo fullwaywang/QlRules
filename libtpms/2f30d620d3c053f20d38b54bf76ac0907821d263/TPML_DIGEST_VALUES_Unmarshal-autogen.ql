@@ -39,4 +39,4 @@ and func_1(vtarget_1995, target_1)
 and func_2(vtarget_1995, target_2)
 and vtarget_1995.getType().hasName("TPML_DIGEST_VALUES *")
 and vtarget_1995.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

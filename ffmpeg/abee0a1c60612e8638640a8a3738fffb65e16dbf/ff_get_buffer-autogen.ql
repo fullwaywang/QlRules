@@ -50,4 +50,4 @@ and vavctx_888.getType().hasName("AVCodecContext *")
 and vframe_888.getType().hasName("AVFrame *")
 and vavctx_888.getParentScope+() = func
 and vframe_888.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

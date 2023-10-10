@@ -44,4 +44,4 @@ and vattr_799.getType().hasName("bpf_attr *")
 and verr_804.getParentScope+() = func
 and vbtf_850.getParentScope+() = func
 and vattr_799.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -79,4 +79,4 @@ and vctx_3657.getType().hasName("SSL_CTX *")
 and vnew_3709.getType().hasName("DH *")
 and vctx_3657.getParentScope+() = func
 and vnew_3709.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

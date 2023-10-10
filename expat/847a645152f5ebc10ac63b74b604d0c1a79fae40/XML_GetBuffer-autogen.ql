@@ -97,4 +97,4 @@ and vneededSize_2059.getType().hasName("int")
 and vparser_2037.getParentScope+() = func
 and vkeep_2056.getParentScope+() = func
 and vneededSize_2059.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

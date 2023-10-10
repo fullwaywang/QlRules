@@ -39,4 +39,4 @@ and vkp_1532.getType().hasName("png_charp")
 and vnew_key_1528.getParentScope+() = func
 and vkey_len_1530.getParentScope+() = func
 and vkp_1532.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

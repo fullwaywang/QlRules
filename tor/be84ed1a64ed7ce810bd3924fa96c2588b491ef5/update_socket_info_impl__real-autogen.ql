@@ -59,4 +59,4 @@ and vsock_buf_size_factor.getType().hasName("double")
 and vent_190.getType().hasName("socket_table_ent_t *")
 and not vsock_buf_size_factor.getParentScope+() = func
 and vent_190.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

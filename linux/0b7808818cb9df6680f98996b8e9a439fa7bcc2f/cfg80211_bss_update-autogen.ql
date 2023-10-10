@@ -31,4 +31,4 @@ and vnew_1720.getType().hasName("cfg80211_internal_bss *")
 and func_1(vnew_1720)
 and vfound_1700.getParentScope+() = func
 and vnew_1720.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

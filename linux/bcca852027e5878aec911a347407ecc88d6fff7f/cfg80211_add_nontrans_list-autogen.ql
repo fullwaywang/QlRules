@@ -30,4 +30,4 @@ not func_0(vnontrans_bss_403, func)
 and vnontrans_bss_403.getType().hasName("cfg80211_bss *")
 and func_1(vnontrans_bss_403)
 and vnontrans_bss_403.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

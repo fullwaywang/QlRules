@@ -37,4 +37,4 @@ and func_1(vmapping_address_952, target_1)
 and func_2(vmapping_address_952, target_2)
 and vmapping_address_952.getType().hasName("int")
 and vmapping_address_952.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

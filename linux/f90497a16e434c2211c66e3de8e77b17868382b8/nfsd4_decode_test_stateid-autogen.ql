@@ -24,4 +24,4 @@ where
 not func_0(vtest_stateid_1800, func)
 and vtest_stateid_1800.getType().hasName("nfsd4_test_stateid *")
 and vtest_stateid_1800.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -56,4 +56,4 @@ and vn_74.getType().hasName("int")
 and vr_76.getType().hasName("gx_ttfReader *")
 and vn_74.getFunction() = func
 and vr_76.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

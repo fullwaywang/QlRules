@@ -56,4 +56,4 @@ and vretval_494.getType().hasName("unsigned long")
 and verrStr.getType() instanceof ArrayType
 and vretval_494.getParentScope+() = func
 and not verrStr.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

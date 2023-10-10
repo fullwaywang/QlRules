@@ -66,4 +66,4 @@ and func_7(vv_146, target_7)
 and func_8(vv_146, target_8)
 and vv_146.getType().hasName("Vdbe *")
 and vv_146.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

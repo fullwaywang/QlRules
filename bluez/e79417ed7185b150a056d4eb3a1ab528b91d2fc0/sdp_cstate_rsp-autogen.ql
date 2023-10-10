@@ -135,4 +135,4 @@ and vbuf_622.getType().hasName("sdp_buf_t *")
 and vcache_626.getParentScope+() = func
 and vcstate_622.getParentScope+() = func
 and vbuf_622.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -34,4 +34,4 @@ not func_0(vvmx_2134, func)
 and not func_1(func)
 and vvmx_2134.getType().hasName("vcpu_vmx *")
 and vvmx_2134.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

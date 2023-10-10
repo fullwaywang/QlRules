@@ -27,4 +27,4 @@ and vregion_7602.getType().hasName("int")
 and vcrop_7600.getFunction() = func
 and vcrop_buff_7602.getFunction() = func
 and vregion_7602.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

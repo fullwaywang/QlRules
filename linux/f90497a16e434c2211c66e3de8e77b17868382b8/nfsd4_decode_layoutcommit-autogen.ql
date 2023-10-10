@@ -24,4 +24,4 @@ where
 not func_0(vlcp_1697, func)
 and vlcp_1697.getType().hasName("nfsd4_layoutcommit *")
 and vlcp_1697.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

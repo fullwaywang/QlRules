@@ -39,4 +39,4 @@ and vdoi_def_581.getType().hasName("cipso_v4_doi *")
 and vcipso_v4_doi_list_lock.getType().hasName("spinlock_t")
 and vdoi_def_581.getParentScope+() = func
 and not vcipso_v4_doi_list_lock.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

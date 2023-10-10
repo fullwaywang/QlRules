@@ -38,4 +38,4 @@ and vtarget_711.getType().hasName("TPMI_SH_HMAC *")
 and visNotHmacSession_719.getType().hasName("BOOL")
 and vtarget_711.getParentScope+() = func
 and visNotHmacSession_719.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

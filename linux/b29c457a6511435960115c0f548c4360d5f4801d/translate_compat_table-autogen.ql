@@ -40,4 +40,4 @@ and vsize_1164.getType().hasName("unsigned int")
 and func_2(vsize_1164)
 and vnewinfo_1160.getParentScope+() = func
 and vsize_1164.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

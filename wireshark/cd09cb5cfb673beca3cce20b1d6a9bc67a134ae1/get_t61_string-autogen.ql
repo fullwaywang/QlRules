@@ -70,4 +70,4 @@ and vc_1377.getType().hasName("guint8 *")
 and vlength_1374.getParentScope+() = func
 and vi_1376.getParentScope+() = func
 and vc_1377.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

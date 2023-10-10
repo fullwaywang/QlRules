@@ -23,4 +23,4 @@ where
 func_0(vfile_5758)
 and vfile_5758.getType().hasName("mdu_bitmap_file_t *")
 and vfile_5758.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

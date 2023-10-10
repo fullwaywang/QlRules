@@ -49,4 +49,4 @@ and vl_4286.getType().hasName("long")
 and vc_4285.getType().hasName("client *")
 and vl_4286.(LocalVariable).getFunction() = func
 and vc_4285.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

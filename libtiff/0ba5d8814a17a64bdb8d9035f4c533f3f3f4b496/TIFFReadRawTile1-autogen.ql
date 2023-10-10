@@ -53,4 +53,4 @@ and vtile_715.getType().hasName("uint32")
 and vtd_717.(LocalVariable).getFunction() = func
 and vma_754.(LocalVariable).getFunction() = func
 and vtile_715.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

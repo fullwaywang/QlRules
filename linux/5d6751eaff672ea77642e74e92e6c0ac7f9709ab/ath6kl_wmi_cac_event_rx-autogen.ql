@@ -35,4 +35,4 @@ and vreply_1509.getType().hasName("wmi_cac_event *")
 and func_3(vdatap_1506, vreply_1509)
 and vdatap_1506.getParentScope+() = func
 and vreply_1509.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

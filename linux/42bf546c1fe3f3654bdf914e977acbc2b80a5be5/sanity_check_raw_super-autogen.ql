@@ -63,4 +63,4 @@ and vsecs_per_zone_2133.getParentScope+() = func
 and vtotal_sections_2134.getParentScope+() = func
 and vraw_super_2135.getParentScope+() = func
 and vsb_2137.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

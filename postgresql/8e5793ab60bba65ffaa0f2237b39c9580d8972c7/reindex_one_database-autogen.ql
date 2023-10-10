@@ -201,4 +201,4 @@ and vport_318.getFunction() = func
 and vusername_318.getFunction() = func
 and vprompt_password_319.getFunction() = func
 and vdbname_316.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

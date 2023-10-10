@@ -98,4 +98,4 @@ and vb_138.getType().hasName("const char *")
 and vu_140.getParentScope+() = func
 and not vhttp_asso_values.getParentScope+() = func
 and vb_138.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

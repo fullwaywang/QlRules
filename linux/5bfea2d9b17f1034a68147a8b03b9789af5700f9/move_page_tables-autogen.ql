@@ -82,4 +82,4 @@ and vold_addr_241.getParentScope+() = func
 and vnew_addr_242.getParentScope+() = func
 and vneed_rmap_locks_243.getParentScope+() = func
 and vextent_245.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

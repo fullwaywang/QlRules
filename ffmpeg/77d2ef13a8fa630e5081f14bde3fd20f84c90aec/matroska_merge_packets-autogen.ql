@@ -37,4 +37,4 @@ and vout_1043.getType().hasName("AVPacket *")
 and vin_1043.getType().hasName("AVPacket *")
 and vout_1043.getFunction() = func
 and vin_1043.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

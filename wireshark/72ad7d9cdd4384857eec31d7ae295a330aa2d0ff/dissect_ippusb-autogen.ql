@@ -78,4 +78,4 @@ and vlast_chunk_204.getType().hasName("const guchar *")
 and vcurrent_msp_209.getType().hasName("ippusb_multisegment_pdu *")
 and vlast_chunk_204.getParentScope+() = func
 and vcurrent_msp_209.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

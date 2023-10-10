@@ -37,4 +37,4 @@ and func_1(vadapter_10633, vii_10635)
 and vii_10635.getType().hasName("const ixgbe_info *")
 and vadapter_10633.getParentScope+() = func
 and vii_10635.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

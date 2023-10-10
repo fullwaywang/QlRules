@@ -28,4 +28,4 @@ not func_0(vsta_1536)
 and func_1(vsta_1536)
 and vsta_1536.getType().hasName("ieee80211_sta *")
 and vsta_1536.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

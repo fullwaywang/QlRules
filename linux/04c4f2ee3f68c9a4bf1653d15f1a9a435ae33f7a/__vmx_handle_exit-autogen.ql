@@ -125,4 +125,4 @@ and vvcpu_5944.getType().hasName("kvm_vcpu *")
 and vexit_reason_5947.getParentScope+() = func
 and vvectoring_info_5948.getParentScope+() = func
 and vvcpu_5944.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

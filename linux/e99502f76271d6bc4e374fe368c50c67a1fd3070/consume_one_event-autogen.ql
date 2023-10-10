@@ -26,4 +26,4 @@ not func_0(func)
 and func_2(vdrop_290)
 and vdrop_290.getType().hasName("bool")
 and vdrop_290.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

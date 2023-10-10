@@ -46,4 +46,4 @@ and vhandle_941.getType().hasName("u32")
 and vfl_940.getParentScope+() = func
 and vkernel_940.getParentScope+() = func
 and vhandle_941.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

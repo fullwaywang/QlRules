@@ -63,4 +63,4 @@ and vresult_231.getType().hasName("TypeFuncClass")
 and vtypid_248.getType().hasName("Oid")
 and vresult_231.(LocalVariable).getFunction() = func
 and vtypid_248.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

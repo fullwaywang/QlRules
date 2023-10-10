@@ -74,4 +74,4 @@ and vlen_1387.getType().hasName("unsigned int")
 and vc_1293.getType().hasName("EVP_CIPHER_CTX *")
 and vlen_1387.getParentScope+() = func
 and vc_1293.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

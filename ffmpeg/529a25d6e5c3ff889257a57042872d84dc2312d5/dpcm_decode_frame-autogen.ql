@@ -58,4 +58,4 @@ and vs_179.getType().hasName("DPCMContext *")
 and vdata_173.getType().hasName("void *")
 and vs_179.(LocalVariable).getFunction() = func
 and vdata_173.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

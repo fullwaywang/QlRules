@@ -30,4 +30,4 @@ not func_0(vllcp_sock_62)
 and vllcp_sock_62.getType().hasName("nfc_llcp_sock *")
 and func_2(vllcp_sock_62)
 and vllcp_sock_62.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

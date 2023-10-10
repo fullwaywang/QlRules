@@ -76,4 +76,4 @@ and vvardata_88.getType().hasName("VariableStatData")
 and vcmpfunc_91.getType().hasName("FmgrInfo *")
 and vvardata_88.(LocalVariable).getFunction() = func
 and vcmpfunc_91.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

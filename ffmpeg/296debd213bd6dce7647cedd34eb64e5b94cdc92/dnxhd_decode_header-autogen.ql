@@ -99,4 +99,4 @@ and vctx_176.getType().hasName("DNXHDContext *")
 and vframe_176.getType().hasName("AVFrame *")
 and vctx_176.getParentScope+() = func
 and vframe_176.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

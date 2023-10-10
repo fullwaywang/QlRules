@@ -38,4 +38,4 @@ and visNotPersistent_619.getType().hasName("BOOL")
 and vtarget_611.getType().hasName("TPMI_DH_PERSISTENT *")
 and visNotPersistent_619.getParentScope+() = func
 and vtarget_611.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -44,4 +44,4 @@ and vtrans_3849.getParentScope+() = func
 and vset_3853.getParentScope+() = func
 and vgenmask_3845.getParentScope+() = func
 and vid_3848.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

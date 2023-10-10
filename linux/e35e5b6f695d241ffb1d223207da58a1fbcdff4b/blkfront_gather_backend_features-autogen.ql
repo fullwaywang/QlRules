@@ -30,4 +30,4 @@ not func_0(vinfo_2243, func)
 and vinfo_2243.getType().hasName("blkfront_info *")
 and func_1(vinfo_2243)
 and vinfo_2243.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -22,4 +22,4 @@ where
 not func_0(vhdr_2586, func)
 and vhdr_2586.getType().hasName("ieee80211_hdr *")
 and vhdr_2586.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

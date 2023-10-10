@@ -92,4 +92,4 @@ and verr_139.getType().hasName("LPC_TYPE")
 and vgen1_140.getType().hasName("LPC_TYPE[32]")
 and verr_139.getParentScope+() = func
 and vgen1_140.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

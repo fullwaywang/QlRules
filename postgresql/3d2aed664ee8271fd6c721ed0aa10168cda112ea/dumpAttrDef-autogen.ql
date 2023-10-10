@@ -171,4 +171,4 @@ and vdelq_16267.getType().hasName("PQExpBuffer")
 and vfout_16261.getFunction() = func
 and vtbinfo_16264.(LocalVariable).getFunction() = func
 and vdelq_16267.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

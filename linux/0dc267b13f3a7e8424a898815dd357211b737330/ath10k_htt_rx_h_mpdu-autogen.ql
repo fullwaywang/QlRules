@@ -104,4 +104,4 @@ and venctype_1842.getParentScope+() = func
 and vfirst_hdr_1843.getParentScope+() = func
 and vis_decrypted_1849.getParentScope+() = func
 and vmulticast_check_1852.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

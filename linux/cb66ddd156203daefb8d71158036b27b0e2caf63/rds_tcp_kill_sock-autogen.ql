@@ -34,4 +34,4 @@ and vnet_598.getType().hasName("net *")
 and vc_net_609.getParentScope+() = func
 and vtc_600.getParentScope+() = func
 and vnet_598.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

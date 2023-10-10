@@ -81,4 +81,4 @@ and vneedle_140.getType().hasName("ssl_primary_config *")
 and vdata_139.getType().hasName("ssl_primary_config *")
 and vneedle_140.getParentScope+() = func
 and vdata_139.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

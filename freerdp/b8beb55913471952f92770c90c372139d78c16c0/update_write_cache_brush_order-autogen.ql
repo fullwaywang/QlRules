@@ -62,4 +62,4 @@ and vBPP_BMF.getType() instanceof ArrayType
 and vcache_brush_2660.getType().hasName("const CACHE_BRUSH_ORDER *")
 and not vBPP_BMF.getParentScope+() = func
 and vcache_brush_2660.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

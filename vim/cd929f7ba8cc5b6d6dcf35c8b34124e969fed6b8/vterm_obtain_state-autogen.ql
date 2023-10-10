@@ -36,4 +36,4 @@ and func_1(vstate_1698, target_1)
 and func_2(vstate_1698, target_2)
 and vstate_1698.getType().hasName("VTermState *")
 and vstate_1698.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

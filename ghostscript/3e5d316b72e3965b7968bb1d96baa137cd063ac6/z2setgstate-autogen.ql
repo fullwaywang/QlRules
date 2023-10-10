@@ -92,4 +92,4 @@ and vop_357.getType().hasName("os_ptr")
 and vi_ctx_p_355.getType().hasName("i_ctx_t *")
 and vop_357.(LocalVariable).getFunction() = func
 and vi_ctx_p_355.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -196,4 +196,4 @@ and vplanSlot_352.getFunction() = func
 and vresultRelInfo_356.(LocalVariable).getFunction() = func
 and vresultRelationDesc_357.(LocalVariable).getFunction() = func
 and vresult_359.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

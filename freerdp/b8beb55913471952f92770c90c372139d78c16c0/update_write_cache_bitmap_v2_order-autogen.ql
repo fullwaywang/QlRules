@@ -67,4 +67,4 @@ and vcache_bitmap_v2_2109.getType().hasName("CACHE_BITMAP_V2_ORDER *")
 and vBPP_CBR2.getType() instanceof ArrayType
 and vcache_bitmap_v2_2109.getParentScope+() = func
 and not vBPP_CBR2.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

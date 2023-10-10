@@ -197,4 +197,4 @@ and velems_1505.getParentScope+() = func
 and vnon_inherit_1506.getParentScope+() = func
 and vnontransmitted_profile_1507.getParentScope+() = func
 and vnontransmitted_profile_len_1508.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

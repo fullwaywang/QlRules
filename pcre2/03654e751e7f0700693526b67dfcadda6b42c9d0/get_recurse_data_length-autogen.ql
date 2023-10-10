@@ -1,7 +1,7 @@
 /**
  * @name pcre2-03654e751e7f0700693526b67dfcadda6b42c9d0-get_recurse_data_length
  * @id cpp/pcre2/03654e751e7f0700693526b67dfcadda6b42c9d0/get-recurse-data-length
- * @description pcre2-03654e751e7f0700693526b67dfcadda6b42c9d0-get_recurse_data_length 
+ * @description pcre2-03654e751e7f0700693526b67dfcadda6b42c9d0-get_recurse_data_length CVE-2022-1587
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -342,4 +342,4 @@ and vsize_2324.getParentScope+() = func
 and valternative_2325.getParentScope+() = func
 and vcapture_last_found_2330.getParentScope+() = func
 and vcontrol_head_found_2331.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

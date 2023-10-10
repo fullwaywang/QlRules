@@ -191,4 +191,4 @@ and vp_manager_7559.getParentScope+() = func
 and vl_marker_size_7562.getParentScope+() = func
 and vnew_header_data_7626.getParentScope+() = func
 and vp_j2k_7551.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -71,4 +71,4 @@ and vllen_1977.getType().hasName("unsigned int")
 and vs_1973.getParentScope+() = func
 and vnc_1976.getParentScope+() = func
 and vllen_1977.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

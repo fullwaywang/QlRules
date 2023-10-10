@@ -29,4 +29,4 @@ not func_0(vline6_819, func)
 and vline6_819.getType().hasName("usb_line6 *")
 and func_1(vline6_819)
 and vline6_819.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

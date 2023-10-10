@@ -104,4 +104,4 @@ and vdump_6054.getType().hasName("dump_opts *")
 and vscanlinesize_6065.getType().hasName("uint32_t")
 and vdump_6054.getFunction() = func
 and vscanlinesize_6065.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

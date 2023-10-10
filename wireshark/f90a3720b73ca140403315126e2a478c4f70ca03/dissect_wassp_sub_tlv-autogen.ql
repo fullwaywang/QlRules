@@ -92,4 +92,4 @@ and vtlv_type_4747.getType().hasName("guint16")
 and vtmp_decr_4749.getType().hasName("WASSP_SUBTLV_DECODER_INFO_t *")
 and vtlv_type_4747.getParentScope+() = func
 and vtmp_decr_4749.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

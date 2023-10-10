@@ -38,4 +38,4 @@ func_0(vspectre_v2_user)
 and not func_8(func)
 and not func_9(func)
 and not vspectre_v2_user.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

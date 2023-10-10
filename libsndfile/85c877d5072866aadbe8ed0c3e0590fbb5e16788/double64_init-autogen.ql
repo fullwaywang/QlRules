@@ -45,4 +45,4 @@ and func_1(vpsf_91, target_2, target_1)
 and func_2(vpsf_91, target_2)
 and vpsf_91.getType().hasName("SF_PRIVATE *")
 and vpsf_91.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

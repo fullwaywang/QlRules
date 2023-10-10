@@ -37,4 +37,4 @@ and func_3(vtimeri_479, func)
 and vtimeri_479.getType().hasName("snd_timer_instance *")
 and func_4(vtimeri_479)
 and vtimeri_479.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

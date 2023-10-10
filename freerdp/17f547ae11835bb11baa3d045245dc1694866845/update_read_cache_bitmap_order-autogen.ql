@@ -41,4 +41,4 @@ and func_1(vcache_bitmap_1863, target_1)
 and func_2(vcache_bitmap_1863, target_2)
 and vcache_bitmap_1863.getType().hasName("CACHE_BITMAP_ORDER *")
 and vcache_bitmap_1863.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

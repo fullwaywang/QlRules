@@ -56,4 +56,4 @@ and vmax_palette_length_509.getType().hasName("int")
 and vpng_ptr_506.getType().hasName("png_structp")
 and vmax_palette_length_509.getParentScope+() = func
 and vpng_ptr_506.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

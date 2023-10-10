@@ -189,4 +189,4 @@ and vblock_1451.(LocalVariable).getFunction() = func
 and vplane_1455.(LocalVariable).getFunction() = func
 and vfirst_pixel_1455.(LocalVariable).getFunction() = func
 and voutput_plane_1461.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

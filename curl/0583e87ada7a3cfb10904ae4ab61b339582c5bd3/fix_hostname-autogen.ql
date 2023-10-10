@@ -52,4 +52,4 @@ and vhost_3615.getType().hasName("hostname *")
 and vlen_3617.getType().hasName("size_t")
 and vhost_3615.getParentScope+() = func
 and vlen_3617.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -24,4 +24,4 @@ where
 not func_0(vlgp_1732, func)
 and vlgp_1732.getType().hasName("nfsd4_layoutget *")
 and vlgp_1732.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

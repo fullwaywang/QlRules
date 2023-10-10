@@ -95,4 +95,4 @@ and vstderr.getType().hasName("FILE *")
 and vfp_1714.getParentScope+() = func
 and vheader_info_1719.getParentScope+() = func
 and not vstderr.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

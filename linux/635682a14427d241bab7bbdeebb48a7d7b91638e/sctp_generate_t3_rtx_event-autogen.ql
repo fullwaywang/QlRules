@@ -35,4 +35,4 @@ and not func_1(func)
 and func_7(vasoc_246)
 and vasoc_246.getType().hasName("sctp_association *")
 and vasoc_246.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

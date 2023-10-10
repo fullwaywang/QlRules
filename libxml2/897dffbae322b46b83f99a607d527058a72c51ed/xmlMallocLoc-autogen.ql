@@ -26,4 +26,4 @@ where
 not func_0(vsize_162, func)
 and vsize_162.getType().hasName("size_t")
 and vsize_162.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

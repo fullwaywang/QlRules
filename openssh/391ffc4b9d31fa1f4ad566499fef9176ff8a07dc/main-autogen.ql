@@ -76,4 +76,4 @@ and vtflag_394.getType().hasName("int")
 and vch_394.getParentScope+() = func
 and vfflag_394.getParentScope+() = func
 and vtflag_394.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -37,4 +37,4 @@ and func_1(vtitle_size_707, target_1)
 and func_2(vtitle_size_707, target_2)
 and vtitle_size_707.getType().hasName("int64_t")
 and vtitle_size_707.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

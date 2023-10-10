@@ -63,4 +63,4 @@ and vprettyFlags_4623.getType().hasName("int")
 and vev_class_4627.getType().hasName("Oid")
 and vprettyFlags_4623.getFunction() = func
 and vev_class_4627.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

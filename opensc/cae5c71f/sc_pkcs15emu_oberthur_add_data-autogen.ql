@@ -56,4 +56,4 @@ and func_3(void_len_915, target_3)
 and func_4(void_len_915, target_4)
 and void_len_915.getType().hasName("size_t")
 and void_len_915.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

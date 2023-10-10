@@ -125,4 +125,4 @@ and viconInfo_96.getType().hasName("ICON_INFO *")
 and vs_96.getType().hasName("wStream *")
 and viconInfo_96.getParentScope+() = func
 and vs_96.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

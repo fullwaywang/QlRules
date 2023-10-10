@@ -50,4 +50,4 @@ and vo_1578.getType().hasName("robj *")
 and vc_1562.getType().hasName("client *")
 and vo_1578.getParentScope+() = func
 and vc_1562.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

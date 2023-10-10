@@ -27,4 +27,4 @@ not func_0(vbid_223, func)
 and vbid_223.getType().hasName("bus_id_priv *")
 and func_1(vbid_223)
 and vbid_223.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

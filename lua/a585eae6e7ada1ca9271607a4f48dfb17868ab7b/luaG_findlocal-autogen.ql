@@ -30,4 +30,4 @@ func_0(vn_200, target_0)
 and func_1(vn_200, target_1)
 and vn_200.getType().hasName("int")
 and vn_200.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -93,4 +93,4 @@ and vrequested_fmt.getType().hasName("IMAGE_FORMATS")
 and vcinfo_495.getParentScope+() = func
 and vdest_mgr_501.getParentScope+() = func
 and not vrequested_fmt.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

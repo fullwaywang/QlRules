@@ -46,4 +46,4 @@ and func_2(vexpr_1401, target_2)
 and func_3(vexpr_1401, target_3)
 and vexpr_1401.getType().hasName("lys_iffeature *")
 and vexpr_1401.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

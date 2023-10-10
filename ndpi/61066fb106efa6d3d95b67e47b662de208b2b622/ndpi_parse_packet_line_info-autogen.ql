@@ -59,4 +59,4 @@ and va1_4870.getType().hasName("u_int32_t")
 and vpacket_4845.getParentScope+() = func
 and vdiff_4869.getParentScope+() = func
 and va1_4870.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

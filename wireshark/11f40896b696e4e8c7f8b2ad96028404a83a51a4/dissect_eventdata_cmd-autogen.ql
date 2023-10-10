@@ -220,4 +220,4 @@ and not vhf_gvcp_eventcmd_block_id_64bit_v2_0.getParentScope+() = func
 and not vhf_gvcp_eventcmd_timestamp.getParentScope+() = func
 and not vhf_gvcp_eventcmd_data.getParentScope+() = func
 and vgvcp_telegram_tree_2002.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

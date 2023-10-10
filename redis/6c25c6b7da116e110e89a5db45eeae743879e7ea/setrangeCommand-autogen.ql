@@ -90,4 +90,4 @@ and voffset_439.getType().hasName("long")
 and vvalue_440.getType().hasName("sds")
 and voffset_439.(LocalVariable).getFunction() = func
 and vvalue_440.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

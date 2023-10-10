@@ -55,4 +55,4 @@ and visReplace_140.getType().hasName("bool")
 and v__func__.getType() instanceof ArrayType
 and visReplace_140.getFunction() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -38,4 +38,4 @@ and func_2(vs_550, target_2)
 and func_3(vs_550, target_3)
 and vs_550.getType().hasName("deflate_state *")
 and vs_550.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

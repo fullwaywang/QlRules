@@ -121,4 +121,4 @@ and vopproc_605.getType().hasName("FmgrInfo *")
 and vvardata_605.getType().hasName("VariableStatData *")
 and vopproc_605.getFunction() = func
 and vvardata_605.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

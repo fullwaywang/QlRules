@@ -57,4 +57,4 @@ and func_4(vtc_basic_11669, target_4)
 and func_5(vtc_basic_11669, target_5)
 and vtc_basic_11669.getType().hasName("TCase *")
 and vtc_basic_11669.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

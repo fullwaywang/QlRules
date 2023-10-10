@@ -39,4 +39,4 @@ and vevent_packet_339.getType().hasName("brcmf_event *")
 and func_4(vskb_337, vevent_packet_339)
 and vskb_337.getParentScope+() = func
 and vevent_packet_339.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

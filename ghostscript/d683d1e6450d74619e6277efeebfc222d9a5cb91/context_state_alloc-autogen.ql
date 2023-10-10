@@ -21,4 +21,4 @@ where
 func_0(vpcst_115, func, target_0)
 and vpcst_115.getType().hasName("gs_context_state_t *")
 and vpcst_115.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -55,4 +55,4 @@ and func_3(func)
 and func_4(func)
 and vracomp_118.getType().hasName("crypto_report_acomp")
 and vracomp_118.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

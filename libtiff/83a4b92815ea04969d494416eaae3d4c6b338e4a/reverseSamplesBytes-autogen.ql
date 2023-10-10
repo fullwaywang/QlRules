@@ -43,4 +43,4 @@ and func_1(vbytes_per_pixel_8904, target_1)
 and func_2(vbytes_per_pixel_8904, target_2)
 and vbytes_per_pixel_8904.getType().hasName("uint32")
 and vbytes_per_pixel_8904.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

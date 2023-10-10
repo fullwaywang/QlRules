@@ -57,4 +57,4 @@ and vline_size_78.getType().hasName("int")
 and vpdev_60.getType().hasName("gx_device_printer *")
 and vline_size_78.(LocalVariable).getFunction() = func
 and vpdev_60.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

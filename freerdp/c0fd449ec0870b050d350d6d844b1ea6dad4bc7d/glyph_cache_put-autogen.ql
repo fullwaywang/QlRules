@@ -74,4 +74,4 @@ and vglyphCache_572.getType().hasName("rdpGlyphCache *")
 and vid_572.getParentScope+() = func
 and vindex_572.getParentScope+() = func
 and vglyphCache_572.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

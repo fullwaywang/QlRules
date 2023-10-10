@@ -33,4 +33,4 @@ and func_1(vpkt_730, target_1)
 and func_2(func, target_2)
 and vpkt_730.getType().hasName("git_pkt *")
 and vpkt_730.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

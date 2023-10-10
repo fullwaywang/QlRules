@@ -54,4 +54,4 @@ and vc_2525.getType().hasName("context *")
 and vfloated_2530.getType().hasName("bool")
 and vc_2525.getParentScope+() = func
 and vfloated_2530.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

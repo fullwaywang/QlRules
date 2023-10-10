@@ -148,4 +148,4 @@ and vvalue_943.getType().hasName("double *")
 and vi_947.getType().hasName("uint32")
 and vvalue_943.getFunction() = func
 and vi_947.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

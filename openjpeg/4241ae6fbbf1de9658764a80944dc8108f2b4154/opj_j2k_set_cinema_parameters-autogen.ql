@@ -75,4 +75,4 @@ and vparameters_6490.getType().hasName("opj_cparameters_t *")
 and vi_6494.getType().hasName("int")
 and vparameters_6490.getParentScope+() = func
 and vi_6494.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

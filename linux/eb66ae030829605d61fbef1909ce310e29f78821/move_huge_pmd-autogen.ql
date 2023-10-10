@@ -39,4 +39,4 @@ and vforce_flush_1788.getType().hasName("bool")
 and vneed_flush_1783.getParentScope+() = func
 and vpmd_1786.getParentScope+() = func
 and vforce_flush_1788.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

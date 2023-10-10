@@ -70,4 +70,4 @@ and vstatus_536.getType().hasName("int")
 and vhquery_539.getType().hasName("host_query *")
 and vstatus_536.getParentScope+() = func
 and vhquery_539.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -59,4 +59,4 @@ and vwFormatNo_615.getType().hasName("UINT16")
 and vrdpsnd_613.getType().hasName("rdpsndPlugin *")
 and vwFormatNo_615.getParentScope+() = func
 and vrdpsnd_613.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

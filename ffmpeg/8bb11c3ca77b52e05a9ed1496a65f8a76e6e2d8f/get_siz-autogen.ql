@@ -91,4 +91,4 @@ and vi_226.getType().hasName("int")
 and vs_224.getType().hasName("Jpeg2000DecoderContext *")
 and vi_226.(LocalVariable).getFunction() = func
 and vs_224.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

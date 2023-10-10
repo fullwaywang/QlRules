@@ -31,4 +31,4 @@ not func_0(vtarget_4220, target_1)
 and func_1(vtarget_4220, target_1)
 and vtarget_4220.getType().hasName("TPMS_NV_PUBLIC *")
 and vtarget_4220.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

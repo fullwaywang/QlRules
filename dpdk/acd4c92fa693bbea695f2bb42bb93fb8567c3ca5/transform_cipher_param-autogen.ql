@@ -46,4 +46,4 @@ and func_1(vparam_233, target_1)
 and func_2(vparam_233, target_2)
 and vparam_233.getType().hasName("VhostUserCryptoSessionParam *")
 and vparam_233.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

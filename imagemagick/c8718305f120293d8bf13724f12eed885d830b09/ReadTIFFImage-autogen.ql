@@ -39,4 +39,4 @@ and vtiff_1235.getType().hasName("TIFF *")
 and vrows_1976.getType().hasName("uint32")
 and vtiff_1235.getParentScope+() = func
 and vrows_1976.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

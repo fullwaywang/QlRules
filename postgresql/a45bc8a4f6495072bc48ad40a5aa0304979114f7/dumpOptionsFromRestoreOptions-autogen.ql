@@ -104,4 +104,4 @@ and vropt_176.getType().hasName("RestoreOptions *")
 and vdopt_178.getType().hasName("DumpOptions *")
 and vropt_176.getFunction() = func
 and vdopt_178.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

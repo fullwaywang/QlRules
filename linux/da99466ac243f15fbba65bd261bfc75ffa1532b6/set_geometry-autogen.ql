@@ -34,4 +34,4 @@ not func_0(vg_3230)
 and func_1(vg_3230)
 and vg_3230.getType().hasName("floppy_struct *")
 and vg_3230.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

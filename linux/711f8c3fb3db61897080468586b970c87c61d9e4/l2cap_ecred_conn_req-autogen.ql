@@ -36,4 +36,4 @@ and vresult_5974.getType().hasName("u8")
 and vreq_5966.getParentScope+() = func
 and vpsm_5973.getParentScope+() = func
 and vresult_5974.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

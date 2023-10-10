@@ -45,4 +45,4 @@ and func_4(vidx_4406, target_4)
 and func_5(vidx_4406, target_5)
 and vidx_4406.getType().hasName("int")
 and vidx_4406.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

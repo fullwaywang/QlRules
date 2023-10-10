@@ -60,4 +60,4 @@ and vctxt_4876.getType().hasName("xmlParserCtxtPtr")
 and vstate_4880.getType().hasName("xmlParserInputState")
 and vctxt_4876.getFunction() = func
 and vstate_4880.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -44,4 +44,4 @@ and func_2(vtrans_3361)
 and vsw_err_bit_3363.getParentScope+() = func
 and vtrans_pcie_3364.getParentScope+() = func
 and vtrans_3361.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

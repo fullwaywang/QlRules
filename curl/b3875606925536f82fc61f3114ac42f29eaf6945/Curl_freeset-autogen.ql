@@ -28,4 +28,4 @@ and vdata_269.getType().hasName("SessionHandle *")
 and vi_272.getParentScope+() = func
 and not vCurl_cfree.getParentScope+() = func
 and vdata_269.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

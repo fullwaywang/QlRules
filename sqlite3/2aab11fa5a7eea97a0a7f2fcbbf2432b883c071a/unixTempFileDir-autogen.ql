@@ -193,4 +193,4 @@ and vzDir_5417.(LocalVariable).getFunction() = func
 and not vaSyscall.getParentScope+() = func
 and vi_5415.(LocalVariable).getFunction() = func
 and vazDirs_5407.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

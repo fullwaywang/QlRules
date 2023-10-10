@@ -109,4 +109,4 @@ and vw_2057.getType().hasName("WriterContext *")
 and vframe_2057.getType().hasName("AVFrame *")
 and vw_2057.getParentScope+() = func
 and vframe_2057.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

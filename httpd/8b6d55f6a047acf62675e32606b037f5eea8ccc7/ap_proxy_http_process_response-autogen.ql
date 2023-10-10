@@ -90,4 +90,4 @@ and vbuffer_996.(LocalVariable).getFunction() = func
 and vresponse_field_size_1006.(LocalVariable).getFunction() = func
 and vpread_len_1007.(LocalVariable).getFunction() = func
 and vrc_1065.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

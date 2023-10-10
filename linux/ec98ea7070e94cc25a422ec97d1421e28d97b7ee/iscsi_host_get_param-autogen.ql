@@ -47,4 +47,4 @@ and vbuf_3703.getType().hasName("char *")
 and vihost_3705.getType().hasName("iscsi_host *")
 and vbuf_3703.getParentScope+() = func
 and vihost_3705.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

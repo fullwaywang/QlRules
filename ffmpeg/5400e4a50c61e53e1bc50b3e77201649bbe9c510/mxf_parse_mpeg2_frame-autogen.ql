@@ -43,4 +43,4 @@ and vst_2385.getType().hasName("AVStream *")
 and vsc_2388.getType().hasName("MXFStreamContext *")
 and vst_2385.getParentScope+() = func
 and vsc_2388.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

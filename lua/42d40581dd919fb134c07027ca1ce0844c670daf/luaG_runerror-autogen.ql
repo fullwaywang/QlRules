@@ -56,4 +56,4 @@ and vmsg_821.getType().hasName("const char *")
 and vL_819.getFunction() = func
 and vci_820.(LocalVariable).getFunction() = func
 and vmsg_821.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -24,4 +24,4 @@ where
 func_0(vparameterTypes_84, target_0)
 and vparameterTypes_84.getType().hasName("oidvector *")
 and vparameterTypes_84.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

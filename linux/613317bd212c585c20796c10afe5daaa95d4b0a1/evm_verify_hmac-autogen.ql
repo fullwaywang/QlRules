@@ -28,4 +28,4 @@ and vxattr_data_115.getType().hasName("evm_ima_xattr_data *")
 and vcalc_116.getType().hasName("evm_ima_xattr_data")
 and vxattr_data_115.getParentScope+() = func
 and vcalc_116.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

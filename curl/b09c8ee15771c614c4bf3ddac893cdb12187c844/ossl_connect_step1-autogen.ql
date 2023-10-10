@@ -152,4 +152,4 @@ and vssl_sessionid_3192.getParentScope+() = func
 and vdata_idx_3193.getParentScope+() = func
 and vconnectdata_idx_3194.getParentScope+() = func
 and vsockindex_idx_3195.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

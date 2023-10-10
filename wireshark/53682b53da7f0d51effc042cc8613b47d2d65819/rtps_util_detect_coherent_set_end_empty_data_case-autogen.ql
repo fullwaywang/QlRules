@@ -31,4 +31,4 @@ and vkey_1991.getType().hasName("coherent_set_key")
 and vcoherent_set_entry_1986.getType().hasName("coherent_set_entity_info *")
 and vkey_1991.getParentScope+() = func
 and vcoherent_set_entry_1986.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

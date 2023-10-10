@@ -35,4 +35,4 @@ func_0(vino_1502)
 and func_1(vino_1502)
 and vino_1502.getType().hasName("unsigned long")
 and vino_1502.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

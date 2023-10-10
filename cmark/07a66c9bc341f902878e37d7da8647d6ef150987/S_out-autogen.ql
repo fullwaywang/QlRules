@@ -55,4 +55,4 @@ and vext_34.getType().hasName("cmark_syntax_extension *")
 and vn_35.getType().hasName("cmark_node *")
 and vext_34.getParentScope+() = func
 and vn_35.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

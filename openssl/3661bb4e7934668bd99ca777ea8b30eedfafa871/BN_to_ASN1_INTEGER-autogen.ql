@@ -1,7 +1,7 @@
 /**
  * @name openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-BN_to_ASN1_INTEGER
  * @id cpp/openssl/3661bb4e7934668bd99ca777ea8b30eedfafa871/BN-to-ASN1-INTEGER
- * @description openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-BN_to_ASN1_INTEGER 
+ * @description openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-BN_to_ASN1_INTEGER CVE-2016-2108
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -38,4 +38,4 @@ and vbn_409.getType().hasName("const BIGNUM *")
 and vret_411.getType().hasName("ASN1_INTEGER *")
 and vbn_409.getParentScope+() = func
 and vret_411.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -90,4 +90,4 @@ and vminor_161.getParentScope+() = func
 and not vminor_rwsem.getParentScope+() = func
 and not vusb_minors.getParentScope+() = func
 and vintf_156.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

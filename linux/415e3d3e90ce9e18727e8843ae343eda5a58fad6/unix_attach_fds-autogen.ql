@@ -27,4 +27,4 @@ not func_0(vscm_1533)
 and vscm_1533.getType().hasName("scm_cookie *")
 and func_1(vscm_1533)
 and vscm_1533.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

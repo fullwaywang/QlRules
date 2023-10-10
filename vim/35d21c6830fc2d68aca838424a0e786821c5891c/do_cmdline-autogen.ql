@@ -65,4 +65,4 @@ and vbreakpoint_639.getType().hasName("linenr_T *")
 and vlines_ga_635.getParentScope+() = func
 and vcurrent_line_636.getParentScope+() = func
 and vbreakpoint_639.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

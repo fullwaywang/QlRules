@@ -78,4 +78,4 @@ and vdata_size_116.getType().hasName("uint32_t")
 and vs_110.getFunction() = func
 and vchunk_id_116.(LocalVariable).getFunction() = func
 and vdata_size_116.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

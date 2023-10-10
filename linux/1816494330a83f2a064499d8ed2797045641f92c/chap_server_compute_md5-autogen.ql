@@ -113,4 +113,4 @@ and vchallenge_binhex_190.getParentScope+() = func
 and vclient_digest_191.getParentScope+() = func
 and vchap_r_193.getParentScope+() = func
 and vchallenge_len_198.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

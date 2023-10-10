@@ -38,4 +38,4 @@ and not func_1(vwcn_1111, func)
 and vwcn_1111.getType().hasName("wcn36xx *")
 and func_2(vwcn_1111)
 and vwcn_1111.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

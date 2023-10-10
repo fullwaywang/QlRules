@@ -71,4 +71,4 @@ and vis_last_block_2594.getType().hasName("FLAC__bool")
 and vencoder_2594.getType().hasName("FLAC__StreamEncoder *")
 and vis_last_block_2594.getParentScope+() = func
 and vencoder_2594.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

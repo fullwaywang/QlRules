@@ -85,4 +85,4 @@ and vk_1049.getType().hasName("SingleRequest *")
 and vcounter_1050.getType().hasName("int")
 and vk_1049.(LocalVariable).getFunction() = func
 and vcounter_1050.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

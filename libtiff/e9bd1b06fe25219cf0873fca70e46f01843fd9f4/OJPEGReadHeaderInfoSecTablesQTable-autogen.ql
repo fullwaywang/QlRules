@@ -64,4 +64,4 @@ and vsp_1753.getType().hasName("OJPEGState *")
 and vm_1754.getType().hasName("uint8")
 and vsp_1753.(LocalVariable).getFunction() = func
 and vm_1754.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -34,4 +34,4 @@ and vp_2181.getType().hasName("Table *")
 and vdb_2182.getType().hasName("sqlite3 *")
 and vp_2181.(LocalVariable).getFunction() = func
 and vdb_2182.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

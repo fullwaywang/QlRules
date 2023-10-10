@@ -29,4 +29,4 @@ not func_0(velem_760, func)
 and velem_760.getType().hasName("bpf_verifier_stack_elem *")
 and func_1(velem_760)
 and velem_760.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

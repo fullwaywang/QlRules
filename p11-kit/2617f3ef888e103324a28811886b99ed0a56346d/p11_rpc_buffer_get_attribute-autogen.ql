@@ -57,4 +57,4 @@ and vattr_1214.getType().hasName("CK_ATTRIBUTE *")
 and vlength_1216.getType().hasName("uint32_t")
 and vattr_1214.getParentScope+() = func
 and vlength_1216.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

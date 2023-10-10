@@ -37,4 +37,4 @@ not func_0(func)
 and func_1(vp_code_block_1181, target_1)
 and vp_code_block_1181.getType().hasName("opj_tcd_cblk_enc_t *")
 and vp_code_block_1181.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

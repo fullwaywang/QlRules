@@ -23,4 +23,4 @@ where
 not func_0(vtrace_304, func)
 and vtrace_304.getType().hasName("rds_rx_trace_so")
 and vtrace_304.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

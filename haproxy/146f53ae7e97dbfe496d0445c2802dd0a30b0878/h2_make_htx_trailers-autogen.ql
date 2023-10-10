@@ -94,4 +94,4 @@ and vlist_709.getType().hasName("http_hdr *")
 and vidx_712.getParentScope+() = func
 and vi_713.getParentScope+() = func
 and vlist_709.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -160,4 +160,4 @@ and vwpc_713.getType().hasName("WavpackContext *")
 and vwpmd_713.getType().hasName("WavpackMetadata *")
 and vwpc_713.getParentScope+() = func
 and vwpmd_713.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

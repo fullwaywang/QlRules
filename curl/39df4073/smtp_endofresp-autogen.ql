@@ -90,4 +90,4 @@ and vresp_196.getType().hasName("int *")
 and vline_195.getFunction() = func
 and vlen_195.getFunction() = func
 and vresp_196.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

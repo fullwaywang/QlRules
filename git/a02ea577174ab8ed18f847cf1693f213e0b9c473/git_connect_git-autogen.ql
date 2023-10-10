@@ -48,4 +48,4 @@ and vpath_1048.getType().hasName("const char *")
 and vtarget_host_1059.getType().hasName("char *")
 and vpath_1048.getParentScope+() = func
 and vtarget_host_1059.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

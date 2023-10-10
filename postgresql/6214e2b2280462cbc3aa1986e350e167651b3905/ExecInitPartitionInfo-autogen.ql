@@ -119,4 +119,4 @@ and vrootResultRelInfo_566.getFunction() = func
 and vnode_569.(LocalVariable).getFunction() = func
 and vrootrel_570.(LocalVariable).getFunction() = func
 and vleaf_part_rri_573.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

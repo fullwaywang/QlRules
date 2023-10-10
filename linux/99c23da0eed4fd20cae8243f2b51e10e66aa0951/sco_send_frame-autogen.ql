@@ -54,4 +54,4 @@ and vskb_286.getType().hasName("sk_buff *")
 and vmsg_283.getParentScope+() = func
 and vlen_283.getParentScope+() = func
 and vskb_286.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

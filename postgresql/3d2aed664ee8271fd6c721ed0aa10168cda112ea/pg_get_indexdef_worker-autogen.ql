@@ -99,4 +99,4 @@ and vprettyFlags_1150.getType().hasName("int")
 and vindrelid_1164.getType().hasName("Oid")
 and vprettyFlags_1150.getFunction() = func
 and vindrelid_1164.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

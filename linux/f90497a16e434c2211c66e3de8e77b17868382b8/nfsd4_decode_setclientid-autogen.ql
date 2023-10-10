@@ -24,4 +24,4 @@ where
 not func_0(vsetclientid_1312, func)
 and vsetclientid_1312.getType().hasName("nfsd4_setclientid *")
 and vsetclientid_1312.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

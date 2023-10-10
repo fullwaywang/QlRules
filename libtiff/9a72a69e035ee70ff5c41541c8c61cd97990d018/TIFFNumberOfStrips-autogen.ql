@@ -22,4 +22,4 @@ where
 func_0(vtd_63, func, target_0)
 and vtd_63.getType().hasName("TIFFDirectory *")
 and vtd_63.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

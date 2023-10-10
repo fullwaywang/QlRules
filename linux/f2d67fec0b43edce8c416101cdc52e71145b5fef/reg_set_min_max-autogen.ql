@@ -27,4 +27,4 @@ and vis_jmp32_5699.getType().hasName("bool")
 and vtrue_reg_5697.getParentScope+() = func
 and vfalse_reg_5698.getParentScope+() = func
 and vis_jmp32_5699.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

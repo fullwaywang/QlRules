@@ -56,4 +56,4 @@ and vms_122.getType().hasName("magic_set *")
 and vclsid_123.getType().hasName("const uint64_t[2]")
 and vms_122.getParentScope+() = func
 and vclsid_123.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

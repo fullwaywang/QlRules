@@ -46,4 +46,4 @@ and vupdate_755.getType().hasName("rdpUpdate *")
 and vs_755.getParentScope+() = func
 and vupdateType_758.getParentScope+() = func
 and vupdate_755.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

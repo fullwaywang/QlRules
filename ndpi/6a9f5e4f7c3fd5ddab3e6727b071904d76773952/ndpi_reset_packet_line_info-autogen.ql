@@ -75,4 +75,4 @@ and func_5(vpacket_4332, target_5)
 and func_6(vpacket_4332, target_6)
 and vpacket_4332.getType().hasName("ndpi_packet_struct *")
 and vpacket_4332.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

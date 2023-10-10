@@ -70,4 +70,4 @@ and vpng_ptr_1834.getType().hasName("png_structp")
 and vlength_1834.getType().hasName("png_uint_32")
 and vpng_ptr_1834.getParentScope+() = func
 and vlength_1834.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

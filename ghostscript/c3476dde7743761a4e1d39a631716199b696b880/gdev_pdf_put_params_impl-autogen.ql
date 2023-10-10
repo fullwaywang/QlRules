@@ -46,4 +46,4 @@ and func_2(vparam_name_289, target_2)
 and func_3(vparam_name_289, target_3)
 and vparam_name_289.getType().hasName("gs_param_name")
 and vparam_name_289.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

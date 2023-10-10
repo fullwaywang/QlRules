@@ -126,4 +126,4 @@ and vinf_745.getType().hasName("zval")
 and vp_743.(LocalVariable).getFunction() = func
 and ventry_745.(LocalVariable).getFunction() = func
 and vinf_745.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

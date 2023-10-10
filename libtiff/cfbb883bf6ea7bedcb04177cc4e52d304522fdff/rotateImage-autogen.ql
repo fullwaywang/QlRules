@@ -102,4 +102,4 @@ and func_8(vbuffsize_8608, target_8)
 and func_9(vbuffsize_8608, target_9)
 and vbuffsize_8608.getType().hasName("uint32_t")
 and vbuffsize_8608.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

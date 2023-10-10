@@ -39,4 +39,4 @@ and func_1(vpcpu_sum_1548, v__cpu_possible_mask)
 and v__cpu_possible_mask.getType().hasName("cpumask")
 and vpcpu_sum_1548.getParentScope+() = func
 and not v__cpu_possible_mask.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

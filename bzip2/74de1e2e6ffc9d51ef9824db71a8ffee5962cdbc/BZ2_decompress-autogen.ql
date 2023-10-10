@@ -44,4 +44,4 @@ and func_2(target_2)
 and func_3(vnSelectors_119, target_3)
 and vnSelectors_119.getType().hasName("Int32")
 and vnSelectors_119.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

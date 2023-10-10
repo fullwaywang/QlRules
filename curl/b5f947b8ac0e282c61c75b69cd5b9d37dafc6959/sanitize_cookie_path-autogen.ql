@@ -131,4 +131,4 @@ and vlen_222.getType().hasName("size_t")
 and vnew_path_223.getType().hasName("char *")
 and vlen_222.getParentScope+() = func
 and vnew_path_223.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

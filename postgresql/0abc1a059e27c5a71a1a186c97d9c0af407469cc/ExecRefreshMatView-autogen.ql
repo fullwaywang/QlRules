@@ -24,4 +24,4 @@ and vrelowner_147.getType().hasName("Oid")
 and vsave_sec_context_155.getType().hasName("int")
 and vrelowner_147.(LocalVariable).getFunction() = func
 and vsave_sec_context_155.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -27,4 +27,4 @@ and vbuf_472.getType().hasName("char *")
 and vdefs_474.getType().hasName("mrvl_mesh_defaults")
 and vbuf_472.getParentScope+() = func
 and vdefs_474.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

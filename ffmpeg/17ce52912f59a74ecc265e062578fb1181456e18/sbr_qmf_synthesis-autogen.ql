@@ -99,4 +99,4 @@ and vv_off_1180.getType().hasName("int *")
 and vdiv_1180.getType().hasName("const unsigned int")
 and vv_off_1180.getFunction() = func
 and vdiv_1180.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

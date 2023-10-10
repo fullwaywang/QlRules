@@ -94,4 +94,4 @@ and func_6(vcur_2377, target_10, target_6)
 and func_10(vcur_2377, target_10)
 and vcur_2377.getType().hasName("xmlNodePtr")
 and vcur_2377.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ from Function func, ExprStmt target_0, EqualityOperation target_1
 where
 func_0(target_1, func, target_0)
 and func_1(target_1)
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

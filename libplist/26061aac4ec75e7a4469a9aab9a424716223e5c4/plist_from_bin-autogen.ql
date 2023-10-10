@@ -36,4 +36,4 @@ and func_1(voffset_size_706, target_1)
 and func_2(voffset_size_706, target_2)
 and voffset_size_706.getType().hasName("uint8_t")
 and voffset_size_706.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

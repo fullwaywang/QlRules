@@ -31,4 +31,4 @@ not func_0(vunquotedlen_233, target_1, func)
 and func_1(vunquotedlen_233, target_1)
 and vunquotedlen_233.getType().hasName("size_t")
 and vunquotedlen_233.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

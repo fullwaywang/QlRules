@@ -420,4 +420,4 @@ and vuser_id_112.(LocalVariable).getFunction() = func
 and vrel_114.(LocalVariable).getFunction() = func
 and vmerge_permissive_policies_406.(LocalVariable).getFunction() = func
 and vmerge_restrictive_policies_407.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

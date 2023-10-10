@@ -49,4 +49,4 @@ and vrequest_598.getType().hasName("int64_t")
 and vp_599.getType().hasName("sparse_block *")
 and vrequest_598.getParentScope+() = func
 and vp_599.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

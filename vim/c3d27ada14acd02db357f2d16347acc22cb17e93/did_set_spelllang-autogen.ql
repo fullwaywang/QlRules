@@ -53,4 +53,4 @@ and vbufref_2014.getType().hasName("bufref_T")
 and vwp_1990.getType().hasName("win_T *")
 and vbufref_2014.getParentScope+() = func
 and vwp_1990.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

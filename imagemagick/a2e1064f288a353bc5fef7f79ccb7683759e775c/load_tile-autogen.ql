@@ -56,4 +56,4 @@ and vtile_image_327.getType().hasName("Image *")
 and vdata_length_328.getType().hasName("size_t")
 and vtile_image_327.getParentScope+() = func
 and vdata_length_328.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

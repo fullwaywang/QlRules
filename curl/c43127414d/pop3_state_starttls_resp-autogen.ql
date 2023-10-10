@@ -106,4 +106,4 @@ and vdata_560.getType().hasName("SessionHandle *")
 and vconn_555.getParentScope+() = func
 and vresult_559.getParentScope+() = func
 and vdata_560.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

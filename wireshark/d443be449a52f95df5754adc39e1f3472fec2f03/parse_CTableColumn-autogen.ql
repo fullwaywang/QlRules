@@ -146,4 +146,4 @@ and vtree_3232.getParentScope+() = func
 and vtype_3234.getParentScope+() = func
 and vmodifier_3241.getParentScope+() = func
 and not vhf_mswsp_ctablecolumn_vtype.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

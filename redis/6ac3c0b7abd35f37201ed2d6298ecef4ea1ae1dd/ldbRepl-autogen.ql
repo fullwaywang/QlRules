@@ -94,4 +94,4 @@ and vldb.getType().hasName("ldbState")
 and vlua_2555.getType().hasName("lua_State *")
 and not vldb.getParentScope+() = func
 and vlua_2555.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

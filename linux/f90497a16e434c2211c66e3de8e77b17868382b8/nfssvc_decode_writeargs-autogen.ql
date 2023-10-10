@@ -33,4 +33,4 @@ and vxdr_320.getType().hasName("xdr_stream *")
 and vargs_322.getType().hasName("nfsd_writeargs *")
 and vxdr_320.getParentScope+() = func
 and vargs_322.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

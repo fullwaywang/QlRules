@@ -171,4 +171,4 @@ and not vlog_opts.getParentScope+() = func
 and vsql_file_name_46.(LocalVariable).getFunction() = func
 and vlog_file_name_47.(LocalVariable).getFunction() = func
 and vold_db_48.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

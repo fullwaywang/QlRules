@@ -96,4 +96,4 @@ and vsk_1435.getType().hasName("sock *")
 and func_9(vsk_1435)
 and vmss_now_1439.getParentScope+() = func
 and vsk_1435.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

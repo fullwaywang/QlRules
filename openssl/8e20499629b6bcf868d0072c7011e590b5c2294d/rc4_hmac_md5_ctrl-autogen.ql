@@ -44,4 +44,4 @@ and func_2(vlen_214, target_2)
 and func_3(vlen_214, target_3)
 and vlen_214.getType().hasName("unsigned int")
 and vlen_214.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

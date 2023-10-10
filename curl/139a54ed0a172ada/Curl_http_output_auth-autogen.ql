@@ -21,4 +21,4 @@ where
 func_0(vdata_808)
 and vdata_808.getType().hasName("Curl_easy *")
 and vdata_808.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

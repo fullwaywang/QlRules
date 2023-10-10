@@ -142,4 +142,4 @@ and vflags_3241.getParentScope+() = func
 and vrc_3243.getParentScope+() = func
 and vorderInfo_3246.getParentScope+() = func
 and not vPRIMARY_DRAWING_ORDER_FIELD_BYTES.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -137,4 +137,4 @@ and vy_size_1540.getParentScope+() = func
 and vy_array_1548.getParentScope+() = func
 and not vcurbuf.getParentScope+() = func
 and vlen_2100.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

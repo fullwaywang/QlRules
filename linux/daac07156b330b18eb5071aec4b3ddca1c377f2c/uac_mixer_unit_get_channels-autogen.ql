@@ -33,4 +33,4 @@ not func_0(vdesc_738, func)
 and vdesc_738.getType().hasName("uac_mixer_unit_descriptor *")
 and func_1(vdesc_738)
 and vdesc_738.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

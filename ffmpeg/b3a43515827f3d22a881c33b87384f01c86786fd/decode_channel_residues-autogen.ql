@@ -33,4 +33,4 @@ and vrem_bits_509.getType().hasName("int")
 and vs_482.getType().hasName("WmallDecodeCtx *")
 and vrem_bits_509.(LocalVariable).getFunction() = func
 and vs_482.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

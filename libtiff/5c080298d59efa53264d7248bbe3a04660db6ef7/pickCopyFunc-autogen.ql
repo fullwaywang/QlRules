@@ -24,4 +24,4 @@ and vshortv_1783.getType().hasName("uint16")
 and vin_1781.getType().hasName("TIFF *")
 and vshortv_1783.(LocalVariable).getFunction() = func
 and vin_1781.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

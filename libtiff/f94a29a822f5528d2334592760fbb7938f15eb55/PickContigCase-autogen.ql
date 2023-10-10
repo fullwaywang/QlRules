@@ -243,4 +243,4 @@ and func_22(vimg_2504, target_22)
 and func_23(vimg_2504, target_23)
 and vimg_2504.getType().hasName("TIFFRGBAImage *")
 and vimg_2504.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

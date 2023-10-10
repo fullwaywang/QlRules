@@ -32,4 +32,4 @@ not func_0(vvcpu_7885, func)
 and vvcpu_7885.getType().hasName("kvm_vcpu *")
 and func_3(vvcpu_7885)
 and vvcpu_7885.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

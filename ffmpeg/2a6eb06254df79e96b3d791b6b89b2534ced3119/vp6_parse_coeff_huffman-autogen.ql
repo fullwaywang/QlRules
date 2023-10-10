@@ -51,4 +51,4 @@ and func_4(vcoeff_idx_370, target_4)
 and func_5(vcoeff_idx_370, target_5)
 and vcoeff_idx_370.getType().hasName("int")
 and vcoeff_idx_370.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

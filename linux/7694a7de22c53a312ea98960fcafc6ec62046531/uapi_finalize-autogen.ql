@@ -43,4 +43,4 @@ and func_1(vdata_417, vuapi_415)
 and vuapi_415.getType().hasName("uverbs_api *")
 and vdata_417.getParentScope+() = func
 and vuapi_415.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

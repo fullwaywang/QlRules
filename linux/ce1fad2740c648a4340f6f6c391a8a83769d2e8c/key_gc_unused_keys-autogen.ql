@@ -60,4 +60,4 @@ and func_1(vkey_130)
 and vkey_130.getType().hasName("key *")
 and func_2(vkey_130)
 and vkey_130.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

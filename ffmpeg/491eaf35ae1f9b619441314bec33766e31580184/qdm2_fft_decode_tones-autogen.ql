@@ -38,4 +38,4 @@ and func_1(vlocal_int_14_1321, target_1)
 and func_2(vlocal_int_14_1321, target_2)
 and vlocal_int_14_1321.getType().hasName("int")
 and vlocal_int_14_1321.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

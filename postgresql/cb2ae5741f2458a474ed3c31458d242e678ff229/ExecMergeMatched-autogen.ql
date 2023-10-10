@@ -64,4 +64,4 @@ and vcommandType_2826.getType().hasName("CmdType")
 and vresultRelInfo_2779.getType().hasName("ResultRelInfo *")
 and vcommandType_2826.(LocalVariable).getFunction() = func
 and vresultRelInfo_2779.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

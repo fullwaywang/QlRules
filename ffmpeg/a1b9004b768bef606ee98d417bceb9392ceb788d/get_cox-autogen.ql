@@ -149,4 +149,4 @@ and vc_358.getType().hasName("Jpeg2000CodingStyle *")
 and vs_358.getType().hasName("Jpeg2000DecoderContext *")
 and vc_358.getFunction() = func
 and vs_358.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

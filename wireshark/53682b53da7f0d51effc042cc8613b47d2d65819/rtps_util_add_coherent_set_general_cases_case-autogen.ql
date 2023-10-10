@@ -23,4 +23,4 @@ where
 not func_0(vcoherent_set_info_key_1901, func)
 and vcoherent_set_info_key_1901.getType().hasName("coherent_set_key")
 and vcoherent_set_info_key_1901.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

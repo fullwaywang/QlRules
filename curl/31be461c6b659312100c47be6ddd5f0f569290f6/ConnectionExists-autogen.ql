@@ -94,4 +94,4 @@ and vcheck_3069.getType().hasName("connectdata *")
 and vwantNTLMhttp_3072.getType().hasName("bool")
 and vcheck_3069.getParentScope+() = func
 and vwantNTLMhttp_3072.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ and verr_363.getType().hasName("int")
 and vbus_360.getType().hasName("mii_bus *")
 and verr_363.getParentScope+() = func
 and vbus_360.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

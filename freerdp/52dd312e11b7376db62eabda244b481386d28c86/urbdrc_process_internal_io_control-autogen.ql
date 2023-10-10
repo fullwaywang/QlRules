@@ -95,4 +95,4 @@ and vInputBufferSize_306.getType().hasName("UINT32")
 and vs_303.getType().hasName("wStream *")
 and vInputBufferSize_306.getParentScope+() = func
 and vs_303.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

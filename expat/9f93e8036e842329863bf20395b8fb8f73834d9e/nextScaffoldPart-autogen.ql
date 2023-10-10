@@ -62,4 +62,4 @@ and func_2(vdtd_7132, target_2)
 and func_3(vdtd_7132, target_3)
 and vdtd_7132.getType().hasName("DTD *const")
 and vdtd_7132.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -43,4 +43,4 @@ and not func_1(func)
 and vlast_2647.getType().hasName("ext4_xattr_entry *")
 and func_2(vlast_2647)
 and vlast_2647.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

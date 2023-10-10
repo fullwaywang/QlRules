@@ -24,4 +24,4 @@ where
 not func_0(vsetattr_1298, func)
 and vsetattr_1298.getType().hasName("nfsd4_setattr *")
 and vsetattr_1298.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

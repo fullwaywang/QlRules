@@ -36,4 +36,4 @@ and func_1(vf_37, va_32)
 and va_32.getType().hasName("X509 *")
 and vf_37.getParentScope+() = func
 and va_32.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

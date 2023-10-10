@@ -59,4 +59,4 @@ and vi_274.getType().hasName("int")
 and vbitmapCache_275.getType().hasName("rdpBitmapCache *")
 and vi_274.getParentScope+() = func
 and vbitmapCache_275.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

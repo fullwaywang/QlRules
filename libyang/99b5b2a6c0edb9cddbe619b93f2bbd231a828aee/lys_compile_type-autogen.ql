@@ -436,4 +436,4 @@ and vprev_type_2851.getParentScope+() = func
 and vtpdf_chain_2852.getParentScope+() = func
 and not vtype_substmt_map.getParentScope+() = func
 and not vly_data_type2str.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

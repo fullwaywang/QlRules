@@ -23,4 +23,4 @@ and vmm_587.getType().hasName("mm_struct *")
 and vtsk_584.getType().hasName("task_struct *")
 and vmm_587.getParentScope+() = func
 and vtsk_584.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

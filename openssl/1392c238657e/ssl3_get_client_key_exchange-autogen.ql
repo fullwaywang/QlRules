@@ -20,4 +20,4 @@ where
 func_0(vp_1972, target_0)
 and vp_1972.getType().hasName("unsigned char *")
 and vp_1972.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

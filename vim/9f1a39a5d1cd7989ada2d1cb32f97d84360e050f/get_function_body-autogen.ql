@@ -158,4 +158,4 @@ and vline_to_free_680.getType().hasName("char_u **")
 and veap_677.getType().hasName("exarg_T *")
 and vline_to_free_680.getParentScope+() = func
 and veap_677.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

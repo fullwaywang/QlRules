@@ -69,4 +69,4 @@ and vuep_1387.getType().hasName("u_entry_T *")
 and varray_1388.getType().hasName("char_u **")
 and vuep_1387.getParentScope+() = func
 and varray_1388.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

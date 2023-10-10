@@ -184,4 +184,4 @@ and func_24(vs_282, target_24)
 and func_25(vs_282, target_25)
 and vs_282.getType().hasName("FloodfillContext *")
 and vs_282.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

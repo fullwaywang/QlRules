@@ -66,4 +66,4 @@ and voptptr_1521.getType().hasName("unsigned char *")
 and vtaglen_1523.getType().hasName("int")
 and voptptr_1521.getParentScope+() = func
 and vtaglen_1523.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

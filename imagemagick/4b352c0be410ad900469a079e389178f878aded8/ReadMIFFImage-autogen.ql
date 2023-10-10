@@ -33,4 +33,4 @@ and func_2(target_3, func, target_2)
 and func_3(target_3)
 and vcolormap_1194.getType().hasName("unsigned char *")
 and vcolormap_1194.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

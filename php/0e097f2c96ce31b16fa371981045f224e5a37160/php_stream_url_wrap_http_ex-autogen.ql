@@ -70,4 +70,4 @@ and ve_759.getType().hasName("char *")
 and vhttp_header_value_760.getType().hasName("char *")
 and ve_759.getParentScope+() = func
 and vhttp_header_value_760.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -102,4 +102,4 @@ and func_9(vc_441, target_9)
 and func_10(vc_441, target_10)
 and vc_441.getType().hasName("G2MContext *")
 and vc_441.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

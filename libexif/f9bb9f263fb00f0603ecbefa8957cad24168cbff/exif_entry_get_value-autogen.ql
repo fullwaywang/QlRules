@@ -123,4 +123,4 @@ and func_7(ventry_845, target_7)
 and func_8(ventry_845, target_8)
 and ventry_845.getType().hasName("ExifEntry *")
 and ventry_845.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

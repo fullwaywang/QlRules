@@ -41,4 +41,4 @@ and vreg_prev_sub.getType().hasName("char_u *")
 and vsource_1719.getParentScope+() = func
 and vnewsub_1721.getParentScope+() = func
 and not vreg_prev_sub.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

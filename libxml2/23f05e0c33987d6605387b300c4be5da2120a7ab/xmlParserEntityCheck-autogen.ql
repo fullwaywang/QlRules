@@ -100,4 +100,4 @@ and vctxt_124.getFunction() = func
 and vsize_124.getFunction() = func
 and vent_125.getFunction() = func
 and vconsumed_127.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

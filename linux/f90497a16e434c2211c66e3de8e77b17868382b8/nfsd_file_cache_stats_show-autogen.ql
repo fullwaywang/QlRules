@@ -50,4 +50,4 @@ and func_4(v__UNIQUE_ID_rcu2542_1233)
 and vht_1226.getType().hasName("rhashtable *")
 and vht_1226.getParentScope+() = func
 and v__UNIQUE_ID_rcu2542_1233.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

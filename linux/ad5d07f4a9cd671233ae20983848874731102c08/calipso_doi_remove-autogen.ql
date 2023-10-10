@@ -59,4 +59,4 @@ and vdoi_def_437.getType().hasName("calipso_doi *")
 and vret_val_436.getParentScope+() = func
 and vdoi_def_437.getParentScope+() = func
 and not vcalipso_doi_list_lock.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

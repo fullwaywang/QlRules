@@ -71,4 +71,4 @@ and vci_2110.getType().hasName("gx_device_color_info *")
 and vpdev_2108.getFunction() = func
 and vbpp_2108.getFunction() = func
 and vci_2110.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

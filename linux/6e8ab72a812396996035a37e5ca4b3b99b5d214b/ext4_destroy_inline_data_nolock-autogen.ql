@@ -37,4 +37,4 @@ not func_0(vei_406, func)
 and vei_406.getType().hasName("ext4_inode_info *")
 and func_1(vei_406)
 and vei_406.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -150,4 +150,4 @@ and verror_message_163.getParentScope+() = func
 and viout_165.getParentScope+() = func
 and viin_165.getParentScope+() = func
 and vbuffer_162.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

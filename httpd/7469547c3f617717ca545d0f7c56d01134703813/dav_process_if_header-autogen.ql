@@ -80,4 +80,4 @@ and vlist_673.getType().hasName("char *")
 and vr_669.getType().hasName("request_rec *")
 and vlist_673.(LocalVariable).getFunction() = func
 and vr_669.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

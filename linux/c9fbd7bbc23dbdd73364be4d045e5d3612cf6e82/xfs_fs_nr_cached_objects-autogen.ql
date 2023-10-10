@@ -40,4 +40,4 @@ where
 not func_0(vsb_1817, func)
 and vsb_1817.getType().hasName("super_block *")
 and vsb_1817.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

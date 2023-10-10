@@ -47,4 +47,4 @@ and func_2(vconn_158, target_2)
 and func_3(vconn_158, target_3)
 and vconn_158.getType().hasName("proxy_conn_rec *")
 and vconn_158.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -52,4 +52,4 @@ and vc_1058.getType().hasName("CERT *")
 and func_4(vc_1058)
 and vs_1056.getParentScope+() = func
 and vc_1058.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

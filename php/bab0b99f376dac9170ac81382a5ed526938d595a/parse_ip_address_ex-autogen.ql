@@ -263,4 +263,4 @@ and verr_568.getFunction() = func
 and vcolon_570.(LocalVariable).getFunction() = func
 and vhost_571.(LocalVariable).getFunction() = func
 and vp_574.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

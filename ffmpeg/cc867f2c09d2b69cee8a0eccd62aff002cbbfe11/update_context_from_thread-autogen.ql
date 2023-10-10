@@ -51,4 +51,4 @@ and vsrc_262.getType().hasName("AVCodecContext *")
 and vdst_262.getType().hasName("AVCodecContext *")
 and vsrc_262.getParentScope+() = func
 and vdst_262.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -32,4 +32,4 @@ not func_0(vskb_118, func)
 and not func_1(vskb_118, func)
 and vskb_118.getType().hasName("sk_buff *")
 and vskb_118.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

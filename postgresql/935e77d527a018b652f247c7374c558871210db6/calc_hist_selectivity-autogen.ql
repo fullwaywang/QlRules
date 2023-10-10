@@ -101,4 +101,4 @@ and func_8(vvardata_372, target_8)
 and func_9(vvardata_372, target_9)
 and vvardata_372.getType().hasName("VariableStatData *")
 and vvardata_372.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

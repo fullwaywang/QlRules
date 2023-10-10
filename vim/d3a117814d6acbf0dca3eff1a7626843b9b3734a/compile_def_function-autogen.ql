@@ -40,4 +40,4 @@ and func_1(vcmd_2617, target_1)
 and func_2(vcmd_2617, target_2)
 and vcmd_2617.getType().hasName("char_u *")
 and vcmd_2617.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

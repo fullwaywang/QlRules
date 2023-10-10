@@ -183,4 +183,4 @@ and vstream_id_1960.getParentScope+() = func
 and vread_packet_1963.getParentScope+() = func
 and vread_local_id_1964.getParentScope+() = func
 and vchannel_1960.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

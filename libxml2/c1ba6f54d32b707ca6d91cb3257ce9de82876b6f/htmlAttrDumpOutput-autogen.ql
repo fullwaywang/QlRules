@@ -284,4 +284,4 @@ and vend_719.(LocalVariable).getFunction() = func
 and vstart_720.(LocalVariable).getFunction() = func
 and not vxmlFree.getParentScope+() = func
 and vbuf_678.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

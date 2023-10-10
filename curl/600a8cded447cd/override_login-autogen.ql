@@ -42,4 +42,4 @@ and vdata_2709.getType().hasName("Curl_easy *")
 and vpasswdp_2711.getParentScope+() = func
 and vuserp_2711.getParentScope+() = func
 and vdata_2709.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

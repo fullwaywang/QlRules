@@ -47,4 +47,4 @@ and func_2(vp14dev_8014, target_2)
 and func_3(vp14dev_8014, target_3)
 and vp14dev_8014.getType().hasName("pdf14_device *")
 and vp14dev_8014.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

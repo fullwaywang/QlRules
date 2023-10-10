@@ -103,4 +103,4 @@ and func_23(vrdnSeqBuf_238, target_23)
 and func_24(vrdnSeqBuf_238, target_24)
 and vrdnSeqBuf_238.getType().hasName("char[1024]")
 and vrdnSeqBuf_238.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

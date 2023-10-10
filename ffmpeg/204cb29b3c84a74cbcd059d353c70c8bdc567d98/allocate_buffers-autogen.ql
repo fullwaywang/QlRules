@@ -117,4 +117,4 @@ and vchan_124.getType().hasName("int")
 and vs_122.getType().hasName("ShortenContext *")
 and vchan_124.(LocalVariable).getFunction() = func
 and vs_122.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

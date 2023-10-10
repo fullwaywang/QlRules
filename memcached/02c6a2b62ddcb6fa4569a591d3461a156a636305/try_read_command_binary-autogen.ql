@@ -52,4 +52,4 @@ and func_2(vextlen_6154, target_2)
 and func_3(vextlen_6154, target_3)
 and vextlen_6154.getType().hasName("uint8_t")
 and vextlen_6154.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

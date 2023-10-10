@@ -61,4 +61,4 @@ and vpi_state_798.getType().hasName("futex_pi_state *")
 and vowner_811.getType().hasName("task_struct *")
 and vpi_state_798.getParentScope+() = func
 and vowner_811.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

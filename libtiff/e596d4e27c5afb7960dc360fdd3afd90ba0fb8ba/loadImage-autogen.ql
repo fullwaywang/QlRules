@@ -383,4 +383,4 @@ and vtl_5747.(LocalVariable).getFunction() = func
 and vtile_rowsize_5748.(LocalVariable).getFunction() = func
 and vreadunit_5751.(LocalVariable).getFunction() = func
 and not vrowsperstrip.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

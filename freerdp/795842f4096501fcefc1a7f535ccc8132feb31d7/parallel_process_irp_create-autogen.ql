@@ -108,4 +108,4 @@ and vPathLength_86.getType().hasName("UINT32")
 and virp_82.getType().hasName("IRP *")
 and vPathLength_86.getParentScope+() = func
 and virp_82.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

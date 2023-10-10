@@ -70,4 +70,4 @@ and func_12(vformat_bw_323)
 and vmvm_321.getParentScope+() = func
 and vpeer_322.getParentScope+() = func
 and vformat_bw_323.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -31,4 +31,4 @@ func_0(va_147)
 and not func_1(va_147)
 and va_147.getType().hasName("const GENERAL_NAME *")
 and va_147.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

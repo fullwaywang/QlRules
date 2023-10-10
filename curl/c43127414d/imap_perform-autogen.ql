@@ -62,4 +62,4 @@ and vconn_1455.getType().hasName("connectdata *")
 and vdophase_done_1456.getParentScope+() = func
 and vresult_1459.getParentScope+() = func
 and vconn_1455.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

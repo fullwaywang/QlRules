@@ -251,4 +251,4 @@ and vneedle_130.getType().hasName("ssl_primary_config *")
 and vdata_129.getType().hasName("ssl_primary_config *")
 and vneedle_130.getFunction() = func
 and vdata_129.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

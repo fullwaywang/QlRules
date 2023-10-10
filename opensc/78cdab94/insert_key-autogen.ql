@@ -43,4 +43,4 @@ and func_2(vi_128, target_2)
 and func_3(vi_128, target_3)
 and vi_128.getType().hasName("int")
 and vi_128.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

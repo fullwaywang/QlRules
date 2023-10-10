@@ -54,4 +54,4 @@ and vc_242.getType().hasName("CDXLVideoContext *")
 and vencoding_244.getType().hasName("int")
 and vc_242.getParentScope+() = func
 and vencoding_244.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

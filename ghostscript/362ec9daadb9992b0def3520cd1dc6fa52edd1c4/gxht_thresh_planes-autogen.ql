@@ -41,4 +41,4 @@ and vnum_full_tiles_848.(LocalVariable).getFunction() = func
 and vright_tile_width_848.(LocalVariable).getFunction() = func
 and vthresh_tile_850.(LocalVariable).getFunction() = func
 and vposition_851.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

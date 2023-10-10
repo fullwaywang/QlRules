@@ -21,4 +21,4 @@ where
 func_0(vcopy_1861)
 and vcopy_1861.getType().hasName("nfsd4_copy *")
 and vcopy_1861.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

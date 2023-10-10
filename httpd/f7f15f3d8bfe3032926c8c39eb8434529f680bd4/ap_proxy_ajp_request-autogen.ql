@@ -67,4 +67,4 @@ and func_3(vtenc_175, target_3)
 and func_4(target_4)
 and vtenc_175.getType().hasName("const char *")
 and vtenc_175.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

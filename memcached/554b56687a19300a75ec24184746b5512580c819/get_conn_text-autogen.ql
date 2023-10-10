@@ -97,4 +97,4 @@ and vaddr_text_3462.getType().hasName("char[4096]")
 and vaf_3460.getParentScope+() = func
 and vsock_addr_3461.getParentScope+() = func
 and vaddr_text_3462.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -95,4 +95,4 @@ and func_7(vropt_4154, target_7)
 and func_9(vropt_4154, target_9)
 and vropt_4154.getType().hasName("RestoreOptions *")
 and vropt_4154.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

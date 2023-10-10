@@ -140,4 +140,4 @@ and vflags_1315.getFunction() = func
 and vnewscore_1315.getFunction() = func
 and not vserver.getParentScope+() = func
 and vzobj_1315.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

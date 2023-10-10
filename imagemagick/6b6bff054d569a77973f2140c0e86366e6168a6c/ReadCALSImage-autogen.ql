@@ -45,4 +45,4 @@ and vfile_152.getType().hasName("FILE *")
 and vc_161.getType().hasName("int")
 and vfile_152.getParentScope+() = func
 and vc_161.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -39,4 +39,4 @@ not func_0(vsz_488, target_1, func)
 and func_1(vsz_488, target_1)
 and vsz_488.getType().hasName("size_t")
 and vsz_488.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -93,4 +93,4 @@ and vslot_227.getType().hasName("int")
 and vstart_223.getParentScope+() = func
 and vstop_223.getParentScope+() = func
 and vslot_227.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

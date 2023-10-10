@@ -156,4 +156,4 @@ and vstride_624.getType().hasName("OPJ_UINT32")
 and vIN_618.getParentScope+() = func
 and vInfo_h_620.getParentScope+() = func
 and vstride_624.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

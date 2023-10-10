@@ -70,4 +70,4 @@ and vdraw_info_5304.getType().hasName("const DrawInfo *")
 and vclone_info_5577.getType().hasName("ImageInfo *")
 and vdraw_info_5304.getParentScope+() = func
 and vclone_info_5577.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

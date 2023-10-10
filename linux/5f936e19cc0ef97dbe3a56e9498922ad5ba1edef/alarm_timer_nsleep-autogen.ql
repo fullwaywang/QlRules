@@ -31,4 +31,4 @@ and vexp_793.getType().hasName("ktime_t")
 and vnow_810.getType().hasName("ktime_t")
 and vexp_793.getParentScope+() = func
 and vnow_810.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

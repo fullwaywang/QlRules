@@ -64,4 +64,4 @@ and vargv_67.getType().hasName("char **")
 and vsfinfo_69.getType().hasName("SF_INFO")
 and vargv_67.getParentScope+() = func
 and vsfinfo_69.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

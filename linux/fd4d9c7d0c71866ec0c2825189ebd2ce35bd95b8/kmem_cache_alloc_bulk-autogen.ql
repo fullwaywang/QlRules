@@ -30,4 +30,4 @@ func_1(vc_3158, func)
 and vc_3158.getType().hasName("kmem_cache_cpu *")
 and func_2(vc_3158)
 and vc_3158.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

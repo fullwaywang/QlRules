@@ -146,4 +146,4 @@ and func_10(vcontent_1159, target_10)
 and func_11(vcontent_1159, target_11)
 and vcontent_1159.getType().hasName("xmlElementContentPtr")
 and vcontent_1159.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -103,4 +103,4 @@ and not vusbcore_name.getParentScope+() = func
 and vsize_834.getParentScope+() = func
 and vtype_835.getParentScope+() = func
 and vbuffer_834.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

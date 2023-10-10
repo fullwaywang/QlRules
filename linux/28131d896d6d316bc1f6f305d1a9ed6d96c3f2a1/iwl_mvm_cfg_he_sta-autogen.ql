@@ -27,4 +27,4 @@ not func_1(vvif_1994)
 and func_3(vvif_1994)
 and vvif_1994.getType().hasName("ieee80211_vif *")
 and vvif_1994.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

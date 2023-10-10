@@ -39,4 +39,4 @@ and func_1(vclk_count_169, vimx_uart_clocks)
 and vclk_count_169.getParentScope+() = func
 and not vimx_keep_uart_clocks.getParentScope+() = func
 and not vimx_uart_clocks.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

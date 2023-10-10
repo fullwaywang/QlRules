@@ -550,4 +550,4 @@ and vurisock_2286.getParentScope+() = func
 and vrv_2287.getParentScope+() = func
 and vrurl_2291.getParentScope+() = func
 and vsockpath_2292.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

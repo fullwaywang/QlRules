@@ -30,4 +30,4 @@ not func_0(vvma_3094, func)
 and vvma_3094.getType().hasName("vm_area_struct *")
 and func_1(vvma_3094)
 and vvma_3094.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

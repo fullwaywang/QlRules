@@ -83,4 +83,4 @@ and vsect_buff_ptr_7398.getType().hasName("unsigned char **")
 and vsect_buff_7400.getType().hasName("unsigned char *")
 and vsect_buff_ptr_7398.getFunction() = func
 and vsect_buff_7400.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

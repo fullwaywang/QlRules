@@ -37,4 +37,4 @@ and not func_1(vpch_2384, func)
 and vpch_2384.getType().hasName("channel *")
 and func_2(vpch_2384)
 and vpch_2384.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

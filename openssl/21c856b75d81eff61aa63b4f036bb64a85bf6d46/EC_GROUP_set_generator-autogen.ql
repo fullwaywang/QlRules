@@ -247,4 +247,4 @@ and vcofactor_298.getType().hasName("const BIGNUM *")
 and vgroup_297.getParentScope+() = func
 and vorder_298.getParentScope+() = func
 and vcofactor_298.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

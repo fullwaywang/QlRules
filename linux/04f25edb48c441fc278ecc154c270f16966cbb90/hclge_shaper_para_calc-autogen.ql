@@ -33,4 +33,4 @@ and vshaper_level_43.getType().hasName("u8")
 and vir_43.getType().hasName("u32")
 and vshaper_level_43.getParentScope+() = func
 and vir_43.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

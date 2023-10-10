@@ -38,4 +38,4 @@ and func_1(vpParse_2526, target_1)
 and func_2(vpParse_2526, target_2)
 and vpParse_2526.getType().hasName("Parse *")
 and vpParse_2526.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

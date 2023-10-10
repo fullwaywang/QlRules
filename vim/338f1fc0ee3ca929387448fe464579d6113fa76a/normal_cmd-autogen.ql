@@ -107,4 +107,4 @@ and vnv_cmds.getType() instanceof ArrayType
 and vidx_664.getParentScope+() = func
 and voap_653.getParentScope+() = func
 and not vnv_cmds.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

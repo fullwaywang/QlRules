@@ -23,4 +23,4 @@ where
 func_0(vrowtypeid_2361, target_0)
 and vrowtypeid_2361.getType().hasName("Oid")
 and vrowtypeid_2361.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

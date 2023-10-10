@@ -44,4 +44,4 @@ and func_1(vop_69, target_2, target_1)
 and func_2(target_2)
 and vop_69.getType().hasName("os_ptr")
 and vop_69.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

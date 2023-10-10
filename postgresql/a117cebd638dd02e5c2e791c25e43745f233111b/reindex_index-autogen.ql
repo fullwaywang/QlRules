@@ -77,4 +77,4 @@ and func_5(vheapRelation_3531, target_5)
 and func_6(vheapRelation_3531, target_6)
 and vheapRelation_3531.getType().hasName("Relation")
 and vheapRelation_3531.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -32,4 +32,4 @@ and func_2(vdev_44, vport_45)
 and vrc_64.getParentScope+() = func
 and vdev_44.getParentScope+() = func
 and vport_45.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

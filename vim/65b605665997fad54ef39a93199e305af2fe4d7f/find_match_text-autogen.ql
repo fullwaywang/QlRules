@@ -102,4 +102,4 @@ and vlen2_5651.getParentScope+() = func
 and not vhas_mbyte.getParentScope+() = func
 and not vmb_char2len.getParentScope+() = func
 and not vrex.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

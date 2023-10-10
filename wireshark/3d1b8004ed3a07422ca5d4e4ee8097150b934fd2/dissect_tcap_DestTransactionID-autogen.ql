@@ -41,4 +41,4 @@ and vgp_tcapsrt_info.getType().hasName("tcapsrt_info_t *")
 and vparameter_tvb_845.getParentScope+() = func
 and vp_tcap_private_849.getParentScope+() = func
 and not vgp_tcapsrt_info.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

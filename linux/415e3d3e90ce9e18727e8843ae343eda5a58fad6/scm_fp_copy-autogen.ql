@@ -68,4 +68,4 @@ and vfpl_70.getType().hasName("scm_fp_list *")
 and func_11(vfpl_70)
 and func_12(vfpl_70)
 and vfpl_70.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

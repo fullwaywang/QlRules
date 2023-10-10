@@ -67,4 +67,4 @@ and vconn_548.getType().hasName("connectdata *")
 and vdata_542.getType().hasName("Curl_easy *")
 and vconn_548.getParentScope+() = func
 and vdata_542.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

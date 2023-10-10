@@ -30,4 +30,4 @@ func_0(vpsep_414, target_1, target_0)
 and func_1(vpsep_414, target_1)
 and vpsep_414.getType().hasName("const char *")
 and vpsep_414.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -22,4 +22,4 @@ where
 func_0(vhw_73)
 and vhw_73.getType().hasName("ieee80211_hw *")
 and vhw_73.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

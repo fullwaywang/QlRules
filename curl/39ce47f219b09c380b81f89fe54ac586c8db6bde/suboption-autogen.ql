@@ -51,4 +51,4 @@ and vvarval_885.getType().hasName("char[128]")
 and vv_879.(LocalVariable).getFunction() = func
 and vvarname_884.(LocalVariable).getFunction() = func
 and vvarval_885.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

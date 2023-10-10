@@ -79,4 +79,4 @@ and vrq_796.getType().hasName("ref *")
 and vi_ctx_p_790.getType().hasName("i_ctx_t *")
 and vrq_796.(LocalVariable).getFunction() = func
 and vi_ctx_p_790.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

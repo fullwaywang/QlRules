@@ -36,4 +36,4 @@ and vsegment_data_155.getType().hasName("const uint8_t *")
 and vend_row_158.getType().hasName("int")
 and vsegment_data_155.getParentScope+() = func
 and vend_row_158.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

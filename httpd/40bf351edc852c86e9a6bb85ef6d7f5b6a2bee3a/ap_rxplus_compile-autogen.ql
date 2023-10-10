@@ -81,4 +81,4 @@ and func_5(vret_46, target_5)
 and func_6(vret_46, target_6)
 and vret_46.getType().hasName("ap_rxplus_t *")
 and vret_46.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

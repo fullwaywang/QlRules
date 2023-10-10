@@ -842,4 +842,4 @@ and vsize_443.getParentScope+() = func
 and vtotal_size_444.getParentScope+() = func
 and vis_trivial_literal_445.getParentScope+() = func
 and vmax_bits_446.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

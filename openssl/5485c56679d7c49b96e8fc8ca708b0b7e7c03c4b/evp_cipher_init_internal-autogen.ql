@@ -99,4 +99,4 @@ and vcipher_83.getParentScope+() = func
 and vctx_82.getParentScope+() = func
 and vimpl_84.getParentScope+() = func
 and vtmpimpl_90.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

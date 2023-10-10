@@ -58,4 +58,4 @@ and func_4(vnelements_977, target_4)
 and func_5(target_5)
 and vnelements_977.getType().hasName("size_t")
 and vnelements_977.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

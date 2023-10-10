@@ -196,4 +196,4 @@ and vmagick_info_1005.getParentScope+() = func
 and not v__func__.getParentScope+() = func
 and vfatal_message_1016.getParentScope+() = func
 and vfatal_exception_1016.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

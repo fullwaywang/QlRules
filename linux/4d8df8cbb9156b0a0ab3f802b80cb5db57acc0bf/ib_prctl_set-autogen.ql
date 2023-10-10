@@ -36,4 +36,4 @@ and vspectre_v2_user_stibp.getType().hasName("spectre_v2_user_mitigation")
 and vtask_1169.getParentScope+() = func
 and not vspectre_v2_user_ibpb.getParentScope+() = func
 and not vspectre_v2_user_stibp.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

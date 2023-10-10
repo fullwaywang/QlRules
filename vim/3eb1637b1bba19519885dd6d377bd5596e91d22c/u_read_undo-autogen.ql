@@ -51,4 +51,4 @@ and vnum_head_1790.getType().hasName("int")
 and vuhp_table_1800.getType().hasName("u_header_T **")
 and vnum_head_1790.getParentScope+() = func
 and vuhp_table_1800.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -31,4 +31,4 @@ not func_0(vbtf_9047, func)
 and vbtf_9047.getType().hasName("btf *")
 and func_3(vbtf_9047)
 and vbtf_9047.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

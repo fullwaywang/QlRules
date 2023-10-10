@@ -57,4 +57,4 @@ and func_2(vs_1853, target_2)
 and func_3(vs_1853, target_3)
 and vs_1853.getType().hasName("Vp3DecodeContext *")
 and vs_1853.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

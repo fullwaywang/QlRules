@@ -34,4 +34,4 @@ not func_0(func)
 and func_1(vconn_363, target_1)
 and vconn_363.getType().hasName("PGconn *")
 and vconn_363.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

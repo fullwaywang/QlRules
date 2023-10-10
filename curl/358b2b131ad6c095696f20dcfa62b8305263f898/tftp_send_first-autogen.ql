@@ -112,4 +112,4 @@ and vstate_448.getFunction() = func
 and vmode_452.(LocalVariable).getFunction() = func
 and vfilename_453.(LocalVariable).getFunction() = func
 and vdata_455.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

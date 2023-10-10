@@ -59,4 +59,4 @@ and vserver_digest_180.getType().hasName("unsigned char[16]")
 and vdigest_175.getParentScope+() = func
 and vresponse_176.getParentScope+() = func
 and vserver_digest_180.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -95,4 +95,4 @@ and vcoeff_idx_430.(LocalVariable).getFunction() = func
 and vcg_431.(LocalVariable).getFunction() = func
 and vrun_436.(LocalVariable).getFunction() = func
 and not vvp6_coeff_groups.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

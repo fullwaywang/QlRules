@@ -137,4 +137,4 @@ and vwhite_luminance_301.getParentScope+() = func
 and vL_316.getParentScope+() = func
 and vM_318.getParentScope+() = func
 and vS_320.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

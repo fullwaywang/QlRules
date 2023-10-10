@@ -118,4 +118,4 @@ and vscanline_55.(LocalVariable).getFunction() = func
 and vn_55.(LocalVariable).getFunction() = func
 and vnpixels_105.(LocalVariable).getFunction() = func
 and vimagewidth_106.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

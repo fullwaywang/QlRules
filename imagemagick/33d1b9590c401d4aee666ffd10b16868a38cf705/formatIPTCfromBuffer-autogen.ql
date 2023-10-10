@@ -66,4 +66,4 @@ and func_5(target_5)
 and func_6(vstr_2016, target_6)
 and vstr_2016.getType().hasName("unsigned char *")
 and vstr_2016.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

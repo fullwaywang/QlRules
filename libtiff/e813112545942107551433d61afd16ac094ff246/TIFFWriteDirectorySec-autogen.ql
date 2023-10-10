@@ -88,4 +88,4 @@ and vndir_352.(LocalVariable).getFunction() = func
 and vdir_353.(LocalVariable).getFunction() = func
 and visimage_349.getFunction() = func
 and vtif_349.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

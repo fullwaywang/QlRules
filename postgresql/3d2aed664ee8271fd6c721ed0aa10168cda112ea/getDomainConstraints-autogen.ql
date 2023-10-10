@@ -27,4 +27,4 @@ and vfout_7189.getType().hasName("Archive *")
 and vtyinfo_7189.getType().hasName("TypeInfo *")
 and vfout_7189.getFunction() = func
 and vtyinfo_7189.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

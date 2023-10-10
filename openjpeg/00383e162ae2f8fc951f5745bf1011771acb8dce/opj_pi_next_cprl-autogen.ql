@@ -102,4 +102,4 @@ and vindex_607.getType().hasName("OPJ_UINT32")
 and vpi_603.getType().hasName("opj_pi_iterator_t *")
 and vindex_607.getParentScope+() = func
 and vpi_603.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

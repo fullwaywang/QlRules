@@ -27,4 +27,4 @@ where
 not func_0(vworker_135, func)
 and vworker_135.getType().hasName("io_worker *")
 and vworker_135.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

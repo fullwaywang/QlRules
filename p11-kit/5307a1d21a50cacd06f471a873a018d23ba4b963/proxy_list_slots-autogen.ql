@@ -39,4 +39,4 @@ and vcount_256.getType().hasName("CK_ULONG")
 and vpy_251.getType().hasName("Proxy *")
 and vcount_256.getParentScope+() = func
 and vpy_251.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

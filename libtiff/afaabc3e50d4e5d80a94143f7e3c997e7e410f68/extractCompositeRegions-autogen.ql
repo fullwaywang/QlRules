@@ -33,4 +33,4 @@ and vcrop_7285.getType().hasName("crop_mask *")
 and vcrop_buff_7287.getFunction() = func
 and vi_7290.(LocalVariable).getFunction() = func
 and vcrop_7285.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

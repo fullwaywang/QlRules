@@ -78,4 +78,4 @@ and vs_86.getType().hasName("MmContext *")
 and vhalf_vert_86.getFunction() = func
 and vy_88.(LocalVariable).getFunction() = func
 and vs_86.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

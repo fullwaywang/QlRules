@@ -283,4 +283,4 @@ and vtv_990.getParentScope+() = func
 and not vpflag.getParentScope+() = func
 and not viamrecursive.getParentScope+() = func
 and vmod_flag_1137.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

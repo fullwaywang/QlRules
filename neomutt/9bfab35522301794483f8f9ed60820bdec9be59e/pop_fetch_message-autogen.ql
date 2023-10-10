@@ -101,4 +101,4 @@ and func_8(vh_596, target_8)
 and func_9(vh_596, target_9)
 and vh_596.getType().hasName("Header *")
 and vh_596.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

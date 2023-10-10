@@ -33,4 +33,4 @@ not func_0(vinode_441, func)
 and vinode_441.getType().hasName("inode *")
 and func_1(vinode_441)
 and vinode_441.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

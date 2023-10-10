@@ -52,4 +52,4 @@ and vs_2120.getType().hasName("wStream *")
 and vnew_len_2125.getType().hasName("UINT32")
 and vs_2120.getParentScope+() = func
 and vnew_len_2125.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

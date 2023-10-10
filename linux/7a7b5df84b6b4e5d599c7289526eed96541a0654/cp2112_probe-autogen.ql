@@ -75,4 +75,4 @@ and v__key_1238.getType().hasName("lock_class_key")
 and vdev_1224.getType().hasName("cp2112_device *")
 and v__key_1238.getParentScope+() = func
 and vdev_1224.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -94,4 +94,4 @@ and vinfilename_80.getType().hasName("char *")
 and vbytes_to_copy_281.getParentScope+() = func
 and vbuff_282.getParentScope+() = func
 and vinfilename_80.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

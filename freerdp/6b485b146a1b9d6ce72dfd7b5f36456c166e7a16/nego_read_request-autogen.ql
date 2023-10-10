@@ -47,4 +47,4 @@ and vs_763.getType().hasName("wStream *")
 and vnego_763.getType().hasName("rdpNego *")
 and vs_763.getParentScope+() = func
 and vnego_763.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

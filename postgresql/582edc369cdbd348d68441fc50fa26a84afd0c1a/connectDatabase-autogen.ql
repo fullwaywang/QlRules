@@ -50,4 +50,4 @@ and func_3(vconn_1525, target_3)
 and func_4(vconn_1525, target_4)
 and vconn_1525.getType().hasName("PGconn *")
 and vconn_1525.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -32,4 +32,4 @@ not func_0(vnd_1631)
 and func_2(vnd_1631)
 and vnd_1631.getType().hasName("nameidata *")
 and vnd_1631.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

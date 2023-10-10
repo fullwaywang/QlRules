@@ -52,4 +52,4 @@ and vcount_217.getType().hasName("int")
 and vcomponent_len_221.getType().hasName("int")
 and vcount_217.getFunction() = func
 and vcomponent_len_221.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

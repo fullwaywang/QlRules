@@ -58,4 +58,4 @@ and vupdate_1602.getType().hasName("mrb_bool")
 and vval_1597.getParentScope+() = func
 and vlen_1601.getParentScope+() = func
 and vupdate_1602.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

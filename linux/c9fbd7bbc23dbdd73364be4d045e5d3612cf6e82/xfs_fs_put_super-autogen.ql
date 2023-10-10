@@ -37,4 +37,4 @@ and not func_1(vsb_1788, func)
 and vsb_1788.getType().hasName("super_block *")
 and func_2(vsb_1788)
 and vsb_1788.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

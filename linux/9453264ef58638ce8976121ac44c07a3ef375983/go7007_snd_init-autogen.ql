@@ -57,4 +57,4 @@ and vgosnd_222.getType().hasName("go7007_snd *")
 and vret_223.getType().hasName("int")
 and vgosnd_222.getParentScope+() = func
 and vret_223.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

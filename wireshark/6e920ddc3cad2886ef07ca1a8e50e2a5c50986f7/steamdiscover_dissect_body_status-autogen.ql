@@ -50,4 +50,4 @@ and func_3(vstrpool_494, target_2, target_4, target_3)
 and func_4(vstrpool_494, func, target_4)
 and vstrpool_494.getType().hasName("wmem_allocator_t *")
 and vstrpool_494.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

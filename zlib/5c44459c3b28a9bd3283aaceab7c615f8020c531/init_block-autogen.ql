@@ -19,4 +19,4 @@ where
 func_0(vs_0, target_0)
 and vs_0.getType().hasName("deflate_state *")
 and vs_0.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

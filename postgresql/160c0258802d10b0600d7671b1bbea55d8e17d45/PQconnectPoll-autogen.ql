@@ -47,4 +47,4 @@ and func_2(vconn_2246, target_2)
 and func_3(vconn_2246, target_3)
 and vconn_2246.getType().hasName("PGconn *")
 and vconn_2246.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

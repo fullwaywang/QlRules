@@ -67,4 +67,4 @@ and vresultRelInfo_634.getType().hasName("ResultRelInfo *")
 and vresultRelationDesc_635.getType().hasName("Relation")
 and vresultRelInfo_634.(LocalVariable).getFunction() = func
 and vresultRelationDesc_635.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

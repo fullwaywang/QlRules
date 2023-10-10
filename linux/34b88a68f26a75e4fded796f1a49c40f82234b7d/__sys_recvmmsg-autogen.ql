@@ -60,4 +60,4 @@ and vsock_2173.getType().hasName("socket *")
 and verr_2172.getParentScope+() = func
 and vdatagrams_2172.getParentScope+() = func
 and vsock_2173.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and func_2(vconn_110, target_2)
 and func_5(vconn_110, target_5)
 and vconn_110.getType().hasName("sftp_conn *")
 and vconn_110.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

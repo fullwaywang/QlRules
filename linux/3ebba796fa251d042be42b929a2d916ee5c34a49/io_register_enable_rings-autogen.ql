@@ -26,4 +26,4 @@ where
 func_0(vctx_9632, func)
 and vctx_9632.getType().hasName("io_ring_ctx *")
 and vctx_9632.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -60,4 +60,4 @@ and vcurbuf.getType().hasName("buf_T *")
 and not ve_invalid_argument.getParentScope+() = func
 and verrmsg_3314.getParentScope+() = func
 and not vcurbuf.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

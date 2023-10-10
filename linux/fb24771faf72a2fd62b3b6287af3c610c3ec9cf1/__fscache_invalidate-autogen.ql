@@ -53,4 +53,4 @@ and func_3(func)
 and func_4(func)
 and vcookie_1034.getType().hasName("fscache_cookie *")
 and vcookie_1034.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

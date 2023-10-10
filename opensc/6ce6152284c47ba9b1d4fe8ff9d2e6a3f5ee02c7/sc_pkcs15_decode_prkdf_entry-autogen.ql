@@ -67,4 +67,4 @@ and vinfo_175.getType().hasName("sc_pkcs15_prkey_info")
 and vasn1_com_prkey_attr_181.getType().hasName("sc_asn1_entry[2]")
 and vinfo_175.getParentScope+() = func
 and vasn1_com_prkey_attr_181.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

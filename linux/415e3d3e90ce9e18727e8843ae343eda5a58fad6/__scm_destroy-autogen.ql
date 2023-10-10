@@ -28,4 +28,4 @@ not func_0(vfpl_115)
 and vfpl_115.getType().hasName("scm_fp_list *")
 and func_1(vfpl_115)
 and vfpl_115.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

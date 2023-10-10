@@ -49,4 +49,4 @@ and func_2(func, target_2)
 and func_3(va_2101, target_3)
 and va_2101.getType().hasName("archive_read *")
 and va_2101.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -89,4 +89,4 @@ and vsql_621.getType().hasName("PQExpBuffer")
 and vconn_621.getFunction() = func
 and vtable_622.getFunction() = func
 and vsql_621.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

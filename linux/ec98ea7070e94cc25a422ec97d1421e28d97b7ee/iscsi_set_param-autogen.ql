@@ -33,4 +33,4 @@ not func_0(vev_2879, func)
 and vev_2879.getType().hasName("iscsi_uevent *")
 and func_1(vev_2879)
 and vev_2879.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

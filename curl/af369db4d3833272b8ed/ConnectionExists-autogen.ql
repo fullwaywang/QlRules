@@ -53,4 +53,4 @@ and func_3(target_4, func, target_3)
 and func_4(target_4)
 and vneedle_1077.getType().hasName("connectdata *")
 and vneedle_1077.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

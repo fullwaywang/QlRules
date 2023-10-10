@@ -39,4 +39,4 @@ func_0(vqueue_263)
 and not func_1(vqueue_263)
 and vqueue_263.getType().hasName("netfront_queue *")
 and vqueue_263.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

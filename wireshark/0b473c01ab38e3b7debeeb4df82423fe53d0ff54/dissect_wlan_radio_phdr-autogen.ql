@@ -279,4 +279,4 @@ and vaitem_1455.getParentScope+() = func
 and not vhf_wlan_radio_ifs.getParentScope+() = func
 and not vhf_wlan_radio_start_tsf.getParentScope+() = func
 and not vhf_wlan_radio_end_tsf.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

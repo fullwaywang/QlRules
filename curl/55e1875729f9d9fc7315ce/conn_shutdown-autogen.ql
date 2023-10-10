@@ -42,4 +42,4 @@ and vdata_748.getType().hasName("Curl_easy *")
 and vconn_748.getParentScope+() = func
 and not vCurl_cfree.getParentScope+() = func
 and vdata_748.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

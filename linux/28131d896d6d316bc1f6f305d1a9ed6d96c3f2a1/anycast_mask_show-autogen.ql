@@ -28,4 +28,4 @@ and vbuf_160.getType().hasName("char *")
 and vmesh_access_163.getType().hasName("cmd_ds_mesh_access")
 and vbuf_160.getParentScope+() = func
 and vmesh_access_163.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

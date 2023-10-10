@@ -34,4 +34,4 @@ and func_1(vinterface_302, vintf_299)
 and vintf_299.getType().hasName("usb_interface *")
 and vinterface_302.getParentScope+() = func
 and vintf_299.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

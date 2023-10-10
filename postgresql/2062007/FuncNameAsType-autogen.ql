@@ -26,4 +26,4 @@ where
 func_0(vfuncname_1767, target_0)
 and vfuncname_1767.getType().hasName("List *")
 and vfuncname_1767.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

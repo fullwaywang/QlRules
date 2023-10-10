@@ -195,4 +195,4 @@ and vbytes_queued_2596.getParentScope+() = func
 and vpacket_2597.getParentScope+() = func
 and vpacket_type_2601.getParentScope+() = func
 and vchannel_2584.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

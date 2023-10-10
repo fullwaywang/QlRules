@@ -93,4 +93,4 @@ and func_8(vparams_585)
 and vparams_585.getType().hasName("const ECPARAMETERS *")
 and func_9(func)
 and vparams_585.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

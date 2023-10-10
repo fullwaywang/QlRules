@@ -77,4 +77,4 @@ and vhcmd_list_1054.getType().hasName("list_head *")
 and vfwrt_1049.getParentScope+() = func
 and vtp_id_1050.getParentScope+() = func
 and vhcmd_list_1054.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

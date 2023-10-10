@@ -52,4 +52,4 @@ and vappend_692.getType().hasName("robj *")
 and vtotlen_691.(LocalVariable).getFunction() = func
 and vo_692.(LocalVariable).getFunction() = func
 and vappend_692.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

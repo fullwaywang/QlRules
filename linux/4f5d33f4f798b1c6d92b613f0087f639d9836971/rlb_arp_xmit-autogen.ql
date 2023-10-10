@@ -37,4 +37,4 @@ and func_2(vdev_656)
 and vdev_656.getType().hasName("net_device *")
 and func_3(vdev_656)
 and vdev_656.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

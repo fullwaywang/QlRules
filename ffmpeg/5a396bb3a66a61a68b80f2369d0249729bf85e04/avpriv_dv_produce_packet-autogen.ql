@@ -47,4 +47,4 @@ and vc_326.getType().hasName("DVDemuxContext *")
 and vbuf_327.getFunction() = func
 and vppcm_330.(LocalVariable).getFunction() = func
 and vc_326.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

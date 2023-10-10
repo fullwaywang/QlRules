@@ -36,4 +36,4 @@ and func_1(vchunk_size_56, target_1)
 and func_2(vchunk_size_56, target_2)
 and vchunk_size_56.getType().hasName("uint32_t")
 and vchunk_size_56.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

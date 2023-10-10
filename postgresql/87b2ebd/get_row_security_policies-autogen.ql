@@ -90,4 +90,4 @@ and vrt_index_107.getFunction() = func
 and vwithCheckOptions_108.getFunction() = func
 and vhasSubLinks_109.getFunction() = func
 and vrel_113.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

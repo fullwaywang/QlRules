@@ -58,4 +58,4 @@ and vs_216.getType().hasName("char **")
 and vread_217.getType().hasName("apr_size_t *")
 and vs_216.getFunction() = func
 and vread_217.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

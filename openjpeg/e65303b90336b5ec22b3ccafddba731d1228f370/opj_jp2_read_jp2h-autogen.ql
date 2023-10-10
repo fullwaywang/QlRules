@@ -59,4 +59,4 @@ and vp_manager_2167.getType().hasName("opj_event_mgr_t *")
 and vbox_2171.getType().hasName("opj_jp2_box_t")
 and vp_manager_2167.getParentScope+() = func
 and vbox_2171.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

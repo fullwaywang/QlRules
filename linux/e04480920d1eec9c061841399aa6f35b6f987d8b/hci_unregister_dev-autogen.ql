@@ -220,4 +220,4 @@ and vhdev_3997.getType().hasName("hci_dev *")
 and vid_3999.getParentScope+() = func
 and not vhci_index_ida.getParentScope+() = func
 and vhdev_3997.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -33,4 +33,4 @@ and vparam_5147.getType().hasName("const devlink_param *")
 and vdevlink_5146.getType().hasName("devlink *")
 and vparam_5147.getParentScope+() = func
 and vdevlink_5146.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

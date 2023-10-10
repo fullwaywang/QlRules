@@ -40,4 +40,4 @@ and func_1(vitem_num_496, target_2, target_1)
 and func_2(vitem_num_496, target_2)
 and vitem_num_496.getType().hasName("int")
 and vitem_num_496.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

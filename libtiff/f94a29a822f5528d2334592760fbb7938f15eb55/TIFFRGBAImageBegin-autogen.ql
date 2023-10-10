@@ -43,4 +43,4 @@ and vtif_249.getType().hasName("TIFF *")
 and vemsg_249.getType().hasName("char[1024]")
 and vtif_249.getFunction() = func
 and vemsg_249.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

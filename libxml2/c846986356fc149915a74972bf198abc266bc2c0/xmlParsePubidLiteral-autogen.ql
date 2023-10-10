@@ -72,4 +72,4 @@ and vsize_4285.getParentScope+() = func
 and not vxmlFree.getParentScope+() = func
 and vbuf_4283.getParentScope+() = func
 and vctxt_4282.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

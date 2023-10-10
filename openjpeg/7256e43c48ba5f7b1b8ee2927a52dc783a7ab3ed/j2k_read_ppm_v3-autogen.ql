@@ -106,4 +106,4 @@ and vl_cp_3524.getType().hasName("opj_cp_t *")
 and vp_header_size_3520.getParentScope+() = func
 and vp_manager_3521.getParentScope+() = func
 and vl_cp_3524.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

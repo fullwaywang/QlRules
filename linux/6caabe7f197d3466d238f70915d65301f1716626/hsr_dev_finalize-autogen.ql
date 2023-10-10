@@ -45,4 +45,4 @@ and func_5(vhsr_444)
 and vres_446.getType().hasName("int")
 and vhsr_444.getParentScope+() = func
 and vres_446.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -83,4 +83,4 @@ and vvalue_377.getParentScope+() = func
 and vme_379.getParentScope+() = func
 and vsubmodule_380.getParentScope+() = func
 and vvar_377.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

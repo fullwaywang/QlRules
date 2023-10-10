@@ -111,4 +111,4 @@ and vreader_609.getParentScope+() = func
 and vdns_answer_record_615.getParentScope+() = func
 and not vdns_answer_item_pool.getParentScope+() = func
 and vbufend_606.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

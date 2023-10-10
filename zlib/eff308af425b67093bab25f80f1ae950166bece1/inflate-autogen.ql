@@ -82,4 +82,4 @@ and vstate_627.getType().hasName("inflate_state *")
 and vlen_638.getType().hasName("unsigned int")
 and vstate_627.getParentScope+() = func
 and vlen_638.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

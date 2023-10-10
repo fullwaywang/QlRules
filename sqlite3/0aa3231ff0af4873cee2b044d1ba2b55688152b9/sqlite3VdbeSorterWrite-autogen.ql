@@ -54,4 +54,4 @@ and func_6(vpSorter_1765, target_6)
 and func_7(vpSorter_1765, target_7)
 and vpSorter_1765.getType().hasName("VdbeSorter *")
 and vpSorter_1765.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -91,4 +91,4 @@ and func_7(vb_176, target_7)
 and func_8(vb_176, target_8)
 and vb_176.getType().hasName("blob *")
 and vb_176.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

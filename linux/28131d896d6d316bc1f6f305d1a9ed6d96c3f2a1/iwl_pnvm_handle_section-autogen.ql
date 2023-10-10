@@ -37,4 +37,4 @@ where
 func_0(func)
 and func_3(func)
 and not func_5(func)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

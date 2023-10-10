@@ -40,4 +40,4 @@ and not func_1(func)
 and vsk_394.getType().hasName("sock *")
 and func_2(vsk_394)
 and vsk_394.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

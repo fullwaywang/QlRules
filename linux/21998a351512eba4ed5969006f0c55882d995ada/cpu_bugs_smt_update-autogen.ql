@@ -17,4 +17,4 @@ from Function func, Variable vspectre_v2_user
 where
 func_0(vspectre_v2_user)
 and not vspectre_v2_user.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

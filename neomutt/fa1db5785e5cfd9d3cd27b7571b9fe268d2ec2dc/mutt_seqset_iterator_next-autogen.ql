@@ -69,4 +69,4 @@ and func_6(viter_1102, target_6)
 and func_7(viter_1102, target_7)
 and viter_1102.getType().hasName("SeqsetIterator *")
 and viter_1102.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

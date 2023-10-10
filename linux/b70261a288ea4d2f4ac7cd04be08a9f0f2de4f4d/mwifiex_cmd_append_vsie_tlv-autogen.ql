@@ -58,4 +58,4 @@ and vvsie_mask_2863.getParentScope+() = func
 and vid_2865.getParentScope+() = func
 and vvs_param_set_2866.getParentScope+() = func
 and vpriv_2862.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

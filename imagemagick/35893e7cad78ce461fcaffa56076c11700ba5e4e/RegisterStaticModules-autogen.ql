@@ -55,4 +55,4 @@ and vi_290.getType().hasName("ssize_t")
 and vMagickModules.getType() instanceof ArrayType
 and vi_290.getParentScope+() = func
 and not vMagickModules.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

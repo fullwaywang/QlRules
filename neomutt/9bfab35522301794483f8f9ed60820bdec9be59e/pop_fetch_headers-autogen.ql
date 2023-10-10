@@ -51,4 +51,4 @@ and vi_337.getType().hasName("int")
 and vctx_290.getType().hasName("Context *")
 and vi_337.getParentScope+() = func
 and vctx_290.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

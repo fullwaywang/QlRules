@@ -46,4 +46,4 @@ and func_1(vc_981, target_1)
 and func_2(vc_981, target_2)
 and vc_981.getType().hasName("SwsContext *")
 and vc_981.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

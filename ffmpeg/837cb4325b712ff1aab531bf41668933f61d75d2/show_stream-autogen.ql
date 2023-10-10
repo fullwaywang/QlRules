@@ -109,4 +109,4 @@ and vpar_2425.getType().hasName("AVCodecParameters *")
 and vw_2422.getType().hasName("WriterContext *")
 and vpar_2425.getParentScope+() = func
 and vw_2422.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

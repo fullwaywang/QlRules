@@ -44,4 +44,4 @@ and not func_2(func)
 and vdev_1111.getType().hasName("drm_device *")
 and func_3(vdev_1111)
 and vdev_1111.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

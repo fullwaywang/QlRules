@@ -99,4 +99,4 @@ and vrtfunc_2964.(LocalVariable).getFunction() = func
 and vfunctypclass_2969.(LocalVariable).getFunction() = func
 and vfuncrettype_2970.(LocalVariable).getFunction() = func
 and vtupdesc_2971.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -41,4 +41,4 @@ and not func_1(func)
 and func_2(vpub_cfg_560)
 and vpub_cfg_560.getType().hasName("const rtw89_hfc_pub_cfg *")
 and vpub_cfg_560.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

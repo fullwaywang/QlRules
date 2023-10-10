@@ -46,4 +46,4 @@ and func_2(vs_971, target_2)
 and func_3(vs_971, target_3)
 and vs_971.getType().hasName("HTTPContext *")
 and vs_971.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

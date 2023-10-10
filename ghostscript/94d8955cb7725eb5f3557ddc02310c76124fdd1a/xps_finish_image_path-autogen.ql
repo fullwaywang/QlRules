@@ -30,4 +30,4 @@ not func_0(vxps_1422, target_1, func)
 and func_1(vxps_1422, target_1)
 and vxps_1422.getType().hasName("gx_device_xps *")
 and vxps_1422.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

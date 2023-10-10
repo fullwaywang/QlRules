@@ -76,4 +76,4 @@ and vbuf2_198.getType().hasName("char[128]")
 and vtib_len_271.getParentScope+() = func
 and vtib_ptr_304.getParentScope+() = func
 and vbuf2_198.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

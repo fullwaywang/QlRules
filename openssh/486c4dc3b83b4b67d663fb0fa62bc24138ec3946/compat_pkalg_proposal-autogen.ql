@@ -37,4 +37,4 @@ and vpkalg_prop_174.getType().hasName("char *")
 and vssh_174.getType().hasName("ssh *")
 and vpkalg_prop_174.getParentScope+() = func
 and vssh_174.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -79,4 +79,4 @@ and vres_687.getType().hasName("opj_tcd_resolution_t *")
 and vp_manager_672.getParentScope+() = func
 and vprecno_679.getParentScope+() = func
 and vres_687.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -38,4 +38,4 @@ and vnum_slots_515.getType().hasName("CK_ULONG")
 and viter_512.getType().hasName("P11KitIter *")
 and vnum_slots_515.getParentScope+() = func
 and viter_512.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

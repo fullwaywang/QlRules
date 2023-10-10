@@ -52,4 +52,4 @@ and vent_2739.getType().hasName("xmlEntityPtr")
 and vctxt_2730.getParentScope+() = func
 and vnbchars_2734.getParentScope+() = func
 and vent_2739.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

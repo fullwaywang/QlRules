@@ -117,4 +117,4 @@ and vresult_2718.getParentScope+() = func
 and vaddcookies_2719.getParentScope+() = func
 and vco_2725.getParentScope+() = func
 and vcount_2726.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

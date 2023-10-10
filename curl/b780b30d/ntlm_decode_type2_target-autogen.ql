@@ -72,4 +72,4 @@ and vtarget_info_offset_175.getType().hasName("unsigned int")
 and vsize_171.getFunction() = func
 and vtarget_info_len_174.(LocalVariable).getFunction() = func
 and vtarget_info_offset_175.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

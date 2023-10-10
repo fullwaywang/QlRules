@@ -42,4 +42,4 @@ and func_1(vOutputBufferSize_946, target_1)
 and func_2(vOutputBufferSize_946, target_2)
 and vOutputBufferSize_946.getType().hasName("UINT32")
 and vOutputBufferSize_946.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

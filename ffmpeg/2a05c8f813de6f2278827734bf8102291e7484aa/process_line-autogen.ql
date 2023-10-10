@@ -190,4 +190,4 @@ and vs_723.getType().hasName("HTTPContext *")
 and vp_725.getType().hasName("char *")
 and vs_723.getParentScope+() = func
 and vp_725.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

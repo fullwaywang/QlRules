@@ -152,4 +152,4 @@ and vhost_err_360.getParentScope+() = func
 and vsize_change_362.getParentScope+() = func
 and vsize_attr_425.getParentScope+() = func
 and not vinit_user_ns.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

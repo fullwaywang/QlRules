@@ -108,4 +108,4 @@ and vfont_1686.getFunction() = func
 and vglyph_1686.getFunction() = func
 and vcode_1688.(LocalVariable).getFunction() = func
 and vgnstr_1689.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

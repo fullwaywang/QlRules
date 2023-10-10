@@ -33,4 +33,4 @@ not func_0(vs_59, target_1, func)
 and func_1(vs_59, target_1)
 and vs_59.getType().hasName("ReverseContext *")
 and vs_59.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

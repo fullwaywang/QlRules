@@ -45,4 +45,4 @@ and func_1(vdata_105, target_1)
 and func_2(vdata_105, target_2)
 and vdata_105.getType().hasName("byte *")
 and vdata_105.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

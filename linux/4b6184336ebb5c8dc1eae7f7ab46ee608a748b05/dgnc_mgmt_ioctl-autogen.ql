@@ -22,4 +22,4 @@ where
 not func_0(vddi_109)
 and vddi_109.getType().hasName("digi_dinfo")
 and vddi_109.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -139,4 +139,4 @@ and vbzstream_981.getType().hasName("bz_stream")
 and vpkt_data_937.(LocalVariable).getFunction() = func
 and vzstream_960.(LocalVariable).getFunction() = func
 and vbzstream_981.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

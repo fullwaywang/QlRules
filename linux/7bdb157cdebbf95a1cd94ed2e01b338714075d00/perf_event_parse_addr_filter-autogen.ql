@@ -43,4 +43,4 @@ and func_4(vfilename_10023)
 and vkernel_10026.getType().hasName("unsigned int")
 and vfilename_10023.getParentScope+() = func
 and vkernel_10026.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

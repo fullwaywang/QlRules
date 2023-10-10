@@ -43,4 +43,4 @@ and func_1(vhostname_41, target_1)
 and func_2(vhostname_41, target_2)
 and vhostname_41.getType().hasName("const char *")
 and vhostname_41.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

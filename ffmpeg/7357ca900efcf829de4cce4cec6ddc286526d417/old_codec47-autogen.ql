@@ -94,4 +94,4 @@ and vleft_624.getFunction() = func
 and vheight_624.getFunction() = func
 and vstride_627.(LocalVariable).getFunction() = func
 and vdecoded_size_631.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

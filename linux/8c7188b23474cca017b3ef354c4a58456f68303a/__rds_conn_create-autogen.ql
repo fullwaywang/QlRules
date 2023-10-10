@@ -39,4 +39,4 @@ and vconn_126.getType().hasName("rds_connection *")
 and not vrds_conn_slab.getParentScope+() = func
 and vtrans_123.getParentScope+() = func
 and vconn_126.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

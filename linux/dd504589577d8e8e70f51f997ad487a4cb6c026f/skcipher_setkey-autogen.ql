@@ -50,4 +50,4 @@ and vkeylen_761.getType().hasName("unsigned int")
 and vprivate_761.getParentScope+() = func
 and vkey_761.getParentScope+() = func
 and vkeylen_761.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

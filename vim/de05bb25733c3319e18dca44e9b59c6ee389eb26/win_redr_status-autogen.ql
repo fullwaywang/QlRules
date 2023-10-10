@@ -54,4 +54,4 @@ and vlen_422.getType().hasName("int")
 and vwp_418.getType().hasName("win_T *")
 and vlen_422.getParentScope+() = func
 and vwp_418.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

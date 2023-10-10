@@ -73,4 +73,4 @@ and vlen_845.getType().hasName("gint32")
 and vdp_847.getType().hasName("gchar *")
 and vlen_845.getParentScope+() = func
 and vdp_847.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -27,4 +27,4 @@ where
 func_1(vg_358, target_1)
 and vg_358.getType().hasName("global_State *")
 and vg_358.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

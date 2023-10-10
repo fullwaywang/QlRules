@@ -99,4 +99,4 @@ and vnum_chans_195.getType().hasName("int")
 and vwpc_191.getParentScope+() = func
 and vconfig_191.getParentScope+() = func
 and vnum_chans_195.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

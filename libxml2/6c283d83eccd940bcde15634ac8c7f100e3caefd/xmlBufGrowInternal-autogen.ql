@@ -183,4 +183,4 @@ and vsize_425.getType().hasName("size_t")
 and vbuf_424.getFunction() = func
 and vlen_424.getFunction() = func
 and vsize_425.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

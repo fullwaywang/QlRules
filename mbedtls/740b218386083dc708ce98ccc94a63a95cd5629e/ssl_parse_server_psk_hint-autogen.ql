@@ -68,4 +68,4 @@ and vssl_2047.getType().hasName("mbedtls_ssl_context *")
 and vp_2048.getParentScope+() = func
 and vend_2049.getParentScope+() = func
 and vssl_2047.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

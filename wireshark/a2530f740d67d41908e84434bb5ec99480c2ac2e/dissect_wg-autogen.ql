@@ -51,4 +51,4 @@ and vmessage_type_1583.getType().hasName("guint32")
 and vtvb_1579.getType().hasName("tvbuff_t *")
 and vmessage_type_1583.getParentScope+() = func
 and vtvb_1579.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -33,4 +33,4 @@ func_0(vtask_47)
 and func_1(vtask_47, func)
 and vtask_47.getType().hasName("sas_task *")
 and vtask_47.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

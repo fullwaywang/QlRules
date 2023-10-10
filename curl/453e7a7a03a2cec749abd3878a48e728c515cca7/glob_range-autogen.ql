@@ -112,4 +112,4 @@ and vendp_244.getType().hasName("char *")
 and vpattern_185.(LocalVariable).getFunction() = func
 and vstep_n_243.(LocalVariable).getFunction() = func
 and vendp_244.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

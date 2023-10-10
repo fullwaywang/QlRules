@@ -39,4 +39,4 @@ and vavc_173.getType().hasName("AVClass *")
 and vptr_170.getType().hasName("void *")
 and vavc_173.(LocalVariable).getFunction() = func
 and vptr_170.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

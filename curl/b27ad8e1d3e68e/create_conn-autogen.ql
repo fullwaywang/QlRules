@@ -56,4 +56,4 @@ and func_2(vconn_3596, func, target_2)
 and func_3(vconn_3596, func, target_3)
 and vconn_3596.getType().hasName("connectdata *")
 and vconn_3596.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

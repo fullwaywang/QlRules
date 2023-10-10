@@ -117,4 +117,4 @@ and func_10(vs_610, target_10)
 and func_11(vs_610, target_11)
 and vs_610.getType().hasName("MpegEncContext *")
 and vs_610.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

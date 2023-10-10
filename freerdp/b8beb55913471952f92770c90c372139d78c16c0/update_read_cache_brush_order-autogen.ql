@@ -67,4 +67,4 @@ and viBitmapFormat_2577.getType().hasName("BYTE")
 and vBMF_BPP.getType() instanceof ArrayType
 and viBitmapFormat_2577.getParentScope+() = func
 and not vBMF_BPP.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

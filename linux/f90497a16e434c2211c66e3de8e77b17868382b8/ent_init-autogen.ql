@@ -103,4 +103,4 @@ and vnew_79.getType().hasName("ent *")
 and vitm_80.getType().hasName("ent *")
 and vnew_79.getParentScope+() = func
 and vitm_80.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

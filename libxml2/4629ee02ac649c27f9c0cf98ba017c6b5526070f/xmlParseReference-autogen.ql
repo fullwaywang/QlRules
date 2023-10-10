@@ -69,4 +69,4 @@ and vent_6848.getType().hasName("xmlEntityPtr")
 and vctxt_6847.getType().hasName("xmlParserCtxtPtr")
 and vent_6848.(LocalVariable).getFunction() = func
 and vctxt_6847.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

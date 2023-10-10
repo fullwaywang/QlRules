@@ -243,4 +243,4 @@ and vnew_opaque_716.getParentScope+() = func
 and vcleanup_whiteout_718.getParentScope+() = func
 and vis_dir_720.getParentScope+() = func
 and vopaquedir_722.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

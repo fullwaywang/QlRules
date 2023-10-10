@@ -88,4 +88,4 @@ and vctx_588.getType().hasName("i915_gem_context *")
 and vfpriv_589.getParentScope+() = func
 and vret_591.getParentScope+() = func
 and vctx_588.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

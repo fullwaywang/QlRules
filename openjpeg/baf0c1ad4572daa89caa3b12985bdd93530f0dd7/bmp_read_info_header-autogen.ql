@@ -65,4 +65,4 @@ and vheader_357.getType().hasName("OPJ_BITMAPINFOHEADER *")
 and vstderr.getType().hasName("FILE *")
 and vheader_357.getParentScope+() = func
 and not vstderr.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

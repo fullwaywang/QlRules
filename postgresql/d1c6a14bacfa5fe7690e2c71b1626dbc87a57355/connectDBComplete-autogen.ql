@@ -162,4 +162,4 @@ and vconn_1840.getType().hasName("PGconn *")
 and vfinish_time_1843.(LocalVariable).getFunction() = func
 and vtimeout_1844.(LocalVariable).getFunction() = func
 and vconn_1840.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

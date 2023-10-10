@@ -274,4 +274,4 @@ and vavctx_703.getType().hasName("AVCodecContext *")
 and vfctx_705.getType().hasName("FrameThreadContext *")
 and vavctx_703.getParentScope+() = func
 and vfctx_705.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

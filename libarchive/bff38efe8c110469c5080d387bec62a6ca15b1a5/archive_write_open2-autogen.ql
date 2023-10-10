@@ -36,4 +36,4 @@ and func_1(vclient_filter_537, target_1)
 and func_2(vclient_filter_537, target_2)
 and vclient_filter_537.getType().hasName("archive_write_filter *")
 and vclient_filter_537.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

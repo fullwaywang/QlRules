@@ -47,4 +47,4 @@ and vr_4916.getType().hasName("request_rec *")
 and vrulestatus_4923.getType().hasName("int")
 and vr_4916.getFunction() = func
 and vrulestatus_4923.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

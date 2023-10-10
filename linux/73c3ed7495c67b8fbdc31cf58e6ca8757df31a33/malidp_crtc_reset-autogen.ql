@@ -49,4 +49,4 @@ and vstate_484.getType().hasName("malidp_crtc_state *")
 and func_3(vstate_484)
 and vcrtc_482.getParentScope+() = func
 and vstate_484.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

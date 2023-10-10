@@ -145,4 +145,4 @@ and verror_730.getParentScope+() = func
 and voffset_733.getParentScope+() = func
 and veocd_offset_735.getParentScope+() = func
 and vsize_736.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

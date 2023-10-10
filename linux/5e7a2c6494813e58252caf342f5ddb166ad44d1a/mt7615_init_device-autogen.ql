@@ -30,4 +30,4 @@ func_0(vdev_498)
 and func_1(func)
 and vdev_498.getType().hasName("mt7615_dev *")
 and vdev_498.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

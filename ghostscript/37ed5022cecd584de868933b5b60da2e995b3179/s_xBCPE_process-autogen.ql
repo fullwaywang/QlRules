@@ -73,4 +73,4 @@ and vq_45.getType().hasName("byte *")
 and vpw_40.getFunction() = func
 and vp_42.(LocalVariable).getFunction() = func
 and vq_45.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and vchunk_4349.getType().hasName("unsigned char *")
 and vimage_4254.getParentScope+() = func
 and vi_4288.getParentScope+() = func
 and vchunk_4349.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

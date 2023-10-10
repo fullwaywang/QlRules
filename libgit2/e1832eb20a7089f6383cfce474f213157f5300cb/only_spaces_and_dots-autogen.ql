@@ -41,4 +41,4 @@ and func_2(target_2)
 and func_3(vc_1646, target_3)
 and vc_1646.getType().hasName("const char *")
 and vc_1646.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

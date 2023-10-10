@@ -322,4 +322,4 @@ and vbuf_3604.getType().hasName("char *")
 and vconn_3606.getType().hasName("iscsi_conn *")
 and vbuf_3604.getParentScope+() = func
 and vconn_3606.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

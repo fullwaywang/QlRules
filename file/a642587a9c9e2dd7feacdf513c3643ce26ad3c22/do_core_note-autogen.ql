@@ -71,4 +71,4 @@ and vnbuf_693.getType().hasName("unsigned char *")
 and vcp_776.getParentScope+() = func
 and vsize_695.getParentScope+() = func
 and vnbuf_693.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

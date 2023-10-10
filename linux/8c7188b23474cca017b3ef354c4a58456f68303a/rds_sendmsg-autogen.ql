@@ -44,4 +44,4 @@ and vdaddr_984.getType().hasName("__be32")
 and vsk_981.getParentScope+() = func
 and vrs_982.getParentScope+() = func
 and vdaddr_984.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

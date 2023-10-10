@@ -138,4 +138,4 @@ and vstream_1149.getType().hasName("StreamInfo *")
 and vpkt_desc_1151.getType().hasName("PacketDesc *")
 and vstream_1149.getParentScope+() = func
 and vpkt_desc_1151.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

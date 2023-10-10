@@ -121,4 +121,4 @@ and vserver.getType().hasName("redisServer")
 and vo_1488.(LocalVariable).getFunction() = func
 and vlen_1489.(LocalVariable).getFunction() = func
 and not vserver.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -49,4 +49,4 @@ and vper_332.getType().hasName("per_transfer *")
 and vouts_337.getParentScope+() = func
 and vglobal_331.getParentScope+() = func
 and vper_332.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

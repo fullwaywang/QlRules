@@ -36,4 +36,4 @@ and vnext_image_2348.getType().hasName("Image *")
 and vchannels_2352.getType().hasName("size_t")
 and vnext_image_2348.getParentScope+() = func
 and vchannels_2352.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

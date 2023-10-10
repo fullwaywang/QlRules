@@ -32,4 +32,4 @@ func_0(vm_607)
 and not func_1(vm_607)
 and vm_607.getType().hasName("seq_file *")
 and vm_607.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

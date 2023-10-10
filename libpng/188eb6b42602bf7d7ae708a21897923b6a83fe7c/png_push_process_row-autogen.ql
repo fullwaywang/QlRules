@@ -37,4 +37,4 @@ not func_0(vpng_ptr_891, func)
 and vpng_ptr_891.getType().hasName("png_structp")
 and func_3(vpng_ptr_891)
 and vpng_ptr_891.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -26,4 +26,4 @@ and vis_native_device_499.getType().hasName("int")
 and vreply_950.getType().hasName("aac_srb_reply")
 and vis_native_device_499.getParentScope+() = func
 and vreply_950.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

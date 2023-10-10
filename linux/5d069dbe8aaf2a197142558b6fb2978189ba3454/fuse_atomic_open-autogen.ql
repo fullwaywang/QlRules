@@ -30,4 +30,4 @@ not func_0(vdir_606, func)
 and vdir_606.getType().hasName("inode *")
 and func_1(vdir_606)
 and vdir_606.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

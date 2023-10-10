@@ -36,4 +36,4 @@ and vdata_206.getType().hasName("Curl_easy *")
 and vs_209.getType().hasName("http_connect_state *")
 and vdata_206.getParentScope+() = func
 and vs_209.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -144,4 +144,4 @@ and func_24(vemtmp_527)
 and vsk_524.getParentScope+() = func
 and vemail_525.getParentScope+() = func
 and vemtmp_527.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

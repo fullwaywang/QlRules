@@ -25,4 +25,4 @@ func_0(vrc_879, target_0)
 and func_1(vrc_879, target_1)
 and vrc_879.getType().hasName("TSS2_RC")
 and vrc_879.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

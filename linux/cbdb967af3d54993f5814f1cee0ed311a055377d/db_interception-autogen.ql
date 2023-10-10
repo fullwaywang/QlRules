@@ -28,4 +28,4 @@ func_0(vsvm_1660)
 and func_1(vsvm_1660)
 and vsvm_1660.getType().hasName("vcpu_svm *")
 and vsvm_1660.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

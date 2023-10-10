@@ -78,4 +78,4 @@ and vt_sql_888.getType().hasName("Datum")
 and vschemaName_790.getFunction() = func
 and not v__func__.getParentScope+() = func
 and vt_sql_888.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

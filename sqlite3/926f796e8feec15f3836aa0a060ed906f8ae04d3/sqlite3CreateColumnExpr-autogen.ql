@@ -86,4 +86,4 @@ and vpItem_626.getType().hasName("SrcList_item *")
 and viCol_623.getFunction() = func
 and vp_624.(LocalVariable).getFunction() = func
 and vpItem_626.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

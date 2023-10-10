@@ -47,4 +47,4 @@ and vc_292.getType().hasName("z_crc_t")
 and vbuf4_293.getType().hasName("const z_crc_t *")
 and vc_292.getParentScope+() = func
 and vbuf4_293.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

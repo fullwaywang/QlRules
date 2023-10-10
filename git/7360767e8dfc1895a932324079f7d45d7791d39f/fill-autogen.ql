@@ -110,4 +110,4 @@ and vstack_1019.getType().hasName("const attr_stack *")
 and vi_1023.getType().hasName("int")
 and vstack_1019.getParentScope+() = func
 and vi_1023.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

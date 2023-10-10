@@ -48,4 +48,4 @@ and vfq_341.getType().hasName("frag_queue *")
 and func_4(vfq_341)
 and vhead_343.getParentScope+() = func
 and vfq_341.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

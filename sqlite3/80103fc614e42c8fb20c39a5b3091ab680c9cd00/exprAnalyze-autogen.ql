@@ -115,4 +115,4 @@ and vpNewExpr1_1363.(LocalVariable).getFunction() = func
 and vpNewExpr2_1364.(LocalVariable).getFunction() = func
 and vsCollSeqName_1367.(LocalVariable).getFunction() = func
 and vpParse_1212.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

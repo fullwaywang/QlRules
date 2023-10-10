@@ -263,4 +263,4 @@ and vc_180.(LocalVariable).getFunction() = func
 and vprecision_182.(LocalVariable).getFunction() = func
 and vwidth_185.(LocalVariable).getFunction() = func
 and vxtype_195.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

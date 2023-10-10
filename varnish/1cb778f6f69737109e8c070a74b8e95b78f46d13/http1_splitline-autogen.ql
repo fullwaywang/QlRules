@@ -170,4 +170,4 @@ and vhtc_218.getType().hasName("http_conn *")
 and vp_221.getParentScope+() = func
 and vi_222.getParentScope+() = func
 and vhtc_218.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

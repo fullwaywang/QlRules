@@ -56,4 +56,4 @@ and vbodylen_2061.getType().hasName("size_t")
 and vrbuf_2057.getParentScope+() = func
 and vbody_2058.getParentScope+() = func
 and vbodylen_2061.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

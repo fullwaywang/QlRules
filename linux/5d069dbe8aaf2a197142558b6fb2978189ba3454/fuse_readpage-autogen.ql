@@ -21,4 +21,4 @@ where
 func_0(vinode_864)
 and vinode_864.getType().hasName("inode *")
 and vinode_864.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

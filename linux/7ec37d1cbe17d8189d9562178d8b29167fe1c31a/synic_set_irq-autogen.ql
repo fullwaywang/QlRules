@@ -53,4 +53,4 @@ where
 not func_0(vvcpu_448, func)
 and vvcpu_448.getType().hasName("kvm_vcpu *")
 and vvcpu_448.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

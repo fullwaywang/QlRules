@@ -86,4 +86,4 @@ and vecode_1278.getType().hasName("uint8_t")
 and vlength_1270.getParentScope+() = func
 and voffset_1275.getParentScope+() = func
 and vecode_1278.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

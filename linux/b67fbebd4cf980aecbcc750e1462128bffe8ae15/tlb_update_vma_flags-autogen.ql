@@ -48,4 +48,4 @@ and vtlb_418.getType().hasName("mmu_gather *")
 and vvma_418.getType().hasName("vm_area_struct *")
 and vtlb_418.getParentScope+() = func
 and vvma_418.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

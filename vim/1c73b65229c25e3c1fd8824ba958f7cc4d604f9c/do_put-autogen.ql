@@ -101,4 +101,4 @@ and vspaces_1824.getType().hasName("int")
 and vcur_ve_flags_1564.getParentScope+() = func
 and not vcurwin.getParentScope+() = func
 and vspaces_1824.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

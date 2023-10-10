@@ -37,4 +37,4 @@ and func_1(target_2, func, target_1)
 and func_2(vinput_7829, target_2)
 and vinput_7829.getType().hasName("xmlParserInputPtr")
 and vinput_7829.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

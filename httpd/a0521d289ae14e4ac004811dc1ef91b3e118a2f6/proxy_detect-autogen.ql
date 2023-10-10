@@ -137,4 +137,4 @@ and vconf_773.getType().hasName("proxy_server_conf *")
 and vr_770.getType().hasName("request_rec *")
 and vconf_773.(LocalVariable).getFunction() = func
 and vr_770.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

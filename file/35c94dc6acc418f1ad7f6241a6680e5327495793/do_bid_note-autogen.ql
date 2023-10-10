@@ -66,4 +66,4 @@ and func_3(target_4, func, target_3)
 and func_4(vdescsz_510, target_4)
 and vdescsz_510.getType().hasName("uint32_t")
 and vdescsz_510.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

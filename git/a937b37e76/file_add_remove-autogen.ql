@@ -59,4 +59,4 @@ and func_4(target_4)
 and func_5(vtree_difference, target_5)
 and vtree_difference.getType().hasName("int")
 and not vtree_difference.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

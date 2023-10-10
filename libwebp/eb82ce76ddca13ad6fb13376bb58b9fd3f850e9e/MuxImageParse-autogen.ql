@@ -45,4 +45,4 @@ and func_2(vwpi_100, target_2)
 and func_3(vwpi_100, target_3)
 and vwpi_100.getType().hasName("WebPMuxImage *const")
 and vwpi_100.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

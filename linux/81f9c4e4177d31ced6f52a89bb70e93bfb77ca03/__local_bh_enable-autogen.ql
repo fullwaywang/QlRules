@@ -23,4 +23,4 @@ where
 not func_0(vcnt_138, func)
 and vcnt_138.getType().hasName("unsigned int")
 and vcnt_138.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -46,4 +46,4 @@ and func_2(vdata_319, target_2)
 and func_3(vdata_319, target_3)
 and vdata_319.getType().hasName("Curl_easy *")
 and vdata_319.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ not func_0(vsitn_1836, func)
 and vsitn_1836.getType().hasName("sit_net *")
 and func_1(vsitn_1836)
 and vsitn_1836.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

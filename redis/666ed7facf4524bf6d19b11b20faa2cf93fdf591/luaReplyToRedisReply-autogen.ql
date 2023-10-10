@@ -82,4 +82,4 @@ and vlua_341.getType().hasName("lua_State *")
 and vc_341.getType().hasName("client *")
 and vlua_341.getFunction() = func
 and vc_341.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

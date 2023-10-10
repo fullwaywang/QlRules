@@ -25,4 +25,4 @@ and vbuflen_5829.getType().hasName("size_t")
 and vlabel_5833.getType().hasName("nfs4_label")
 and vbuflen_5829.getParentScope+() = func
 and vlabel_5833.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

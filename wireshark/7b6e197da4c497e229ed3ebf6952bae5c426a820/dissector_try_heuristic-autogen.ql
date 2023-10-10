@@ -46,4 +46,4 @@ and func_1(vsaved_layers_len_2570, target_1)
 and func_2(vsaved_layers_len_2570, target_2)
 and vsaved_layers_len_2570.getType().hasName("guint")
 and vsaved_layers_len_2570.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

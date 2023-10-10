@@ -28,4 +28,4 @@ not func_0(vofilter_529, target_1)
 and func_1(vofilter_529, target_1)
 and vofilter_529.getType().hasName("OutputFilter *")
 and vofilter_529.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -105,4 +105,4 @@ and vdbname_1742.getType().hasName("char *")
 and vOPF.getType().hasName("FILE *")
 and vdbname_1742.(LocalVariable).getFunction() = func
 and not vOPF.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

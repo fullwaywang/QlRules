@@ -29,4 +29,4 @@ not func_0(vseq_1781, func)
 and vseq_1781.getType().hasName("nfsd4_sequence *")
 and func_1(vseq_1781)
 and vseq_1781.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

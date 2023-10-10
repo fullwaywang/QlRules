@@ -138,4 +138,4 @@ and vbflush_2147.getType().hasName("int")
 and vs_0.getType().hasName("deflate_state *")
 and vbflush_2147.getParentScope+() = func
 and vs_0.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

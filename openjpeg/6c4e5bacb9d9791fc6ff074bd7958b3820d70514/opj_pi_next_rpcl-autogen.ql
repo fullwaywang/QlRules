@@ -56,4 +56,4 @@ and vcomp_340.getType().hasName("opj_pi_comp_t *")
 and vlevelno_384.getType().hasName("OPJ_UINT32")
 and vcomp_340.getParentScope+() = func
 and vlevelno_384.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

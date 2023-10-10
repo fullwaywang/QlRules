@@ -515,4 +515,4 @@ and vhp_406.getType().hasName("http *")
 and vp_408.getType().hasName("char *")
 and vhp_406.getParentScope+() = func
 and vp_408.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

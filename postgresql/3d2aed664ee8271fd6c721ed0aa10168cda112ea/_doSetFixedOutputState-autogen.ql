@@ -47,4 +47,4 @@ and func_1(vAH_3097, target_1)
 and func_2(vAH_3097, target_2)
 and vAH_3097.getType().hasName("ArchiveHandle *")
 and vAH_3097.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

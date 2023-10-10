@@ -79,4 +79,4 @@ and vsshdr_189.getType().hasName("scsi_sense_hdr")
 and vcgc_186.getParentScope+() = func
 and vSDev_188.getParentScope+() = func
 and vsshdr_189.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

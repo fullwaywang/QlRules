@@ -92,4 +92,4 @@ and vimg_90.getParentScope+() = func
 and vr_92.getParentScope+() = func
 and vg_92.getParentScope+() = func
 and vb_92.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

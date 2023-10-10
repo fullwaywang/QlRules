@@ -59,4 +59,4 @@ and vllen_1102.getType().hasName("unsigned long")
 and val_1101.getParentScope+() = func
 and vnc_1102.getParentScope+() = func
 and vllen_1102.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

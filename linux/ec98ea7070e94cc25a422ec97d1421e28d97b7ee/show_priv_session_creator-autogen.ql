@@ -25,4 +25,4 @@ and vbuf_4200.getType().hasName("char *")
 and vsession_4202.getType().hasName("iscsi_cls_session *")
 and vbuf_4200.getParentScope+() = func
 and vsession_4202.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -51,4 +51,4 @@ and func_2(vctxt_981, target_2)
 and func_3(vctxt_981, target_3)
 and vctxt_981.getType().hasName("xsltTransformContextPtr")
 and vctxt_981.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

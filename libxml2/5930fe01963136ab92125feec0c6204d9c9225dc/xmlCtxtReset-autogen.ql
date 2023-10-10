@@ -43,4 +43,4 @@ and func_1(vctxt_14792, target_1)
 and func_2(vctxt_14792, target_2)
 and vctxt_14792.getType().hasName("xmlParserCtxtPtr")
 and vctxt_14792.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

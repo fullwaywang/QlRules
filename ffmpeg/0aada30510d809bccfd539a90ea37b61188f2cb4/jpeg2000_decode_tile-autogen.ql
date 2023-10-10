@@ -65,4 +65,4 @@ and vx_1761.getType().hasName("int")
 and vs_1758.getType().hasName("Jpeg2000DecoderContext *")
 and vx_1761.getParentScope+() = func
 and vs_1758.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

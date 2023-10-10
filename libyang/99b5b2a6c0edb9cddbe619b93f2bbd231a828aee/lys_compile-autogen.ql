@@ -61,4 +61,4 @@ and func_4(vctx_5777, target_4)
 and func_5(vctx_5777, target_5)
 and vctx_5777.getType().hasName("lysc_ctx")
 and vctx_5777.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

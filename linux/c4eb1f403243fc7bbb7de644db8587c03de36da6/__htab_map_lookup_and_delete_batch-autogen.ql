@@ -52,4 +52,4 @@ and vbucket_size_1518.getType().hasName("u32")
 and vkey_size_1513.getParentScope+() = func
 and vvalue_size_1513.getParentScope+() = func
 and vbucket_size_1518.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

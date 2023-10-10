@@ -23,4 +23,4 @@ and vctxt_2210.getType().hasName("htmlParserCtxtPtr")
 and voptions.getType().hasName("int")
 and vctxt_2210.(LocalVariable).getFunction() = func
 and not voptions.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -164,4 +164,4 @@ and verror_1629.getParentScope+() = func
 and vrandsuffix_1644.getParentScope+() = func
 and vfilename_1623.getParentScope+() = func
 and vdata_1622.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

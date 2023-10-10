@@ -33,4 +33,4 @@ and vcflags_164.getType().hasName("int")
 and vdefault_cflags.getType().hasName("int")
 and vcflags_164.getFunction() = func
 and not vdefault_cflags.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

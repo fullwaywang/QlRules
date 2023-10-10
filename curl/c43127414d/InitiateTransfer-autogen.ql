@@ -20,4 +20,4 @@ where
 func_0(vconn_485, target_0)
 and vconn_485.getType().hasName("connectdata *")
 and vconn_485.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

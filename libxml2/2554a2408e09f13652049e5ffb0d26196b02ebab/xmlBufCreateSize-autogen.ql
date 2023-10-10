@@ -74,4 +74,4 @@ and vsize_156.getType().hasName("size_t")
 and vret_157.getType().hasName("xmlBufPtr")
 and vsize_156.getFunction() = func
 and vret_157.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

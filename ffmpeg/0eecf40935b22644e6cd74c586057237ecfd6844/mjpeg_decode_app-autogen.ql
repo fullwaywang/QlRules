@@ -163,4 +163,4 @@ and func_19(vs_1538, target_19)
 and func_20(vs_1538, target_20)
 and vs_1538.getType().hasName("MJpegDecodeContext *")
 and vs_1538.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

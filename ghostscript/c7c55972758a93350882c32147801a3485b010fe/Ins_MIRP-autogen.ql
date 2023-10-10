@@ -68,4 +68,4 @@ and vargs_3845.getType().hasName("PStorage")
 and vexc_3845.getType().hasName("PExecution_Context")
 and vargs_3845.getFunction() = func
 and vexc_3845.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

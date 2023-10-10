@@ -41,4 +41,4 @@ and vcc_405.getType().hasName("tmsize_t")
 and vtmp_412.getType().hasName("uint8 *")
 and vcc_405.getFunction() = func
 and vtmp_412.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

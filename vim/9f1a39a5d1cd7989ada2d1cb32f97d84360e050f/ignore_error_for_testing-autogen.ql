@@ -23,4 +23,4 @@ and verror_582.getType().hasName("char_u *")
 and vignore_error_list.getType().hasName("garray_T")
 and verror_582.getParentScope+() = func
 and not vignore_error_list.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

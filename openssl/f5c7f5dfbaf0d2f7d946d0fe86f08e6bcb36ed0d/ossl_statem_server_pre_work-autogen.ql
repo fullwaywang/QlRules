@@ -21,4 +21,4 @@ where
 func_0(vs_428)
 and vs_428.getType().hasName("SSL *")
 and vs_428.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -102,4 +102,4 @@ and vout_87.getType().hasName("buffer *")
 and vlen_89.getType().hasName("size_t")
 and vout_87.getParentScope+() = func
 and vlen_89.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -83,4 +83,4 @@ and vskb_2812.getType().hasName("sk_buff *")
 and vtp_2815.getType().hasName("tcp_sock *")
 and vskb_2812.getParentScope+() = func
 and vtp_2815.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

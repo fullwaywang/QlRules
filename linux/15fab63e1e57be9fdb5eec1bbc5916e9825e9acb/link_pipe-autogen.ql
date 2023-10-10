@@ -46,4 +46,4 @@ and vipipe_1627.getType().hasName("pipe_inode_info *")
 and vibuf_1631.getParentScope+() = func
 and vret_1632.getParentScope+() = func
 and vipipe_1627.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

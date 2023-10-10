@@ -27,4 +27,4 @@ and vqueue_gref_125.getType().hasName("list_head")
 and vgref_list.getType().hasName("list_head")
 and vqueue_gref_125.getParentScope+() = func
 and not vgref_list.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

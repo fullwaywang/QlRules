@@ -122,4 +122,4 @@ and func_14(target_14)
 and func_16(target_16)
 and vtext_2566.getType().hasName("char[4]")
 and vtext_2566.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

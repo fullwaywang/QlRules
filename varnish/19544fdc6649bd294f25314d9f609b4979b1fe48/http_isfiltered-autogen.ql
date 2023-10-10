@@ -36,4 +36,4 @@ and func_1(vu_1128, target_1)
 and func_2(vu_1128, target_2)
 and vu_1128.getType().hasName("unsigned int")
 and vu_1128.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

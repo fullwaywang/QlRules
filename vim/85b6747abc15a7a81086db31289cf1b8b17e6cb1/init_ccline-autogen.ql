@@ -31,4 +31,4 @@ and vindent_1505.getType().hasName("int")
 and vexmode_active.getType().hasName("int")
 and vindent_1505.getParentScope+() = func
 and not vexmode_active.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

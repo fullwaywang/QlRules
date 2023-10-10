@@ -53,4 +53,4 @@ and vimagewidth_104.getType().hasName("uint32")
 and vtif_49.getType().hasName("TIFF *")
 and vimagewidth_104.(LocalVariable).getFunction() = func
 and vtif_49.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

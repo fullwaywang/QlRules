@@ -91,4 +91,4 @@ and vresultRelInfo_944.getType().hasName("ResultRelInfo *")
 and vestate_944.getType().hasName("EState *")
 and vresultRelInfo_944.getFunction() = func
 and vestate_944.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

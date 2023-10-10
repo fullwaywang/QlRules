@@ -71,4 +71,4 @@ and vubits_697.getType().hasName("int")
 and vudp_700.getType().hasName("unsigned long *")
 and vubits_697.getParentScope+() = func
 and vudp_700.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

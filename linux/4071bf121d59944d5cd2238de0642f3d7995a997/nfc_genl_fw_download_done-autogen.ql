@@ -44,4 +44,4 @@ and vmsg_1244.getType().hasName("sk_buff *")
 and vnfc_genl_family.getType().hasName("genl_family")
 and vmsg_1244.getParentScope+() = func
 and not vnfc_genl_family.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

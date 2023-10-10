@@ -44,4 +44,4 @@ and valloc_150.getType().hasName("size_t")
 and vin_152.getType().hasName("unsigned char")
 and valloc_150.(LocalVariable).getFunction() = func
 and vin_152.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

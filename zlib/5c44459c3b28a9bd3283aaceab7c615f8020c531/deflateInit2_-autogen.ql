@@ -156,4 +156,4 @@ and vstrm_0.getType().hasName("z_streamp")
 and vs_254.getParentScope+() = func
 and voverlay_258.getParentScope+() = func
 and vstrm_0.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

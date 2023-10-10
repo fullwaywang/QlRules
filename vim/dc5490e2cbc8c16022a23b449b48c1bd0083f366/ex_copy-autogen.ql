@@ -35,4 +35,4 @@ not func_0(vcurbuf, target_1, func)
 and func_1(vcurbuf, target_1)
 and vcurbuf.getType().hasName("buf_T *")
 and not vcurbuf.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

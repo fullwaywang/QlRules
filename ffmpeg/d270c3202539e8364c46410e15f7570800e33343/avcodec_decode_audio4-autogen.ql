@@ -53,4 +53,4 @@ and func_3(vframe_1717, target_3)
 and func_4(vframe_1717, target_4)
 and vframe_1717.getType().hasName("AVFrame *")
 and vframe_1717.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

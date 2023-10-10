@@ -121,4 +121,4 @@ and vfilenum_318.getType().hasName("unsigned int")
 and vfe_305.(LocalVariable).getFunction() = func
 and vm3_307.(LocalVariable).getFunction() = func
 and vfilenum_318.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

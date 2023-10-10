@@ -362,4 +362,4 @@ and vin_115.(LocalVariable).getFunction() = func
 and vout_115.(LocalVariable).getFunction() = func
 and vinbuf_127.(LocalVariable).getFunction() = func
 and voutbuf_127.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

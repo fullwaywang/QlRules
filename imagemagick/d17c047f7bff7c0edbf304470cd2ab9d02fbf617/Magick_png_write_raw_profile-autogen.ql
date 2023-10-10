@@ -45,4 +45,4 @@ and vprofile_type_8161.getType().hasName("unsigned char *")
 and vlength_8162.getType().hasName("png_uint_32")
 and vprofile_type_8161.getParentScope+() = func
 and vlength_8162.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -297,4 +297,4 @@ and vtuple_2717.(LocalVariable).getFunction() = func
 and vjso_2718.(LocalVariable).getFunction() = func
 and vtupdesc_2725.(LocalVariable).getFunction() = func
 and voldcxt_2726.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

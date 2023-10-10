@@ -73,4 +73,4 @@ and vAH_997.getType().hasName("ArchiveHandle *")
 and vte_997.getType().hasName("TocEntry *")
 and vAH_997.getFunction() = func
 and vte_997.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

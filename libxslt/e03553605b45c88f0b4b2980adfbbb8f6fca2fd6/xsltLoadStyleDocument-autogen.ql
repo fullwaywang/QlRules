@@ -68,4 +68,4 @@ and vURI_359.getType().hasName("const xmlChar *")
 and vres_372.getType().hasName("int")
 and vURI_359.getParentScope+() = func
 and vres_372.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

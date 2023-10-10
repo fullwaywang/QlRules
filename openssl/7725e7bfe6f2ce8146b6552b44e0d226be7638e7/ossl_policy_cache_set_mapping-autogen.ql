@@ -32,4 +32,4 @@ and vx_22.getType().hasName("X509 *")
 and vret_28.getType().hasName("int")
 and vx_22.getParentScope+() = func
 and vret_28.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

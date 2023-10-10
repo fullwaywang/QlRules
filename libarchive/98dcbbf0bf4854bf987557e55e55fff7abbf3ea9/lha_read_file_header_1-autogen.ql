@@ -32,4 +32,4 @@ not func_0(vlha_875, target_1, func)
 and func_1(vlha_875, target_1)
 and vlha_875.getType().hasName("lha *")
 and vlha_875.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

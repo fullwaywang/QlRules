@@ -151,4 +151,4 @@ and vframe_end_144.(LocalVariable).getFunction() = func
 and vmask_145.(LocalVariable).getFunction() = func
 and vbitbuf_145.(LocalVariable).getFunction() = func
 and vv_146.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

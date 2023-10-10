@@ -147,4 +147,4 @@ and vpubinfo_3762.getType().hasName("PublicationInfo *")
 and vlabelq_3766.getType().hasName("PQExpBuffer")
 and vpubinfo_3762.getFunction() = func
 and vlabelq_3766.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

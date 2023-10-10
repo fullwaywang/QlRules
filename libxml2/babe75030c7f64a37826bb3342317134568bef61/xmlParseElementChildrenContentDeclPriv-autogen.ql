@@ -1,7 +1,7 @@
 /**
  * @name libxml2-babe75030c7f64a37826bb3342317134568bef61-xmlParseElementChildrenContentDeclPriv
  * @id cpp/libxml2/babe75030c7f64a37826bb3342317134568bef61/xmlParseElementChildrenContentDeclPriv
- * @description libxml2-babe75030c7f64a37826bb3342317134568bef61-xmlParseElementChildrenContentDeclPriv 
+ * @description libxml2-babe75030c7f64a37826bb3342317134568bef61-xmlParseElementChildrenContentDeclPriv CVE-2021-3537
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -159,4 +159,4 @@ and vop_6190.getParentScope+() = func
 and velem_6191.getParentScope+() = func
 and vinputid_6338.getParentScope+() = func
 and vctxt_6188.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

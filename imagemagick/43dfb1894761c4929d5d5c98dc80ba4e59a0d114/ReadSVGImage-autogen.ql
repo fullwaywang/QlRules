@@ -222,4 +222,4 @@ and vn_3206.getParentScope+() = func
 and vsvg_info_3209.getParentScope+() = func
 and vmessage_3212.getParentScope+() = func
 and vimage_info_3186.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

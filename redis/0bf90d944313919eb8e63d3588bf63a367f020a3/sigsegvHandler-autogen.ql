@@ -111,4 +111,4 @@ and veip_1971.getType().hasName("void *")
 and vinfo_1954.getFunction() = func
 and vuc_1970.(LocalVariable).getFunction() = func
 and veip_1971.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

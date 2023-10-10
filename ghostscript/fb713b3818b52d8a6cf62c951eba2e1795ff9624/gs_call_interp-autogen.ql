@@ -89,4 +89,4 @@ and vperrordict_488.(LocalVariable).getFunction() = func
 and verror_name_489.(LocalVariable).getFunction() = func
 and vcode_490.(LocalVariable).getFunction() = func
 and vi_ctx_p_492.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

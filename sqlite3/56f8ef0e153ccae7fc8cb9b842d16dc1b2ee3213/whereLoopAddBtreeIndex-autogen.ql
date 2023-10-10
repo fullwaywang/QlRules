@@ -114,4 +114,4 @@ and vpTerm_3872.(LocalVariable).getFunction() = func
 and vsaved_nEq_3877.(LocalVariable).getFunction() = func
 and vsaved_nSkip_3878.(LocalVariable).getFunction() = func
 and vrc_3882.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

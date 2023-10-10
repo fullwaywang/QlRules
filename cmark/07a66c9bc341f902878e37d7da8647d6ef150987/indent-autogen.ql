@@ -49,4 +49,4 @@ and vstate_27.getType().hasName("render_state *")
 and vi_28.getType().hasName("int")
 and vstate_27.getParentScope+() = func
 and vi_28.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

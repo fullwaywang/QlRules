@@ -37,4 +37,4 @@ and not func_1(vpcm_119)
 and vpcm_119.getType().hasName("snd_pcm *")
 and func_2(vpcm_119)
 and vpcm_119.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

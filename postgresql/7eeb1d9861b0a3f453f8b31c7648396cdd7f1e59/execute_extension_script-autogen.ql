@@ -87,4 +87,4 @@ and vpathbuf_846.getType().hasName("StringInfoData")
 and vreqname_925.getType().hasName("char *")
 and vpathbuf_846.(LocalVariable).getFunction() = func
 and vreqname_925.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

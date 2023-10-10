@@ -47,4 +47,4 @@ and vdtd_974.getType().hasName("DTD *")
 and vparser_975.getType().hasName("XML_Parser")
 and vdtd_974.getParentScope+() = func
 and vparser_975.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

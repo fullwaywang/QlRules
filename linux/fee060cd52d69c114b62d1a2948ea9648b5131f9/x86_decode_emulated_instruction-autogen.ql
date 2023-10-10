@@ -44,4 +44,4 @@ and vr_8373.getType().hasName("int")
 and vvcpu_8370.getParentScope+() = func
 and vemulation_type_8370.getParentScope+() = func
 and vr_8373.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

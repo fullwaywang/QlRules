@@ -62,4 +62,4 @@ and func_4(target_4)
 and func_5(vi_5413, target_5)
 and vi_5413.getType().hasName("unsigned int")
 and vi_5413.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

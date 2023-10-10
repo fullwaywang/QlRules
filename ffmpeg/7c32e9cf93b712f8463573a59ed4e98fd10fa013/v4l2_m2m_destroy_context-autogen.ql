@@ -36,4 +36,4 @@ and func_1(vs_326, target_1)
 and func_2(vs_326, target_2)
 and vs_326.getType().hasName("V4L2m2mContext *")
 and vs_326.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

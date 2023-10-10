@@ -36,4 +36,4 @@ not func_0(vcert_731, target_1, func)
 and func_1(vcert_731, target_1)
 and vcert_731.getType().hasName("X509 *")
 and vcert_731.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

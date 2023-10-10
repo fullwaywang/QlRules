@@ -43,4 +43,4 @@ and vpriv_flags_3505.getType().hasName("u32")
 and func_2(vpriv_flags_3505, func)
 and vadapter_3504.getParentScope+() = func
 and vpriv_flags_3505.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

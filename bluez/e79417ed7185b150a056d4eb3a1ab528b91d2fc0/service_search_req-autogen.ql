@@ -261,4 +261,4 @@ and vpCacheBuffer_363.getParentScope+() = func
 and vcStateId_365.getParentScope+() = func
 and vpCache_475.getParentScope+() = func
 and vnewState_526.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

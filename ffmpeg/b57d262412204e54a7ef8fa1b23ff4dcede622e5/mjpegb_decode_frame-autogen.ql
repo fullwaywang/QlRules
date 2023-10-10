@@ -133,4 +133,4 @@ and vbuf_end_47.(LocalVariable).getFunction() = func
 and vbuf_ptr_47.(LocalVariable).getFunction() = func
 and vsos_offs_50.(LocalVariable).getFunction() = func
 and vfield_size_51.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

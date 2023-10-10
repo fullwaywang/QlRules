@@ -93,4 +93,4 @@ and vpeek_964.getType().hasName("int")
 and vrr_968.getType().hasName("SSL3_RECORD *")
 and vpeek_964.getParentScope+() = func
 and vrr_968.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

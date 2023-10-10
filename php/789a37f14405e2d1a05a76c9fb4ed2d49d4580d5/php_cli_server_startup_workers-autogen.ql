@@ -75,4 +75,4 @@ and vphp_cli_server_workers_max.getType().hasName("zend_long")
 and vphp_cli_server_workers.getType().hasName("pid_t *")
 and not vphp_cli_server_workers_max.getParentScope+() = func
 and not vphp_cli_server_workers.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

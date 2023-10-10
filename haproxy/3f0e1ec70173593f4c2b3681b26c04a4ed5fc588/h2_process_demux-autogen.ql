@@ -72,4 +72,4 @@ and func_6(vh2c_1698, target_6)
 and func_7(vh2c_1698, target_7)
 and vh2c_1698.getType().hasName("h2c *")
 and vh2c_1698.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

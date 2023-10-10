@@ -261,4 +261,4 @@ and vresultRelInfo_1564.(LocalVariable).getFunction() = func
 and vecontext_1745.(LocalVariable).getFunction() = func
 and vsetexpr_1746.(LocalVariable).getFunction() = func
 and vtupDesc_1747.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

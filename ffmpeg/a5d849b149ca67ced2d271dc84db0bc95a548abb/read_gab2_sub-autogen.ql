@@ -61,4 +61,4 @@ and func_2(vsub_demuxer_1071, target_2)
 and func_3(vsub_demuxer_1071, target_3)
 and vsub_demuxer_1071.getType().hasName("AVInputFormat *")
 and vsub_demuxer_1071.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

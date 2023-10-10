@@ -113,4 +113,4 @@ and func_6(vdh_1374, target_6)
 and func_7(vdh_1374, target_7)
 and vdh_1374.getType().hasName("DH *")
 and vdh_1374.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

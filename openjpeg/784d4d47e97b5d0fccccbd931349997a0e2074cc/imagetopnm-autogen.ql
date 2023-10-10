@@ -67,4 +67,4 @@ and vforce_split_1908.getType().hasName("int")
 and vncomp_1913.getType().hasName("unsigned int")
 and vforce_split_1908.getParentScope+() = func
 and vncomp_1913.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

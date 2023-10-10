@@ -25,4 +25,4 @@ where
 func_0(vsctp_net_ops)
 and not func_1(func)
 and not vsctp_net_ops.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

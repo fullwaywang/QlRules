@@ -53,4 +53,4 @@ and vbusid_42.getType().hasName("const char *")
 and vi_44.getParentScope+() = func
 and vidx_45.getParentScope+() = func
 and vbusid_42.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

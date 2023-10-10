@@ -53,4 +53,4 @@ and func_8(vnew_201, target_8)
 and func_9(target_9)
 and vnew_201.getType().hasName("Jbig2SymbolDict *")
 and vnew_201.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

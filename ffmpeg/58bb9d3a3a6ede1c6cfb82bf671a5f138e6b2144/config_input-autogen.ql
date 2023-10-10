@@ -109,4 +109,4 @@ and vinlink_121.getType().hasName("AVFilterLink *")
 and vs_124.getType().hasName("TremoloContext *")
 and vinlink_121.getParentScope+() = func
 and vs_124.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

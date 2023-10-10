@@ -36,4 +36,4 @@ and vbuffer_80.getType().hasName("ScreenCell *")
 and vscreen_80.getType().hasName("VTermScreen *")
 and vbuffer_80.getParentScope+() = func
 and vscreen_80.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

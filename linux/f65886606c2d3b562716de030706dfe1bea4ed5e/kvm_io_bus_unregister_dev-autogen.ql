@@ -110,4 +110,4 @@ and func_13(vbus_4336)
 and vi_4335.getParentScope+() = func
 and vnew_bus_4336.getParentScope+() = func
 and vbus_4336.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

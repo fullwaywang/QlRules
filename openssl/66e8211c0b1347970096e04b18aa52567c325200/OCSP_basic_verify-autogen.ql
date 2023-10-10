@@ -99,4 +99,4 @@ and vskey_92.getParentScope+() = func
 and not vOCSP_RESPDATA_it.getParentScope+() = func
 and vflags_76.getParentScope+() = func
 and vbs_75.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -67,4 +67,4 @@ and func_3(target_4, func, target_3)
 and func_4(target_4)
 and vcur_600.getType().hasName("const xmlChar *")
 and vcur_600.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

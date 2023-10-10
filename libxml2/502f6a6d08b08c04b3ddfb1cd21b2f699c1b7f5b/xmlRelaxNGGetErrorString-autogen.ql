@@ -28,4 +28,4 @@ func_0(vmsg_2090, target_0)
 and not func_1(func)
 and vmsg_2090.getType().hasName("char[1000]")
 and vmsg_2090.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

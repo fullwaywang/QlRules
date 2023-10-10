@@ -29,4 +29,4 @@ func_0(vctx_1355, func, target_0)
 and func_1(vctx_1355, func, target_1)
 and vctx_1355.getType().hasName("rsa_context *")
 and vctx_1355.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

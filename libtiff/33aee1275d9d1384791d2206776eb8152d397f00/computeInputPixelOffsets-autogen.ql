@@ -110,4 +110,4 @@ and vi_5818.(LocalVariable).getFunction() = func
 and vzwidth_5818.(LocalVariable).getFunction() = func
 and vzlength_5818.(LocalVariable).getFunction() = func
 and vcrop_5806.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

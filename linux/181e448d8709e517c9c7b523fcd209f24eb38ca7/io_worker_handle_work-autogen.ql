@@ -41,4 +41,4 @@ and vwq_398.getType().hasName("io_wq *")
 and func_2(vwq_398)
 and vworker_393.getParentScope+() = func
 and vwq_398.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

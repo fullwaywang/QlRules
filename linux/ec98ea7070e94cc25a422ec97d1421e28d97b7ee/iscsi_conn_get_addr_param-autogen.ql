@@ -63,4 +63,4 @@ and vsin_3565.getType().hasName("sockaddr_in *")
 and vbuf_3562.getParentScope+() = func
 and vsin6_3564.getParentScope+() = func
 and vsin_3565.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

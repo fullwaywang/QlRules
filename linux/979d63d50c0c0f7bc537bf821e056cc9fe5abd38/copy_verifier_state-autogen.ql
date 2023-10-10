@@ -38,4 +38,4 @@ and vsrc_703.getType().hasName("const bpf_verifier_state *")
 and func_2(vsrc_703)
 and vdst_state_702.getParentScope+() = func
 and vsrc_703.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

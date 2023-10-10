@@ -84,4 +84,4 @@ and vtif_741.getType().hasName("TIFF *")
 and vmodule_743.(LocalVariable).getFunction() = func
 and vsp_745.(LocalVariable).getFunction() = func
 and vtif_741.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

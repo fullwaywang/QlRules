@@ -41,4 +41,4 @@ and not func_1(vvma_1267, func)
 and vvma_1267.getType().hasName("vm_area_struct *")
 and func_2(vvma_1267)
 and vvma_1267.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

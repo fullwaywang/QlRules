@@ -44,4 +44,4 @@ and vdev_1661.getType().hasName("gx_device *")
 and vpdev_1663.(LocalVariable).getFunction() = func
 and vrect_1664.(LocalVariable).getFunction() = func
 and vdev_1661.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

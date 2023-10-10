@@ -40,4 +40,4 @@ and func_1(vt2p_2155, target_1)
 and func_2(vt2p_2155, target_2)
 and vt2p_2155.getType().hasName("T2P *")
 and vt2p_2155.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

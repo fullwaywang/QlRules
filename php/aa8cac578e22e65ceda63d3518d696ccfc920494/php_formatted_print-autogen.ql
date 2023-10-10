@@ -79,4 +79,4 @@ and func_6(vnewargs_388, target_6)
 and func_7(vnewargs_388, target_7)
 and vnewargs_388.getType().hasName("zval *")
 and vnewargs_388.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

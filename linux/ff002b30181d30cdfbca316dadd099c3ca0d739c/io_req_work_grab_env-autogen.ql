@@ -63,4 +63,4 @@ and vdef_902.getType().hasName("const io_op_def *")
 and func_8(vdef_902)
 and vreq_901.getParentScope+() = func
 and vdef_902.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

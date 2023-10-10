@@ -50,4 +50,4 @@ and vconn_1481.getType().hasName("connectdata *")
 and vdata_1479.getType().hasName("Curl_easy *")
 and vconn_1481.(LocalVariable).getFunction() = func
 and vdata_1479.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

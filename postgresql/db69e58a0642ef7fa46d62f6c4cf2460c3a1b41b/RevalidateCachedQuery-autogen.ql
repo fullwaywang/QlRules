@@ -99,4 +99,4 @@ and vrow_security.getType().hasName("bool")
 and vplansource_551.getType().hasName("CachedPlanSource *")
 and not vrow_security.getParentScope+() = func
 and vplansource_551.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

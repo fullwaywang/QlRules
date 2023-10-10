@@ -51,4 +51,4 @@ and vnr_3244.getType().hasName("ssize_t")
 and vreq_3226.getParentScope+() = func
 and viter_3226.getParentScope+() = func
 and vnr_3244.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

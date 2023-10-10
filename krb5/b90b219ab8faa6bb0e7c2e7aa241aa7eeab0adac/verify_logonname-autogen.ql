@@ -42,4 +42,4 @@ and func_2(vlogon_name_930, target_2)
 and func_3(vlogon_name_930, target_3)
 and vlogon_name_930.getType().hasName("const PAC_INFO_BUFFER *")
 and vlogon_name_930.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

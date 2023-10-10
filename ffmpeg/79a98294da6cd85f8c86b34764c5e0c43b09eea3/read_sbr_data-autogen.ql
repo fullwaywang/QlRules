@@ -40,4 +40,4 @@ and vsbr_1017.getType().hasName("SpectralBandReplication *")
 and vid_aac_1018.getType().hasName("int")
 and vsbr_1017.getFunction() = func
 and vid_aac_1018.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

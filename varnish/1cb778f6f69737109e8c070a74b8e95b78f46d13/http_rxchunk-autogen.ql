@@ -84,4 +84,4 @@ and vold_544.getType().hasName("char *")
 and vhp_542.getType().hasName("http *")
 and vold_544.getParentScope+() = func
 and vhp_542.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

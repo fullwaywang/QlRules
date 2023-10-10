@@ -75,4 +75,4 @@ and vpacketLength_291.getType().hasName("size_t")
 and vs_289.getParentScope+() = func
 and vheader_290.getParentScope+() = func
 and vpacketLength_291.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

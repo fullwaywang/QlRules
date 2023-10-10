@@ -104,4 +104,4 @@ and vaction_1260.getParentScope+() = func
 and vcount_1263.getParentScope+() = func
 and vbuf_1266.getParentScope+() = func
 and not ve_buffer_nr_does_not_exist.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

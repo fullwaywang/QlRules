@@ -51,4 +51,4 @@ and not func_2(func)
 and func_6(vsession_261)
 and vsession_261.getType().hasName("j1939_session *")
 and vsession_261.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

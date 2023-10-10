@@ -28,4 +28,4 @@ not func_0(vhchan_5018, func)
 and vhchan_5018.getType().hasName("hci_chan *")
 and func_1(vhchan_5018)
 and vhchan_5018.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

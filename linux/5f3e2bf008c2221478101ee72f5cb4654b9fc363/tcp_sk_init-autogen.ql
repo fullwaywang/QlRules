@@ -29,4 +29,4 @@ not func_0(vnet_2602, func)
 and vnet_2602.getType().hasName("net *")
 and func_1(vnet_2602)
 and vnet_2602.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

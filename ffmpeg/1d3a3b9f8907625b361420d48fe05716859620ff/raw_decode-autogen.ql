@@ -51,4 +51,4 @@ and func_1(vcontext_153, target_1)
 and func_2(vcontext_153, target_2)
 and vcontext_153.getType().hasName("RawVideoContext *")
 and vcontext_153.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

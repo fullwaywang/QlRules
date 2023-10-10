@@ -346,4 +346,4 @@ and vFromLT2_945.getFunction() = func
 and vmask_947.(LocalVariable).getFunction() = func
 and vfltsize_948.(LocalVariable).getFunction() = func
 and not vLogK1.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

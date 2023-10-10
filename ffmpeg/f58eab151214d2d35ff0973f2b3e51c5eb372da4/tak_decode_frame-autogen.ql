@@ -56,4 +56,4 @@ and vavctx_671.getType().hasName("AVCodecContext *")
 and vs_674.(LocalVariable).getFunction() = func
 and vret_678.(LocalVariable).getFunction() = func
 and vavctx_671.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

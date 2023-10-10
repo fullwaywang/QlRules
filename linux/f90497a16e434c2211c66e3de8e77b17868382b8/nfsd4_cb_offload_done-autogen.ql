@@ -38,4 +38,4 @@ and vcb_1621.getType().hasName("nfsd4_callback *")
 and vtask_1622.getType().hasName("rpc_task *")
 and vcb_1621.getParentScope+() = func
 and vtask_1622.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

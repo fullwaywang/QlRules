@@ -129,4 +129,4 @@ and vdata_1956.getFunction() = func
 and vdata_size_1956.getFunction() = func
 and vs_1961.(LocalVariable).getFunction() = func
 and vout_1962.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

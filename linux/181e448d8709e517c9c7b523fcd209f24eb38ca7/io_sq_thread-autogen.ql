@@ -45,4 +45,4 @@ and not func_2(func)
 and vctx_3268.getType().hasName("io_ring_ctx *")
 and func_3(vctx_3268)
 and vctx_3268.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

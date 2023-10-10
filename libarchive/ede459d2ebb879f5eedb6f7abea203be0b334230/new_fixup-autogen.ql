@@ -38,4 +38,4 @@ and func_1(vfe_2681, target_1)
 and func_2(vfe_2681, target_2)
 and vfe_2681.getType().hasName("fixup_entry *")
 and vfe_2681.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

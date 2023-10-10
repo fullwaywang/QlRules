@@ -194,4 +194,4 @@ and not vCurrentMemoryContext.getParentScope+() = func
 and vpartrelDesc_571.(LocalVariable).getFunction() = func
 and vecontext_572.(LocalVariable).getFunction() = func
 and vonconflset_632.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

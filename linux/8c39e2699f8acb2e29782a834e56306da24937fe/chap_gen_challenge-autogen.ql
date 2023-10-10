@@ -47,4 +47,4 @@ and vchallenge_asciihex_45.getType().hasName("unsigned char[33]")
 and vchap_46.getType().hasName("iscsi_chap *")
 and vchallenge_asciihex_45.getParentScope+() = func
 and vchap_46.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

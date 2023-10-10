@@ -121,4 +121,4 @@ and func_11(vdata_373, target_11)
 and func_12(vdata_373, target_12)
 and vdata_373.getType().hasName("SessionHandle *")
 and vdata_373.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -66,4 +66,4 @@ and vtvb_1145.getType().hasName("tvbuff_t *")
 and voffset_1145.getParentScope+() = func
 and vmsglen_1151.getParentScope+() = func
 and vtvb_1145.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

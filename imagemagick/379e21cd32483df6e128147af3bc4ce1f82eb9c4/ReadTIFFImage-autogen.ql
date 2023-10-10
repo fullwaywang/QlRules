@@ -106,4 +106,4 @@ and vimage_1098.getParentScope+() = func
 and vtiff_1125.getParentScope+() = func
 and vbits_per_sample_1132.getParentScope+() = func
 and vsamples_per_pixel_1143.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

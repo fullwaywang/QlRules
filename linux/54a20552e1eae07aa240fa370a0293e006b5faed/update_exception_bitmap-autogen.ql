@@ -48,4 +48,4 @@ not func_0(veb_1639)
 and func_1(veb_1639)
 and veb_1639.getType().hasName("u32")
 and veb_1639.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

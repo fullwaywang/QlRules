@@ -51,4 +51,4 @@ and func_1(target_1)
 and func_2(vi_ctx_p_866, target_2)
 and vi_ctx_p_866.getType().hasName("i_ctx_t *")
 and vi_ctx_p_866.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

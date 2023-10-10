@@ -67,4 +67,4 @@ and vidata_617.getType().hasName("ImapData *")
 and vlitlen_624.getType().hasName("unsigned int")
 and vidata_617.getParentScope+() = func
 and vlitlen_624.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -39,4 +39,4 @@ and not func_1(vg_1679, target_2)
 and func_2(vg_1679, target_2)
 and vg_1679.getType().hasName("global_State *")
 and vg_1679.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

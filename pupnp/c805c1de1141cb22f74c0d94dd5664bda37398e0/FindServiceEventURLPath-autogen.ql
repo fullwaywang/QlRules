@@ -101,4 +101,4 @@ and vtable_279.getFunction() = func
 and veventURLPath_279.getFunction() = func
 and vfinger_281.(LocalVariable).getFunction() = func
 and vparsed_url_in_283.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

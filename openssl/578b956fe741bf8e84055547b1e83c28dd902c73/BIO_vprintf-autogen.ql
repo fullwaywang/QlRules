@@ -109,4 +109,4 @@ and vhugebufp_764.getParentScope+() = func
 and vhugebufsize_765.getParentScope+() = func
 and vdynbuf_766.getParentScope+() = func
 and vignored_767.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

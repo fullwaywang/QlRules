@@ -52,4 +52,4 @@ and vmaster_679.getType().hasName("RAND_DRBG *")
 and vpublic_679.getParentScope+() = func
 and vprivate_679.getParentScope+() = func
 and vmaster_679.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

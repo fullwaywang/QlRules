@@ -59,4 +59,4 @@ and vfirst_digits_3605.getType().hasName("int")
 and vret_3608.getType().hasName("int")
 and vfirst_digits_3605.getParentScope+() = func
 and vret_3608.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

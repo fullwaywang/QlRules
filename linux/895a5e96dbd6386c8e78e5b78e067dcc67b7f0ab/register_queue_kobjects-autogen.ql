@@ -32,4 +32,4 @@ and func_1(vdev_1522, vrxq_1524)
 and vrxq_1524.getType().hasName("int")
 and vdev_1522.getParentScope+() = func
 and vrxq_1524.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

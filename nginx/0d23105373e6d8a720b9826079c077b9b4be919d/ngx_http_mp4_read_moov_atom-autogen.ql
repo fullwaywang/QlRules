@@ -47,4 +47,4 @@ not func_0(vmp4_1163, target_1, func)
 and func_1(vmp4_1163, target_1)
 and vmp4_1163.getType().hasName("ngx_http_mp4_file_t *")
 and vmp4_1163.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

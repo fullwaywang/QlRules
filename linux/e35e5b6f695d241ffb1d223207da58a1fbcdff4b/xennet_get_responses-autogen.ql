@@ -50,4 +50,4 @@ and func_4(v__UNIQUE_ID_rcu1819_1041)
 and vqueue_975.getType().hasName("netfront_queue *")
 and vqueue_975.getParentScope+() = func
 and v__UNIQUE_ID_rcu1819_1041.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

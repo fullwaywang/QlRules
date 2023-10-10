@@ -62,4 +62,4 @@ and vtif_848.getType().hasName("TIFF *")
 and vsubsamplingver_854.getType().hasName("uint16")
 and vtif_848.(LocalVariable).getFunction() = func
 and vsubsamplingver_854.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

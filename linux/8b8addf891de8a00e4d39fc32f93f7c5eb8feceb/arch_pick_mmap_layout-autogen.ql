@@ -51,4 +51,4 @@ and vmm_112.getType().hasName("mm_struct *")
 and vrandom_factor_114.getType().hasName("unsigned long")
 and vmm_112.getParentScope+() = func
 and vrandom_factor_114.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

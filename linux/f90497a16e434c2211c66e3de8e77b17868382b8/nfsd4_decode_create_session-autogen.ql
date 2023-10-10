@@ -66,4 +66,4 @@ and vargp_1633.getType().hasName("nfsd4_compoundargs *")
 and vsess_1634.getParentScope+() = func
 and vstatus_1636.getParentScope+() = func
 and vargp_1633.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

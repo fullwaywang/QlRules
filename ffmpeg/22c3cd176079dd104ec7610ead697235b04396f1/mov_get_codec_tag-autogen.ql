@@ -37,4 +37,4 @@ not func_0(vtag_1654, target_1, func)
 and func_1(vtag_1654, target_1)
 and vtag_1654.getType().hasName("unsigned int")
 and vtag_1654.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

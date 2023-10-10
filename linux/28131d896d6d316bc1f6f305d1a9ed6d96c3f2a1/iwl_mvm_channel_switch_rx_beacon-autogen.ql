@@ -38,4 +38,4 @@ and not func_4(func)
 and vmvmvif_4694.getType().hasName("iwl_mvm_vif *")
 and func_6(vmvmvif_4694)
 and vmvmvif_4694.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

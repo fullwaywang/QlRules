@@ -110,4 +110,4 @@ and vjoinName_296.getType().hasName("List *")
 and vtypeId_298.(LocalVariable).getFunction() = func
 and vjoinOid_299.(LocalVariable).getFunction() = func
 and vjoinName_296.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

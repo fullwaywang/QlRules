@@ -48,4 +48,4 @@ and vctx_1594.getType().hasName("vhu_msg_context *")
 and vdev_1600.getType().hasName("virtio_net *")
 and vctx_1594.getParentScope+() = func
 and vdev_1600.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

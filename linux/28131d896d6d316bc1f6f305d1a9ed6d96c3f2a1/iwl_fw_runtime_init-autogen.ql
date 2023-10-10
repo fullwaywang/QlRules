@@ -45,4 +45,4 @@ and not func_2(vfwrt_16, func)
 and vfwrt_16.getType().hasName("iwl_fw_runtime *")
 and func_3(vfwrt_16)
 and vfwrt_16.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

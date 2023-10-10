@@ -52,4 +52,4 @@ and vwork_1309.getType().hasName("nfsd4_ssc_umount_item *")
 and vipaddr_1305.getType().hasName("char *")
 and vwork_1309.getParentScope+() = func
 and vipaddr_1305.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -268,4 +268,4 @@ and vop_480.(LocalVariable).getFunction() = func
 and vnum_out_484.(LocalVariable).getFunction() = func
 and vstack_depth_adjust_488.(LocalVariable).getFunction() = func
 and vi_ctx_p_478.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

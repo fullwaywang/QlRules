@@ -53,4 +53,4 @@ and func_7(vmask_506)
 and not func_9(func)
 and func_12(vmask_506)
 and vmask_506.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

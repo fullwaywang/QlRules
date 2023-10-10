@@ -31,4 +31,4 @@ not func_0(vcstate_6757, func)
 and vcstate_6757.getType().hasName("nfsd4_compound_state *")
 and func_1(vcstate_6757)
 and vcstate_6757.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

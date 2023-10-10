@@ -139,4 +139,4 @@ and vci_488.getType().hasName("CallInfo *")
 and vL_457.getFunction() = func
 and vci_468.(LocalVariable).getFunction() = func
 and vci_488.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

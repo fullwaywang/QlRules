@@ -46,4 +46,4 @@ and func_2(vavc_2938, target_2)
 and func_3(vavc_2938, target_3)
 and vavc_2938.getType().hasName("AVFormatContext *")
 and vavc_2938.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

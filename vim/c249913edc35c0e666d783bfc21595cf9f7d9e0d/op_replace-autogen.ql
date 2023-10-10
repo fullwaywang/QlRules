@@ -201,4 +201,4 @@ and not vcurbuf.getParentScope+() = func
 and not vcurwin.getParentScope+() = func
 and not vvirtual_op.getParentScope+() = func
 and vvirtcols_1212.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

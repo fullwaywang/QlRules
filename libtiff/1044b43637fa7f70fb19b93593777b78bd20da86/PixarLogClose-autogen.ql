@@ -50,4 +50,4 @@ and func_2(vtd_1236, func, target_2)
 and func_3(vtd_1236, func, target_3)
 and vtd_1236.getType().hasName("TIFFDirectory *")
 and vtd_1236.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

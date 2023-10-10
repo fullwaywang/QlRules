@@ -48,4 +48,4 @@ and func_2(vsp_1274, target_2)
 and func_3(vsp_1274, target_3)
 and vsp_1274.getType().hasName("trystate_T *")
 and vsp_1274.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

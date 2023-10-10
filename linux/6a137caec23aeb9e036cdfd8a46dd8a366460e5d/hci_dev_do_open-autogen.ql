@@ -26,4 +26,4 @@ func_0(vhdev_1433)
 and func_1(vhdev_1433)
 and vhdev_1433.getType().hasName("hci_dev *")
 and vhdev_1433.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

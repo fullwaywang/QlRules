@@ -27,4 +27,4 @@ func_0(vei_3435, target_0)
 and func_4(vei_3435, target_4)
 and vei_3435.getType().hasName("ei_register_info[]")
 and vei_3435.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -46,4 +46,4 @@ and func_2(vmulti_draw_nine_grid_1359, target_2)
 and func_3(vmulti_draw_nine_grid_1359, target_3)
 and vmulti_draw_nine_grid_1359.getType().hasName("MULTI_DRAW_NINE_GRID_ORDER *")
 and vmulti_draw_nine_grid_1359.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

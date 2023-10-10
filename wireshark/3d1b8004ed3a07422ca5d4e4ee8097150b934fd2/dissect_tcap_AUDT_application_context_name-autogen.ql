@@ -41,4 +41,4 @@ and vp_tcap_private_1050.getType().hasName("tcap_private_t *")
 and vcur_oid.getType().hasName("const char *")
 and vp_tcap_private_1050.getParentScope+() = func
 and not vcur_oid.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

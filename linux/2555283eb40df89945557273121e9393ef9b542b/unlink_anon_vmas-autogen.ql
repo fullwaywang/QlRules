@@ -102,4 +102,4 @@ and vanon_vma_403.getType().hasName("anon_vma *")
 and vvma_393.getParentScope+() = func
 and vanon_vma_403.getParentScope+() = func
 and vanon_vma_437.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -37,4 +37,4 @@ and func_1(vlen_402, target_1)
 and func_2(vlen_402, target_2)
 and vlen_402.getType().hasName("int32_t")
 and vlen_402.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

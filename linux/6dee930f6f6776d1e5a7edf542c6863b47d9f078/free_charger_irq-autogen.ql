@@ -31,4 +31,4 @@ not func_0(vwm8350_519, func)
 and vwm8350_519.getType().hasName("wm8350 *")
 and func_1(vwm8350_519)
 and vwm8350_519.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

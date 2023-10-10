@@ -53,4 +53,4 @@ and vnew_cursor_col_1250.getType().hasName("int")
 and vptr_1252.getType().hasName("char_u *")
 and vnew_cursor_col_1250.getParentScope+() = func
 and vptr_1252.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

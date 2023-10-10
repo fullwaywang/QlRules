@@ -71,4 +71,4 @@ and vpSubSrc_3723.getType().hasName("SrcList *")
 and vp_3714.getFunction() = func
 and visAgg_3716.getFunction() = func
 and vpSubSrc_3723.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

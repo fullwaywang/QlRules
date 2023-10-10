@@ -74,4 +74,4 @@ and vfrom_192.getType().hasName("const ModifyTable *")
 and vnewnode_194.getType().hasName("ModifyTable *")
 and vfrom_192.getFunction() = func
 and vnewnode_194.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

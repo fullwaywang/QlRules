@@ -56,4 +56,4 @@ and vconn_1966.getType().hasName("PGconn *")
 and vsavedMessage_1966.getType().hasName("PQExpBuffer")
 and vconn_1966.getFunction() = func
 and vsavedMessage_1966.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

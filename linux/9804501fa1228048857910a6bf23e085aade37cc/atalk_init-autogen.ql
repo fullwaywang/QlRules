@@ -63,4 +63,4 @@ and func_8(func)
 and vrc_1913.getType().hasName("int")
 and not vatalk_err_snap.getParentScope+() = func
 and vrc_1913.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

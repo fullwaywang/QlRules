@@ -35,4 +35,4 @@ and vprevwin.getType().hasName("win_T *")
 and vcurbuf.getType().hasName("buf_T *")
 and not vprevwin.getParentScope+() = func
 and not vcurbuf.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

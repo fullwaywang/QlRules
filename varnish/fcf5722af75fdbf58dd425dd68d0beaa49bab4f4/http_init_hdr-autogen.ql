@@ -38,4 +38,4 @@ and vflg_165.getType().hasName("int")
 and vf_167.getType().hasName("http_hdrflg *")
 and vflg_165.getParentScope+() = func
 and vf_167.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

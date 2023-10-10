@@ -42,4 +42,4 @@ and vruntime_1329.getType().hasName("snd_rawmidi_runtime *")
 and func_2(vruntime_1329)
 and func_3(vruntime_1329)
 and vruntime_1329.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

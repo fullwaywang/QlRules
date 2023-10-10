@@ -70,4 +70,4 @@ and vctx_764.getType().hasName("IVI4DecContext *")
 and vavctx_761.getType().hasName("AVCodecContext *")
 and vctx_764.(LocalVariable).getFunction() = func
 and vavctx_761.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

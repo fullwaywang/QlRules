@@ -55,4 +55,4 @@ and vsamplesref_656.getType().hasName("AVFilterBufferRef *")
 and vi_660.getType().hasName("int")
 and vsamplesref_656.getFunction() = func
 and vi_660.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

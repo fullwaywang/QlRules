@@ -64,4 +64,4 @@ and func_4(vx_1661, target_4)
 and func_5(target_5)
 and vx_1661.getType().hasName("X509 *")
 and vx_1661.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

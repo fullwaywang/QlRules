@@ -67,4 +67,4 @@ and func_3(vpng_ptr_167)
 and not func_4(vpng_ptr_167)
 and vchunk_name_169.getParentScope+() = func
 and vpng_ptr_167.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

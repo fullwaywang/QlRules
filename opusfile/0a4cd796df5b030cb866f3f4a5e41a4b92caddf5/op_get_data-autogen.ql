@@ -41,4 +41,4 @@ and func_1(vbuffer_147, target_1)
 and func_2(vbuffer_147, target_2)
 and vbuffer_147.getType().hasName("unsigned char *")
 and vbuffer_147.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

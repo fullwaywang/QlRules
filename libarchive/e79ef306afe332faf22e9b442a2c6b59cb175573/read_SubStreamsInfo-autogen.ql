@@ -35,4 +35,4 @@ and func_1(vunpack_streams_2135, target_1)
 and func_2(vunpack_streams_2135, target_2)
 and vunpack_streams_2135.getType().hasName("size_t")
 and vunpack_streams_2135.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

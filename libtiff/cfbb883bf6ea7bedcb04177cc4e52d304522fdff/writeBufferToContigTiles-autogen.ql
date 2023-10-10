@@ -83,4 +83,4 @@ and vtile_buffsize_1272.getType().hasName("tsize_t")
 and vtilebuf_1274.getType().hasName("unsigned char *")
 and vtile_buffsize_1272.(LocalVariable).getFunction() = func
 and vtilebuf_1274.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

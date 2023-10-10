@@ -34,4 +34,4 @@ and not func_2(vret_1627)
 and func_3(vret_1627, target_3)
 and vret_1627.getType().hasName("int")
 and vret_1627.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

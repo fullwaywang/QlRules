@@ -46,4 +46,4 @@ and vnewpath_308.getType().hasName("extent_path *")
 and vop_315.getType().hasName("int")
 and vnewpath_308.getParentScope+() = func
 and vop_315.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ and vadapter_239.getType().hasName("rsi_hw *")
 and func_1(vadapter_239)
 and vhw_241.getParentScope+() = func
 and vadapter_239.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

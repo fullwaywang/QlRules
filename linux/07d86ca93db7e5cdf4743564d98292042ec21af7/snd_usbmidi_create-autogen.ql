@@ -23,4 +23,4 @@ and vumidi_2328.getType().hasName("snd_usb_midi *")
 and verr_2331.getType().hasName("int")
 and vumidi_2328.getParentScope+() = func
 and verr_2331.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

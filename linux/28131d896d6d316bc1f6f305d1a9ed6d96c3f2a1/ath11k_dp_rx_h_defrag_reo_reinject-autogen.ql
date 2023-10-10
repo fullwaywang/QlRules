@@ -29,4 +29,4 @@ not func_0(vab_3364)
 and vab_3364.getType().hasName("ath11k_base *")
 and func_2(vab_3364)
 and vab_3364.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

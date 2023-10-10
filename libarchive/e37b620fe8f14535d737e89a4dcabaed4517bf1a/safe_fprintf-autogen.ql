@@ -26,4 +26,4 @@ from Function func, SubExpr target_0, BlockStmt target_1
 where
 func_0(target_1, func, target_0)
 and func_1(target_1)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

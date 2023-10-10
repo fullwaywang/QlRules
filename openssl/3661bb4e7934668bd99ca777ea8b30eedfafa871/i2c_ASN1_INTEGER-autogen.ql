@@ -1,7 +1,7 @@
 /**
  * @name openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-i2c_ASN1_INTEGER
  * @id cpp/openssl/3661bb4e7934668bd99ca777ea8b30eedfafa871/i2c-ASN1-INTEGER
- * @description openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-i2c_ASN1_INTEGER NULL
+ * @description openssl-3661bb4e7934668bd99ca777ea8b30eedfafa871-i2c_ASN1_INTEGER CVE-2016-2108
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -114,4 +114,4 @@ and vneg_116.getParentScope+() = func
 and vp_117.getParentScope+() = func
 and vn_117.getParentScope+() = func
 and vpb_117.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

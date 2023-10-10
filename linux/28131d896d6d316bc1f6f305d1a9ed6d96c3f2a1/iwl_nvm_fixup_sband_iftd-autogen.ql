@@ -65,4 +65,4 @@ and func_5(viftype_data_729, vis_ap_733)
 and vtrans_727.getParentScope+() = func
 and viftype_data_729.getParentScope+() = func
 and vis_ap_733.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

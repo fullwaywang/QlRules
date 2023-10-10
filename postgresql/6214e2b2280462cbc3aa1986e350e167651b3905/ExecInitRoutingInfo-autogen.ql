@@ -19,4 +19,4 @@ where
 func_0(vpartRelInfo_951, target_0)
 and vpartRelInfo_951.getType().hasName("ResultRelInfo *")
 and vpartRelInfo_951.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

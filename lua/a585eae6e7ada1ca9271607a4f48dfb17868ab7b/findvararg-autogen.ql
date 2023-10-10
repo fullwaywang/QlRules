@@ -87,4 +87,4 @@ and vnextra_190.getType().hasName("int")
 and vci_188.getFunction() = func
 and vn_188.getFunction() = func
 and vnextra_190.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

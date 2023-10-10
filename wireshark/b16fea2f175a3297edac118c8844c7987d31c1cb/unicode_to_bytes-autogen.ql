@@ -107,4 +107,4 @@ and vc_char1_447.getType().hasName("guint8")
 and vascii_text_445.getParentScope+() = func
 and vi_446.getParentScope+() = func
 and vc_char1_447.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

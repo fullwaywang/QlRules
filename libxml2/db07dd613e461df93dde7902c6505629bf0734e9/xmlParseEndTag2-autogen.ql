@@ -135,4 +135,4 @@ and vctxt_9825.getType().hasName("xmlParserCtxtPtr")
 and vtlen_9826.getType().hasName("int")
 and vctxt_9825.getFunction() = func
 and vtlen_9826.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -38,4 +38,4 @@ and vcmd_3755.getType().hasName("cmd_parms *")
 and vconf_3758.getType().hasName("core_dir_config *")
 and vcmd_3755.getParentScope+() = func
 and vconf_3758.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

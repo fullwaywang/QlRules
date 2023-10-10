@@ -55,4 +55,4 @@ and func_3(vstr_2538, target_3)
 and func_4(vstr_2538, target_4)
 and vstr_2538.getType().hasName("xmlChar *")
 and vstr_2538.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

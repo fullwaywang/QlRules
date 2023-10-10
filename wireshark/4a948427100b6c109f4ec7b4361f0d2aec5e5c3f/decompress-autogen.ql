@@ -411,4 +411,4 @@ and vdecompressedChild_274.getParentScope+() = func
 and vdecompress_buffer_295.getParentScope+() = func
 and verr_301.getParentScope+() = func
 and vdata_to_save_1_316.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

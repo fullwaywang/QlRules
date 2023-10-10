@@ -66,4 +66,4 @@ and vrr_964.getType().hasName("SSL3_RECORD *")
 and val_962.getParentScope+() = func
 and vs_960.getParentScope+() = func
 and vrr_964.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

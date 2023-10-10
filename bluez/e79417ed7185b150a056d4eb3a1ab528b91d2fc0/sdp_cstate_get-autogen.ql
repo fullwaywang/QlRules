@@ -45,4 +45,4 @@ and func_2(target_2)
 and func_3(vcstate_278, target_3)
 and vcstate_278.getType().hasName("sdp_cont_state_t **")
 and vcstate_278.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

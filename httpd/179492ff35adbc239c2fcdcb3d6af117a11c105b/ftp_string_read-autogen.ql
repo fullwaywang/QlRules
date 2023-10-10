@@ -44,4 +44,4 @@ and func_2(vlen_228, target_2)
 and func_3(vlen_228, target_3)
 and vlen_228.getType().hasName("apr_size_t")
 and vlen_228.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

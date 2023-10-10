@@ -149,4 +149,4 @@ and vtrk_5315.getType().hasName("MOVTrack *")
 and vsize_5318.getType().hasName("int")
 and vtrk_5315.getParentScope+() = func
 and vsize_5318.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

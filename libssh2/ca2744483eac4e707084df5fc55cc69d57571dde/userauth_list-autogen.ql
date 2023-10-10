@@ -50,4 +50,4 @@ and vrc_72.getType().hasName("int")
 and vsession_63.getType().hasName("LIBSSH2_SESSION *")
 and vrc_72.getParentScope+() = func
 and vsession_63.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

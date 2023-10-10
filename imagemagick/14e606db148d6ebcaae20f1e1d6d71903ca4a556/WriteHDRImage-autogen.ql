@@ -93,4 +93,4 @@ and vimage_658.getType().hasName("Image *")
 and vpixels_686.getType().hasName("unsigned char *")
 and vimage_658.getParentScope+() = func
 and vpixels_686.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

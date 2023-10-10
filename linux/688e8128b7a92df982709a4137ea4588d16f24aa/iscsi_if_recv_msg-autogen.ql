@@ -23,4 +23,4 @@ where
 not func_0(vskb_3613, func)
 and vskb_3613.getType().hasName("sk_buff *")
 and vskb_3613.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

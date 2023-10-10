@@ -96,4 +96,4 @@ and func_7(vs_780, target_7)
 and func_8(vs_780, target_8)
 and vs_780.getType().hasName("BM3DContext *")
 and vs_780.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

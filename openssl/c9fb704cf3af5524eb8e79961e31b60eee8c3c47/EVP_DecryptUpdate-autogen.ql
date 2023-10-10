@@ -66,4 +66,4 @@ and vin_687.getParentScope+() = func
 and vinl_687.getParentScope+() = func
 and vb_690.getParentScope+() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -259,4 +259,4 @@ and vdec_notice_limit_767.getParentScope+() = func
 and vdec_notice_limit_781.getParentScope+() = func
 and vcc_728.getParentScope+() = func
 and vold_delta_729.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

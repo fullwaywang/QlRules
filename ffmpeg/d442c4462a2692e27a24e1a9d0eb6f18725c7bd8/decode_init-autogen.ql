@@ -84,4 +84,4 @@ and vavctx_171.getType().hasName("AVCodecContext *")
 and vs_173.getType().hasName("WmallDecodeCtx *")
 and vavctx_171.getFunction() = func
 and vs_173.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

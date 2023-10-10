@@ -240,4 +240,4 @@ and verr_813.(LocalVariable).getFunction() = func
 and voffset_814.(LocalVariable).getFunction() = func
 and verr_831.(LocalVariable).getFunction() = func
 and voffset_832.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

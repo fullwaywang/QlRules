@@ -91,4 +91,4 @@ and vs_339.getType().hasName("V4L2m2mContext *")
 and vret_340.getType().hasName("int")
 and vs_339.getParentScope+() = func
 and vret_340.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -50,4 +50,4 @@ and func_2(vsearch_33, target_2)
 and func_3(vsearch_33, target_3)
 and vsearch_33.getType().hasName("char *")
 and vsearch_33.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

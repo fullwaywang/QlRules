@@ -105,4 +105,4 @@ and vleadingSizeInByte_819.getParentScope+() = func
 and vbuffer_822.getParentScope+() = func
 and vcipherSize_832.getParentScope+() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -40,4 +40,4 @@ and func_1(vguard_1436, target_1)
 and func_2(vguard_1436, target_2)
 and vguard_1436.getType().hasName("const entry_guard_t *")
 and vguard_1436.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

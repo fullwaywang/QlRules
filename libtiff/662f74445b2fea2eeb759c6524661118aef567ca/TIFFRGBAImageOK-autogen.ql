@@ -81,4 +81,4 @@ and vphotometric_79.getType().hasName("uint16")
 and vemsg_76.getFunction() = func
 and vtd_78.(LocalVariable).getFunction() = func
 and vphotometric_79.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

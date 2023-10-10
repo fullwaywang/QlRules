@@ -84,4 +84,4 @@ and func_4(vpgs_691, target_4)
 and func_5(vpgs_691, target_5)
 and vpgs_691.getType().hasName("gs_gstate *")
 and vpgs_691.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

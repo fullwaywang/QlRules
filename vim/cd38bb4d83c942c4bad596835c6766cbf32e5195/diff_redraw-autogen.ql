@@ -48,4 +48,4 @@ and func_2(vwp_665, target_2)
 and func_3(vwp_665, target_3)
 and vwp_665.getType().hasName("win_T *")
 and vwp_665.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

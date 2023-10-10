@@ -28,4 +28,4 @@ and vflags_322.getType().hasName("RemoveFlags")
 and vfd_322.getParentScope+() = func
 and vname_322.getParentScope+() = func
 and vflags_322.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

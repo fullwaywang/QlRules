@@ -62,4 +62,4 @@ and vrp_270.getType().hasName("ipddp_route *")
 and func_6(vrp_270)
 and vrcp2_270.getParentScope+() = func
 and vrp_270.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

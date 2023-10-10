@@ -27,4 +27,4 @@ not func_1(velelen_650, target_3)
 and func_3(velelen_650, target_3)
 and velelen_650.getType().hasName("size_t")
 and velelen_650.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

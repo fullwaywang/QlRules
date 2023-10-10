@@ -894,4 +894,4 @@ and vi_136.(LocalVariable).getFunction() = func
 and vpix16_137.(LocalVariable).getFunction() = func
 and vpix32_138.(LocalVariable).getFunction() = func
 and vpix_200.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

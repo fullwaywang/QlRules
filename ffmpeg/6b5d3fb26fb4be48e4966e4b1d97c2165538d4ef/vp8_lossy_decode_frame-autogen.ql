@@ -65,4 +65,4 @@ and vs_1330.getType().hasName("WebPContext *")
 and vavctx_1326.getType().hasName("AVCodecContext *")
 and vs_1330.getParentScope+() = func
 and vavctx_1326.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

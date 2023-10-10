@@ -421,4 +421,4 @@ and vchosen_3128.getParentScope+() = func
 and vwantNTLMhttp_3132.getParentScope+() = func
 and vmatch_3190.getParentScope+() = func
 and vcredentialsMatch_3192.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

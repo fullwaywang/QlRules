@@ -56,4 +56,4 @@ and vbusid_table.getType().hasName("bus_id_priv[16]")
 and vi_126.getParentScope+() = func
 and vout_127.getParentScope+() = func
 and not vbusid_table.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

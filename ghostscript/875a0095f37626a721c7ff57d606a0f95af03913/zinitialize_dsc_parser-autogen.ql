@@ -110,4 +110,4 @@ and vpdict_1_153.(LocalVariable).getFunction() = func
 and vmem_1_154.(LocalVariable).getFunction() = func
 and vdata_1_155.(LocalVariable).getFunction() = func
 and not vst_dsc_data_t.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

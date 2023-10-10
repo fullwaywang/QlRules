@@ -165,4 +165,4 @@ and func_16(vcropsize_7838, target_16)
 and func_17(vcropsize_7838, target_17)
 and vcropsize_7838.getType().hasName("tsize_t")
 and vcropsize_7838.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

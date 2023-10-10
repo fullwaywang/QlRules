@@ -131,4 +131,4 @@ and func_13(target_13)
 and func_14(target_14)
 and veasy_432.getType().hasName("Curl_one_easy *")
 and veasy_432.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -19,4 +19,4 @@ where
 func_1(vline_to_free_813, target_1)
 and vline_to_free_813.getType().hasName("char_u **")
 and vline_to_free_813.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

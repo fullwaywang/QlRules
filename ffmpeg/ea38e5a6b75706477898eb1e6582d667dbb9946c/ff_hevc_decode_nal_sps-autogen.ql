@@ -53,4 +53,4 @@ and func_2(vsps_712, target_2)
 and func_3(vsps_712, target_3)
 and vsps_712.getType().hasName("HEVCSPS *")
 and vsps_712.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

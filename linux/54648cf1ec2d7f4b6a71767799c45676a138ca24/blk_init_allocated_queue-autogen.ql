@@ -28,4 +28,4 @@ not func_0(vq_1154, func)
 and vq_1154.getType().hasName("request_queue *")
 and func_1(vq_1154)
 and vq_1154.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

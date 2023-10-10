@@ -104,4 +104,4 @@ and vtrans_pcie_127.getType().hasName("iwl_trans_pcie *")
 and vtrans_125.getType().hasName("iwl_trans *")
 and vtrans_pcie_127.getParentScope+() = func
 and vtrans_125.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

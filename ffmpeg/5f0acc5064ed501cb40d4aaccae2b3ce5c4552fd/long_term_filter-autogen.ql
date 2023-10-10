@@ -76,4 +76,4 @@ and vshift_120.getParentScope+() = func
 and vsh_gain_num_127.getParentScope+() = func
 and vsh_gain_long_num_131.getParentScope+() = func
 and vselected_signal_138.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

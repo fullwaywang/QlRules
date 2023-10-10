@@ -63,4 +63,4 @@ and vs_1568.getType().hasName("AVFormatContext *")
 and vret_1573.getType().hasName("int64_t")
 and vs_1568.getParentScope+() = func
 and vret_1573.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

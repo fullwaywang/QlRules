@@ -82,4 +82,4 @@ and vpParse_4884.getType().hasName("Parse *")
 and vdb_4889.getType().hasName("sqlite3 *")
 and vpParse_4884.(LocalVariable).getFunction() = func
 and vdb_4889.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

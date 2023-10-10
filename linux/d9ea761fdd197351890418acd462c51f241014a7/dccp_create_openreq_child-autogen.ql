@@ -41,4 +41,4 @@ and vnewdp_92.getType().hasName("dccp_sock *")
 and func_2(vnewdp_92)
 and vnewsk_87.getParentScope+() = func
 and vnewdp_92.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

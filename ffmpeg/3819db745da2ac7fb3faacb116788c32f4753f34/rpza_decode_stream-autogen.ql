@@ -114,4 +114,4 @@ and vwidth_74.(LocalVariable).getFunction() = func
 and vrow_ptr_87.(LocalVariable).getFunction() = func
 and vpixel_ptr_88.(LocalVariable).getFunction() = func
 and vtotal_blocks_91.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

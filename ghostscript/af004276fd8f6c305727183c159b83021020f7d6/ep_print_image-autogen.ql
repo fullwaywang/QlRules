@@ -69,4 +69,4 @@ and vimg_rows_1930.(LocalVariable).getFunction() = func
 and vp3_1931.(LocalVariable).getFunction() = func
 and voutp_1932.(LocalVariable).getFunction() = func
 and vzeros_1963.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

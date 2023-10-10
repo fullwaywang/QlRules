@@ -71,4 +71,4 @@ and func_5(target_5)
 and func_6(ve_834, target_6)
 and ve_834.getType().hasName("ExifEntry *")
 and ve_834.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -49,4 +49,4 @@ and vframe_224.getType().hasName("uint8_t *")
 and vframe_end_226.getType().hasName("const uint8_t *")
 and vframe_224.getFunction() = func
 and vframe_end_226.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

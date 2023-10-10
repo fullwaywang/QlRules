@@ -28,4 +28,4 @@ where
 not func_0(vwrite_1059)
 and vwrite_1059.getType().hasName("int")
 and vwrite_1059.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

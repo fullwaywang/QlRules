@@ -260,4 +260,4 @@ and vhist_values_374.(LocalVariable).getFunction() = func
 and vnhist_375.(LocalVariable).getFunction() = func
 and vlength_hist_values_376.(LocalVariable).getFunction() = func
 and vlength_nhist_377.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

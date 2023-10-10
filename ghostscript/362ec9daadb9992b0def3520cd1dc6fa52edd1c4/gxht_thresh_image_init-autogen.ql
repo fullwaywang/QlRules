@@ -151,4 +151,4 @@ and vspp_out_582.getType().hasName("int")
 and vpenum_576.getFunction() = func
 and vmax_height_581.(LocalVariable).getFunction() = func
 and vspp_out_582.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -54,4 +54,4 @@ and vmax_queues_2210.getParentScope+() = func
 and not vxennet_max_queues.getParentScope+() = func
 and v__UNIQUE_ID___x1826_2220.getParentScope+() = func
 and v__UNIQUE_ID___y1827_2220.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

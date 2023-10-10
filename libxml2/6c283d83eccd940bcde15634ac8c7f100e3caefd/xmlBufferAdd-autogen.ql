@@ -116,4 +116,4 @@ and vneedSize_7578.getType().hasName("unsigned int")
 and vbuf_7577.getFunction() = func
 and vlen_7577.getFunction() = func
 and vneedSize_7578.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

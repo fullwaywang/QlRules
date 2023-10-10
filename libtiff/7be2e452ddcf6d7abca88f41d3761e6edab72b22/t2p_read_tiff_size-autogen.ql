@@ -93,4 +93,4 @@ and vk_1976.getType().hasName("uint64")
 and vt2p_1968.getFunction() = func
 and vinput_1968.getFunction() = func
 and vk_1976.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and vself_277.getType().hasName("trans *")
 and vsize_280.getType().hasName("int")
 and vself_277.getParentScope+() = func
 and vsize_280.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

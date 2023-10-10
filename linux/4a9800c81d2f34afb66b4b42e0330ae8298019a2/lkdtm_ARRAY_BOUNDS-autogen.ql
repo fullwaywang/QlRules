@@ -68,4 +68,4 @@ and func_8(vchecked_325)
 and func_9(vchecked_325)
 and vnot_checked_324.getParentScope+() = func
 and vchecked_325.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

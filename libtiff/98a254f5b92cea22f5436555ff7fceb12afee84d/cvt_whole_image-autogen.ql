@@ -65,4 +65,4 @@ and vpixel_count_395.getType().hasName("size_t")
 and vin_389.getType().hasName("TIFF *")
 and vpixel_count_395.(LocalVariable).getFunction() = func
 and vin_389.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

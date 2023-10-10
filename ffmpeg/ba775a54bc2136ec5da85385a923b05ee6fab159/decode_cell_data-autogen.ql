@@ -133,4 +133,4 @@ and vh_zoom_405.getFunction() = func
 and vv_zoom_405.getFunction() = func
 and vx_409.(LocalVariable).getFunction() = func
 and vy_409.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

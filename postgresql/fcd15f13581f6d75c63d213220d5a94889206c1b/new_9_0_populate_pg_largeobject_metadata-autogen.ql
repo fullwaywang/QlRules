@@ -115,4 +115,4 @@ and vscript_25.getType().hasName("FILE *")
 and vactive_db_37.getType().hasName("DbInfo *")
 and vscript_25.(LocalVariable).getFunction() = func
 and vactive_db_37.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

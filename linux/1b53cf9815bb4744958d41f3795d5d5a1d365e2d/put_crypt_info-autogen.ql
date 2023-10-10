@@ -22,4 +22,4 @@ where
 func_0(vci_167, func)
 and vci_167.getType().hasName("fscrypt_info *")
 and vci_167.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

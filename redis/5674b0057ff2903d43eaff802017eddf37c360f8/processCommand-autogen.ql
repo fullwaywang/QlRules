@@ -83,4 +83,4 @@ and vc_3552.getType().hasName("client *")
 and vauth_required_3595.getType().hasName("int")
 and vc_3552.getFunction() = func
 and vauth_required_3595.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

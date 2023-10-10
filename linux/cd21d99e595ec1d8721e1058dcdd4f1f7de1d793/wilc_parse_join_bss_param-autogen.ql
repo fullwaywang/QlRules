@@ -97,4 +97,4 @@ and voffset_485.getType().hasName("int")
 and vparam_377.getParentScope+() = func
 and vrsn_ie_381.getParentScope+() = func
 and voffset_485.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -48,4 +48,4 @@ and vupload_cnt_689.getType().hasName("int")
 and vsapi_module.getType().hasName("sapi_module_struct")
 and vupload_cnt_689.getParentScope+() = func
 and not vsapi_module.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

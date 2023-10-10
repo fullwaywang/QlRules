@@ -34,4 +34,4 @@ and func_1(vp_1379)
 and func_2(func)
 and vp_1379.getType().hasName("xfrm_userpolicy_info *")
 and vp_1379.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

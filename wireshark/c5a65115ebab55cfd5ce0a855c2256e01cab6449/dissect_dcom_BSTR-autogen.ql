@@ -49,4 +49,4 @@ and voffset_1712.getType().hasName("gint")
 and vpszStr_1714.getType().hasName("gchar *")
 and voffset_1712.getParentScope+() = func
 and vpszStr_1714.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

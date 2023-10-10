@@ -25,4 +25,4 @@ and vsvm_437.getType().hasName("vcpu_svm *")
 and vvmcb12_438.getType().hasName("vmcb *")
 and vsvm_437.getParentScope+() = func
 and vvmcb12_438.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

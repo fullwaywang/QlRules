@@ -82,4 +82,4 @@ and vctx_150.getType().hasName("Indeo3DecodeContext *")
 and vluma_width_153.(LocalVariable).getFunction() = func
 and vluma_height_153.(LocalVariable).getFunction() = func
 and vctx_150.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

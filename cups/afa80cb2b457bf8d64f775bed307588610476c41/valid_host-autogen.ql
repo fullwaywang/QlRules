@@ -34,4 +34,4 @@ func_0(vcon_3858, target_0)
 and func_1(vcon_3858, target_1)
 and vcon_3858.getType().hasName("cupsd_client_t *")
 and vcon_3858.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

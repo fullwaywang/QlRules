@@ -66,4 +66,4 @@ and vdesc_in_197.getType().hasName("const AVPixFmtDescriptor *")
 and vs_194.getParentScope+() = func
 and vdesc_out_196.getParentScope+() = func
 and vdesc_in_197.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

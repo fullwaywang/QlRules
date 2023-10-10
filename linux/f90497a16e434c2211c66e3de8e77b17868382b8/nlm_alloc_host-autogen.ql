@@ -58,4 +58,4 @@ and func_3(vhost_114)
 and func_4(func)
 and vhost_114.getType().hasName("nlm_host *")
 and vhost_114.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

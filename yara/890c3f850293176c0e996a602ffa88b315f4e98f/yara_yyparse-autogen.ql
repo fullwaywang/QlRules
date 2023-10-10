@@ -110,4 +110,4 @@ and vcompiler_1404.getType().hasName("YR_COMPILER *")
 and vyyn_1442.getType().hasName("int")
 and vcompiler_1404.getParentScope+() = func
 and vyyn_1442.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

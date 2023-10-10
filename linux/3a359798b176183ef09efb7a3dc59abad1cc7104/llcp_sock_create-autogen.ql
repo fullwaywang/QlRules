@@ -47,4 +47,4 @@ and vllcp_rawsock_ops.getType().hasName("const proto_ops")
 and not vllcp_sock_ops.getParentScope+() = func
 and vsock_995.getParentScope+() = func
 and not vllcp_rawsock_ops.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

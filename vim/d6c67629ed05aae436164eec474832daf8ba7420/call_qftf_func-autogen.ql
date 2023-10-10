@@ -75,4 +75,4 @@ and vcb_4675.getType().hasName("callback_T *")
 and vd_4686.getType().hasName("dict_T *")
 and vcb_4675.getParentScope+() = func
 and vd_4686.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

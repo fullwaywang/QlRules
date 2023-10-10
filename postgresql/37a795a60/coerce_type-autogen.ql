@@ -92,4 +92,4 @@ and vnode_156.getFunction() = func
 and vinputTypeId_157.getFunction() = func
 and vtargetTypeId_157.getFunction() = func
 and vlocation_158.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -42,4 +42,4 @@ and vreq_142.getType().hasName("io_kiocb *")
 and func_2(vret_145, vreq_142)
 and vret_145.getParentScope+() = func
 and vreq_142.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ not func_0(vvport_1134, func)
 and vvport_1134.getType().hasName("hclge_vport *")
 and func_1(vvport_1134)
 and vvport_1134.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

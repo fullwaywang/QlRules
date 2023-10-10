@@ -47,4 +47,4 @@ and vext_plugins.getType().hasName("lyext_plugin_list *")
 and vrevision_452.getParentScope+() = func
 and vu_454.getParentScope+() = func
 and not vext_plugins.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

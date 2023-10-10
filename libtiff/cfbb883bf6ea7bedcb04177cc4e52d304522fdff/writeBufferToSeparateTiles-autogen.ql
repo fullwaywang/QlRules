@@ -76,4 +76,4 @@ and vobuf_1361.getType().hasName("tdata_t")
 and vout_1357.getType().hasName("TIFF *")
 and vobuf_1361.(LocalVariable).getFunction() = func
 and vout_1357.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -54,4 +54,4 @@ and vclp_178.getType().hasName("nfs4_client *")
 and func_4(vclp_178)
 and vnn_180.getParentScope+() = func
 and vclp_178.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

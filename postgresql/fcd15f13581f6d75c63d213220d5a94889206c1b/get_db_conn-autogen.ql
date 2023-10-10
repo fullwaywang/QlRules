@@ -198,4 +198,4 @@ and vcluster_52.getFunction() = func
 and vdb_name_52.getFunction() = func
 and vconn_opts_54.(LocalVariable).getFunction() = func
 and not vos_info.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -180,4 +180,4 @@ and vval_114.getType().hasName("u16")
 and vdev_90.getParentScope+() = func
 and verr_92.getParentScope+() = func
 and vval_114.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

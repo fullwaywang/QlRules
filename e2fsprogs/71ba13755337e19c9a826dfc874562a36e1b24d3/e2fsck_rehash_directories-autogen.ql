@@ -60,4 +60,4 @@ and vctx_984.getType().hasName("e2fsck_t")
 and vino_993.getType().hasName("ext2_ino_t")
 and vctx_984.getParentScope+() = func
 and vino_993.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

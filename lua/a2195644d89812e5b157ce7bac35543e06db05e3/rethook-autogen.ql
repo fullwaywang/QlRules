@@ -105,4 +105,4 @@ and vL_326.getType().hasName("lua_State *")
 and vci_326.getType().hasName("CallInfo *")
 and vL_326.getFunction() = func
 and vci_326.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

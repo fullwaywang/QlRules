@@ -60,4 +60,4 @@ and func_6(vsave_pgd_78, func)
 and vefi_mm.getType().hasName("mm_struct")
 and vsave_pgd_78.getParentScope+() = func
 and not vefi_mm.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

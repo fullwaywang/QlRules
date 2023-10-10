@@ -59,4 +59,4 @@ and vnum_bits_1169.getType().hasName("int")
 and vs_1057.getType().hasName("WMAProDecodeCtx *")
 and vnum_bits_1169.(LocalVariable).getFunction() = func
 and vs_1057.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

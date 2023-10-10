@@ -41,4 +41,4 @@ not func_0(vs_543, target_1, func)
 and func_1(vs_543, target_1)
 and vs_543.getType().hasName("AVCodecContext *")
 and vs_543.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

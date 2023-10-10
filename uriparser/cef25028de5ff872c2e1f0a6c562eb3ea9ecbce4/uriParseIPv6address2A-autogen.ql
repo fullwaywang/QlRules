@@ -30,4 +30,4 @@ and vfirst_578.getParentScope+() = func
 and vafterLast_578.getParentScope+() = func
 and vmemory_579.getParentScope+() = func
 and vstate_577.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -60,4 +60,4 @@ and vstat_614.getType().hasName("p9_stat_dotl *")
 and vinode_614.getType().hasName("inode *")
 and vstat_614.getParentScope+() = func
 and vinode_614.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

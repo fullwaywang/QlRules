@@ -80,4 +80,4 @@ and vspcoid_1194.getType().hasName("uint32")
 and vfspcname_1202.getType().hasName("char *")
 and vspcoid_1194.(LocalVariable).getFunction() = func
 and vfspcname_1202.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

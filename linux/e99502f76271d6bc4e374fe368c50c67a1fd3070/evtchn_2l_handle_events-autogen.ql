@@ -41,4 +41,4 @@ and virq_166.getType().hasName("int")
 and vport_233.getType().hasName("evtchn_port_t")
 and virq_166.getParentScope+() = func
 and vport_233.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

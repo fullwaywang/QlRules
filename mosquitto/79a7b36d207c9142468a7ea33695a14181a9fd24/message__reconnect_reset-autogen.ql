@@ -35,4 +35,4 @@ and func_1(vmessage_156, target_1)
 and func_2(vmessage_156, target_2)
 and vmessage_156.getType().hasName("mosquitto_message_all *")
 and vmessage_156.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

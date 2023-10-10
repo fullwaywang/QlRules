@@ -69,4 +69,4 @@ and v__UNIQUE_ID___x2980_1597.getParentScope+() = func
 and v__UNIQUE_ID___y2981_1597.getParentScope+() = func
 and v__UNIQUE_ID___x2982_1612.getParentScope+() = func
 and v__UNIQUE_ID___y2983_1612.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

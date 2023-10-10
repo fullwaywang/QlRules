@@ -205,4 +205,4 @@ and vtransfer_info_446.getParentScope+() = func
 and valready_dissected_481.getParentScope+() = func
 and vis_digest_line_505.getParentScope+() = func
 and vdigest_type_len_506.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

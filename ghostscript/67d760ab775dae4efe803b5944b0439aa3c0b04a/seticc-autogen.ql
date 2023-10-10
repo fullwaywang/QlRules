@@ -53,4 +53,4 @@ and vICCdict_45.getType().hasName("ref *")
 and vpnameval_53.getType().hasName("ref *")
 and vICCdict_45.getFunction() = func
 and vpnameval_53.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

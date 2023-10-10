@@ -30,4 +30,4 @@ not func_0(vframe_size_1897, target_1, func)
 and func_1(vframe_size_1897, target_1)
 and vframe_size_1897.getType().hasName("const int")
 and vframe_size_1897.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

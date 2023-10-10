@@ -73,4 +73,4 @@ and vnb_841.getType().hasName("int")
 and vnb_872.getType().hasName("int")
 and vnb_841.getParentScope+() = func
 and vnb_872.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

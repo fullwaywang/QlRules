@@ -74,4 +74,4 @@ and func_7(veval_438, target_7)
 and func_8(veval_438, target_8)
 and veval_438.getType().hasName("sed_eval_t *")
 and veval_438.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

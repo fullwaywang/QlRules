@@ -620,4 +620,4 @@ and vsize_563.getType().hasName("uint64_t")
 and vbplist_560.getParentScope+() = func
 and vobject_560.getParentScope+() = func
 and vsize_563.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

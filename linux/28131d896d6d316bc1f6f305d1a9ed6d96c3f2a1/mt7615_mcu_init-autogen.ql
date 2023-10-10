@@ -57,4 +57,4 @@ and vdev_1876.getType().hasName("mt7615_dev *")
 and func_6(vdev_1876)
 and vret_1884.getParentScope+() = func
 and vdev_1876.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

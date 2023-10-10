@@ -99,4 +99,4 @@ and vvectorlen_194.getType().hasName("int")
 and vlimit_start_193.(LocalVariable).getFunction() = func
 and vlimit_count_193.(LocalVariable).getFunction() = func
 and vvectorlen_194.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

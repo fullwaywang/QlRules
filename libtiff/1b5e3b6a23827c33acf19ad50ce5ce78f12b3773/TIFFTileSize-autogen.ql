@@ -111,4 +111,4 @@ and vmodule_273.(LocalVariable).getFunction() = func
 and vm_274.(LocalVariable).getFunction() = func
 and vn_275.(LocalVariable).getFunction() = func
 and vtif_271.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

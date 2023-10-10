@@ -79,4 +79,4 @@ and vrows_3831.getType().hasName("uint32_t")
 and vbytes_read_3828.(LocalVariable).getFunction() = func
 and vstripsize_3830.(LocalVariable).getFunction() = func
 and vrows_3831.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

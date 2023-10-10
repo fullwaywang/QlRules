@@ -22,4 +22,4 @@ where
 func_0(vuc_2073, target_0)
 and vuc_2073.getType().hasName("ucontext_t *")
 and vuc_2073.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

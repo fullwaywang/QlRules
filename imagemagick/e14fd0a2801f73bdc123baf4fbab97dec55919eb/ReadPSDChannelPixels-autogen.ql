@@ -62,4 +62,4 @@ and vq_778.getType().hasName("Quantum *")
 and vimage_767.getParentScope+() = func
 and vexception_769.getParentScope+() = func
 and vq_778.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

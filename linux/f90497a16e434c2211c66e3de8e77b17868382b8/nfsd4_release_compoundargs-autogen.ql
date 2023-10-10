@@ -22,4 +22,4 @@ where
 func_0(vargs_5394)
 and vargs_5394.getType().hasName("nfsd4_compoundargs *")
 and vargs_5394.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

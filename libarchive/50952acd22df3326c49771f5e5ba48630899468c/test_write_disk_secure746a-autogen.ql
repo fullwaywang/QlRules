@@ -26,4 +26,4 @@ predicate func_0(Function func, UnaryMinusExpr target_0) {
 from Function func, UnaryMinusExpr target_0
 where
 func_0(func, target_0)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

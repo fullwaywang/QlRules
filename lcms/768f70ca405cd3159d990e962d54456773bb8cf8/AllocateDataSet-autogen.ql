@@ -84,4 +84,4 @@ and vt_1502.getType().hasName("TABLE *")
 and vit8_1500.getType().hasName("cmsIT8 *")
 and vt_1502.getParentScope+() = func
 and vit8_1500.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -75,4 +75,4 @@ and vvardata_227.getType().hasName("VariableStatData *")
 and vnumbers_241.(LocalVariable).getFunction() = func
 and vnnumbers_242.(LocalVariable).getFunction() = func
 and vvardata_227.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

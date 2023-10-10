@@ -157,4 +157,4 @@ and vraster_144.(LocalVariable).getFunction() = func
 and vtile_width_146.(LocalVariable).getFunction() = func
 and vtile_height_146.(LocalVariable).getFunction() = func
 and vwrk_line_148.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

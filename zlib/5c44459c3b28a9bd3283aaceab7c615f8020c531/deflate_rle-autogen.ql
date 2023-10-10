@@ -283,4 +283,4 @@ and vdist_2115.getType().hasName("ush")
 and vbflush_2074.getParentScope+() = func
 and vs_0.getParentScope+() = func
 and vdist_2115.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

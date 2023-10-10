@@ -105,4 +105,4 @@ and vsource_154.getType().hasName("ssl_primary_config *")
 and vdest_155.getType().hasName("ssl_primary_config *")
 and vsource_154.getFunction() = func
 and vdest_155.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

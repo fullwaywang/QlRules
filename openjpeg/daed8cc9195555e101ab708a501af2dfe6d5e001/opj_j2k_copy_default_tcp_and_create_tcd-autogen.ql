@@ -38,4 +38,4 @@ and func_1(vl_tcp_7321, target_1)
 and func_2(vl_tcp_7321, target_2)
 and vl_tcp_7321.getType().hasName("opj_tcp_t *")
 and vl_tcp_7321.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

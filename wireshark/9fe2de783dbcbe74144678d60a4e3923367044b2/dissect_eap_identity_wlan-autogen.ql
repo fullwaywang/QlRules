@@ -82,4 +82,4 @@ and func_7(func, target_7)
 and func_8(vtokens_545, target_8)
 and vtokens_545.getType().hasName("gchar **")
 and vtokens_545.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

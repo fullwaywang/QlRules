@@ -71,4 +71,4 @@ and func_3(vcp_985, target_3)
 and func_4(vcp_985, target_4)
 and vcp_985.getType().hasName("char *")
 and vcp_985.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

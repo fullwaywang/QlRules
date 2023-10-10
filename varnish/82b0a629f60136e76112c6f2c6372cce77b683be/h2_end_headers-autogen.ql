@@ -251,4 +251,4 @@ and not vH_Content_Length.getParentScope+() = func
 and not vBS_EOF.getParentScope+() = func
 and not vBS_LENGTH.getParentScope+() = func
 and not vH2CE_PROTOCOL_ERROR.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

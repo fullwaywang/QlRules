@@ -24,4 +24,4 @@ where
 not func_0(vgdev_1677, func)
 and vgdev_1677.getType().hasName("nfsd4_getdeviceinfo *")
 and vgdev_1677.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -200,4 +200,4 @@ and vdevlen_367.(LocalVariable).getFunction() = func
 and viodev_368.(LocalVariable).getFunction() = func
 and vlen_369.(LocalVariable).getFunction() = func
 and vcode_370.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

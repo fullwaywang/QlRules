@@ -72,4 +72,4 @@ and vc_1997.getFunction() = func
 and vextlen_2000.getParentScope+() = func
 and vkeylen_2001.getParentScope+() = func
 and vbodylen_2002.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

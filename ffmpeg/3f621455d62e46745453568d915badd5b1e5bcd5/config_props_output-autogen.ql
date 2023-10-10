@@ -61,4 +61,4 @@ and vdesc_in_199.getType().hasName("const AVPixFmtDescriptor *")
 and voutlink_193.getType().hasName("AVFilterLink *")
 and vdesc_in_199.getParentScope+() = func
 and voutlink_193.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

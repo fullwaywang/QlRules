@@ -58,4 +58,4 @@ and func_2(vsrp_763)
 and vsrp_763.getType().hasName("Sg_request *")
 and func_3(vsrp_763)
 and vsrp_763.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -39,4 +39,4 @@ and func_1(vtarget_2017, target_1)
 and func_2(vtarget_2017, target_2)
 and vtarget_2017.getType().hasName("TPML_PCR_SELECTION *")
 and vtarget_2017.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

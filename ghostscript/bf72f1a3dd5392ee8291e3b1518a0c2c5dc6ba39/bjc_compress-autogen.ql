@@ -24,4 +24,4 @@ func_0(vexam_331, target_0)
 and func_1(vexam_331, target_1)
 and vexam_331.getType().hasName("const byte *")
 and vexam_331.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

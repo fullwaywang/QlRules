@@ -43,4 +43,4 @@ and vrpcap_tcp_handle.getType().hasName("dissector_handle_t")
 and vpinfo_1153.getParentScope+() = func
 and vconversation_1162.getParentScope+() = func
 and not vrpcap_tcp_handle.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

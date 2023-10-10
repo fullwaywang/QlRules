@@ -39,4 +39,4 @@ and func_1(vcrgram_len_599, target_1)
 and func_2(vcrgram_len_599, target_2)
 and vcrgram_len_599.getType().hasName("size_t")
 and vcrgram_len_599.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

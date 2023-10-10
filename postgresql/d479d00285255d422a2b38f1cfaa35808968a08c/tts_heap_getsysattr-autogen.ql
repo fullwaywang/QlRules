@@ -44,4 +44,4 @@ not func_0(vhslot_334, target_1, func)
 and func_1(vhslot_334, target_1)
 and vhslot_334.getType().hasName("HeapTupleTableSlot *")
 and vhslot_334.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

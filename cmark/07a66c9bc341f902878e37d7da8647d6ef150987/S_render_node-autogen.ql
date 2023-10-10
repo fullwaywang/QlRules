@@ -466,4 +466,4 @@ and vlistmarker_182.getParentScope+() = func
 and vmarker_width_185.getParentScope+() = func
 and vrenderer_170.getParentScope+() = func
 and vnode_170.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

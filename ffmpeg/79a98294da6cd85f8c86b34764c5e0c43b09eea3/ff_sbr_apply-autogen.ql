@@ -109,4 +109,4 @@ and vid_aac_1690.getType().hasName("int")
 and vac_1690.getFunction() = func
 and vsbr_1690.getFunction() = func
 and vid_aac_1690.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

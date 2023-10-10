@@ -40,4 +40,4 @@ and func_2(varg_263)
 and vrt_266.getType().hasName("rt6_info *")
 and varg_263.getParentScope+() = func
 and vrt_266.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -21,4 +21,4 @@ where
 not func_0(vinstance_4136)
 and vinstance_4136.getType().hasName("megasas_instance *")
 and vinstance_4136.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

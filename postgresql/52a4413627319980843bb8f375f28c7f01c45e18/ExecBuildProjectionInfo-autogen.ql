@@ -538,4 +538,4 @@ and v_result_307.(LocalVariable).getFunction() = func
 and not vCurrentMemoryContext.getParentScope+() = func
 and vstate_308.(LocalVariable).getFunction() = func
 and vscratch_309.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -37,4 +37,4 @@ and vkwb_conn_142.getType().hasName("komeda_wb_connector *")
 and func_2(vkwb_conn_142)
 and verr_145.getParentScope+() = func
 and vkwb_conn_142.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

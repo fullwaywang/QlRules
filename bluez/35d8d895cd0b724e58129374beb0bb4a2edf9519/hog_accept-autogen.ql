@@ -57,4 +57,4 @@ and func_3(vdevice_179, target_3)
 and func_4(vdevice_179, target_4)
 and vdevice_179.getType().hasName("btd_device *")
 and vdevice_179.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -108,4 +108,4 @@ and vtype_2582.getParentScope+() = func
 and vsize_2583.getParentScope+() = func
 and vsdata_2642.getParentScope+() = func
 and vecpointformatlist_length_2643.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

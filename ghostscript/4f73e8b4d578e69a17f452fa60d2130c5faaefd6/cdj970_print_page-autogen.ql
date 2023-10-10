@@ -64,4 +64,4 @@ and vprn_stream_830.getType().hasName("gp_file *")
 and vpdev_830.getType().hasName("gx_device_printer *")
 and vprn_stream_830.getFunction() = func
 and vpdev_830.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

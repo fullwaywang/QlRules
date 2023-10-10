@@ -107,4 +107,4 @@ and func_9(vsp_453, target_9)
 and func_10(vsp_453, target_10)
 and vsp_453.getType().hasName("sess *")
 and vsp_453.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

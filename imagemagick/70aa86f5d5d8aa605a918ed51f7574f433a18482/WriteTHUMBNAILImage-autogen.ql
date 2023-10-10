@@ -108,4 +108,4 @@ and vq_180.getType().hasName("unsigned char *")
 and vprofile_159.getParentScope+() = func
 and vlength_174.getParentScope+() = func
 and vq_180.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

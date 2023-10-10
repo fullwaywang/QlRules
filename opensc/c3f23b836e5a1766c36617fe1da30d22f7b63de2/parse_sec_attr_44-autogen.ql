@@ -38,4 +38,4 @@ and func_1(viACLen_791, target_1)
 and func_2(viACLen_791, target_2)
 and viACLen_791.getType().hasName("size_t")
 and viACLen_791.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

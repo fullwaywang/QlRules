@@ -32,4 +32,4 @@ not func_0(vwmm_param_ie_921)
 and vwmm_param_ie_921.getType().hasName("ieee_types_wmm_parameter *")
 and func_1(vwmm_param_ie_921)
 and vwmm_param_ie_921.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

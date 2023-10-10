@@ -54,4 +54,4 @@ and vmax_bytes_matched_2190.getType().hasName("int")
 and vinput_size_2167.getParentScope+() = func
 and vflags_2168.getParentScope+() = func
 and vmax_bytes_matched_2190.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

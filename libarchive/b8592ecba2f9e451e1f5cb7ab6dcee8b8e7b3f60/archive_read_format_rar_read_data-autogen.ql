@@ -59,4 +59,4 @@ and vrar_993.getType().hasName("rar *")
 and v__archive_ppmd7_functions.getType().hasName("const IPpmd7")
 and vrar_993.getParentScope+() = func
 and not v__archive_ppmd7_functions.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

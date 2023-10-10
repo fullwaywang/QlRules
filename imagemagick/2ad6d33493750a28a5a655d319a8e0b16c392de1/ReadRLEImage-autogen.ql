@@ -145,4 +145,4 @@ and vpixel_info_length_178.getType().hasName("size_t")
 and vimage_140.getParentScope+() = func
 and vnumber_planes_175.getParentScope+() = func
 and vpixel_info_length_178.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

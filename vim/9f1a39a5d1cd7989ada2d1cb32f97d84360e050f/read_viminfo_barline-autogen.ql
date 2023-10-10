@@ -33,4 +33,4 @@ func_0(vvirp_2712, target_0)
 and func_1(vvirp_2712, target_1)
 and vvirp_2712.getType().hasName("vir_T *")
 and vvirp_2712.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

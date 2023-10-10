@@ -29,4 +29,4 @@ func_0(vd_222, target_0)
 and func_1(vd_222, target_1)
 and vd_222.getType().hasName("btf_dump *")
 and vd_222.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

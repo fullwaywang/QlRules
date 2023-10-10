@@ -37,4 +37,4 @@ and func_1(vobj_4112, target_1)
 and func_2(vobj_4112, target_2)
 and vobj_4112.getType().hasName("const bpf_object *")
 and vobj_4112.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

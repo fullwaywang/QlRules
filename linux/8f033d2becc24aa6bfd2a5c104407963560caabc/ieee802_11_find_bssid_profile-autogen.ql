@@ -35,4 +35,4 @@ not func_0(velem_1438)
 and velem_1438.getType().hasName("const element *")
 and func_1(velem_1438)
 and velem_1438.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

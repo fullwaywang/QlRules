@@ -61,4 +61,4 @@ and func_2(vexc_4124, target_2)
 and func_3(vexc_4124, target_3)
 and vexc_4124.getType().hasName("PExecution_Context")
 and vexc_4124.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

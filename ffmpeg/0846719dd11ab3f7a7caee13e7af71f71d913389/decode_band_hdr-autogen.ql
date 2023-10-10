@@ -141,4 +141,4 @@ and vtransform_id_328.getType().hasName("int")
 and vband_325.getFunction() = func
 and vavctx_326.getFunction() = func
 and vtransform_id_328.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

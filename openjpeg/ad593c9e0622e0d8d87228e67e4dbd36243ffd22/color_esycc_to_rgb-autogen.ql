@@ -80,4 +80,4 @@ and func_3(func, target_3)
 and func_4(target_2, func, target_4)
 and vimage_886.getType().hasName("opj_image_t *")
 and vimage_886.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

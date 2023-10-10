@@ -22,4 +22,4 @@ where
 not func_0(veth_755)
 and veth_755.getType().hasName("ethhdr")
 and veth_755.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -170,4 +170,4 @@ and vend_444.getFunction() = func
 and vret_445.(LocalVariable).getFunction() = func
 and not vxmlMalloc.getParentScope+() = func
 and vstart_444.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -56,4 +56,4 @@ and func_4(func, target_4)
 and func_6(func, target_6)
 and vlength_56.getType().hasName("size_t")
 and vlength_56.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

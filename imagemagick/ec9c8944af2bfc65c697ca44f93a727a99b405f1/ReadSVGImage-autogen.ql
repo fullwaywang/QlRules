@@ -70,4 +70,4 @@ and vsvg_info_3202.getType().hasName("SVGInfo *")
 and vimage_info_3182.getType().hasName("const ImageInfo *")
 and vsvg_info_3202.getParentScope+() = func
 and vimage_info_3182.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

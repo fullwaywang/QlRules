@@ -39,4 +39,4 @@ not func_0(vserial_534, func)
 and vserial_534.getType().hasName("usb_serial *")
 and func_3(vserial_534)
 and vserial_534.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

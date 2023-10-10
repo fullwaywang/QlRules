@@ -41,4 +41,4 @@ and vpfn_2063.getType().hasName("kvm_pfn_t")
 and vr_2066.getType().hasName("int")
 and vpfn_2063.getParentScope+() = func
 and vr_2066.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -93,4 +93,4 @@ and vi_ctx_p_795.getFunction() = func
 and vpstack_795.getFunction() = func
 and varr_795.getFunction() = func
 and vcode_799.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

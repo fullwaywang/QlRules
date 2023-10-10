@@ -40,4 +40,4 @@ and vvcpu_5193.getType().hasName("kvm_vcpu *")
 and vex_no_5197.getParentScope+() = func
 and verror_code_5197.getParentScope+() = func
 and vvcpu_5193.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

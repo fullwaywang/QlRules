@@ -27,4 +27,4 @@ func_0(vbuff_989, target_1, target_0)
 and func_1(target_1)
 and vbuff_989.getType().hasName("const void **")
 and vbuff_989.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

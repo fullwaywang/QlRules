@@ -40,4 +40,4 @@ not func_0(vtd_63, target_1, func)
 and func_1(vtd_63, target_1)
 and vtd_63.getType().hasName("TIFFDirectory *")
 and vtd_63.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

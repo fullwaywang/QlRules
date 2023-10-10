@@ -62,4 +62,4 @@ and func_6(vdws_191)
 and vmax_193.getType().hasName("u32")
 and vdws_191.getParentScope+() = func
 and vmax_193.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

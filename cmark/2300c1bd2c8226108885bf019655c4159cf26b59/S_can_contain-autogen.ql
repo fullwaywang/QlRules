@@ -76,4 +76,4 @@ and vcur_73.getType().hasName("cmark_node *")
 and vnode_72.getParentScope+() = func
 and vchild_72.getParentScope+() = func
 and vcur_73.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

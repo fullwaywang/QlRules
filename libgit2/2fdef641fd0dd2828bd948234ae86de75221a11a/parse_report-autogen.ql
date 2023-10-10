@@ -20,4 +20,4 @@ where
 func_0(vpkt_792, target_0)
 and vpkt_792.getType().hasName("git_pkt *")
 and vpkt_792.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -80,4 +80,4 @@ and func_5(vcurrent_element_1774, target_5)
 and func_6(vcurrent_element_1774, target_6)
 and vcurrent_element_1774.getType().hasName("cJSON *")
 and vcurrent_element_1774.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

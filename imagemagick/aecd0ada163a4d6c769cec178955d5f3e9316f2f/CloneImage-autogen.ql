@@ -53,4 +53,4 @@ and func_3(vclone_image_797, target_3)
 and func_4(target_4)
 and vclone_image_797.getType().hasName("Image *")
 and vclone_image_797.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -62,4 +62,4 @@ and vs_631.getType().hasName("MpegEncContext *")
 and vavctx_625.getType().hasName("AVCodecContext *")
 and vs_631.(LocalVariable).getFunction() = func
 and vavctx_625.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -19,4 +19,4 @@ where
 vtimeri_438.getType().hasName("snd_timer_instance *")
 and func_5(vtimeri_438)
 and vtimeri_438.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

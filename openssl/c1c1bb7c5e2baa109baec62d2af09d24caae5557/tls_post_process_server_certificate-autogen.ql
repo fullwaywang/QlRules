@@ -51,4 +51,4 @@ and vi_1860.getType().hasName("int")
 and vs_1854.getType().hasName("SSL *")
 and vi_1860.getParentScope+() = func
 and vs_1854.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -243,4 +243,4 @@ and func_34(target_34)
 and func_35(vOldHeap_279, target_35)
 and vOldHeap_279.getType().hasName("Relation")
 and vOldHeap_279.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

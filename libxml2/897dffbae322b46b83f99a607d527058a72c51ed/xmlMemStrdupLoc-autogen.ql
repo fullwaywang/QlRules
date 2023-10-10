@@ -33,4 +33,4 @@ not func_0(vsize_496, func)
 and not func_3(func)
 and vsize_496.getType().hasName("size_t")
 and vsize_496.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

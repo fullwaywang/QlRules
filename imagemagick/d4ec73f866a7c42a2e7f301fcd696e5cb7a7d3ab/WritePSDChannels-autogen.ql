@@ -27,4 +27,4 @@ func_0(vimage_2612, target_1, target_0)
 and func_1(vimage_2612, target_1)
 and vimage_2612.getType().hasName("Image *")
 and vimage_2612.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

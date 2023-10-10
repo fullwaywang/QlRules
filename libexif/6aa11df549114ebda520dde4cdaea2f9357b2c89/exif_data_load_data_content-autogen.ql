@@ -88,4 +88,4 @@ and vrecursion_depth_366.getType().hasName("unsigned int")
 and vn_369.getType().hasName("ExifShort")
 and vrecursion_depth_366.getParentScope+() = func
 and vn_369.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

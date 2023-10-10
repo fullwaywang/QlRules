@@ -29,4 +29,4 @@ not func_0(vqueue_683)
 and vqueue_683.getType().hasName("xenvif_queue *")
 and func_1(vqueue_683)
 and vqueue_683.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

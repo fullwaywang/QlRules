@@ -134,4 +134,4 @@ and vL_520.getFunction() = func
 and vfunc_520.getFunction() = func
 and vdelta_521.getFunction() = func
 and vfsize_530.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

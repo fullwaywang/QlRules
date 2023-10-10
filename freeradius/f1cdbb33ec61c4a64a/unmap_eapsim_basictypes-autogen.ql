@@ -225,4 +225,4 @@ and vattr_285.getParentScope+() = func
 and vnewvp_287.getParentScope+() = func
 and veapsim_attribute_288.getParentScope+() = func
 and veapsim_len_289.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

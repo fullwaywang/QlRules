@@ -49,4 +49,4 @@ and func_3(vcap_4047, target_0, target_3)
 and func_4(target_0, func, target_4)
 and vcap_4047.getType().hasName("cmdarg_T *")
 and vcap_4047.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

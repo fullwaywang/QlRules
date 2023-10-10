@@ -66,4 +66,4 @@ and func_7(vdn_112)
 and vfio_114.getType().hasName("f2fs_io_info")
 and vdn_112.getParentScope+() = func
 and vfio_114.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

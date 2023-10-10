@@ -37,4 +37,4 @@ and func_1(vscreen_482, func, target_1)
 and func_2(vscreen_482, target_2)
 and vscreen_482.getType().hasName("VTermScreen *")
 and vscreen_482.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

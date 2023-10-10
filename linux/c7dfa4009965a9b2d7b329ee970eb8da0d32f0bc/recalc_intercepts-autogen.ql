@@ -35,4 +35,4 @@ and not func_1(vc_124, func)
 and vc_124.getType().hasName("vmcb_control_area *")
 and func_2(vc_124)
 and vc_124.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

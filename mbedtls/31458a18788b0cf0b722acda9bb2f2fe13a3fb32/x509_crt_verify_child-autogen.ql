@@ -33,4 +33,4 @@ and func_1(vflags_2043, target_2, target_1)
 and func_2(target_2)
 and vflags_2043.getType().hasName("uint32_t *")
 and vflags_2043.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

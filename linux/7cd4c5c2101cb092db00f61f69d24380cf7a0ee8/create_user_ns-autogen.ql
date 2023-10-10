@@ -39,4 +39,4 @@ and vnew_81.getType().hasName("cred *")
 and func_2(vnew_81)
 and vret_87.getParentScope+() = func
 and vnew_81.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

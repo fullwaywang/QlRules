@@ -30,4 +30,4 @@ not func_0(vrc_1002)
 and not func_1(func)
 and vrc_1002.getType().hasName("int")
 and vrc_1002.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

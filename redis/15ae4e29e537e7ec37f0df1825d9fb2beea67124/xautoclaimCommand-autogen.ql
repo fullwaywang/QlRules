@@ -44,4 +44,4 @@ and func_2(vcount_3336, target_2)
 and func_3(vcount_3336, target_3)
 and vcount_3336.getType().hasName("long")
 and vcount_3336.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

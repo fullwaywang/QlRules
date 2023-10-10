@@ -63,4 +63,4 @@ and func_3(vtt_591, target_3)
 and func_4(vtt_591, target_4)
 and vtt_591.getType().hasName("const ASN1_TEMPLATE *")
 and vtt_591.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

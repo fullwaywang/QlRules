@@ -44,4 +44,4 @@ and func_2(vopts_163, target_2)
 and func_3(vopts_163, target_3)
 and vopts_163.getType().hasName("DumpOptions *")
 and vopts_163.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

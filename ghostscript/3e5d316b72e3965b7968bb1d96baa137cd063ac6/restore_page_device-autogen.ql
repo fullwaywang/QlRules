@@ -85,4 +85,4 @@ and func_10(vsamepagedevice_261, target_10)
 and func_11(target_11)
 and vsamepagedevice_261.getType().hasName("bool")
 and vsamepagedevice_261.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

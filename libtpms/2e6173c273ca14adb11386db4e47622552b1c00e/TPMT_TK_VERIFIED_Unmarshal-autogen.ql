@@ -37,4 +37,4 @@ and func_1(vtarget_1726, target_1)
 and func_2(vtarget_1726, target_2)
 and vtarget_1726.getType().hasName("TPMT_TK_VERIFIED *")
 and vtarget_1726.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

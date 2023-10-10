@@ -55,4 +55,4 @@ and vmtstate_517.getType().hasName("ModifyTableState *")
 and vproute_518.getFunction() = func
 and vrri_535.(LocalVariable).getFunction() = func
 and vmtstate_517.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

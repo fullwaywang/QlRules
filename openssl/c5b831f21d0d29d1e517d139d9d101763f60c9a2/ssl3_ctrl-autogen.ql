@@ -80,4 +80,4 @@ and vdh_3200.getType().hasName("DH *")
 and vs_3126.getParentScope+() = func
 and vret_3128.getParentScope+() = func
 and vdh_3200.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

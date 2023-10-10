@@ -40,4 +40,4 @@ and vnaddrttls_54.getType().hasName("int *")
 and vnaddrs_63.getType().hasName("int")
 and vnaddrttls_54.getParentScope+() = func
 and vnaddrs_63.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

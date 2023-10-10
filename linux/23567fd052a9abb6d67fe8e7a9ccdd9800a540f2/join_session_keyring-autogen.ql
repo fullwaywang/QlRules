@@ -27,4 +27,4 @@ func_1(vkeyring_757, func)
 and vkeyring_757.getType().hasName("key *")
 and func_2(vkeyring_757)
 and vkeyring_757.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

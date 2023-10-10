@@ -60,4 +60,4 @@ and vrect_1184.getType().hasName("const RECTANGLE_16 *")
 and vsurface_1185.getType().hasName("gdiGfxSurface *")
 and vrect_1184.getParentScope+() = func
 and vsurface_1185.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -48,4 +48,4 @@ and vretval_765.getType().hasName("int")
 and vinterface_757.getParentScope+() = func
 and viface_desc_762.getParentScope+() = func
 and vretval_765.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

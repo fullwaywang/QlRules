@@ -45,4 +45,4 @@ and vcinfo_379.getType().hasName("j_decompress_ptr")
 and vrows_379.getType().hasName("JDIMENSION")
 and vcinfo_379.getParentScope+() = func
 and vrows_379.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

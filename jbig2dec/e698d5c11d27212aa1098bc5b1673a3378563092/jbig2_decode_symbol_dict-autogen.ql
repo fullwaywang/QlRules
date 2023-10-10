@@ -61,4 +61,4 @@ and vexrunlength_708.getType().hasName("int32_t")
 and vparams_228.getParentScope+() = func
 and vj_704.getParentScope+() = func
 and vexrunlength_708.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

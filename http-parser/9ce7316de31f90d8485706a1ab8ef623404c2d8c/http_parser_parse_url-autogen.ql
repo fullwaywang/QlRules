@@ -174,4 +174,4 @@ and vv_2371.getType().hasName("unsigned long")
 and vbuf_2281.getFunction() = func
 and vu_2282.getFunction() = func
 and vv_2371.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

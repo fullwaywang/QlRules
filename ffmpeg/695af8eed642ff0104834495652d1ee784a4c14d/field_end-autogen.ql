@@ -45,4 +45,4 @@ and vs_2324.getType().hasName("MpegEncContext *const")
 and vh_2322.getType().hasName("H264Context *")
 and vs_2324.(LocalVariable).getFunction() = func
 and vh_2322.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

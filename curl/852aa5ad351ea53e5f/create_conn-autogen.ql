@@ -61,4 +61,4 @@ and vresult_3591.getParentScope+() = func
 and vconn_3592.getParentScope+() = func
 and vdata_3587.getParentScope+() = func
 and not vCurl_cstrdup.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

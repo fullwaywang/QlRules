@@ -99,4 +99,4 @@ and func_7(vconn_opt_64, target_7)
 and func_8(vconn_opt_64, target_8)
 and vconn_opt_64.getType().hasName("PQconninfoOption *")
 and vconn_opt_64.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

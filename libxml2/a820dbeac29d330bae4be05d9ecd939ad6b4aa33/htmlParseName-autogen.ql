@@ -77,4 +77,4 @@ and vctxt_2453.getType().hasName("htmlParserCtxtPtr")
 and vin_2454.getType().hasName("const xmlChar *")
 and vctxt_2453.getFunction() = func
 and vin_2454.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

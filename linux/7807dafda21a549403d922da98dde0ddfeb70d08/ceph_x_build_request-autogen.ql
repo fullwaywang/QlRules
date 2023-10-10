@@ -21,4 +21,4 @@ where
 func_0(vauth_507)
 and vauth_507.getType().hasName("ceph_x_authenticate *")
 and vauth_507.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

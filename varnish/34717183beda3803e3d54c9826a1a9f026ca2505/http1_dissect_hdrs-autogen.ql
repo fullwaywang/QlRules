@@ -162,4 +162,4 @@ and v__func__.getType() instanceof ArrayType
 and vp_110.getParentScope+() = func
 and vhtc_110.getParentScope+() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

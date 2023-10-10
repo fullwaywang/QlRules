@@ -170,4 +170,4 @@ and vdev_448.getParentScope+() = func
 and vrio_449.getParentScope+() = func
 and vretval_450.getParentScope+() = func
 and not vusb_rio_class.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -41,4 +41,4 @@ and func_2(vs_1173, target_2)
 and func_3(vs_1173, target_3)
 and vs_1173.getType().hasName("WavpackContext *")
 and vs_1173.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

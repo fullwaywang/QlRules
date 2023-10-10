@@ -23,4 +23,4 @@ where
 not func_0(vexception_5115, func)
 and vexception_5115.getType().hasName("x86_exception *")
 and vexception_5115.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

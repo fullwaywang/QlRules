@@ -58,4 +58,4 @@ and vsp_820.getType().hasName("sixpack *")
 and func_6(vsp_820)
 and func_7(vsp_820)
 and vsp_820.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

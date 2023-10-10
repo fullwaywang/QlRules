@@ -32,4 +32,4 @@ func_0(func)
 and func_1(vhe_cap_elem_49)
 and vhe_cap_elem_49.getType().hasName("ieee80211_he_cap_elem *")
 and vhe_cap_elem_49.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

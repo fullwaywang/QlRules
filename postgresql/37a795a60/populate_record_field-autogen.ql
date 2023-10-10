@@ -192,4 +192,4 @@ and vtypcat_2934.(LocalVariable).getFunction() = func
 and vtypmod_2927.getFunction() = func
 and vjsv_2931.getFunction() = func
 and visnull_2932.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

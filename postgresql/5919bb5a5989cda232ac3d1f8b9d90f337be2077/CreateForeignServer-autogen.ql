@@ -153,4 +153,4 @@ and vmyself_871.getType().hasName("ObjectAddress")
 and vstmt_861.getFunction() = func
 and vsrvId_868.(LocalVariable).getFunction() = func
 and vmyself_871.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

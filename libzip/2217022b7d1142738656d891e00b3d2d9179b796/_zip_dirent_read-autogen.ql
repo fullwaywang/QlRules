@@ -54,4 +54,4 @@ and vbuffer_340.getType().hasName("zip_buffer_t *")
 and vfrom_buffer_347.getType().hasName("bool")
 and vbuffer_340.getParentScope+() = func
 and vfrom_buffer_347.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

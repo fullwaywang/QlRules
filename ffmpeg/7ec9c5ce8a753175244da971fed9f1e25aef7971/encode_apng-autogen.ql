@@ -88,4 +88,4 @@ and func_6(vs_835, target_6)
 and func_7(vs_835, target_7)
 and vs_835.getType().hasName("PNGEncContext *")
 and vs_835.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

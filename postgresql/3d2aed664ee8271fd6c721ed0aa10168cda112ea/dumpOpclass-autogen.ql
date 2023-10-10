@@ -380,4 +380,4 @@ and vopcinfo_12731.getFunction() = func
 and vq_12735.(LocalVariable).getFunction() = func
 and vdelq_12736.(LocalVariable).getFunction() = func
 and vlabelq_12737.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -203,4 +203,4 @@ and virp_299.getParentScope+() = func
 and vLength_301.getParentScope+() = func
 and vnbWritten_303.getParentScope+() = func
 and vserial_299.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

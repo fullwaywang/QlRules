@@ -50,4 +50,4 @@ and vbuf_171.getType().hasName("AVFrame *")
 and vs_174.getType().hasName("FPSContext *")
 and vbuf_171.getFunction() = func
 and vs_174.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

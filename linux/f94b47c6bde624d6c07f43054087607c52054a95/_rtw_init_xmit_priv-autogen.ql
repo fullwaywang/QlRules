@@ -47,4 +47,4 @@ and vres_45.getType().hasName("int")
 and func_6(vres_45, func)
 and vpadapter_40.getParentScope+() = func
 and vres_45.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

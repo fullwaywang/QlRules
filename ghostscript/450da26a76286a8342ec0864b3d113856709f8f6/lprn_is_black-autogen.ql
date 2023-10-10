@@ -73,4 +73,4 @@ and vlprn_326.(LocalVariable).getFunction() = func
 and vbpl_329.(LocalVariable).getFunction() = func
 and vx_330.(LocalVariable).getFunction() = func
 and vp_331.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

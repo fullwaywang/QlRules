@@ -26,4 +26,4 @@ and vnodes_2876.getType().hasName("nodemask_t")
 and vnodelist_2877.getType().hasName("char *")
 and vnodes_2876.getParentScope+() = func
 and vnodelist_2877.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

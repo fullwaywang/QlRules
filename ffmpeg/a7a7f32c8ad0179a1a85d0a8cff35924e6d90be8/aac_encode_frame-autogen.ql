@@ -54,4 +54,4 @@ and vs_556.getType().hasName("AACEncContext *")
 and vratio_840.getType().hasName("float")
 and vs_556.getParentScope+() = func
 and vratio_840.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

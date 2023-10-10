@@ -117,4 +117,4 @@ and func_16(vio_586)
 and vflags_588.getType().hasName("unsigned long")
 and vio_586.getParentScope+() = func
 and vflags_588.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

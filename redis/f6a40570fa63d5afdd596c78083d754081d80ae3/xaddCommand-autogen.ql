@@ -62,4 +62,4 @@ and func_2(vc_1195, target_2)
 and func_3(vc_1195, target_3)
 and vc_1195.getType().hasName("client *")
 and vc_1195.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

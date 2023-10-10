@@ -30,4 +30,4 @@ not func_0(vpi_state_2335, func)
 and vpi_state_2335.getType().hasName("futex_pi_state *")
 and func_1(vpi_state_2335)
 and vpi_state_2335.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

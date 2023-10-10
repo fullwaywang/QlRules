@@ -400,4 +400,4 @@ and vcount_3320.(LocalVariable).getFunction() = func
 and not vxmlIsBaseCharGroup.getParentScope+() = func
 and not vxmlIsDigitGroup.getParentScope+() = func
 and not vxmlIsExtenderGroup.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

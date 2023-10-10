@@ -81,4 +81,4 @@ and vscratch_64.getType().hasName("mp_limb_t *")
 and vecc_57.getParentScope+() = func
 and vsp_63.getParentScope+() = func
 and vscratch_64.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

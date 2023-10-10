@@ -91,4 +91,4 @@ and vlnum_4070.getType().hasName("linenr_T")
 and vcurbuf.getType().hasName("buf_T *")
 and vlnum_4070.getParentScope+() = func
 and not vcurbuf.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

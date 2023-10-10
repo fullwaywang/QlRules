@@ -91,4 +91,4 @@ and vstate_986.getType().hasName("tftp_state_data_t *")
 and vblksize_987.getType().hasName("int")
 and vstate_986.(LocalVariable).getFunction() = func
 and vblksize_987.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

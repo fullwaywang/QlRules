@@ -53,4 +53,4 @@ and func_3(vparent_697, func)
 and ventry_700.getType().hasName("snd_info_entry *")
 and vparent_697.getParentScope+() = func
 and ventry_700.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

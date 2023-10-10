@@ -40,4 +40,4 @@ and func_1(vparam_9123, target_1)
 and func_2(vparam_9123, target_2)
 and vparam_9123.getType().hasName("yang_parameter *")
 and vparam_9123.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

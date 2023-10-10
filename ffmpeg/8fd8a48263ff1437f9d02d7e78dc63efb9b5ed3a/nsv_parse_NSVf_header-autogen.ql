@@ -153,4 +153,4 @@ and vpb_275.(LocalVariable).getFunction() = func
 and vtable_entries_280.(LocalVariable).getFunction() = func
 and vtable_entries_used_281.(LocalVariable).getFunction() = func
 and vi_347.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

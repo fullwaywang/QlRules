@@ -79,4 +79,4 @@ and vsrc_608.getType().hasName("const AVFrame *")
 and vplane_610.getType().hasName("int")
 and vsrc_608.getFunction() = func
 and vplane_610.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

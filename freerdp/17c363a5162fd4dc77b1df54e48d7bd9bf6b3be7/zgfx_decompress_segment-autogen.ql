@@ -461,4 +461,4 @@ and vcount_229.getParentScope+() = func
 and vdistance_230.getParentScope+() = func
 and vcbSegment_232.getParentScope+() = func
 and not vZGFX_TOKEN_TABLE.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

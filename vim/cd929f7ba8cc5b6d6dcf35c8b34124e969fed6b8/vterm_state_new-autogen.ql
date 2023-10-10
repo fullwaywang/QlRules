@@ -29,4 +29,4 @@ not func_0(vstate_54, target_1, func)
 and func_1(vstate_54, target_1)
 and vstate_54.getType().hasName("VTermState *")
 and vstate_54.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

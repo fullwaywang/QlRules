@@ -339,4 +339,4 @@ and vdots_per_space_189.(LocalVariable).getFunction() = func
 and vbytes_per_space_190.(LocalVariable).getFunction() = func
 and vspare_bits_196.(LocalVariable).getFunction() = func
 and vwhole_bits_197.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

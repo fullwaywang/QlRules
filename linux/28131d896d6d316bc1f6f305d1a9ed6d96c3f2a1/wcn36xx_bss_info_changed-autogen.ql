@@ -24,4 +24,4 @@ and vvif_priv_826.getType().hasName("wcn36xx_vif *")
 and vbss_conf_819.getType().hasName("ieee80211_bss_conf *")
 and vvif_priv_826.getParentScope+() = func
 and vbss_conf_819.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

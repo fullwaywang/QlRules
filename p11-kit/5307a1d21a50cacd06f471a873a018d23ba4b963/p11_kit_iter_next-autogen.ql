@@ -37,4 +37,4 @@ and func_1(viter_631, target_1)
 and func_2(func, target_2)
 and viter_631.getType().hasName("P11KitIter *")
 and viter_631.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

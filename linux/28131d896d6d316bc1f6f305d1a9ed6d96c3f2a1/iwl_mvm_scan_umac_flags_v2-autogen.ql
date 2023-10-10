@@ -38,4 +38,4 @@ and func_1(vparams_1992)
 and vflags_1996.getType().hasName("u16")
 and vparams_1992.getParentScope+() = func
 and vflags_1996.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -48,4 +48,4 @@ and vinitlen_103.getType().hasName("size_t")
 and vhdrlen_110.getType().hasName("int")
 and vinitlen_103.getFunction() = func
 and vhdrlen_110.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

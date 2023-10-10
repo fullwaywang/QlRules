@@ -139,4 +139,4 @@ and vAH_2981.getType().hasName("ArchiveHandle *")
 and vdbname_2981.getFunction() = func
 and vqry_2987.(LocalVariable).getFunction() = func
 and vAH_2981.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

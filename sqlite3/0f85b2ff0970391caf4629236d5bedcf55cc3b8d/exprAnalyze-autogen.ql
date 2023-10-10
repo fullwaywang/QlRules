@@ -67,4 +67,4 @@ and vpTerm_903.getType().hasName("WhereTerm *")
 and vpWC_899.getFunction() = func
 and vidxTerm_900.getFunction() = func
 and vpTerm_903.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

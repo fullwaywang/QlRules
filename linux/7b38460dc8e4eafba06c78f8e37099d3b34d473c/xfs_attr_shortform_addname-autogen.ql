@@ -61,4 +61,4 @@ and vargs_501.getType().hasName("xfs_da_args_t *")
 and func_5(vargs_501)
 and vretval_503.getParentScope+() = func
 and vargs_501.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

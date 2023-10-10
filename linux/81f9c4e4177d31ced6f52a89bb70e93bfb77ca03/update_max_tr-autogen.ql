@@ -65,4 +65,4 @@ and func_6(vbuf_1363, func)
 and vtr_1361.getType().hasName("trace_array *")
 and vtr_1361.getParentScope+() = func
 and vbuf_1363.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

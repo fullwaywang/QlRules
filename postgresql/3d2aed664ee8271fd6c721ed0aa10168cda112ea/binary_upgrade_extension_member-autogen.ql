@@ -85,4 +85,4 @@ and vobjlabel_4368.getType().hasName("const char *")
 and vupgrade_buffer_4366.getType().hasName("PQExpBuffer")
 and vobjlabel_4368.getFunction() = func
 and vupgrade_buffer_4366.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

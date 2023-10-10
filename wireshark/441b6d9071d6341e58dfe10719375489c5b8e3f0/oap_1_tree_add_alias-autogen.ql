@@ -114,4 +114,4 @@ and voffset_1363.getType().hasName("gint")
 and valias_length_1363.getType().hasName("guint8")
 and voffset_1363.getParentScope+() = func
 and valias_length_1363.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -52,4 +52,4 @@ and func_9(vctx_115)
 and vctx_115.getType().hasName("timerfd_ctx *")
 and vctx_115.getParentScope+() = func
 and not vcancel_lock.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

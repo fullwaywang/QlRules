@@ -70,4 +70,4 @@ and vneedle_1050.getType().hasName("connectdata *")
 and vcheck_1055.getType().hasName("connectdata *")
 and vneedle_1050.getFunction() = func
 and vcheck_1055.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ not func_0(vtc_alloc_12056, target_1, func)
 and func_1(vtc_alloc_12056, target_1)
 and vtc_alloc_12056.getType().hasName("TCase *")
 and vtc_alloc_12056.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

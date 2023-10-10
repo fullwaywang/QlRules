@@ -645,4 +645,4 @@ and vrow_643.getFunction() = func
 and verr_corrC_648.(LocalVariable).getFunction() = func
 and verr_corrM_648.(LocalVariable).getFunction() = func
 and verr_corrY_648.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

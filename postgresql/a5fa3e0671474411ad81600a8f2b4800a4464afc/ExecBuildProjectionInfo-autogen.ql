@@ -553,4 +553,4 @@ and not vCurrentMemoryContext.getParentScope+() = func
 and vstate_357.(LocalVariable).getFunction() = func
 and vscratch_358.(LocalVariable).getFunction() = func
 and vlc_359.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

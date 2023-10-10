@@ -111,4 +111,4 @@ and vblockSize_6289.getParentScope+() = func
 and vtemp_6290.getParentScope+() = func
 and vblockSize_6304.getParentScope+() = func
 and vpool_6263.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

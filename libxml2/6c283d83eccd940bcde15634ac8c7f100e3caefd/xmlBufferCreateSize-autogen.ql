@@ -40,4 +40,4 @@ and not func_1(vsize_7120, target_2, func)
 and func_2(vsize_7120, target_2)
 and vsize_7120.getType().hasName("size_t")
 and vsize_7120.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

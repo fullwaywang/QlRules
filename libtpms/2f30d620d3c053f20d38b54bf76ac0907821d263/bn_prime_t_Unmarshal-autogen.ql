@@ -53,4 +53,4 @@ and func_2(vdata_1504, target_2)
 and func_3(vdata_1504, target_3)
 and vdata_1504.getType().hasName("bn_prime_t *")
 and vdata_1504.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

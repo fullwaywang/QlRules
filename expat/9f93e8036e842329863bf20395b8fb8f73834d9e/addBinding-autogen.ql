@@ -69,4 +69,4 @@ and func_5(vlen_3670, target_5)
 and func_6(vlen_3670, target_6)
 and vlen_3670.getType().hasName("int")
 and vlen_3670.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

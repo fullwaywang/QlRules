@@ -36,4 +36,4 @@ and vrate_162.getParentScope+() = func
 and vidx_163.getParentScope+() = func
 and vband_offset_164.getParentScope+() = func
 and not vfw_rate_idx_to_plcp.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

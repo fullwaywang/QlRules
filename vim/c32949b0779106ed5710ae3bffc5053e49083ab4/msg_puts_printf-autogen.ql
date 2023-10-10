@@ -83,4 +83,4 @@ and vmaxlen_2997.getType().hasName("int")
 and vp_3001.getType().hasName("char_u *")
 and vmaxlen_2997.getParentScope+() = func
 and vp_3001.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

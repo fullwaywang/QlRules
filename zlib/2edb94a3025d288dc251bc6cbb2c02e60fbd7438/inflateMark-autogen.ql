@@ -24,4 +24,4 @@ from Function func, BinaryBitwiseOperation target_2
 where
 not func_0(func)
 and func_2(func, target_2)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

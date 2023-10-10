@@ -45,4 +45,4 @@ and func_2(vctx_152, target_4, target_2)
 and func_4(vctx_152, target_4)
 and vctx_152.getType().hasName("X509_STORE_CTX *")
 and vctx_152.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

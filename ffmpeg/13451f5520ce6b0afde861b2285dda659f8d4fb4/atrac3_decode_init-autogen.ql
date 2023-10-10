@@ -69,4 +69,4 @@ and vq_870.getType().hasName("ATRAC3Context *")
 and vavctx_865.getType().hasName("AVCodecContext *")
 and vq_870.(LocalVariable).getFunction() = func
 and vavctx_865.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

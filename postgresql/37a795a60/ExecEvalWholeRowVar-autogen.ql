@@ -24,4 +24,4 @@ where
 func_0(vvariable_3404, target_0)
 and vvariable_3404.getType().hasName("Var *")
 and vvariable_3404.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

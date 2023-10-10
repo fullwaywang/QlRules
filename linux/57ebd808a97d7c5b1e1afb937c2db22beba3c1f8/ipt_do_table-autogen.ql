@@ -76,4 +76,4 @@ and vjumpstack_238.getParentScope+() = func
 and vstackidx_239.getParentScope+() = func
 and vprivate_240.getParentScope+() = func
 and vv_314.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

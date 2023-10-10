@@ -28,4 +28,4 @@ not func_0(vchain_9668)
 and vchain_9668.getType().hasName("nft_chain *")
 and func_1(vchain_9668)
 and vchain_9668.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -71,4 +71,4 @@ and vi_202.getType().hasName("int")
 and vnb_samples_199.getFunction() = func
 and vlpc_order_200.getFunction() = func
 and vi_202.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

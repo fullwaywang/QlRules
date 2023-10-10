@@ -142,4 +142,4 @@ and vpAvPair_106.getType().hasName("NTLM_AV_PAIR *")
 and not vAV_PAIR_STRINGS.getParentScope+() = func
 and vcbAvPair_105.getParentScope+() = func
 and vpAvPair_106.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

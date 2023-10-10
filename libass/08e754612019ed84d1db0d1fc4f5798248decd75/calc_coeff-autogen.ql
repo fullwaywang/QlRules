@@ -20,4 +20,4 @@ predicate func_1(Function func, SubExpr target_1) {
 from Function func, SubExpr target_1
 where
 func_1(func, target_1)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

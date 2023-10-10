@@ -98,4 +98,4 @@ and vaux_5931.getParentScope+() = func
 and vopcode_5933.getParentScope+() = func
 and valu_state_5934.getParentScope+() = func
 and valu_limit_5934.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

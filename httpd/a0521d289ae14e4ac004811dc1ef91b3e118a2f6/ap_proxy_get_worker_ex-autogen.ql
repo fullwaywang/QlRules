@@ -50,4 +50,4 @@ and vmask_1728.getType().hasName("unsigned int")
 and vp_1724.getFunction() = func
 and vurl_1727.getFunction() = func
 and vmask_1728.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

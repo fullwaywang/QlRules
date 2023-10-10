@@ -512,4 +512,4 @@ and vx1_5138.(LocalVariable).getFunction() = func
 and vx2_5138.(LocalVariable).getFunction() = func
 and vy1_5138.(LocalVariable).getFunction() = func
 and vy2_5138.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

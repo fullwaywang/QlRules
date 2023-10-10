@@ -65,4 +65,4 @@ and func_3(vpaging_736)
 and vfwrt_729.getParentScope+() = func
 and vi_732.getParentScope+() = func
 and vpaging_736.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

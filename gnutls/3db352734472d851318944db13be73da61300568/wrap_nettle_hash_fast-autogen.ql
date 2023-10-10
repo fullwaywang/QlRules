@@ -1,7 +1,7 @@
 /**
  * @name gnutls-3db352734472d851318944db13be73da61300568-wrap_nettle_hash_fast
  * @id cpp/gnutls/3db352734472d851318944db13be73da61300568/wrap-nettle-hash-fast
- * @description gnutls-3db352734472d851318944db13be73da61300568-wrap_nettle_hash_fast 
+ * @description gnutls-3db352734472d851318944db13be73da61300568-wrap_nettle_hash_fast CVE-2021-4209
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -37,4 +37,4 @@ and vtext_781.getType().hasName("const void *")
 and vtext_size_781.getParentScope+() = func
 and vctx_784.getParentScope+() = func
 and vtext_781.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

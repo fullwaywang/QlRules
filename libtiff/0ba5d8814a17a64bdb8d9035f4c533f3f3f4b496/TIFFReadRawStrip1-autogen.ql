@@ -53,4 +53,4 @@ and vstrip_384.getType().hasName("uint32")
 and vtd_387.(LocalVariable).getFunction() = func
 and vma_420.(LocalVariable).getFunction() = func
 and vstrip_384.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

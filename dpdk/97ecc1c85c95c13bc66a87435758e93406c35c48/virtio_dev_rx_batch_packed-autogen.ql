@@ -58,4 +58,4 @@ and vdesc_addrs_1034.getType().hasName("uint64_t[4]")
 and vi_1039.getType().hasName("uint16_t")
 and vdesc_addrs_1034.getParentScope+() = func
 and vi_1039.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

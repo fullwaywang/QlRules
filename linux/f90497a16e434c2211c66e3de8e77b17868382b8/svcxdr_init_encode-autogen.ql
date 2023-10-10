@@ -28,4 +28,4 @@ func_0(vrqstp_565)
 and func_1(func)
 and vrqstp_565.getType().hasName("svc_rqst *")
 and vrqstp_565.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -28,4 +28,4 @@ func_0(var_2683)
 and func_2(func)
 and var_2683.getType().hasName("ath10k *")
 and var_2683.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

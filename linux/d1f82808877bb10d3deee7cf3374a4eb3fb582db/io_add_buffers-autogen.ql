@@ -93,4 +93,4 @@ and func_7(vpbuf_3977)
 and vbuf_3979.getType().hasName("io_buffer *")
 and vpbuf_3977.getParentScope+() = func
 and vbuf_3979.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

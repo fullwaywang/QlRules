@@ -52,4 +52,4 @@ and vcfg_2772.getType().hasName("const iwl_cfg *")
 and func_4(vcfg_2772)
 and vfwrt_2770.getParentScope+() = func
 and vcfg_2772.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

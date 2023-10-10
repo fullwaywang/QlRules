@@ -30,4 +30,4 @@ and func_2(vdata_interface_1125, vacm_1131)
 and vcontrol_interface_1124.getParentScope+() = func
 and vdata_interface_1125.getParentScope+() = func
 and vacm_1131.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

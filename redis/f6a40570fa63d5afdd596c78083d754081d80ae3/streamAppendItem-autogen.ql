@@ -197,4 +197,4 @@ and vlp_bytes_216.(LocalVariable).getFunction() = func
 and vlp_217.(LocalVariable).getFunction() = func
 and not vserver.getParentScope+() = func
 and vcount_273.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

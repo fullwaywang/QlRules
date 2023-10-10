@@ -20,4 +20,4 @@ where
 func_0(vtrans_1733)
 and vtrans_1733.getType().hasName("iwl_trans *")
 and vtrans_1733.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

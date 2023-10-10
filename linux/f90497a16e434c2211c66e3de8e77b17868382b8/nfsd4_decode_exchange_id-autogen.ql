@@ -24,4 +24,4 @@ where
 not func_0(vexid_1582, func)
 and vexid_1582.getType().hasName("nfsd4_exchange_id *")
 and vexid_1582.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

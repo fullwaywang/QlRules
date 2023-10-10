@@ -37,4 +37,4 @@ and func_1(vconn_3314, func, target_1)
 and func_2(vconn_3314, func, target_2)
 and vconn_3314.getType().hasName("PGconn *")
 and vconn_3314.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

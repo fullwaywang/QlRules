@@ -57,4 +57,4 @@ and vfd_111.getType().hasName("fill_dir_struct *")
 and vname_len_115.getType().hasName("unsigned int")
 and vfd_111.getParentScope+() = func
 and vname_len_115.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

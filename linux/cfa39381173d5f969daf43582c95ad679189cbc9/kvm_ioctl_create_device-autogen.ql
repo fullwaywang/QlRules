@@ -31,4 +31,4 @@ and vkvm_2965.getType().hasName("kvm *")
 and func_1(vkvm_2965)
 and vret_2971.getParentScope+() = func
 and vkvm_2965.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

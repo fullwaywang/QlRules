@@ -24,4 +24,4 @@ where
 not func_0(vopen_down_1186, func)
 and vopen_down_1186.getType().hasName("nfsd4_open_downgrade *")
 and vopen_down_1186.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

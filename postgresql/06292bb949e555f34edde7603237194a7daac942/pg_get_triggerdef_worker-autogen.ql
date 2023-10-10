@@ -67,4 +67,4 @@ and vtgoldtable_834.getType().hasName("char *")
 and vtgnewtable_835.getType().hasName("char *")
 and vtgoldtable_834.(LocalVariable).getFunction() = func
 and vtgnewtable_835.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

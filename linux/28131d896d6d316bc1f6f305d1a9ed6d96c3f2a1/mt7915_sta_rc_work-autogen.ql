@@ -38,4 +38,4 @@ and vhw_997.getType().hasName("ieee80211_hw *")
 and vmsta_995.getParentScope+() = func
 and vdev_996.getParentScope+() = func
 and vhw_997.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

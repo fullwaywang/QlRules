@@ -37,4 +37,4 @@ and func_1(func)
 and func_2(func)
 and vcps_1903.getType().hasName("nfs4_cpntf_state *")
 and vcps_1903.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

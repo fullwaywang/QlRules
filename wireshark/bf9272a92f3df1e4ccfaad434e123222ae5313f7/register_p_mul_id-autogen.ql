@@ -47,4 +47,4 @@ and vpdu_type_354.getType().hasName("guint8")
 and vseq_no_355.getType().hasName("guint16")
 and vpdu_type_354.getParentScope+() = func
 and vseq_no_355.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

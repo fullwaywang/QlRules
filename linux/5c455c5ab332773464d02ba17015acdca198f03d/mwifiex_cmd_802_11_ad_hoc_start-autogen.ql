@@ -25,4 +25,4 @@ where
 not func_0(vreq_ssid_842, func)
 and vreq_ssid_842.getType().hasName("cfg80211_ssid *")
 and vreq_ssid_842.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

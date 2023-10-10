@@ -150,4 +150,4 @@ and vschemaName_54.(LocalVariable).getFunction() = func
 and vnamespaceId_55.(LocalVariable).getFunction() = func
 and vaddress_63.(LocalVariable).getFunction() = func
 and not v__func__.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ and vnew_member_cnt_488.getType().hasName("u16")
 and func_1(varrv_dom_484, vnew_member_cnt_488)
 and varrv_dom_484.getParentScope+() = func
 and vnew_member_cnt_488.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

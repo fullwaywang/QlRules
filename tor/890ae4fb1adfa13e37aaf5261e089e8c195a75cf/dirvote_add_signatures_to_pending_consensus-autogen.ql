@@ -53,4 +53,4 @@ and func_4(vpc_3478, target_4)
 and func_5(vpc_3478, target_5)
 and vpc_3478.getType().hasName("pending_consensus_t *")
 and vpc_3478.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -33,4 +33,4 @@ not func_0(func)
 and func_1(vx_error_handler, func, target_1)
 and vx_error_handler.getType().hasName("xv_")
 and not vx_error_handler.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

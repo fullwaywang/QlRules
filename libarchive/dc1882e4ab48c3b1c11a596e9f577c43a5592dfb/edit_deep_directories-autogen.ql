@@ -66,4 +66,4 @@ and func_7(func, target_7)
 and func_8(target_8)
 and vtail_1796.getType().hasName("char *")
 and vtail_1796.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -25,4 +25,4 @@ and vimage_7069.getType().hasName("image_data *")
 and vwidth_7075.getType().hasName("uint32_t")
 and vimage_7069.getFunction() = func
 and vwidth_7075.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

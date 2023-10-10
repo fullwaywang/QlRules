@@ -161,4 +161,4 @@ and vpEnd_48.getParentScope+() = func
 and vcRawBytes_54.getParentScope+() = func
 and vpSrcData_42.getParentScope+() = func
 and vSrcSize_42.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

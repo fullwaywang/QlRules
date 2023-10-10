@@ -38,4 +38,4 @@ and vtarget_1084.getType().hasName("TPMI_RH_ACT *")
 and visNotACT_1092.getType().hasName("BOOL")
 and vtarget_1084.getParentScope+() = func
 and visNotACT_1092.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

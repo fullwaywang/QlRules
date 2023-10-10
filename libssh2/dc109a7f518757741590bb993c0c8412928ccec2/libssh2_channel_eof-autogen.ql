@@ -181,4 +181,4 @@ and vchannel_2219.getType().hasName("LIBSSH2_CHANNEL *")
 and vpacket_2222.getType().hasName("LIBSSH2_PACKET *")
 and vchannel_2219.getParentScope+() = func
 and vpacket_2222.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

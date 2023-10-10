@@ -61,4 +61,4 @@ and vlogical_124.getType().hasName("bool")
 and vconn_127.getType().hasName("WalReceiverConn *")
 and vlogical_124.getFunction() = func
 and vconn_127.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

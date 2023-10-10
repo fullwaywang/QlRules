@@ -45,4 +45,4 @@ and func_2(vdest_431, target_2)
 and func_3(vdest_431, target_3)
 and vdest_431.getType().hasName("bmp_dest_ptr")
 and vdest_431.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

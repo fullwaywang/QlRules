@@ -52,4 +52,4 @@ and vmagic_2495.getType().hasName("char[4096]")
 and vimage_info_2490.getType().hasName("ImageInfo *")
 and vmagic_2495.getParentScope+() = func
 and vimage_info_2490.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

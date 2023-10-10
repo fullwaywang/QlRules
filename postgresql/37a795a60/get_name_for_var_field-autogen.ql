@@ -158,4 +158,4 @@ and vvar_6687.getType().hasName("Var *")
 and vtupleDesc_6694.(LocalVariable).getFunction() = func
 and vexpr_6695.(LocalVariable).getFunction() = func
 and vvar_6687.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

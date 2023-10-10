@@ -34,4 +34,4 @@ not func_0(vip_618, func)
 and vip_618.getType().hasName("xfs_inode *")
 and func_1(vip_618)
 and vip_618.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

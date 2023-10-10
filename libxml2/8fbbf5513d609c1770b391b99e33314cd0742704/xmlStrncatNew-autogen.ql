@@ -69,4 +69,4 @@ and vsize_484.getType().hasName("int")
 and vstr2_483.getFunction() = func
 and vlen_483.getFunction() = func
 and vsize_484.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

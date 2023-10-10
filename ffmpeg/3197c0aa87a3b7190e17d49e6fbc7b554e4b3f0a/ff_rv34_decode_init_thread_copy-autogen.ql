@@ -84,4 +84,4 @@ and func_6(vr_1531, target_6)
 and func_7(vr_1531, target_7)
 and vr_1531.getType().hasName("RV34DecContext *")
 and vr_1531.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

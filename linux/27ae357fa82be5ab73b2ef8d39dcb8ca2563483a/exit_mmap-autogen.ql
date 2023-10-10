@@ -53,4 +53,4 @@ and not func_2(vmm_3018)
 and vmm_3018.getType().hasName("mm_struct *")
 and func_3(vmm_3018)
 and vmm_3018.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -42,4 +42,4 @@ and vptrptr_192.getType().hasName("void **")
 and vnmemb_190.getFunction() = func
 and vsize_190.getFunction() = func
 and vptrptr_192.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

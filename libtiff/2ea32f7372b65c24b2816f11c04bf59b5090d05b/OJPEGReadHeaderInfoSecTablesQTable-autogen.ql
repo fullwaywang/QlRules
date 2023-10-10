@@ -51,4 +51,4 @@ and func_3(vob_1757, target_3)
 and func_4(vob_1757, target_4)
 and vob_1757.getType().hasName("uint8 *")
 and vob_1757.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ and vmc_231.getType().hasName("ucma_multicast *")
 and vmulticast_idr.getType().hasName("idr")
 and vmc_231.getParentScope+() = func
 and not vmulticast_idr.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

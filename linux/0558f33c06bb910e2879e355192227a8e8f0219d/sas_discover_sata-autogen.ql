@@ -22,4 +22,4 @@ where
 func_0(vdev_719, func)
 and vdev_719.getType().hasName("domain_device *")
 and vdev_719.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

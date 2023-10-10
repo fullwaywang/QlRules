@@ -46,4 +46,4 @@ and func_1(vpath_1601, target_1)
 and func_2(vpath_1601, target_2)
 and vpath_1601.getType().hasName("extent_path *")
 and vpath_1601.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and vimage_216.getType().hasName("Image *")
 and vstatus_222.getType().hasName("MagickBooleanType")
 and vimage_216.getParentScope+() = func
 and vstatus_222.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

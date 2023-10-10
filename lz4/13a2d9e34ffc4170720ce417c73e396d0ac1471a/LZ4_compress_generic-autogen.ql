@@ -53,4 +53,4 @@ and func_4(vmatchCode_1008, target_4)
 and func_5(vmatchCode_1008, target_5)
 and vmatchCode_1008.getType().hasName("unsigned int")
 and vmatchCode_1008.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

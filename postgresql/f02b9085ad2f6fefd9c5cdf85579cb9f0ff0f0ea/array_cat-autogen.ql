@@ -81,4 +81,4 @@ and vndims_225.getType().hasName("int")
 and vdims_223.(LocalVariable).getFunction() = func
 and vlbs_224.(LocalVariable).getFunction() = func
 and vndims_225.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

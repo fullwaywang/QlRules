@@ -36,4 +36,4 @@ and violink_1003.getType().hasName("crat_subtype_iolink *")
 and vprops_1006.getParentScope+() = func
 and vprops2_1006.getParentScope+() = func
 and violink_1003.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

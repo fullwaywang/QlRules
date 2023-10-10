@@ -48,4 +48,4 @@ and vcb_1031.getType().hasName("qrtr_cb *")
 and vmsg_1025.getParentScope+() = func
 and vaddr_1028.getParentScope+() = func
 and vcb_1031.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

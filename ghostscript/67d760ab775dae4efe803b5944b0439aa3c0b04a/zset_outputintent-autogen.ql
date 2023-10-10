@@ -38,4 +38,4 @@ and func_1(vpnval_232, target_1)
 and func_2(vpnval_232, target_2)
 and vpnval_232.getType().hasName("ref *")
 and vpnval_232.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

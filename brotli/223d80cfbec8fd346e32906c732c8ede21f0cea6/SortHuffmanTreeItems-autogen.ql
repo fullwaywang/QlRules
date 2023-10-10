@@ -23,4 +23,4 @@ func_0(vgaps_84, target_0)
 and func_1(func, target_1)
 and vgaps_84.getType().hasName("const size_t[]")
 and vgaps_84.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

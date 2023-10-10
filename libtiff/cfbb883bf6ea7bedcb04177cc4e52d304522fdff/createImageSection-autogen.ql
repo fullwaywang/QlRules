@@ -158,4 +158,4 @@ and func_15(vsectsize_7547, target_15)
 and func_16(vsectsize_7547, target_16)
 and vsectsize_7547.getType().hasName("uint32_t")
 and vsectsize_7547.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -98,4 +98,4 @@ and vd_325.getType().hasName("char_u *")
 and varg_320.getType().hasName("char_u *")
 and vd_325.getParentScope+() = func
 and varg_320.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

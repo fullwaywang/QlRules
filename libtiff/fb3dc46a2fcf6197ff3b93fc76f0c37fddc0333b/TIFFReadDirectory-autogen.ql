@@ -123,4 +123,4 @@ and vtif_3413.getType().hasName("TIFF *")
 and vmodule_3415.getType().hasName("const char[]")
 and vtif_3413.getFunction() = func
 and vmodule_3415.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -56,4 +56,4 @@ and vms_414.getType().hasName("magic_set *")
 and vlevel_414.getType().hasName("unsigned int")
 and vms_414.getParentScope+() = func
 and vlevel_414.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -94,4 +94,4 @@ and vlnum_529.getType().hasName("linenr_T")
 and vleader1_len_530.getType().hasName("int")
 and vlnum_529.getParentScope+() = func
 and vleader1_len_530.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

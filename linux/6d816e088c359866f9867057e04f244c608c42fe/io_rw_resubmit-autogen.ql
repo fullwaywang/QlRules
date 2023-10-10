@@ -31,4 +31,4 @@ and vctx_2312.getType().hasName("io_ring_ctx *")
 and func_1(vreq_2311, vctx_2312)
 and vreq_2311.getParentScope+() = func
 and vctx_2312.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -24,4 +24,4 @@ where
 not func_3(vpktsize_139, func)
 and vpktsize_139.getType().hasName("apr_uint16_t")
 and vpktsize_139.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

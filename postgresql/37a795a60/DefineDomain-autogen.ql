@@ -117,4 +117,4 @@ and func_9(vtyptype_746, target_9)
 and func_10(vtyptype_746, target_10)
 and vtyptype_746.getType().hasName("char")
 and vtyptype_746.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

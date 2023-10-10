@@ -578,4 +578,4 @@ and not vxsltGenericDebug.getParentScope+() = func
 and not vxsltGenericDebugContext.getParentScope+() = func
 and vval_5007.getParentScope+() = func
 and vctxt_4857.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

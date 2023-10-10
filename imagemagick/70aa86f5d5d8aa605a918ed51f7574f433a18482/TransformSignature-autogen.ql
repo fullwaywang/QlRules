@@ -22,4 +22,4 @@ where
 func_0(vW_642, target_0)
 and vW_642.getType().hasName("unsigned int[64]")
 and vW_642.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

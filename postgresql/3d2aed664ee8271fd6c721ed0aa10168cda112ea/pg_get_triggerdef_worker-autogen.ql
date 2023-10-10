@@ -67,4 +67,4 @@ and vpretty_819.getType().hasName("bool")
 and vtrigrec_822.getType().hasName("Form_pg_trigger")
 and vpretty_819.getFunction() = func
 and vtrigrec_822.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

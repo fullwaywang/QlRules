@@ -127,4 +127,4 @@ and func_12(vpac_1243, target_12)
 and func_13(vpac_1243, target_13)
 and vpac_1243.getType().hasName("const krb5_pac")
 and vpac_1243.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

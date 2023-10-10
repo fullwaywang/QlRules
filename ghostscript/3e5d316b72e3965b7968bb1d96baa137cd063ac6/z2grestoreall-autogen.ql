@@ -101,4 +101,4 @@ and vdone_301.getType().hasName("bool")
 and vi_ctx_p_297.getType().hasName("i_ctx_t *")
 and vdone_301.(LocalVariable).getFunction() = func
 and vi_ctx_p_297.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

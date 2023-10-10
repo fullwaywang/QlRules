@@ -173,4 +173,4 @@ and vmodule_709.(LocalVariable).getFunction() = func
 and vbytecount_711.(LocalVariable).getFunction() = func
 and vbytecountm_712.(LocalVariable).getFunction() = func
 and vtif_707.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -44,4 +44,4 @@ and not func_2(vport_501, func)
 and vport_501.getType().hasName("asd_sas_port *")
 and func_3(vport_501)
 and vport_501.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

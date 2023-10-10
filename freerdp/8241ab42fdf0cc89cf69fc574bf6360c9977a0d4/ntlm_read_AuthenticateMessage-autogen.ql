@@ -1381,4 +1381,4 @@ and vmessage_689.getParentScope+() = func
 and vcredentials_690.getParentScope+() = func
 and vcbAvFlags_807.getParentScope+() = func
 and vsnt_808.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ not func_0(vbuf_7568)
 and vbuf_7568.getType().hasName("trace_buffer *")
 and func_1(vbuf_7568)
 and vbuf_7568.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

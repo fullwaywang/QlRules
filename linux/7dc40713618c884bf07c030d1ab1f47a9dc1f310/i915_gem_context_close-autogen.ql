@@ -28,4 +28,4 @@ not func_0(vfile_priv_660, func)
 and vfile_priv_660.getType().hasName("drm_i915_file_private *")
 and func_1(vfile_priv_660)
 and vfile_priv_660.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

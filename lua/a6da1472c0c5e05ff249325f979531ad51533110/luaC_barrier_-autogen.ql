@@ -56,4 +56,4 @@ and vo_193.getType().hasName("GCObject *")
 and vg_194.getType().hasName("global_State *")
 and vo_193.getFunction() = func
 and vg_194.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

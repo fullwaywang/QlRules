@@ -38,4 +38,4 @@ and vrtwdev_709.getType().hasName("rtw89_dev *")
 and vphy_idx_710.getType().hasName("rtw89_phy_idx")
 and vrtwdev_709.getParentScope+() = func
 and vphy_idx_710.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

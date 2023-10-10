@@ -52,4 +52,4 @@ and vtotlen_1535.getType().hasName("int")
 and vspaces_1823.getType().hasName("int")
 and vtotlen_1535.getParentScope+() = func
 and vspaces_1823.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

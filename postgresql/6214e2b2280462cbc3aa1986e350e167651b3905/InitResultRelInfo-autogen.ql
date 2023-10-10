@@ -51,4 +51,4 @@ and vpartition_root_1199.getType().hasName("Relation")
 and vresultRelInfo_1196.getType().hasName("ResultRelInfo *")
 and vpartition_root_1199.getFunction() = func
 and vresultRelInfo_1196.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

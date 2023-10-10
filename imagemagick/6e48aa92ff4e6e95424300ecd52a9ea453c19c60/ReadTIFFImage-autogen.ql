@@ -163,4 +163,4 @@ and vimage_info_1071.getType().hasName("const ImageInfo *")
 and vimage_1085.getParentScope+() = func
 and vquantum_info_1097.getParentScope+() = func
 and vimage_info_1071.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

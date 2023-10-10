@@ -1,7 +1,7 @@
 /**
  * @name openssl-4a23b12a031860253b58d503f296377ca076427b-srp_Calc_k
  * @id cpp/openssl/4a23b12a031860253b58d503f296377ca076427b/srp-Calc-k
- * @description openssl-4a23b12a031860253b58d503f296377ca076427b-srp_Calc_k 
+ * @description openssl-4a23b12a031860253b58d503f296377ca076427b-srp_Calc_k CVE-2014-3512
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -51,4 +51,4 @@ and vg_82.getParentScope+() = func
 and vtmp_87.getParentScope+() = func
 and vlongN_90.getParentScope+() = func
 and vN_82.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

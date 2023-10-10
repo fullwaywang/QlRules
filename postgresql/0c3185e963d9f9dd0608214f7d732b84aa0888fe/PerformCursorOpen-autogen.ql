@@ -34,4 +34,4 @@ from Function func, NotExpr target_1
 where
 not func_0(target_1, func)
 and func_1(target_1)
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

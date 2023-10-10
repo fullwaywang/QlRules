@@ -33,4 +33,4 @@ and vline_1021.getType().hasName("char_u *")
 and vp_1013.getParentScope+() = func
 and vga_1020.getParentScope+() = func
 and vline_1021.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -71,4 +71,4 @@ and not func_21(func)
 and vcard_403.getType().hasName("usb_card_rec *")
 and func_22(vcard_403)
 and vcard_403.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -150,4 +150,4 @@ and voptions.getType().hasName("Options")
 and vret_108.getParentScope+() = func
 and vhostkeys_110.getParentScope+() = func
 and not voptions.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

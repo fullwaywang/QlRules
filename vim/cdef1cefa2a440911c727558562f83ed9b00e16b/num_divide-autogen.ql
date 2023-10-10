@@ -60,4 +60,4 @@ and vresult_52.getType().hasName("varnumber_T")
 and vn1_50.getParentScope+() = func
 and vn2_50.getParentScope+() = func
 and vresult_52.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

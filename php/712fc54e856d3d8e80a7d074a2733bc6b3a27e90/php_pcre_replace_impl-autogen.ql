@@ -53,4 +53,4 @@ and not func_1(vnew_len_1621, target_3)
 and func_3(vnew_len_1621, target_3)
 and vnew_len_1621.getType().hasName("size_t")
 and vnew_len_1621.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

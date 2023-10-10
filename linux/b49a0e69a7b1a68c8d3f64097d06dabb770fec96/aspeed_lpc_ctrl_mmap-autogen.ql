@@ -60,4 +60,4 @@ and vvsize_51.getType().hasName("unsigned long")
 and vvma_48.getParentScope+() = func
 and vlpc_ctrl_50.getParentScope+() = func
 and vvsize_51.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -79,4 +79,4 @@ and vdev_45.getType().hasName("mt7615_dev *")
 and vmt7663u_mcu_ops_47.getType().hasName("const mt76_mcu_ops")
 and vdev_45.getParentScope+() = func
 and vmt7663u_mcu_ops_47.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

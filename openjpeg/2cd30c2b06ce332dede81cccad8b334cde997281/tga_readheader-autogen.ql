@@ -37,4 +37,4 @@ and func_1(vtga_598, target_1)
 and func_2(vtga_598, target_2)
 and vtga_598.getType().hasName("unsigned char[18]")
 and vtga_598.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

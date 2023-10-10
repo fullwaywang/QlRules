@@ -89,4 +89,4 @@ and vsslc_179.getType().hasName("ssl_primary_config *")
 and vCurl_cfree.getType().hasName("curl_free_callback")
 and vsslc_179.getFunction() = func
 and not vCurl_cfree.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

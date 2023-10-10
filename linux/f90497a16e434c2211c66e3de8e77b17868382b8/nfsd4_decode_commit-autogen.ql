@@ -33,4 +33,4 @@ not func_0(vcommit_788, func)
 and vcommit_788.getType().hasName("nfsd4_commit *")
 and func_1(vcommit_788)
 and vcommit_788.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

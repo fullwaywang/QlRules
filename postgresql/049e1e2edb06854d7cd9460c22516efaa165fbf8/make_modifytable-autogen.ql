@@ -102,4 +102,4 @@ and func_9(vnode_6882, target_9)
 and func_10(vnode_6882, target_10)
 and vnode_6882.getType().hasName("ModifyTable *")
 and vnode_6882.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

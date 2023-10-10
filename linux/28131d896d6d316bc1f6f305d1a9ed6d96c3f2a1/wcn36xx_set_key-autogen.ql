@@ -24,4 +24,4 @@ and vvif_519.getType().hasName("ieee80211_vif *")
 and vvif_priv_524.getType().hasName("wcn36xx_vif *")
 and vvif_519.getParentScope+() = func
 and vvif_priv_524.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

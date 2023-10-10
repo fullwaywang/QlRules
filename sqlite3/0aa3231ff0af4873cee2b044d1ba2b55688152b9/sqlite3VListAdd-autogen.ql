@@ -71,4 +71,4 @@ and vpIn_1587.getType().hasName("VList *")
 and vnInt_1592.getType().hasName("int")
 and vpIn_1587.getFunction() = func
 and vnInt_1592.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

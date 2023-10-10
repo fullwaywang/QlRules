@@ -50,4 +50,4 @@ and func_1(vtrans_2129, func)
 and vtrans_2129.getType().hasName("iwl_trans *")
 and func_2(vtrans_2129)
 and vtrans_2129.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

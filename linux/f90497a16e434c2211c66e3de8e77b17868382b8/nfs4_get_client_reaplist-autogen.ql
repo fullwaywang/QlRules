@@ -52,4 +52,4 @@ and vnn_5864.getType().hasName("nfsd_net *")
 and func_3(vnn_5864)
 and vclp_5869.getParentScope+() = func
 and vnn_5864.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

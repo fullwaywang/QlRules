@@ -64,4 +64,4 @@ and vchunks_per_page_344.getParentScope+() = func
 and vsize_chk_346.getParentScope+() = func
 and vchunk_size_343.getParentScope+() = func
 and vheadroom_343.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

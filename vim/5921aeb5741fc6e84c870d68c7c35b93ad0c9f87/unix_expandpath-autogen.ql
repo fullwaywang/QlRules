@@ -41,4 +41,4 @@ and vmb_ptr2char.getType().hasName("..(*)(..)")
 and vpath_end_3578.getParentScope+() = func
 and not vhas_mbyte.getParentScope+() = func
 and not vmb_ptr2char.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

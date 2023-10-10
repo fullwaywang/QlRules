@@ -81,4 +81,4 @@ and vs_218.getType().hasName("GIFContext *")
 and vavctx_216.getType().hasName("AVCodecContext *")
 and vs_218.getParentScope+() = func
 and vavctx_216.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

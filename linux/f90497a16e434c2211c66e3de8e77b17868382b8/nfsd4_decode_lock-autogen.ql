@@ -24,4 +24,4 @@ where
 not func_0(vlock_904, func)
 and vlock_904.getType().hasName("nfsd4_lock *")
 and vlock_904.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

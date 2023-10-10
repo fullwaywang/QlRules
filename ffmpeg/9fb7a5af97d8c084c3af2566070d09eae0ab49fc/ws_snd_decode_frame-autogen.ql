@@ -52,4 +52,4 @@ and func_4(vcount_108, target_4)
 and func_5(vcount_108, target_5)
 and vcount_108.getType().hasName("uint8_t")
 and vcount_108.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

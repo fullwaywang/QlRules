@@ -66,4 +66,4 @@ and vvertSubSampling.getType().hasName("uint16")
 and vc_74.(LocalVariable).getFunction() = func
 and not vhorizSubSampling.getParentScope+() = func
 and not vvertSubSampling.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

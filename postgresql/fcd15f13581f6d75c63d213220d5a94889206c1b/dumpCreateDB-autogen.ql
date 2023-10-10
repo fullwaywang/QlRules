@@ -24,4 +24,4 @@ and vfdbname_1434.getType().hasName("char *")
 and vbuf_1257.getType().hasName("PQExpBuffer")
 and vfdbname_1434.(LocalVariable).getFunction() = func
 and vbuf_1257.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

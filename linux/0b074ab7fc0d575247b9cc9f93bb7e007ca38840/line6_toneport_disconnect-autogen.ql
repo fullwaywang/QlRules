@@ -22,4 +22,4 @@ where
 func_0(vtoneport_407, func)
 and vtoneport_407.getType().hasName("usb_line6_toneport *")
 and vtoneport_407.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

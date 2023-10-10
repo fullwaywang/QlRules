@@ -94,4 +94,4 @@ and vhdrlen_237.getType().hasName("int")
 and vlen_235.(LocalVariable).getFunction() = func
 and vnewlen_235.(LocalVariable).getFunction() = func
 and vhdrlen_237.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

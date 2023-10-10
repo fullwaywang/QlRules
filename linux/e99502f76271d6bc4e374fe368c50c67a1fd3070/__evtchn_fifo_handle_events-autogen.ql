@@ -32,4 +32,4 @@ and vcontrol_block_334.getParentScope+() = func
 and vready_335.getParentScope+() = func
 and vq_336.getParentScope+() = func
 and vcpu_332.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

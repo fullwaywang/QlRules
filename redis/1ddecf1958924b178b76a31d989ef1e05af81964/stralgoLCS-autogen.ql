@@ -144,4 +144,4 @@ and vb_735.(LocalVariable).getFunction() = func
 and valen_805.(LocalVariable).getFunction() = func
 and vblen_806.(LocalVariable).getFunction() = func
 and vlcs_811.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

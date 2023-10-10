@@ -197,4 +197,4 @@ and vname_275.getFunction() = func
 and vtype_275.getFunction() = func
 and vsql_280.(LocalVariable).getFunction() = func
 and vconn_282.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

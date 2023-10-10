@@ -60,4 +60,4 @@ and func_9(vchandef_48, vctrl_ch_position_50)
 and vchandef_48.getParentScope+() = func
 and vformat_bw_49.getParentScope+() = func
 and vctrl_ch_position_50.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

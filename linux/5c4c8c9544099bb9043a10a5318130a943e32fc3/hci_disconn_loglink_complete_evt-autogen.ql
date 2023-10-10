@@ -42,4 +42,4 @@ and vhdev_5052.getType().hasName("hci_dev *")
 and vev_5055.getParentScope+() = func
 and vhchan_5056.getParentScope+() = func
 and vhdev_5052.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

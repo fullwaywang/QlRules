@@ -33,4 +33,4 @@ and vwritten_out_124.getType().hasName("size_t")
 and vmax_out_125.getType().hasName("unsigned int")
 and vwritten_out_124.getParentScope+() = func
 and vmax_out_125.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

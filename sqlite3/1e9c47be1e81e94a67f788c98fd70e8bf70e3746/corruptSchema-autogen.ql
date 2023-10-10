@@ -50,4 +50,4 @@ and func_2(vzExtra_25, target_2)
 and func_3(vzExtra_25, target_3)
 and vzExtra_25.getType().hasName("const char *")
 and vzExtra_25.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

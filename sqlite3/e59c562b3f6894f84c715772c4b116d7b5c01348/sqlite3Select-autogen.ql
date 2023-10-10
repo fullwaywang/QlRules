@@ -68,4 +68,4 @@ and vsSort_5678.getType().hasName("SortCtx")
 and vp_5664.getFunction() = func
 and vpEList_5671.(LocalVariable).getFunction() = func
 and vsSort_5678.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

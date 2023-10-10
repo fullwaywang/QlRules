@@ -67,4 +67,4 @@ and vsmk_176.getType().hasName("SmackVContext *")
 and vhuff_179.(LocalVariable).getFunction() = func
 and vctx_183.(LocalVariable).getFunction() = func
 and vsmk_176.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -57,4 +57,4 @@ and vsublen_7264.getType().hasName("int")
 and vga_7270.getType().hasName("garray_T")
 and vsublen_7264.getParentScope+() = func
 and vga_7270.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

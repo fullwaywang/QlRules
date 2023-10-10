@@ -47,4 +47,4 @@ and vmode_43.getType().hasName("const WEBP_CSP_MODE")
 and vwidth_44.getType().hasName("const int")
 and vmode_43.getParentScope+() = func
 and vwidth_44.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

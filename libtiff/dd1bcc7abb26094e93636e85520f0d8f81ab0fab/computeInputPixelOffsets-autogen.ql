@@ -446,4 +446,4 @@ and vxres_5218.(LocalVariable).getFunction() = func
 and vyres_5218.(LocalVariable).getFunction() = func
 and vcrop_5214.getFunction() = func
 and vimage_5214.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

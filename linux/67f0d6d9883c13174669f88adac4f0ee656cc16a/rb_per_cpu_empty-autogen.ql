@@ -80,4 +80,4 @@ and vreader_3875.getType().hasName("buffer_page *")
 and vhead_3876.getParentScope+() = func
 and vcommit_3877.getParentScope+() = func
 and vreader_3875.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

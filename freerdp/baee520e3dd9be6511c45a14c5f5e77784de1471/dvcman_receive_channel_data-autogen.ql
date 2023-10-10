@@ -34,4 +34,4 @@ and vdata_624.getType().hasName("wStream *")
 and vchannel_627.getParentScope+() = func
 and vdataSize_628.getParentScope+() = func
 and vdata_624.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

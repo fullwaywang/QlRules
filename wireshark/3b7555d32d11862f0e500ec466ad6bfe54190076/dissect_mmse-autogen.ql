@@ -43,4 +43,4 @@ and not func_3(voffset_704)
 and func_4(voffset_704, target_4)
 and voffset_704.getType().hasName("guint")
 and voffset_704.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

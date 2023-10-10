@@ -136,4 +136,4 @@ and func_12(target_12)
 and func_13(vpExpr_5426, target_13)
 and vpExpr_5426.getType().hasName("Expr *")
 and vpExpr_5426.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -88,4 +88,4 @@ and vocc_49.getType().hasName("tmsize_t")
 and vcc_53.getType().hasName("tmsize_t")
 and vocc_49.getFunction() = func
 and vcc_53.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

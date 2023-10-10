@@ -557,4 +557,4 @@ and vupsample_541.getParentScope+() = func
 and vupsample_545.getParentScope+() = func
 and vupsample_589.getParentScope+() = func
 and vupsample_592.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

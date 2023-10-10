@@ -250,4 +250,4 @@ and func_19(vpie_2196, target_19)
 and func_20(vpie_2196, target_20)
 and vpie_2196.getType().hasName("xps_image_enum_t *")
 and vpie_2196.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

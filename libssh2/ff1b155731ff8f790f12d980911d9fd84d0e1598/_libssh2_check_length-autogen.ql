@@ -97,4 +97,4 @@ and vbuf_812.getType().hasName("string_buf *")
 and vlen_812.getType().hasName("size_t")
 and vbuf_812.getParentScope+() = func
 and vlen_812.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

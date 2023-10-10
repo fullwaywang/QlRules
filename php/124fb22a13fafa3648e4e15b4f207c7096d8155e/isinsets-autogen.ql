@@ -41,4 +41,4 @@ and func_1(vg_0, target_1)
 and func_2(vg_0, target_2)
 and vg_0.getType().hasName("re_guts *")
 and vg_0.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

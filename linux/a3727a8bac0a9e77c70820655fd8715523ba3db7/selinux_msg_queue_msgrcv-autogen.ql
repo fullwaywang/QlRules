@@ -21,4 +21,4 @@ where
 func_0(vtarget_6219)
 and vtarget_6219.getType().hasName("task_struct *")
 and vtarget_6219.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -68,4 +68,4 @@ and vi_404.getParentScope+() = func
 and vctx_408.getParentScope+() = func
 and vpitch_delay_int_415.getParentScope+() = func
 and vfc_417.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

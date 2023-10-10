@@ -43,4 +43,4 @@ and vs_614.getType().hasName("ShortenContext *")
 and vi_615.getType().hasName("int")
 and vs_614.(LocalVariable).getFunction() = func
 and vi_615.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

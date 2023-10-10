@@ -35,4 +35,4 @@ and vword_4381.getType().hasName("char_u *")
 and venc_utf8.getType().hasName("int")
 and vword_4381.getParentScope+() = func
 and not venc_utf8.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

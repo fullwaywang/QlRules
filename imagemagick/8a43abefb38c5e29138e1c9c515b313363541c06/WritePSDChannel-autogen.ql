@@ -46,4 +46,4 @@ and func_2(vcompressed_pixels_2745, target_2)
 and func_3(vcompressed_pixels_2745, target_3)
 and vcompressed_pixels_2745.getType().hasName("unsigned char *")
 and vcompressed_pixels_2745.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

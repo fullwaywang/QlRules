@@ -55,4 +55,4 @@ and func_5(vmax_signed_time_t_152, target_5)
 and func_6(target_6)
 and vmax_signed_time_t_152.getType().hasName("const uintmax_t")
 and vmax_signed_time_t_152.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

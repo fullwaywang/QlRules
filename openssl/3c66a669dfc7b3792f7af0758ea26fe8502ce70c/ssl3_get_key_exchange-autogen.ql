@@ -1,7 +1,7 @@
 /**
  * @name openssl-3c66a669dfc7b3792f7af0758ea26fe8502ce70c-ssl3_get_key_exchange
  * @id cpp/openssl/3c66a669dfc7b3792f7af0758ea26fe8502ce70c/ssl3-get-key-exchange
- * @description openssl-3c66a669dfc7b3792f7af0758ea26fe8502ce70c-ssl3_get_key_exchange 
+ * @description openssl-3c66a669dfc7b3792f7af0758ea26fe8502ce70c-ssl3_get_key_exchange CVE-2015-3196
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -106,4 +106,4 @@ and vi_1367.getParentScope+() = func
 and valg_k_1367.getParentScope+() = func
 and vtmp_id_hint_1459.getParentScope+() = func
 and vs_1359.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

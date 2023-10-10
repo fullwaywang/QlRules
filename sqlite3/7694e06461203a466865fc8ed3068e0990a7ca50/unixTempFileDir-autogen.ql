@@ -33,4 +33,4 @@ and not func_1(func)
 and func_2(vzDir_5415, func, target_2)
 and vzDir_5415.getType().hasName("const char *")
 and vzDir_5415.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

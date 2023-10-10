@@ -62,4 +62,4 @@ and func_6(vopen_1138, func)
 and func_7(vopen_1138, func)
 and vopen_1138.getType().hasName("nfsd4_open *")
 and vopen_1138.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

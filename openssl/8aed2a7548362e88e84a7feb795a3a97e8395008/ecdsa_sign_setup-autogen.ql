@@ -1,7 +1,7 @@
 /**
  * @name openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-ecdsa_sign_setup
  * @id cpp/openssl/8aed2a7548362e88e84a7feb795a3a97e8395008/ecdsa-sign-setup
- * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-ecdsa_sign_setup 
+ * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-ecdsa_sign_setup CVE-2016-7056 
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -138,4 +138,4 @@ and vorder_93.getParentScope+() = func
 and vX_93.getParentScope+() = func
 and vtmp_point_94.getParentScope+() = func
 and vgroup_95.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

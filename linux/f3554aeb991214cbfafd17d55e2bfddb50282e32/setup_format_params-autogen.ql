@@ -29,4 +29,4 @@ not func_0(vraw_cmd, func)
 and vraw_cmd.getType().hasName("floppy_raw_cmd *")
 and func_1(vraw_cmd)
 and not vraw_cmd.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

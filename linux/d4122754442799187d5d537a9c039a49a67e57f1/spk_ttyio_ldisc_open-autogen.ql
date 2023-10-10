@@ -66,4 +66,4 @@ and func_11(vspeakup_tty)
 and vtty_46.getParentScope+() = func
 and vldisc_data_48.getParentScope+() = func
 and not vspeakup_tty.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

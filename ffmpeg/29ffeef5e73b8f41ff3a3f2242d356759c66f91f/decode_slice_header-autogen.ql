@@ -110,4 +110,4 @@ and vlast_pic_droppable_3372.getType().hasName("int")
 and vh0_3366.getFunction() = func
 and vlast_pic_structure_3372.(LocalVariable).getFunction() = func
 and vlast_pic_droppable_3372.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

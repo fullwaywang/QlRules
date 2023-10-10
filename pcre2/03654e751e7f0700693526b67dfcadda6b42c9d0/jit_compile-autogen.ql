@@ -243,4 +243,4 @@ and vcompiler_13624.getParentScope+() = func
 and vcommon_13627.getParentScope+() = func
 and vallocator_data_13629.getParentScope+() = func
 and vprivate_data_size_13630.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

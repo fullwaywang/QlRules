@@ -29,4 +29,4 @@ not func_0(vendpoint_307)
 and vendpoint_307.getType().hasName("usb_endpoint_descriptor *")
 and func_1(vendpoint_307)
 and vendpoint_307.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

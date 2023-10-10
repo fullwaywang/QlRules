@@ -71,4 +71,4 @@ and func_4(vtrack_6713, target_4)
 and func_5(vtrack_6713, target_5)
 and vtrack_6713.getType().hasName("MOVTrack *")
 and vtrack_6713.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

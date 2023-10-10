@@ -27,4 +27,4 @@ and vbuf_270.getType().hasName("char *")
 and vpriv_272.getType().hasName("lbs_private *")
 and vbuf_270.getParentScope+() = func
 and vpriv_272.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

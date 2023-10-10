@@ -160,4 +160,4 @@ and vr_2016.getType().hasName("int")
 and va_2011.getParentScope+() = func
 and vlinkname_2014.getParentScope+() = func
 and vr_2016.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

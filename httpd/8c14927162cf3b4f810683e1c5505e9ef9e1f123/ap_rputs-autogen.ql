@@ -48,4 +48,4 @@ and vr_476.getType().hasName("request_rec *")
 and vstr_476.getType().hasName("const char *")
 and vr_476.getFunction() = func
 and vstr_476.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -30,4 +30,4 @@ from Function func, LogicalAndExpr target_2
 where
 not func_0(target_2, func)
 and func_2(target_2)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

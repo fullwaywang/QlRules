@@ -103,4 +103,4 @@ and vstr_250.getParentScope+() = func
 and not vclsid2desc.getParentScope+() = func
 and vclsid_239.getParentScope+() = func
 and vms_238.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

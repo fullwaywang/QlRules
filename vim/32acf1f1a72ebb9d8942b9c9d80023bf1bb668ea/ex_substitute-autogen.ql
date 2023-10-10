@@ -68,4 +68,4 @@ and vsub_3682.getType().hasName("char_u *")
 and vsub_copy_3683.getType().hasName("char_u *")
 and vsub_3682.getParentScope+() = func
 and vsub_copy_3683.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

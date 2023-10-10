@@ -48,4 +48,4 @@ and vsig_nid_2237.getType().hasName("int")
 and vsigalg_2239.getType().hasName("const SIGALG_LOOKUP *")
 and vsig_nid_2237.getParentScope+() = func
 and vsigalg_2239.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

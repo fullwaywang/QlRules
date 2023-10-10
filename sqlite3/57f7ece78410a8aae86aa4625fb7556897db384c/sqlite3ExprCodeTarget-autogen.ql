@@ -71,4 +71,4 @@ and vpExpr_3562.getType().hasName("Expr *")
 and vaff_3608.getType().hasName("int")
 and vpExpr_3562.getFunction() = func
 and vaff_3608.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

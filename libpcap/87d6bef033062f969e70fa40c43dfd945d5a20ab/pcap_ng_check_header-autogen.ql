@@ -151,4 +151,4 @@ and vtotal_length_769.getType().hasName("bpf_u_int32")
 and verrbuf_765.getParentScope+() = func
 and verr_765.getParentScope+() = func
 and vtotal_length_769.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

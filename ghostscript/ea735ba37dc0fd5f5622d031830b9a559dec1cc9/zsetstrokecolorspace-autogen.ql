@@ -40,4 +40,4 @@ and not func_1(vi_ctx_p_6638, func)
 and func_2(vi_ctx_p_6638, target_2)
 and vi_ctx_p_6638.getType().hasName("i_ctx_t *")
 and vi_ctx_p_6638.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

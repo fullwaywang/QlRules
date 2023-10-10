@@ -159,4 +159,4 @@ and vret_2841.getType().hasName("int")
 and vs_2837.getType().hasName("HEVCContext *")
 and vret_2841.getParentScope+() = func
 and vs_2837.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

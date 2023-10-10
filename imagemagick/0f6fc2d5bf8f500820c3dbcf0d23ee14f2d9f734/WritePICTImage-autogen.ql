@@ -74,4 +74,4 @@ and vrow_bytes_1_1652.getType().hasName("unsigned short")
 and vimage_1594.getType().hasName("Image *")
 and vrow_bytes_1_1652.getParentScope+() = func
 and vimage_1594.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

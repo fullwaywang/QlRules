@@ -83,4 +83,4 @@ and vbest_crl_1120.getType().hasName("X509_CRL *")
 and vcrl_score_1117.getParentScope+() = func
 and vbest_score_1117.getParentScope+() = func
 and vbest_crl_1120.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

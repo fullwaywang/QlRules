@@ -85,4 +85,4 @@ and vlen_1945.getType().hasName("uint16_t")
 and vc_1924.getParentScope+() = func
 and vcctx_1926.getParentScope+() = func
 and vlen_1945.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

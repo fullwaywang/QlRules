@@ -80,4 +80,4 @@ and vresult_429.(LocalVariable).getFunction() = func
 and vp_430.(LocalVariable).getFunction() = func
 and vsubdomain_431.(LocalVariable).getFunction() = func
 and vh_413.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -92,4 +92,4 @@ and vtmp_4600.getType().hasName("char *")
 and verrorMessage_4597.getFunction() = func
 and voption_4599.(LocalVariable).getFunction() = func
 and vtmp_4600.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

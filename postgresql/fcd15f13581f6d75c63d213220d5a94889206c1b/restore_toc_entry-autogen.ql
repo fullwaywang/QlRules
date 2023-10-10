@@ -136,4 +136,4 @@ and vte_688.getType().hasName("TocEntry *")
 and vropt_690.getType().hasName("RestoreOptions *")
 and vte_688.getFunction() = func
 and vropt_690.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

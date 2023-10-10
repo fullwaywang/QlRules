@@ -40,4 +40,4 @@ not func_0(vsz_850, target_1, func)
 and func_1(vsz_850, target_1)
 and vsz_850.getType().hasName("const size_t")
 and vsz_850.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

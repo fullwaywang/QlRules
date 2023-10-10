@@ -139,4 +139,4 @@ and vlimit_228.getType().hasName("png_alloc_size_t")
 and vpng_ptr_167.getParentScope+() = func
 and vchunk_name_169.getParentScope+() = func
 and vlimit_228.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

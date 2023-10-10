@@ -65,4 +65,4 @@ and func_4(vbprm_473)
 and vbprm_473.getType().hasName("linux_binprm *")
 and func_5(vbprm_473)
 and vbprm_473.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

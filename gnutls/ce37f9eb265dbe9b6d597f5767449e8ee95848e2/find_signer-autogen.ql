@@ -93,4 +93,4 @@ and vissuer_1245.getParentScope+() = func
 and vsigner_1246.getParentScope+() = func
 and not v__func__.getParentScope+() = func
 and vprev_1312.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

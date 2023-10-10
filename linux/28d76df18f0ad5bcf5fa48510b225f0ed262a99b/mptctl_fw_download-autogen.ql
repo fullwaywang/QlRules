@@ -32,4 +32,4 @@ and vufwdl_759.getType().hasName("mpt_fw_xfer *")
 and vkfwdl_760.getType().hasName("mpt_fw_xfer")
 and vufwdl_759.getParentScope+() = func
 and vkfwdl_760.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

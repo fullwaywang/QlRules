@@ -61,4 +61,4 @@ and vj_893.getType().hasName("int")
 and vv_894.getType().hasName("sds *")
 and vj_893.(LocalVariable).getFunction() = func
 and vv_894.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

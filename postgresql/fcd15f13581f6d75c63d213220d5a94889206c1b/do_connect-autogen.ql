@@ -320,4 +320,4 @@ and vpassword_1784.(LocalVariable).getFunction() = func
 and vkeywords_1877.(LocalVariable).getFunction() = func
 and vvalues_1878.(LocalVariable).getFunction() = func
 and vparamnum_1879.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

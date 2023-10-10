@@ -82,4 +82,4 @@ and vavctx_175.getType().hasName("AVCodecContext *")
 and vbuf_size_176.getFunction() = func
 and vrle_bitmap_len_181.(LocalVariable).getFunction() = func
 and vavctx_175.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -95,4 +95,4 @@ and vreq_959.getType().hasName("sdp_req_t *")
 and vreqhdr_961.getParentScope+() = func
 and vstatus_965.getParentScope+() = func
 and vreq_959.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

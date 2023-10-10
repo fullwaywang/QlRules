@@ -43,4 +43,4 @@ and func_2(vbb_data_len_1148, target_2)
 and func_3(vbb_data_len_1148, target_3)
 and vbb_data_len_1148.getType().hasName("guint16")
 and vbb_data_len_1148.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -129,4 +129,4 @@ and vheapRel_1010.getType().hasName("Relation")
 and vindexoid_1005.(LocalVariable).getFunction() = func
 and vheapoid_1008.(LocalVariable).getFunction() = func
 and vheapRel_1010.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

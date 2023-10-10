@@ -37,4 +37,4 @@ and vsfep_1012.getType().hasName("xfs_attr_sf_entry *")
 and vendp_1014.getType().hasName("char *")
 and vsfep_1012.getParentScope+() = func
 and vendp_1014.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

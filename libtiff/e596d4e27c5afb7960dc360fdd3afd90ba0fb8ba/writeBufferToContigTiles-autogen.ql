@@ -113,4 +113,4 @@ and vtw_1199.(LocalVariable).getFunction() = func
 and vtile_rowsize_1202.(LocalVariable).getFunction() = func
 and vtile_buffsize_1204.(LocalVariable).getFunction() = func
 and vtilesize_1205.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

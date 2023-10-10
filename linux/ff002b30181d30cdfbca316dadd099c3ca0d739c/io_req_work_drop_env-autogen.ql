@@ -49,4 +49,4 @@ not func_0(vreq_912, func)
 and vreq_912.getType().hasName("io_kiocb *")
 and func_6(vreq_912)
 and vreq_912.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

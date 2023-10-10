@@ -38,4 +38,4 @@ and func_1(vpSelect_2458, target_1)
 and func_2(vpSelect_2458, target_2)
 and vpSelect_2458.getType().hasName("Select *")
 and vpSelect_2458.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

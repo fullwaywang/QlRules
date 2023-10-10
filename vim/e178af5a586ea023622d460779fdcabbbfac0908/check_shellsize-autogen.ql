@@ -42,4 +42,4 @@ and not func_1(vRows, func)
 and func_2(vRows, target_2)
 and vRows.getType().hasName("long")
 and not vRows.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

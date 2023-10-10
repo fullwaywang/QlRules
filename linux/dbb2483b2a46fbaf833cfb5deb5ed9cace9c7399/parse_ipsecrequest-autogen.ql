@@ -30,4 +30,4 @@ not func_0(vrq_1943, func)
 and vrq_1943.getType().hasName("sadb_x_ipsecrequest *")
 and func_1(vrq_1943)
 and vrq_1943.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

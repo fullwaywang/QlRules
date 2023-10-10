@@ -90,4 +90,4 @@ and vsize_2050.getType().hasName("uint64_t")
 and voff_2050.getType().hasName("uint64_t")
 and vsize_2050.getParentScope+() = func
 and voff_2050.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

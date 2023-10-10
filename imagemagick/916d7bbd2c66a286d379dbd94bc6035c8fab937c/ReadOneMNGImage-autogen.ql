@@ -33,4 +33,4 @@ and func_1(vmng_info_5317, target_2, target_1)
 and func_2(target_2)
 and vmng_info_5317.getType().hasName("MngInfo *")
 and vmng_info_5317.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

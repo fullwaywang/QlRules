@@ -26,4 +26,4 @@ and vfout_7402.getType().hasName("Archive *")
 and vtbinfo_7428.getType().hasName("TableInfo *")
 and vfout_7402.getFunction() = func
 and vtbinfo_7428.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

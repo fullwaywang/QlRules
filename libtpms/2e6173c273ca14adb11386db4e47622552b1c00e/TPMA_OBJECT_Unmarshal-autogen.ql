@@ -28,4 +28,4 @@ not func_0(vtarget_470, target_1)
 and func_1(vtarget_470, target_1)
 and vtarget_470.getType().hasName("TPMA_OBJECT *")
 and vtarget_470.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

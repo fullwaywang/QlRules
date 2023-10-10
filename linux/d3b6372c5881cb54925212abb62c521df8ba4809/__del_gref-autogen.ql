@@ -93,4 +93,4 @@ and func_14(vgref_184)
 and func_15(func)
 and vgref_184.getType().hasName("gntalloc_gref *")
 and vgref_184.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

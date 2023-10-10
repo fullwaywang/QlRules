@@ -98,4 +98,4 @@ and vcurbuf.getType().hasName("buf_T *")
 and vb_im_ptr_1589.getType().hasName("long *")
 and not vcurbuf.getParentScope+() = func
 and vb_im_ptr_1589.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

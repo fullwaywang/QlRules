@@ -106,4 +106,4 @@ and vnetdev_3516.getParentScope+() = func
 and vpriv_flags_3516.getParentScope+() = func
 and vadapter_3518.getParentScope+() = func
 and vflags2_3519.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

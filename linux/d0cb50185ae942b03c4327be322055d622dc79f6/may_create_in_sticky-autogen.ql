@@ -28,4 +28,4 @@ func_4(vdir_1020)
 and func_5(vdir_1020)
 and vdir_1020.getType().hasName("dentry *const")
 and vdir_1020.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

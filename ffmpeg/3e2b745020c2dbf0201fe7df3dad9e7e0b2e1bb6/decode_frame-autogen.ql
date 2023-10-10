@@ -52,4 +52,4 @@ and func_1(vs_526, target_1)
 and func_2(vs_526, target_2)
 and vs_526.getType().hasName("PNGDecContext *const")
 and vs_526.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

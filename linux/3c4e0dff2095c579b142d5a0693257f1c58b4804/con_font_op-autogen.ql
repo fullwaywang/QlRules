@@ -30,4 +30,4 @@ and vvc_4728.getType().hasName("vc_data *")
 and vop_4728.getType().hasName("console_font_op *")
 and vvc_4728.getParentScope+() = func
 and vop_4728.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

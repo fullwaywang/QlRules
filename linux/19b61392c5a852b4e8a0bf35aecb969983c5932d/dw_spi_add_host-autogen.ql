@@ -39,4 +39,4 @@ not func_0(vdws_458, func)
 and vdws_458.getType().hasName("dw_spi *")
 and func_5(vdws_458)
 and vdws_458.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

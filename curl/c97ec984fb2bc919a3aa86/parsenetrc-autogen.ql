@@ -27,4 +27,4 @@ and vnetrcbuffsize_83.getType().hasName("int")
 and vfile_63.getParentScope+() = func
 and vnetrcbuffer_82.getParentScope+() = func
 and vnetrcbuffsize_83.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

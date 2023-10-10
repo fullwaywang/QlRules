@@ -28,4 +28,4 @@ not func_0(vstime_102, func)
 and vstime_102.getType().hasName("snd_hrtimer *")
 and func_1(vstime_102)
 and vstime_102.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

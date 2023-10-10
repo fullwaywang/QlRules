@@ -34,4 +34,4 @@ and vrx_status_2647.getType().hasName("ieee80211_rx_status *")
 and vlq_sta_2649.getType().hasName("iwl_lq_sta *")
 and vrx_status_2647.getParentScope+() = func
 and vlq_sta_2649.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

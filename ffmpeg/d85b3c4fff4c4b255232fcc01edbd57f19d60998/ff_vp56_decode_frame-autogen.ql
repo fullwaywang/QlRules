@@ -84,4 +84,4 @@ and vs_493.getType().hasName("VP56Context *")
 and vp_494.getType().hasName("AVFrame *const")
 and vs_493.(LocalVariable).getFunction() = func
 and vp_494.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

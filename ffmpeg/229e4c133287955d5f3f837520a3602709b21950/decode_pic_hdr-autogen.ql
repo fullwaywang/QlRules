@@ -55,4 +55,4 @@ and func_3(vctx_322, target_3)
 and func_4(vctx_322, target_4)
 and vctx_322.getType().hasName("IVI5DecContext *")
 and vctx_322.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

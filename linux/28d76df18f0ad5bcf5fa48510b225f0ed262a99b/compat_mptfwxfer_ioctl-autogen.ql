@@ -31,4 +31,4 @@ and vkfw_2829.getType().hasName("mpt_fw_xfer")
 and viocnumX_2831.getType().hasName("int")
 and vkfw_2829.getParentScope+() = func
 and viocnumX_2831.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

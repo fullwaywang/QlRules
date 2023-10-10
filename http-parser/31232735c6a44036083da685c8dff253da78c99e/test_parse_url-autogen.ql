@@ -75,4 +75,4 @@ and func_4(vtest_3328, target_4)
 and func_5(vtest_3328, target_5)
 and vtest_3328.getType().hasName("const url_test *")
 and vtest_3328.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

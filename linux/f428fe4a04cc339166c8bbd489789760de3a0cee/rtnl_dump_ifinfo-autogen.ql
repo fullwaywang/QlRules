@@ -13,4 +13,4 @@ from Function func, Parameter vskb_1702
 where
 vskb_1702.getType().hasName("sk_buff *")
 and vskb_1702.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

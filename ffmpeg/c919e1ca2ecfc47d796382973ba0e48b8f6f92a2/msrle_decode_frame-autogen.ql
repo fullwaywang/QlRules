@@ -54,4 +54,4 @@ and func_3(vavctx_84, target_3)
 and func_4(vavctx_84, target_4)
 and vavctx_84.getType().hasName("AVCodecContext *")
 and vavctx_84.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

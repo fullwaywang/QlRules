@@ -1,7 +1,7 @@
 /**
  * @name openssl-ae50d8270026edf5b3c7f8aaa0c6677462b33d97-get_client_master_key
  * @id cpp/openssl/ae50d8270026edf5b3c7f8aaa0c6677462b33d97/get-client-master-key
- * @description openssl-ae50d8270026edf5b3c7f8aaa0c6677462b33d97-get_client_master_key 
+ * @description openssl-ae50d8270026edf5b3c7f8aaa0c6677462b33d97-get_client_master_key CVE-2016-0703
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -313,4 +313,4 @@ and vi_374.getParentScope+() = func
 and vek_375.getParentScope+() = func
 and vp_377.getParentScope+() = func
 and vc_379.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

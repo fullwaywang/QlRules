@@ -32,4 +32,4 @@ not func_0(vsave_pgd_85, func)
 and vsave_pgd_85.getType().hasName("pgd_t *")
 and func_1(vsave_pgd_85)
 and vsave_pgd_85.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

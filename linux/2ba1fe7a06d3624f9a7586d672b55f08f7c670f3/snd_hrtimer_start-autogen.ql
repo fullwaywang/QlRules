@@ -21,4 +21,4 @@ where
 func_0(vstime_90)
 and vstime_90.getType().hasName("snd_hrtimer *")
 and vstime_90.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -421,4 +421,4 @@ and not vdebug_logging_mode.getParentScope+() = func
 and vcaf_channel_layout_277.getParentScope+() = func
 and vbytes_to_copy_498.getParentScope+() = func
 and vbuff_499.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

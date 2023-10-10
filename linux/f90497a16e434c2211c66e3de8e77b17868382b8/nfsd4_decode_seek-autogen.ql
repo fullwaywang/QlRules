@@ -38,4 +38,4 @@ and not func_1(vseek_1979, func)
 and vseek_1979.getType().hasName("nfsd4_seek *")
 and func_2(vseek_1979)
 and vseek_1979.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -51,4 +51,4 @@ and vpset.getType().hasName("PsqlSettings")
 and vvarname_783.getType().hasName("char *")
 and not vpset.getParentScope+() = func
 and vvarname_783.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -54,4 +54,4 @@ and func_2(vpcs_45, target_2)
 and func_3(vpcs_45, target_3)
 and vpcs_45.getType().hasName("pcl_state_t *")
 and vpcs_45.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

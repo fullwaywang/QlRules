@@ -84,4 +84,4 @@ and vpParse_918.getType().hasName("Parse *")
 and vrc_919.(LocalVariable).getFunction() = func
 and vdb_922.(LocalVariable).getFunction() = func
 and vpParse_918.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

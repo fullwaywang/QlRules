@@ -393,4 +393,4 @@ and vssl_config_496.getParentScope+() = func
 and vhostname_499.getParentScope+() = func
 and vdata_481.getParentScope+() = func
 and vconn_482.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

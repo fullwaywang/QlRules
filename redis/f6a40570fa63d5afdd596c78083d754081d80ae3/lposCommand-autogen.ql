@@ -54,4 +54,4 @@ and vele_508.getType().hasName("robj *")
 and vc_507.getType().hasName("client *")
 and vele_508.(LocalVariable).getFunction() = func
 and vc_507.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

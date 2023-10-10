@@ -45,4 +45,4 @@ and func_2(func)
 and func_3(vcopy_1012)
 and vcopy_1012.getType().hasName("nfsd4_copy *")
 and vcopy_1012.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

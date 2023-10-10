@@ -47,4 +47,4 @@ and verror_1209.getType().hasName("int *")
 and vdata_1219.getType().hasName("Elf_Data *")
 and verror_1209.getFunction() = func
 and vdata_1219.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

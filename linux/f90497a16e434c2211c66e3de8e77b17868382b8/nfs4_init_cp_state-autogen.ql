@@ -31,4 +31,4 @@ and vstid_965.getType().hasName("copy_stateid_t *")
 and vsc_type_966.getType().hasName("unsigned char")
 and vstid_965.getParentScope+() = func
 and vsc_type_966.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -62,4 +62,4 @@ and vcheck_1120.getType().hasName("connectdata *")
 and func_3(vcheck_1120)
 and vneedle_1115.getParentScope+() = func
 and vcheck_1120.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

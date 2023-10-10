@@ -27,4 +27,4 @@ not func_0(vsk_3287, func)
 and vsk_3287.getType().hasName("sock *")
 and func_1(vsk_3287)
 and vsk_3287.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

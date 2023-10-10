@@ -66,4 +66,4 @@ not func_0(vnn_7791, func)
 and vnn_7791.getType().hasName("nfsd_net *")
 and func_11(vnn_7791)
 and vnn_7791.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

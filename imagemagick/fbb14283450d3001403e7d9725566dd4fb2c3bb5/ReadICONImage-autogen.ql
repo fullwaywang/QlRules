@@ -49,4 +49,4 @@ and func_3(target_3)
 and func_4(vicon_colormap_444, target_4)
 and vicon_colormap_444.getType().hasName("unsigned char *")
 and vicon_colormap_444.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

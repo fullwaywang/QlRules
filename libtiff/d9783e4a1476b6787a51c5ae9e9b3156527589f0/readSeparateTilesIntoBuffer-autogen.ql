@@ -53,4 +53,4 @@ and vspp_954.getType().hasName("uint16")
 and vs_963.getType().hasName("tsample_t")
 and vspp_954.getFunction() = func
 and vs_963.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

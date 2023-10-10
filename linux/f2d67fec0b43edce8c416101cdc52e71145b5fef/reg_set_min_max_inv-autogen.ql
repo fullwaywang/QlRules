@@ -27,4 +27,4 @@ and vtrue_reg_5823.getType().hasName("bpf_reg_state *")
 and vfalse_reg_5824.getParentScope+() = func
 and vis_jmp32_5825.getParentScope+() = func
 and vtrue_reg_5823.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

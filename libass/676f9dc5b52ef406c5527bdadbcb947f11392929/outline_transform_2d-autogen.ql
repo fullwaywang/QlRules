@@ -65,4 +65,4 @@ and vv_243.getType().hasName("double[2]")
 and voutline_230.getType().hasName("ASS_Outline *")
 and vv_243.getParentScope+() = func
 and voutline_230.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

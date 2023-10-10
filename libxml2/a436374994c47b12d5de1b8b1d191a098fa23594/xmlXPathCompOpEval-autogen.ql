@@ -87,4 +87,4 @@ and vctxt_13212.getType().hasName("xmlXPathParserContextPtr")
 and varg1_13217.getParentScope+() = func
 and varg2_13217.getParentScope+() = func
 and vctxt_13212.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

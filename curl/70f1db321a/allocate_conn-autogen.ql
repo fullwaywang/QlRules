@@ -583,4 +583,4 @@ and not vCurl_handler_dummy.getParentScope+() = func
 and not vCurl_cstrdup.getParentScope+() = func
 and not vCurl_cfree.getParentScope+() = func
 and vdata_4177.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

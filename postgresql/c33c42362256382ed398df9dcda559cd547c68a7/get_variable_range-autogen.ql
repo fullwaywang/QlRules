@@ -52,4 +52,4 @@ and vvardata_4860.getType().hasName("VariableStatData *")
 and vsortop_4860.getType().hasName("Oid")
 and vvardata_4860.getFunction() = func
 and vsortop_4860.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

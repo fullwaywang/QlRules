@@ -122,4 +122,4 @@ and voverlay_1116.getType().hasName("ushf *")
 and vdest_0.getParentScope+() = func
 and vds_1114.getParentScope+() = func
 and voverlay_1116.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

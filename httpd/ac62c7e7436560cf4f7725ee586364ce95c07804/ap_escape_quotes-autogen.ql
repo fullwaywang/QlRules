@@ -69,4 +69,4 @@ and vinchr_2515.getType().hasName("const char *")
 and voutchr_2516.getType().hasName("char *")
 and vinchr_2515.(LocalVariable).getFunction() = func
 and voutchr_2516.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -194,4 +194,4 @@ and vyyscanner_1076.getType().hasName("void *")
 and vlex_env_1076.getType().hasName("HEX_LEX_ENVIRONMENT *")
 and vyyscanner_1076.getParentScope+() = func
 and vlex_env_1076.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

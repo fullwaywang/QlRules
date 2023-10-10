@@ -64,4 +64,4 @@ and func_20(vuaddr_2524, vq_2524)
 and vq_2524.getType().hasName("futex_q *")
 and vuaddr_2524.getParentScope+() = func
 and vq_2524.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

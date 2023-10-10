@@ -54,4 +54,4 @@ and vtree_12309.getType().hasName("proto_tree *")
 and vpinfo_12309.getParentScope+() = func
 and vbit_offset_12314.getParentScope+() = func
 and vtree_12309.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

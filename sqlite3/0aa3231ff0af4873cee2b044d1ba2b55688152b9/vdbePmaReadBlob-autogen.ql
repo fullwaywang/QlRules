@@ -89,4 +89,4 @@ and func_10(vp_487, target_10)
 and func_11(vp_487, target_11)
 and vp_487.getType().hasName("PmaReader *")
 and vp_487.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

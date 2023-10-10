@@ -46,4 +46,4 @@ and vline_322.getType().hasName("int")
 and vsize_322.getParentScope+() = func
 and vfile_322.getParentScope+() = func
 and vline_322.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

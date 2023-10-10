@@ -50,4 +50,4 @@ and va_434.getType().hasName("const char *")
 and vb_435.getParentScope+() = func
 and vresult_437.getParentScope+() = func
 and va_434.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

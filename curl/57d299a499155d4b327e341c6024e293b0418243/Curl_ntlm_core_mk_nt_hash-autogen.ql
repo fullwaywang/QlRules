@@ -73,4 +73,4 @@ and vlen_559.(LocalVariable).getFunction() = func
 and vpw_560.(LocalVariable).getFunction() = func
 and not vCurl_cmalloc.getParentScope+() = func
 and not vCurl_cstrdup.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

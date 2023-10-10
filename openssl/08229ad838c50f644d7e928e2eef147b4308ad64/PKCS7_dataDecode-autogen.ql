@@ -33,4 +33,4 @@ and vevp_cipher_363.getType().hasName("const EVP_CIPHER *")
 and func_2(vetmp_359, vevp_cipher_363)
 and vetmp_359.getParentScope+() = func
 and vevp_cipher_363.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -93,4 +93,4 @@ and vavctx_640.getType().hasName("AVCodecContext *")
 and vp_641.getType().hasName("PerThreadContext *")
 and vavctx_640.getParentScope+() = func
 and vp_641.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

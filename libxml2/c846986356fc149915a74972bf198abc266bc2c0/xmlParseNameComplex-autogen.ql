@@ -134,4 +134,4 @@ and vl_3202.getType().hasName("int")
 and vctxt_3201.getParentScope+() = func
 and vlen_3202.getParentScope+() = func
 and vl_3202.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

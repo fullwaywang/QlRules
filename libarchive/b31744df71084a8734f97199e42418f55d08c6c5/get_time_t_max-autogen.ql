@@ -99,4 +99,4 @@ and vt_142.getType().hasName("time_t")
 and va_143.getType().hasName("time_t")
 and vt_142.getParentScope+() = func
 and va_143.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

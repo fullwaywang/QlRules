@@ -73,4 +73,4 @@ and vv_2206.getType().hasName("bcf1_t *")
 and vmem_2216.getParentScope+() = func
 and vf_2340.getParentScope+() = func
 and vv_2206.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

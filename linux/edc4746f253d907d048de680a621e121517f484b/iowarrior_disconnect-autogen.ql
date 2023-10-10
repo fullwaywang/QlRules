@@ -29,4 +29,4 @@ not func_0(vdev_863)
 and vdev_863.getType().hasName("iowarrior *")
 and func_2(vdev_863)
 and vdev_863.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

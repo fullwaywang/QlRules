@@ -59,4 +59,4 @@ and vadded_179.getType().hasName("uint")
 and vsize_158.getFunction() = func
 and vmmem_160.(LocalVariable).getFunction() = func
 and vadded_179.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -275,4 +275,4 @@ and vs_819.getType().hasName("Jpeg2000DecoderContext *")
 and vtilex_822.getParentScope+() = func
 and vtiley_823.getParentScope+() = func
 and vs_819.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

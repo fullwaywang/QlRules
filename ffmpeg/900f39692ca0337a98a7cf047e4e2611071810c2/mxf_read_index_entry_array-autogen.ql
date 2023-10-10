@@ -93,4 +93,4 @@ and vlength_897.getType().hasName("int")
 and vpb_895.getParentScope+() = func
 and vsegment_895.getParentScope+() = func
 and vlength_897.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

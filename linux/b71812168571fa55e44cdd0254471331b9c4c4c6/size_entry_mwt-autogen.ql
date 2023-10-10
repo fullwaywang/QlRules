@@ -75,4 +75,4 @@ and vi_2075.getParentScope+() = func
 and vstartoff_2075.getParentScope+() = func
 and voffsets_2077.getParentScope+() = func
 and v__ret_warn_on_2150.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -46,4 +46,4 @@ and func_2(vmulti_patblt_1257, target_2)
 and func_3(vmulti_patblt_1257, target_3)
 and vmulti_patblt_1257.getType().hasName("MULTI_PATBLT_ORDER *")
 and vmulti_patblt_1257.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

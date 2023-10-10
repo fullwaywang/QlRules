@@ -21,4 +21,4 @@ where
 func_0(vintf_1063, func)
 and vintf_1063.getType().hasName("usb_interface *")
 and vintf_1063.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

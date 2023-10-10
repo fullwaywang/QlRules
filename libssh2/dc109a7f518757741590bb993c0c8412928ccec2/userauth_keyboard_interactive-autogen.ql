@@ -176,4 +176,4 @@ and vi_1596.getType().hasName("unsigned int")
 and vsession_1583.getParentScope+() = func
 and vrc_1589.getParentScope+() = func
 and vi_1596.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

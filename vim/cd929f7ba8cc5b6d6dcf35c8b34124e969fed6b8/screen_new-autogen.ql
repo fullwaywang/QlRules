@@ -109,4 +109,4 @@ and vscreen_625.getType().hasName("VTermScreen *")
 and vstate_624.getType().hasName("VTermState *")
 and vscreen_625.getParentScope+() = func
 and vstate_624.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

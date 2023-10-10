@@ -29,4 +29,4 @@ not func_0(vbuflen_2309, target_1)
 and func_1(vbuflen_2309, target_1)
 and vbuflen_2309.getType().hasName("size_t")
 and vbuflen_2309.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

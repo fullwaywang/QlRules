@@ -259,4 +259,4 @@ and vsize_1241.getParentScope+() = func
 and vbuf_1242.getParentScope+() = func
 and not vthe_repository.getParentScope+() = func
 and voptions_1232.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

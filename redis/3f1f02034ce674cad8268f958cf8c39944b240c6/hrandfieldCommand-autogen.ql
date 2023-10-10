@@ -76,4 +76,4 @@ and vc_1116.getType().hasName("client *")
 and vl_1117.(LocalVariable).getFunction() = func
 and vwithvalues_1118.(LocalVariable).getFunction() = func
 and vc_1116.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

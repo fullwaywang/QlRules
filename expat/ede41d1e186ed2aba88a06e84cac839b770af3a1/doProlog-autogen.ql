@@ -53,4 +53,4 @@ and vdtd_4496.getType().hasName("DTD *const")
 and vnameLen_5375.getType().hasName("int")
 and vdtd_4496.getParentScope+() = func
 and vnameLen_5375.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -1,7 +1,7 @@
 /**
  * @name openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_clear_free
  * @id cpp/openssl/8aed2a7548362e88e84a7feb795a3a97e8395008/EC-GROUP-clear-free
- * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_clear_free NULL
+ * @description openssl-8aed2a7548362e88e84a7feb795a3a97e8395008-EC_GROUP_clear_free CVE-2016-7056
  * @kind problem
  * @problem.severity error
  * @tags security
@@ -39,4 +39,4 @@ and not func_1(vgroup_144, func)
 and vgroup_144.getType().hasName("EC_GROUP *")
 and func_2(vgroup_144)
 and vgroup_144.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

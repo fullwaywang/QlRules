@@ -67,4 +67,4 @@ and vupdateType_767.getType().hasName("UINT16")
 and vUPDATE_TYPE_STRINGS.getType() instanceof ArrayType
 and vupdateType_767.getParentScope+() = func
 and not vUPDATE_TYPE_STRINGS.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

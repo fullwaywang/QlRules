@@ -51,4 +51,4 @@ and verror_591.getType().hasName("int")
 and vis_valid_627.getType().hasName("int")
 and verror_591.getParentScope+() = func
 and vis_valid_627.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

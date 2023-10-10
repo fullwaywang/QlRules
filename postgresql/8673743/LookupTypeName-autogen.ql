@@ -856,4 +856,4 @@ and vschemaname_149.(LocalVariable).getFunction() = func
 and vtypname_150.(LocalVariable).getFunction() = func
 and vnamespaceId_158.(LocalVariable).getFunction() = func
 and vpstate_58.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

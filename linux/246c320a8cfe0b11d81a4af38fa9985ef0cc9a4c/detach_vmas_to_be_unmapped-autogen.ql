@@ -48,4 +48,4 @@ and vprev_2625.getType().hasName("vm_area_struct *")
 and func_4(vprev_2625)
 and vvma_2624.getParentScope+() = func
 and vprev_2625.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

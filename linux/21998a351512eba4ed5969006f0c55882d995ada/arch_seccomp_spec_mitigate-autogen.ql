@@ -34,4 +34,4 @@ and not func_1(vtask_1215)
 and vtask_1215.getType().hasName("task_struct *")
 and vtask_1215.getParentScope+() = func
 and not vspectre_v2_user.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

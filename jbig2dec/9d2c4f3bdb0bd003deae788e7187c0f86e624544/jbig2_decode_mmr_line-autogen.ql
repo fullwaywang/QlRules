@@ -66,4 +66,4 @@ and func_5(va0_836, target_5)
 and func_6(va0_836, target_6)
 and va0_836.getType().hasName("uint32_t")
 and va0_836.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

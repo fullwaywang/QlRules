@@ -59,4 +59,4 @@ and vs_2593.getType().hasName("Vp3DecodeContext *")
 and vret_2595.getType().hasName("int")
 and vs_2593.getParentScope+() = func
 and vret_2595.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -55,4 +55,4 @@ and vexception_1017.getType().hasName("ExceptionInfo *")
 and vimage_1016.getType().hasName("Image *")
 and vexception_1017.getParentScope+() = func
 and vimage_1016.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

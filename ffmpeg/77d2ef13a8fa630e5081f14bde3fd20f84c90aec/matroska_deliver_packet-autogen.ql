@@ -73,4 +73,4 @@ and func_5(vmatroska_1600, target_5)
 and func_6(vmatroska_1600, target_6)
 and vmatroska_1600.getType().hasName("MatroskaDemuxContext *")
 and vmatroska_1600.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

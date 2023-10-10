@@ -86,4 +86,4 @@ and vendian_1237.getType().hasName("EndianType")
 and vp1_1548.getParentScope+() = func
 and vp1_1553.getParentScope+() = func
 and vendian_1237.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

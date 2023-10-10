@@ -36,4 +36,4 @@ and vlength_70.getType().hasName("uint32_t")
 and vmsg_66.getType().hasName("p11_rpc_message *")
 and vlength_70.getParentScope+() = func
 and vmsg_66.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

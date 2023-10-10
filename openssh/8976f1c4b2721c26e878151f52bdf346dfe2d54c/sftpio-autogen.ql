@@ -40,4 +40,4 @@ and vbwlimit_103.getType().hasName("bwlimit *")
 and vamount_101.getType().hasName("size_t")
 and vbwlimit_103.getParentScope+() = func
 and vamount_101.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

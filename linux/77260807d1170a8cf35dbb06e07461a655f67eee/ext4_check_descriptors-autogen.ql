@@ -176,4 +176,4 @@ and vblock_bitmap_2351.getParentScope+() = func
 and vinode_bitmap_2352.getParentScope+() = func
 and vinode_table_2353.getParentScope+() = func
 and vi_2355.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

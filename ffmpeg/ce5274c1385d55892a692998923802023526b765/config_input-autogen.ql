@@ -45,4 +45,4 @@ and vfm_936.getType().hasName("FieldMatchContext *")
 and vh_939.getType().hasName("const int")
 and vfm_936.getParentScope+() = func
 and vh_939.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

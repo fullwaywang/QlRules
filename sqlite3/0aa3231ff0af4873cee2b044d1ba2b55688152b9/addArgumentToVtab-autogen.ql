@@ -25,4 +25,4 @@ where
 func_1(vdb_376, target_1)
 and vdb_376.getType().hasName("sqlite3 *")
 and vdb_376.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

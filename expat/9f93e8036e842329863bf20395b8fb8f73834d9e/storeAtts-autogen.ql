@@ -361,4 +361,4 @@ and vbinding_3243.getParentScope+() = func
 and voldAttsSize_3265.getParentScope+() = func
 and vtemp_3266.getParentScope+() = func
 and vp_3615.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

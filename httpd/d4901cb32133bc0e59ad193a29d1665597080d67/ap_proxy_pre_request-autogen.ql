@@ -74,4 +74,4 @@ and vr_2309.getType().hasName("request_rec *")
 and vurl_2310.getType().hasName("char **")
 and vr_2309.getFunction() = func
 and vurl_2310.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

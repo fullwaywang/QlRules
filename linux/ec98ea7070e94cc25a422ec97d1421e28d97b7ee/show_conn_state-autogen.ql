@@ -24,4 +24,4 @@ and vbuf_3957.getType().hasName("char *")
 and vstate_3960.getType().hasName("const char *")
 and vbuf_3957.getParentScope+() = func
 and vstate_3960.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

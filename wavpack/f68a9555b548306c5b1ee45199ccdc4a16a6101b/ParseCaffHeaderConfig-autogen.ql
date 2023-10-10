@@ -65,4 +65,4 @@ and vinfile_153.getType().hasName("FILE *")
 and vbcount_155.getParentScope+() = func
 and vmEditCount_459.getParentScope+() = func
 and vinfile_153.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

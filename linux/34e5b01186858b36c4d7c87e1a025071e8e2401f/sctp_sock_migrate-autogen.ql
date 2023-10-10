@@ -27,4 +27,4 @@ not func_0(vnewsp_9354, func)
 and vnewsp_9354.getType().hasName("sctp_sock *")
 and func_1(vnewsp_9354)
 and vnewsp_9354.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

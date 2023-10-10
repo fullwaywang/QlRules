@@ -49,4 +49,4 @@ and vdepth_1145.getType().hasName("size_t")
 and vcolormap_1453.getType().hasName("unsigned char *")
 and vdepth_1145.getParentScope+() = func
 and vcolormap_1453.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

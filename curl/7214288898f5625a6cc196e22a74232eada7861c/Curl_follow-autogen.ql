@@ -178,4 +178,4 @@ and vCurl_cstrdup.getType().hasName("curl_strdup_callback")
 and vdata_1551.getParentScope+() = func
 and vuc_1566.getParentScope+() = func
 and not vCurl_cstrdup.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

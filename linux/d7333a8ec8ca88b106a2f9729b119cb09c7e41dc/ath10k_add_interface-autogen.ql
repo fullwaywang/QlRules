@@ -33,4 +33,4 @@ not func_0(varvif_5461)
 and func_1(varvif_5461)
 and varvif_5461.getType().hasName("ath10k_vif *")
 and varvif_5461.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

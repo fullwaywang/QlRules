@@ -44,4 +44,4 @@ and vp_manager_8166.getType().hasName("opj_event_mgr_t *")
 and vl_tcp_8170.getType().hasName("opj_tcp_t *")
 and vp_manager_8166.getParentScope+() = func
 and vl_tcp_8170.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

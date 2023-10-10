@@ -65,4 +65,4 @@ and vcode_875.getType().hasName("uint32_t")
 and vkBlockLengthPrefixCode.getType() instanceof ArrayType
 and vcode_875.getParentScope+() = func
 and not vkBlockLengthPrefixCode.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

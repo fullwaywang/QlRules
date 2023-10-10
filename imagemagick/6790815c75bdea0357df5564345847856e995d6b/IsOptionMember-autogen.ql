@@ -42,4 +42,4 @@ and func_1(voption_list_2405, target_1)
 and func_2(voption_list_2405, target_2)
 and voption_list_2405.getType().hasName("char **")
 and voption_list_2405.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

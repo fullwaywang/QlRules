@@ -194,4 +194,4 @@ and vreply_384.getParentScope+() = func
 and vret_385.getParentScope+() = func
 and not vtests.getParentScope+() = func
 and not vfails.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

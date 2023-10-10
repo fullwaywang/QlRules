@@ -21,4 +21,4 @@ where
 func_0(vdev_112)
 and vdev_112.getType().hasName("mt7615_dev *")
 and vdev_112.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

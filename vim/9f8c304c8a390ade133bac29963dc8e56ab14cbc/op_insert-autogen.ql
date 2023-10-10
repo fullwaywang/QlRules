@@ -53,4 +53,4 @@ and func_2(voap_1458, target_2)
 and func_3(voap_1458, target_3)
 and voap_1458.getType().hasName("oparg_T *")
 and voap_1458.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

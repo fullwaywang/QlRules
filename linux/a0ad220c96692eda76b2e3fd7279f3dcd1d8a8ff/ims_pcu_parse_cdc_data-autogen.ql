@@ -39,4 +39,4 @@ and not func_1(vpcu_1655, func)
 and vpcu_1655.getType().hasName("ims_pcu *")
 and func_2(vpcu_1655)
 and vpcu_1655.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

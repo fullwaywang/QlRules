@@ -52,4 +52,4 @@ and not func_3(target_4, func)
 and func_4(vc_72, target_4)
 and vc_72.getType().hasName("int")
 and vc_72.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -325,4 +325,4 @@ and vkey_len_403.getParentScope+() = func
 and vrng_403.getParentScope+() = func
 and vret_405.getParentScope+() = func
 and vhash_len_406.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

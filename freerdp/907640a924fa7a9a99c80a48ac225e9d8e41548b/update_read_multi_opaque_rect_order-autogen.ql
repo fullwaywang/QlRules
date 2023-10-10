@@ -46,4 +46,4 @@ and func_2(vmulti_opaque_rect_1309, target_2)
 and func_3(vmulti_opaque_rect_1309, target_3)
 and vmulti_opaque_rect_1309.getType().hasName("MULTI_OPAQUE_RECT_ORDER *")
 and vmulti_opaque_rect_1309.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

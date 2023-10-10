@@ -66,4 +66,4 @@ and vnew_len_374.getType().hasName("unsigned int")
 and vfs_365.getType().hasName("ext2_filsys")
 and vnew_len_374.getParentScope+() = func
 and vfs_365.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

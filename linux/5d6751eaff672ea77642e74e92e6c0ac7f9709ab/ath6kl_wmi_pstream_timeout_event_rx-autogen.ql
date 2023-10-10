@@ -35,4 +35,4 @@ and vev_1173.getType().hasName("wmi_pstream_timeout_event *")
 and func_3(vdatap_1170, vev_1173)
 and vdatap_1170.getParentScope+() = func
 and vev_1173.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

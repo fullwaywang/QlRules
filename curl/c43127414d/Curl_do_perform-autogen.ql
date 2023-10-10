@@ -21,4 +21,4 @@ where
 func_0(vdata_2063, func, target_0)
 and vdata_2063.getType().hasName("SessionHandle *")
 and vdata_2063.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

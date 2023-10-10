@@ -94,4 +94,4 @@ and func_8(target_8)
 and func_9(target_9)
 and vrecursion_count_1588.getType().hasName("int")
 and vrecursion_count_1588.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

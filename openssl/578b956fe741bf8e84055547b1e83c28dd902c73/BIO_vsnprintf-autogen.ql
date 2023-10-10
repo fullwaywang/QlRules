@@ -87,4 +87,4 @@ and vformat_801.getParentScope+() = func
 and vargs_801.getParentScope+() = func
 and vretlen_803.getParentScope+() = func
 and vtruncated_804.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -287,4 +287,4 @@ and not voom_lock.getParentScope+() = func
 and vstart_560.getParentScope+() = func
 and vend_561.getParentScope+() = func
 and vtsk_483.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

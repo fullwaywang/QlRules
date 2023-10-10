@@ -71,4 +71,4 @@ and func_5(vs_792, func, target_5)
 and func_6(vs_792, target_6)
 and vs_792.getType().hasName("MpegEncContext *")
 and vs_792.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

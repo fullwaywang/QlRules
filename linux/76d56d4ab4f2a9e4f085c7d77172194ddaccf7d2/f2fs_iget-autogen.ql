@@ -25,4 +25,4 @@ and vinode_324.getType().hasName("inode *")
 and vret_325.getType().hasName("int")
 and vinode_324.getParentScope+() = func
 and vret_325.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

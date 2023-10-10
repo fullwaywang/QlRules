@@ -133,4 +133,4 @@ and vcap_5883.getType().hasName("cmdarg_T *")
 and voap_5885.getType().hasName("oparg_T *")
 and vcap_5883.getParentScope+() = func
 and voap_5885.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

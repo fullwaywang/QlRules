@@ -32,4 +32,4 @@ not func_0(vs_186)
 and vs_186.getType().hasName("SSL *")
 and func_1(vs_186)
 and vs_186.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

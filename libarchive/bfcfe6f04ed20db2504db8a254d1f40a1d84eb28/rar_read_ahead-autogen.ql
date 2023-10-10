@@ -53,4 +53,4 @@ and func_2(vrar_2922, target_2)
 and func_3(vrar_2922, target_3)
 and vrar_2922.getType().hasName("rar *")
 and vrar_2922.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

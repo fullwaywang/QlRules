@@ -30,4 +30,4 @@ not func_0(vpxmitpriv_1471, func)
 and vpxmitpriv_1471.getType().hasName("xmit_priv *")
 and func_2(vpxmitpriv_1471)
 and vpxmitpriv_1471.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

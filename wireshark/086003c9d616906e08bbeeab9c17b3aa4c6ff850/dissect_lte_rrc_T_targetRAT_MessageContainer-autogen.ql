@@ -22,4 +22,4 @@ where
 func_0(vpd_52218, target_0)
 and vpd_52218.getType().hasName("guint8 *")
 and vpd_52218.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

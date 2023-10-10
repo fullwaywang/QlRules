@@ -35,4 +35,4 @@ not func_0(vslots_874, func)
 and vslots_874.getType().hasName("kvm_memslots *")
 and func_1(vslots_874)
 and vslots_874.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

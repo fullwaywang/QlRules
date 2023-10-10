@@ -76,4 +76,4 @@ and vavpkt_174.getFunction() = func
 and vbuf_size_177.(LocalVariable).getFunction() = func
 and vbuf_end_178.(LocalVariable).getFunction() = func
 and vstereo_183.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

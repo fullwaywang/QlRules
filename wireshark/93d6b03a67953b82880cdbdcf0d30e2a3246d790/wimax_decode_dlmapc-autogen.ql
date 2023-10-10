@@ -141,4 +141,4 @@ and not vproto_mac_mgmt_msg_dlmap_decoder.getParentScope+() = func
 and not vhf_mac_header_compress_dlmap_crc.getParentScope+() = func
 and not vhf_mac_header_compress_dlmap_crc_status.getParentScope+() = func
 and not vei_mac_header_compress_dlmap_crc.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

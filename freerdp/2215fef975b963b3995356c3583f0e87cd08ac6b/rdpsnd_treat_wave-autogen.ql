@@ -33,4 +33,4 @@ not func_0(vrdpsnd_541, target_1, func)
 and func_1(vrdpsnd_541, target_1)
 and vrdpsnd_541.getType().hasName("rdpsndPlugin *")
 and vrdpsnd_541.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

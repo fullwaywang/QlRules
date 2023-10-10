@@ -58,4 +58,4 @@ and vs_1298.getType().hasName("AC3DecodeContext *")
 and vavctx_1293.getType().hasName("AVCodecContext *")
 and vs_1298.(LocalVariable).getFunction() = func
 and vavctx_1293.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

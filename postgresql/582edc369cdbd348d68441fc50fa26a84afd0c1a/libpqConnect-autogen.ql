@@ -53,4 +53,4 @@ and vres_48.getType().hasName("PGresult *")
 and vconn.getType().hasName("PGconn *")
 and vres_48.(LocalVariable).getFunction() = func
 and not vconn.getParentScope+() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

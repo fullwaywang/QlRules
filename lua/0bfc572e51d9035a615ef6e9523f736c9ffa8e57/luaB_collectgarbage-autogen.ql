@@ -107,4 +107,4 @@ and vres_208.(LocalVariable).getFunction() = func
 and vprevious_215.(LocalVariable).getFunction() = func
 and vres_220.(LocalVariable).getFunction() = func
 and vres_236.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

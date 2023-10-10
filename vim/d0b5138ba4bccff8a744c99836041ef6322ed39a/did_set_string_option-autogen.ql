@@ -133,4 +133,4 @@ and vvarp_5832.getParentScope+() = func
 and not vp_ww.getParentScope+() = func
 and not vp_shm.getParentScope+() = func
 and not vp_cpo.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

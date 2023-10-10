@@ -103,4 +103,4 @@ and vt2p_1029.getFunction() = func
 and vinput_1029.getFunction() = func
 and vi_1032.(LocalVariable).getFunction() = func
 and vxuint16_1035.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

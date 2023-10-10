@@ -152,4 +152,4 @@ and vriff_size_170.getType().hasName("size_t")
 and vsize_176.getType().hasName("size_t")
 and vriff_size_170.getParentScope+() = func
 and vsize_176.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

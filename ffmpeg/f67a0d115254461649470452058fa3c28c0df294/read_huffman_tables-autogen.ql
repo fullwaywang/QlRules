@@ -55,4 +55,4 @@ and vi_184.getType().hasName("int")
 and vs_181.getType().hasName("HYuvContext *")
 and vi_184.(LocalVariable).getFunction() = func
 and vs_181.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

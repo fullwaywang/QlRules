@@ -164,4 +164,4 @@ and vncomp_1898.getType().hasName("unsigned int")
 and vimage_1893.getType().hasName("opj_image_t *")
 and vncomp_1898.getParentScope+() = func
 and vimage_1893.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

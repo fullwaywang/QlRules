@@ -224,4 +224,4 @@ and vline_buff_9266.getType().hasName("unsigned char *")
 and vmirror_9261.getFunction() = func
 and vrowsize_9265.(LocalVariable).getFunction() = func
 and vline_buff_9266.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -637,4 +637,4 @@ and vp_manager_3876.getParentScope+() = func
 and vl_tcp_3880.getParentScope+() = func
 and vl_Z_ppt_3881.getParentScope+() = func
 and vnew_ppt_buffer_3924.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

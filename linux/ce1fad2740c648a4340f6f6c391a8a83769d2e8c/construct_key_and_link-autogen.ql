@@ -26,4 +26,4 @@ where
 not func_0(vctx_430, func)
 and vctx_430.getType().hasName("keyring_search_context *")
 and vctx_430.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

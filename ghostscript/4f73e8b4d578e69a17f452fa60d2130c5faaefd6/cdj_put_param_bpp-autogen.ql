@@ -245,4 +245,4 @@ and vccomps_2598.getFunction() = func
 and vsave_info_2603.(LocalVariable).getFunction() = func
 and vsave_bpp_2604.(LocalVariable).getFunction() = func
 and vcode_2605.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

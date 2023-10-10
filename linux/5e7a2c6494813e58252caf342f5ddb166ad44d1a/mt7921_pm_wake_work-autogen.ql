@@ -50,4 +50,4 @@ and vmphy_1394.getType().hasName("mt76_phy *")
 and func_2(vdev_1393, vmphy_1394)
 and vdev_1393.getParentScope+() = func
 and vmphy_1394.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

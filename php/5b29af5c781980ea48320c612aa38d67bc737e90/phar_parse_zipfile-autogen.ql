@@ -82,4 +82,4 @@ and vphar_globals.getType().hasName("zend_phar_globals")
 and vmydata_172.getParentScope+() = func
 and vactual_alias_174.getParentScope+() = func
 and not vphar_globals.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

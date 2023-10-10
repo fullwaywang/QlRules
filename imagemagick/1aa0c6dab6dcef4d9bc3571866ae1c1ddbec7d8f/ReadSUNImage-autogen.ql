@@ -126,4 +126,4 @@ and vsun_info_265.getParentScope+() = func
 and vsun_data_268.getParentScope+() = func
 and vsun_pixels_269.getParentScope+() = func
 and vheight_428.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

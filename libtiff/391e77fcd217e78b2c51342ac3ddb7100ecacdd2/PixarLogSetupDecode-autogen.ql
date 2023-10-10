@@ -49,4 +49,4 @@ and vsp_675.getType().hasName("PixarLogState *")
 and vtbuf_size_676.getType().hasName("tmsize_t")
 and vsp_675.(LocalVariable).getFunction() = func
 and vtbuf_size_676.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -37,4 +37,4 @@ not func_0(vzlbytes_894, target_1, func)
 and func_1(vzlbytes_894, target_1)
 and vzlbytes_894.getType().hasName("size_t")
 and vzlbytes_894.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

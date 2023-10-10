@@ -67,4 +67,4 @@ and vnew_mct_records_5539.getType().hasName("opj_mct_data_t *")
 and vi_5489.getParentScope+() = func
 and vl_tcp_5490.getParentScope+() = func
 and vnew_mct_records_5539.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

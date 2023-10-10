@@ -31,4 +31,4 @@ not func_0(vstream_975, target_1)
 and func_1(vstream_975, target_1)
 and vstream_975.getType().hasName("StreamInfo *")
 and vstream_975.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

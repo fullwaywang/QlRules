@@ -39,4 +39,4 @@ and vcode_822.getType().hasName("int")
 and vloc_825.getType().hasName("iparam_loc")
 and vcode_822.getFunction() = func
 and vloc_825.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -32,4 +32,4 @@ and func_1(vnewpn_765, vsk_762)
 and vnewpn_765.getParentScope+() = func
 and verr_770.getParentScope+() = func
 and vsk_762.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

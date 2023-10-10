@@ -40,4 +40,4 @@ and vi_ctx_p_123.getType().hasName("i_ctx_t *")
 and viodev_124.getType().hasName("gx_io_device *")
 and vi_ctx_p_123.getFunction() = func
 and viodev_124.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

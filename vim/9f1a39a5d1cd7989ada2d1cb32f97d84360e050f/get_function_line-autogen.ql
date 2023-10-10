@@ -121,4 +121,4 @@ and vtheline_179.getType().hasName("char_u *")
 and veap_174.getParentScope+() = func
 and vline_to_free_175.getParentScope+() = func
 and vtheline_179.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

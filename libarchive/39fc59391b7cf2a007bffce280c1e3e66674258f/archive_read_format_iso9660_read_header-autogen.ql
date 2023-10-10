@@ -105,4 +105,4 @@ and viso9660_1169.getType().hasName("iso9660 *")
 and va_1166.getParentScope+() = func
 and ventry_1167.getParentScope+() = func
 and viso9660_1169.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -94,4 +94,4 @@ and vrbuf_1547.getType().hasName("u8[4096]")
 and vbody_1559.getType().hasName("const u8 *")
 and vrbuf_1547.getParentScope+() = func
 and vbody_1559.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

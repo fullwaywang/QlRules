@@ -56,4 +56,4 @@ and func_1(vrex, target_1)
 and func_2(vrex, target_2)
 and vrex.getType().hasName("regexec_T")
 and not vrex.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

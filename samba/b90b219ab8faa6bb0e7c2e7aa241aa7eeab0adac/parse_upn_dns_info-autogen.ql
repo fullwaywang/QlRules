@@ -42,4 +42,4 @@ and func_2(vupndnsinfo_719, target_2)
 and func_3(vupndnsinfo_719, target_3)
 and vupndnsinfo_719.getType().hasName("const PAC_INFO_BUFFER *")
 and vupndnsinfo_719.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

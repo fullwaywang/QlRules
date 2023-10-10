@@ -323,4 +323,4 @@ and vconcurrentCons_712.getFunction() = func
 and vconnstr_716.(LocalVariable).getFunction() = func
 and vdbname_727.(LocalVariable).getFunction() = func
 and vmaintenance_db_708.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

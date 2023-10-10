@@ -111,4 +111,4 @@ and vnewdb_132.getType().hasName("const char *")
 and vvalues_162.getType().hasName("const char *[7]")
 and vnewdb_132.(LocalVariable).getFunction() = func
 and vvalues_162.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -74,4 +74,4 @@ and ve_576.getType().hasName("char *")
 and ve_601.getType().hasName("char *")
 and ve_576.getParentScope+() = func
 and ve_601.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

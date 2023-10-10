@@ -92,4 +92,4 @@ and vcinfo_219.getType().hasName("j_decompress_ptr")
 and vdest_221.getType().hasName("tga_dest_ptr")
 and vcinfo_219.getParentScope+() = func
 and vdest_221.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

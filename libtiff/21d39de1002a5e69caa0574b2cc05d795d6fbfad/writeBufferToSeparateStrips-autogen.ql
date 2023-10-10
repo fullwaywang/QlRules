@@ -121,4 +121,4 @@ and vspp_1150.getFunction() = func
 and vbps_1154.(LocalVariable).getFunction() = func
 and vrowsperstrip_1155.(LocalVariable).getFunction() = func
 and vbytes_per_sample_1156.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

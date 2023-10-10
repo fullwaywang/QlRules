@@ -86,4 +86,4 @@ and vms_530.getType().hasName("magic_set *")
 and vp_538.getParentScope+() = func
 and vstr_643.getParentScope+() = func
 and vms_530.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

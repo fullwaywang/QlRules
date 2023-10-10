@@ -37,4 +37,4 @@ not func_0(vp_759, target_1, func)
 and func_1(vp_759, target_1)
 and vp_759.getType().hasName("Select *")
 and vp_759.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

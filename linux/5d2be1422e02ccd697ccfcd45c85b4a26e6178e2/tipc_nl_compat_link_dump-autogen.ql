@@ -48,4 +48,4 @@ and vlink_593.getType().hasName("nlattr *[11]")
 and vlink_info_594.getType().hasName("tipc_link_info")
 and vlink_593.getParentScope+() = func
 and vlink_info_594.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

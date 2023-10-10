@@ -38,4 +38,4 @@ and vtarget_730.getType().hasName("TPMI_SH_POLICY *")
 and visNotPolicySession_738.getType().hasName("BOOL")
 and vtarget_730.getParentScope+() = func
 and visNotPolicySession_738.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

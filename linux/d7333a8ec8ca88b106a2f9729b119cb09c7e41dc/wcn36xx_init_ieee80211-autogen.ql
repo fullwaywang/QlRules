@@ -29,4 +29,4 @@ func_0(vwcn_1334)
 and func_1(func)
 and vwcn_1334.getType().hasName("wcn36xx *")
 and vwcn_1334.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -21,4 +21,4 @@ where
 func_0(vuser_1259, func)
 and vuser_1259.getType().hasName("ipmi_user *")
 and vuser_1259.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -35,4 +35,4 @@ not func_0(vctx_450, target_1, func)
 and func_1(vctx_450, target_1)
 and vctx_450.getType().hasName("SANMVideoContext *")
 and vctx_450.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

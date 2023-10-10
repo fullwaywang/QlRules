@@ -51,4 +51,4 @@ and vctx_1024.getType().hasName("Indeo3DecodeContext *")
 and vavctx_1022.getType().hasName("AVCodecContext *")
 and vctx_1024.(LocalVariable).getFunction() = func
 and vavctx_1022.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

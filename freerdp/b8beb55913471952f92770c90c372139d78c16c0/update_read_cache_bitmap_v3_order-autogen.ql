@@ -54,4 +54,4 @@ and vbitsPerPixelId_2180.getType().hasName("BYTE")
 and vCBR23_BPP.getType() instanceof ArrayType
 and vbitsPerPixelId_2180.getParentScope+() = func
 and not vCBR23_BPP.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -40,4 +40,4 @@ and func_1(vh_367, target_1)
 and func_2(vh_367, target_2)
 and vh_367.getType().hasName("H264Context *")
 and vh_367.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

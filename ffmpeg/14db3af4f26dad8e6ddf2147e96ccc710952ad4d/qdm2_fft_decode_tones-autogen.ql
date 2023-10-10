@@ -48,4 +48,4 @@ and not func_1(vgb_1318, target_3)
 and func_3(vgb_1318, target_3)
 and vgb_1318.getType().hasName("GetBitContext *")
 and vgb_1318.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

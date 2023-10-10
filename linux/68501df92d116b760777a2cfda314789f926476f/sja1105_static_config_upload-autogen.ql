@@ -71,4 +71,4 @@ and func_6(vrc_400)
 and func_7(vrc_400)
 and vrc_400.getType().hasName("int")
 and vrc_400.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

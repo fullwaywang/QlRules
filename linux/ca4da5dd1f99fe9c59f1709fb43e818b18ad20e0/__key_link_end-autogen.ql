@@ -47,4 +47,4 @@ and vedit_1174.getType().hasName("assoc_array_edit *")
 and vkeyring_1172.getType().hasName("key *")
 and vedit_1174.getParentScope+() = func
 and vkeyring_1172.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

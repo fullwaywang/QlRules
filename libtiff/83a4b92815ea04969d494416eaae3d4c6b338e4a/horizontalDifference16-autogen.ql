@@ -264,4 +264,4 @@ and vwp_1003.getFunction() = func
 and vFrom14_1003.getFunction() = func
 and vmask_1005.(LocalVariable).getFunction() = func
 and vip_1002.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

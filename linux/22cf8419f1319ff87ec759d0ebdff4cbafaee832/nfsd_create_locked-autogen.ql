@@ -45,4 +45,4 @@ and func_2(vdentry_1204, vdirp_1205)
 and viap_1201.getParentScope+() = func
 and vdentry_1204.getParentScope+() = func
 and vdirp_1205.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

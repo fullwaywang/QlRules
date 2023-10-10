@@ -55,4 +55,4 @@ and func_4(vbuf_1699, target_5, target_4)
 and func_5(vbuf_1699, target_5)
 and vbuf_1699.getType().hasName("buf_T *")
 and vbuf_1699.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

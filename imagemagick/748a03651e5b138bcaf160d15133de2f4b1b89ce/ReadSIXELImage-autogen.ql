@@ -38,4 +38,4 @@ and func_1(vsixel_pixels_1007, target_1)
 and func_2(vsixel_pixels_1007, target_2)
 and vsixel_pixels_1007.getType().hasName("unsigned char *")
 and vsixel_pixels_1007.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

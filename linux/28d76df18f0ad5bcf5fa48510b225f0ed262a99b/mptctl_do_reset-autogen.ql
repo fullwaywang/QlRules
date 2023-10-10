@@ -67,4 +67,4 @@ and viocp_712.getType().hasName("MPT_ADAPTER *")
 and vurinfo_710.getParentScope+() = func
 and vkrinfo_711.getParentScope+() = func
 and viocp_712.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

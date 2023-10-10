@@ -116,4 +116,4 @@ and vs_3433.getParentScope+() = func
 and vd_3434.getParentScope+() = func
 and not vIObuff.getParentScope+() = func
 and not vhas_mbyte.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

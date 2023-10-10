@@ -109,4 +109,4 @@ and vstart_1802.getType().hasName("const wchar_t *")
 and vflag_1803.getType().hasName("flag *")
 and vstart_1802.getParentScope+() = func
 and vflag_1803.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

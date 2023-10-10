@@ -66,4 +66,4 @@ and vctx_744.getType().hasName("IVI5DecContext *")
 and vresult_747.getType().hasName("int")
 and vctx_744.(LocalVariable).getFunction() = func
 and vresult_747.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

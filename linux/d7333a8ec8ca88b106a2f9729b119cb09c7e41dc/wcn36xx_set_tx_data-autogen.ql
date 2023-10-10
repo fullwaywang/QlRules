@@ -92,4 +92,4 @@ and vis_data_qos_388.getType().hasName("bool")
 and vbd_377.getParentScope+() = func
 and vhdr_384.getParentScope+() = func
 and vis_data_qos_388.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

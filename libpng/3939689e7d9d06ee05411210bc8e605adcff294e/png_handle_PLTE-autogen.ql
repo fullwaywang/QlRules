@@ -55,4 +55,4 @@ and vlength_506.getType().hasName("png_uint_32")
 and vnum_509.getType().hasName("int")
 and vlength_506.getParentScope+() = func
 and vnum_509.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

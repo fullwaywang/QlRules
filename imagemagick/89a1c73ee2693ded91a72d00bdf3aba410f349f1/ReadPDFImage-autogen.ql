@@ -115,4 +115,4 @@ and voption_383.getType().hasName("const char *")
 and vpassphrase_598.getType().hasName("char[4096]")
 and voption_383.getParentScope+() = func
 and vpassphrase_598.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -35,4 +35,4 @@ and vs_149.getType().hasName("VP8Context *")
 and vavctx_151.getType().hasName("AVCodecContext *")
 and vs_149.getParentScope+() = func
 and vavctx_151.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

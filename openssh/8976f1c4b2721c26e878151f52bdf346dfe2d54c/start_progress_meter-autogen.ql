@@ -30,4 +30,4 @@ where
 func_1(target_3, func, target_1)
 and func_2(func, target_2)
 and func_3(target_3)
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

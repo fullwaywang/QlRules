@@ -56,4 +56,4 @@ and vdp_5035.getType().hasName("TIFFDirEntry *")
 and vdata_5060.(LocalVariable).getFunction() = func
 and vo_5082.(LocalVariable).getFunction() = func
 and vdp_5035.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

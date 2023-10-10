@@ -21,4 +21,4 @@ where
 func_0(vfe_2656, func, target_0)
 and vfe_2656.getType().hasName("fixup_entry *")
 and vfe_2656.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

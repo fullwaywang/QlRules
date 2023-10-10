@@ -68,4 +68,4 @@ and viter_406.getType().hasName("pb_field_iter_t *")
 and vtype_408.getType().hasName("pb_type_t")
 and viter_406.getParentScope+() = func
 and vtype_408.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

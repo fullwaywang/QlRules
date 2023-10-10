@@ -55,4 +55,4 @@ and func_3(func)
 and func_4(func)
 and vrcipher_85.getType().hasName("crypto_report_cipher")
 and vrcipher_85.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

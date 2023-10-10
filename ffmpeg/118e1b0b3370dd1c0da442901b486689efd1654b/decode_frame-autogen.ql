@@ -176,4 +176,4 @@ and vslice_start_600.getParentScope+() = func
 and vslice_end_600.getParentScope+() = func
 and vslice_size_600.getParentScope+() = func
 and vgb_602.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

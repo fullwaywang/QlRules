@@ -80,4 +80,4 @@ and vstmt_431.getType().hasName("AlterObjectDependsStmt *")
 and vaddress_433.(LocalVariable).getFunction() = func
 and vrel_435.(LocalVariable).getFunction() = func
 and vstmt_431.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

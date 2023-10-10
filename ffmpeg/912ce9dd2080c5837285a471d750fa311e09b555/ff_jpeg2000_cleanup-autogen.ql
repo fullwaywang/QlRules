@@ -44,4 +44,4 @@ and vband_510.getType().hasName("Jpeg2000Band *")
 and vprec_512.getType().hasName("Jpeg2000Prec *")
 and vband_510.(LocalVariable).getFunction() = func
 and vprec_512.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -58,4 +58,4 @@ and func_4(vvring_idx_2869, target_4)
 and func_5(vvring_idx_2869, target_5)
 and vvring_idx_2869.getType().hasName("uint32_t")
 and vvring_idx_2869.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

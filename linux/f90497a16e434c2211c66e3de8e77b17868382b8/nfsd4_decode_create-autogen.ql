@@ -24,4 +24,4 @@ where
 not func_0(vcreate_798, func)
 and vcreate_798.getType().hasName("nfsd4_create *")
 and vcreate_798.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

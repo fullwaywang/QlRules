@@ -37,4 +37,4 @@ and func_2(vdrbg_191, vrand_fork_count)
 and vdrbg_191.getType().hasName("RAND_DRBG *")
 and vdrbg_191.getParentScope+() = func
 and not vrand_fork_count.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

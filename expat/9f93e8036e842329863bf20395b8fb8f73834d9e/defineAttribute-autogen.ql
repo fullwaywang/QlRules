@@ -47,4 +47,4 @@ and func_2(vtype_6120, target_2)
 and func_3(vtype_6120, target_3)
 and vtype_6120.getType().hasName("ELEMENT_TYPE *")
 and vtype_6120.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

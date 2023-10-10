@@ -24,4 +24,4 @@ func_0(vu0_137, target_1, target_0)
 and func_1(vu0_137, target_1)
 and vu0_137.getType().hasName("mp_limb_t")
 and vu0_137.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

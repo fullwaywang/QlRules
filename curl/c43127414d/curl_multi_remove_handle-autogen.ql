@@ -195,4 +195,4 @@ and veasy_owns_conn_632.getType().hasName("bool")
 and vmulti_615.getParentScope+() = func
 and veasy_616.getParentScope+() = func
 and veasy_owns_conn_632.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

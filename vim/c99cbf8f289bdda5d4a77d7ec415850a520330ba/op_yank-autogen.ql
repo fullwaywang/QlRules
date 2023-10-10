@@ -55,4 +55,4 @@ and func_2(vbd_1138, target_2)
 and func_3(vbd_1138, target_3)
 and vbd_1138.getType().hasName("block_def")
 and vbd_1138.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

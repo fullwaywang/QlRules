@@ -60,4 +60,4 @@ and func_5(vargc_1364, target_5)
 and func_6(vargc_1364, target_6)
 and vargc_1364.getType().hasName("int")
 and vargc_1364.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

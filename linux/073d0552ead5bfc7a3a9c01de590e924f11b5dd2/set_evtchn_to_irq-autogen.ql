@@ -96,4 +96,4 @@ and virq_122.getParentScope+() = func
 and vrow_124.getParentScope+() = func
 and vcol_125.getParentScope+() = func
 and not vevtchn_to_irq.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

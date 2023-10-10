@@ -181,4 +181,4 @@ and vpte_3506.getParentScope+() = func
 and vexclusive_3508.getParentScope+() = func
 and vret_3509.getParentScope+() = func
 and not vvmemmap_base.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

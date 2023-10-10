@@ -41,4 +41,4 @@ and vparent_1891.getType().hasName("domain_device *")
 and func_4(vphy_1895, vparent_1891)
 and vphy_1895.getParentScope+() = func
 and vparent_1891.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

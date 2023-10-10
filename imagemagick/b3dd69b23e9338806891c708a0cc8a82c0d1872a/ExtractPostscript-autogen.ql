@@ -76,4 +76,4 @@ and vmagic_info_743.getType().hasName("const MagicInfo *")
 and vclone_info_749.getType().hasName("ImageInfo *")
 and vmagic_info_743.getParentScope+() = func
 and vclone_info_749.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -490,4 +490,4 @@ and vcell__state_1245.(LocalVariable).getFunction() = func
 and vcldidxid_1247.(LocalVariable).getFunction() = func
 and vcldidx_1248.(LocalVariable).getFunction() = func
 and vcldIdxInfo_1249.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

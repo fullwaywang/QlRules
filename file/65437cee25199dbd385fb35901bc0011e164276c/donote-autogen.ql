@@ -112,4 +112,4 @@ and vflags_817.getType().hasName("int *")
 and vdescsz_822.getType().hasName("uint32_t")
 and vflags_817.getParentScope+() = func
 and vdescsz_822.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

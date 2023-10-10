@@ -30,4 +30,4 @@ not func_0(vdir_3203, func)
 and not func_1(vdir_3203, func)
 and vdir_3203.getType().hasName("dentry *")
 and vdir_3203.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

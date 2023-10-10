@@ -122,4 +122,4 @@ and vfp_2933.getType().hasName("cups_file_t *")
 and vformat_3102.getType().hasName("const char *")
 and vfp_2933.getParentScope+() = func
 and vformat_3102.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

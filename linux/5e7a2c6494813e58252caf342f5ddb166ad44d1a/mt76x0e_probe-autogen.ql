@@ -39,4 +39,4 @@ not func_0(vpdev_136, func)
 and vpdev_136.getType().hasName("pci_dev *")
 and func_1(vpdev_136)
 and vpdev_136.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

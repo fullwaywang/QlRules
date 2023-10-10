@@ -52,4 +52,4 @@ and vdeleted_ids_3402.getType().hasName("streamID *")
 and vcount_3336.(LocalVariable).getFunction() = func
 and vc_3332.getFunction() = func
 and vdeleted_ids_3402.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

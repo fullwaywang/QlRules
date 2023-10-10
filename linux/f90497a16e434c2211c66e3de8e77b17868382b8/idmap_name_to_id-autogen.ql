@@ -57,4 +57,4 @@ and vkey_541.getType().hasName("ent")
 and vrqstp_538.getType().hasName("svc_rqst *")
 and vkey_541.getParentScope+() = func
 and vrqstp_538.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -93,4 +93,4 @@ and func_8(vpc_216, target_8)
 and func_9(vpc_216, target_9)
 and vpc_216.getType().hasName("ParseContext *")
 and vpc_216.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -65,4 +65,4 @@ and vresultRelInfo_1075.getType().hasName("ResultRelInfo *")
 and vmtstate_1074.getType().hasName("ModifyTableState *")
 and vresultRelInfo_1075.getFunction() = func
 and vmtstate_1074.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

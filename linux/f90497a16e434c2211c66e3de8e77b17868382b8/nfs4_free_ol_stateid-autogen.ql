@@ -48,4 +48,4 @@ not func_0(vstid_1457, func)
 and vstid_1457.getType().hasName("nfs4_stid *")
 and func_11(vstid_1457)
 and vstid_1457.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

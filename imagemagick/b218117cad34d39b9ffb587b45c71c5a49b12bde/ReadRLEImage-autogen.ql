@@ -28,4 +28,4 @@ not func_0(func)
 and func_1(vimage_140, target_1)
 and vimage_140.getType().hasName("Image *")
 and vimage_140.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

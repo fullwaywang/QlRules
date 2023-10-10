@@ -42,4 +42,4 @@ and func_2(vmxf_2055, target_2)
 and func_3(vmxf_2055, target_3)
 and vmxf_2055.getType().hasName("MXFContext *")
 and vmxf_2055.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

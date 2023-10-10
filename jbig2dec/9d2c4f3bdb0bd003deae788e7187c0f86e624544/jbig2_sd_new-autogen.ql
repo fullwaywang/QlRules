@@ -59,4 +59,4 @@ and vctx_91.getType().hasName("Jbig2Ctx *")
 and vn_symbols_91.getType().hasName("uint32_t")
 and vctx_91.getParentScope+() = func
 and vn_symbols_91.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

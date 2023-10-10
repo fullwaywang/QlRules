@@ -212,4 +212,4 @@ and vchroma_planes_583.(LocalVariable).getFunction() = func
 and vchroma_v_shift_583.(LocalVariable).getFunction() = func
 and vtransparency_583.(LocalVariable).getFunction() = func
 and vf_574.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

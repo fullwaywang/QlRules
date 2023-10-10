@@ -66,4 +66,4 @@ and vbuffer_3592.getParentScope+() = func
 and not vxmlFree.getParentScope+() = func
 and vlen_3568.getParentScope+() = func
 and vctxt_3565.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

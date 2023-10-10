@@ -43,4 +43,4 @@ and func_2(vpb_84, target_2)
 and func_3(vpb_84, target_3)
 and vpb_84.getType().hasName("AVIOContext *")
 and vpb_84.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

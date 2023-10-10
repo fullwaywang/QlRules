@@ -61,4 +61,4 @@ and vpss_266.getType().hasName("RSA_PSS_PARAMS *")
 and vparam_280.getType().hasName("ASN1_TYPE *")
 and vpss_266.getParentScope+() = func
 and vparam_280.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

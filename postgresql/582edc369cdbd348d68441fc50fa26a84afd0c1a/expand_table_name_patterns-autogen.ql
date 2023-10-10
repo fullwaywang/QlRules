@@ -55,4 +55,4 @@ and func_3(vfout_1293, target_3)
 and func_4(vfout_1293, target_4)
 and vfout_1293.getType().hasName("Archive *")
 and vfout_1293.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

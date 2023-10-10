@@ -42,4 +42,4 @@ and func_1(vline_190, target_1)
 and func_2(vline_190, target_2)
 and vline_190.getType().hasName("char *")
 and vline_190.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

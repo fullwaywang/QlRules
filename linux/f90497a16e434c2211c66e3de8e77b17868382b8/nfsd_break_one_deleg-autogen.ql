@@ -58,4 +58,4 @@ and func_11(vdp_4785)
 and func_12(func)
 and vdp_4785.getType().hasName("nfs4_delegation *")
 and vdp_4785.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

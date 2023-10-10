@@ -21,4 +21,4 @@ where
 func_1(vmime_492, target_1)
 and vmime_492.getType().hasName("char *")
 and vmime_492.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

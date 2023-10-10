@@ -57,4 +57,4 @@ and vamount_1969.getType().hasName("int")
 and vthat_1970.getType().hasName("char_u *")
 and vamount_1969.getParentScope+() = func
 and vthat_1970.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

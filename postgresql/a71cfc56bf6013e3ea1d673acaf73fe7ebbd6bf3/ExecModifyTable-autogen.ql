@@ -101,4 +101,4 @@ and vestate_2020.getType().hasName("EState *")
 and vresultRelInfo_2023.getType().hasName("ResultRelInfo *")
 and vestate_2020.(LocalVariable).getFunction() = func
 and vresultRelInfo_2023.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

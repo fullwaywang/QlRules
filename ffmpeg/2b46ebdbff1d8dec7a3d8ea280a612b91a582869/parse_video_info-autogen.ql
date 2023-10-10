@@ -56,4 +56,4 @@ and func_2(vsize_bmp_697, target_2)
 and func_3(vsize_bmp_697, target_3)
 and vsize_bmp_697.getType().hasName("uint32_t")
 and vsize_bmp_697.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

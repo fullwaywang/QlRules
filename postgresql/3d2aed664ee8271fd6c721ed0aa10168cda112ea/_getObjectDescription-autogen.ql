@@ -104,4 +104,4 @@ and vbuf_3426.getType().hasName("PQExpBuffer")
 and vte_3426.getType().hasName("TocEntry *")
 and vbuf_3426.getFunction() = func
 and vte_3426.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

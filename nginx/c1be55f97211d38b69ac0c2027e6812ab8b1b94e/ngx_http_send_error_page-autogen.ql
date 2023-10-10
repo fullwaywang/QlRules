@@ -50,4 +50,4 @@ and func_2(vr_584, target_2)
 and func_3(vr_584, target_3)
 and vr_584.getType().hasName("ngx_http_request_t *")
 and vr_584.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

@@ -65,4 +65,4 @@ and vdomainType_73.getType().hasName("Oid")
 and vmy_extra_75.(LocalVariable).getFunction() = func
 and vtypentry_76.(LocalVariable).getFunction() = func
 and vdomainType_73.getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

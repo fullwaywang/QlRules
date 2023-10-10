@@ -97,4 +97,4 @@ and vsubject_52.getType().hasName("robj *")
 and vsuccess_64.(LocalVariable).getFunction() = func
 and not vserver.getParentScope+() = func
 and vsubject_52.getFunction() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

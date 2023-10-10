@@ -37,4 +37,4 @@ and func_1(vcut_57, target_1)
 and func_2(vcut_57, target_2)
 and vcut_57.getType().hasName("size_t")
 and vcut_57.(LocalVariable).getFunction() = func
-select func, "function relativepath is " + func.getFile(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

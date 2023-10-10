@@ -64,4 +64,4 @@ and vl_seg_1245.getType().hasName("opj_tcd_seg_t *")
 and vp_data_read_1217.getParentScope+() = func
 and vp_max_length_1218.getParentScope+() = func
 and vl_seg_1245.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

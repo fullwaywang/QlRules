@@ -46,4 +46,4 @@ and vcmap_1036.getType().hasName("fb_cmap *")
 and ventries_1038.getType().hasName("uvesafb_pal_entry *")
 and vcmap_1036.getParentScope+() = func
 and ventries_1038.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

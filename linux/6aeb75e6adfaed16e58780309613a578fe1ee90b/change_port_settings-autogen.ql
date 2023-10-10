@@ -40,4 +40,4 @@ and vbaud_2236.getType().hasName("int")
 and vtty_2231.getType().hasName("tty_struct *")
 and vbaud_2236.getParentScope+() = func
 and vtty_2231.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

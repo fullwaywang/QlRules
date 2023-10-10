@@ -89,4 +89,4 @@ and func_18(vargv_1867, vretval_1872)
 and vargv_1867.getParentScope+() = func
 and vbprm_1871.getParentScope+() = func
 and vretval_1872.getParentScope+() = func
-select func, "function relativepath is " + func.getFile().getRelativePath(), "function startline is " + func.getLocation().getStartLine()
+select func, func.getFile().toString() + ":" + func.getLocation().getStartLine().toString()

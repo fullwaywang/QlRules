@@ -1,0 +1,18 @@
+commit 0bf8b796a0ea98395b390c7807187982215f5c11	0bf8b796a0ea98395b390c7807187982215f5c11
+Author: Daniel Stenberg <daniel@haxx.se>
+Date:   Tue Dec 27 11:50:23 2022 +0100
+
+    tool_operate: share HSTS between handles
+
+diff --git a/src/tool_operate.c b/src/tool_operate.c
+index 616061ee4..2b0cc083c 100644
+--- a/src/tool_operate.c
++++ b/src/tool_operate.c
+@@ -2721,6 +2721,7 @@ CURLcode operate(struct GlobalConfig *global, int argc, argv_item_t argv[])
+         curl_share_setopt(share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
+         curl_share_setopt(share, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+         curl_share_setopt(share, CURLSHOPT_SHARE, CURL_LOCK_DATA_PSL);
++        curl_share_setopt(share, CURLSHOPT_SHARE, CURL_LOCK_DATA_HSTS);
+ 
+         /* Get the required arguments for each operation */
+         do {

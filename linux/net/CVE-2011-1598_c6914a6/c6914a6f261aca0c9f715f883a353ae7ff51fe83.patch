@@ -1,0 +1,32 @@
+commit c6914a6f261aca0c9f715f883a353ae7ff51fe83
+Author: Dave Jones <davej@redhat.com>
+Date:   Tue Apr 19 20:36:59 2011 -0700
+
+    can: Add missing socket check in can/bcm release.
+    
+    We can get here with a NULL socket argument passed from userspace,
+    so we need to handle it accordingly.
+    
+    Signed-off-by: Dave Jones <davej@redhat.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/can/bcm.c b/net/can/bcm.c
+index 57b1aed..8a6a05e 100644
+--- a/net/can/bcm.c
++++ b/net/can/bcm.c
+@@ -1427,9 +1427,14 @@ static int bcm_init(struct sock *sk)
+ static int bcm_release(struct socket *sock)
+ {
+ 	struct sock *sk = sock->sk;
+-	struct bcm_sock *bo = bcm_sk(sk);
++	struct bcm_sock *bo;
+ 	struct bcm_op *op, *next;
+ 
++	if (sk == NULL)
++		return 0;
++
++	bo = bcm_sk(sk);
++
+ 	/* remove bcm_ops, timer, rx_unregister(), etc. */
+ 
+ 	unregister_netdevice_notifier(&bo->notifier);

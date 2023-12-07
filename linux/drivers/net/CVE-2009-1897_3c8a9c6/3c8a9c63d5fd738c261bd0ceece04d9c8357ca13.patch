@@ -1,0 +1,41 @@
+commit 3c8a9c63d5fd738c261bd0ceece04d9c8357ca13
+Author: Mariusz Kozlowski <m.kozlowski@tuxland.pl>
+Date:   Sun Jul 5 19:48:35 2009 +0000
+
+    tun/tap: Fix crashes if open() /dev/net/tun and then poll() it.
+    
+    Fix NULL pointer dereference in tun_chr_pool() introduced by commit
+    33dccbb050bbe35b88ca8cf1228dcf3e4d4b3554 ("tun: Limit amount of queued
+    packets per device") and triggered by this code:
+    
+    	int fd;
+    	struct pollfd pfd;
+    	fd = open("/dev/net/tun", O_RDWR);
+    	pfd.fd = fd;
+    	pfd.events = POLLIN | POLLOUT;
+    	poll(&pfd, 1, 0);
+    
+    Reported-by: Eugene Kapun <abacabadabacaba@gmail.com>
+    Signed-off-by: Mariusz Kozlowski <m.kozlowski@tuxland.pl>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/tun.c b/drivers/net/tun.c
+index b393536..027f7ab 100644
+--- a/drivers/net/tun.c
++++ b/drivers/net/tun.c
+@@ -486,12 +486,14 @@ static unsigned int tun_chr_poll(struct file *file, poll_table * wait)
+ {
+ 	struct tun_file *tfile = file->private_data;
+ 	struct tun_struct *tun = __tun_get(tfile);
+-	struct sock *sk = tun->sk;
++	struct sock *sk;
+ 	unsigned int mask = 0;
+ 
+ 	if (!tun)
+ 		return POLLERR;
+ 
++	sk = tun->sk;
++
+ 	DBG(KERN_INFO "%s: tun_chr_poll\n", tun->dev->name);
+ 
+ 	poll_wait(file, &tun->socket.wait, wait);

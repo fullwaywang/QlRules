@@ -1,0 +1,23 @@
+commit 03d673e6af6490371aaf64dfe1f84c658c48b71d
+Author: Kay Sievers <kay.sievers@vrfy.org>
+Date:   Fri Oct 30 12:48:32 2009 +0100
+
+    Driver-Core: devtmpfs - set root directory mode to 0755
+    
+    Signed-off-by: Kay Sievers <kay.sievers@vrfy.org>
+    Cc: Mark Rosenstand <rosenstand@gmail.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@suse.de>
+
+diff --git a/drivers/base/devtmpfs.c b/drivers/base/devtmpfs.c
+index c7f5c08..50375bb 100644
+--- a/drivers/base/devtmpfs.c
++++ b/drivers/base/devtmpfs.c
+@@ -361,7 +361,7 @@ int __init devtmpfs_init(void)
+ 		return err;
+ 	}
+ 
+-	mnt = kern_mount(&dev_fs_type);
++	mnt = kern_mount_data(&dev_fs_type, "mode=0755");
+ 	if (IS_ERR(mnt)) {
+ 		err = PTR_ERR(mnt);
+ 		printk(KERN_ERR "devtmpfs: unable to create devtmpfs %i\n", err);

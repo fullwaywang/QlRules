@@ -1,0 +1,37 @@
+commit 76597cd31470fa130784c78fadb4dab2e624a723
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Sun Mar 27 19:09:29 2011 -0700
+
+    proc: fix oops on invalid /proc/<pid>/maps access
+    
+    When m_start returns an error, the seq_file logic will still call m_stop
+    with that error entry, so we'd better make sure that we check it before
+    using it as a vma.
+    
+    Introduced by commit ec6fd8a4355c ("report errors in /proc/*/*map*
+    sanely"), which replaced NULL with various ERR_PTR() cases.
+    
+    (On ia64, you happen to get a unaligned fault instead of a page fault,
+    since the address used is generally some random error code like -EPERM)
+    
+    Reported-by: Anca Emanuel <anca.emanuel@gmail.com>
+    Reported-by: Tony Luck <tony.luck@intel.com>
+    Cc: Al Viro <viro@zeniv.linux.org.uk>
+    Cc: Américo Wang <xiyou.wangcong@gmail.com>
+    Cc: Stephen Wilson <wilsons@start.ca>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index 7c708a4..2e7addf 100644
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -182,7 +182,8 @@ static void m_stop(struct seq_file *m, void *v)
+ 	struct proc_maps_private *priv = m->private;
+ 	struct vm_area_struct *vma = v;
+ 
+-	vma_stop(priv, vma);
++	if (!IS_ERR(vma))
++		vma_stop(priv, vma);
+ 	if (priv->task)
+ 		put_task_struct(priv->task);
+ }

@@ -1,0 +1,34 @@
+commit 712a30e63c8066ed84385b12edbfb804f49cbc44
+Author: Bastian Blank <bastian@waldi.eu.org>
+Date:   Sun Feb 10 16:47:57 2008 +0200
+
+    splice: fix user pointer access in get_iovec_page_array()
+    
+    Commit 8811930dc74a503415b35c4a79d14fb0b408a361 ("splice: missing user
+    pointer access verification") added the proper access_ok() calls to
+    copy_from_user_mmap_sem() which ensures we can copy the struct iovecs
+    from userspace to the kernel.
+    
+    But we also must check whether we can access the actual memory region
+    pointed to by the struct iovec to fix the access checks properly.
+    
+    Signed-off-by: Bastian Blank <waldi@debian.org>
+    Acked-by: Oliver Pinter <oliver.pntr@gmail.com>
+    Cc: Jens Axboe <jens.axboe@oracle.com>
+    Cc: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Pekka Enberg <penberg@cs.helsinki.fi>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/splice.c b/fs/splice.c
+index 14e2262..9b559ee 100644
+--- a/fs/splice.c
++++ b/fs/splice.c
+@@ -1234,7 +1234,7 @@ static int get_iovec_page_array(const struct iovec __user *iov,
+ 		if (unlikely(!len))
+ 			break;
+ 		error = -EFAULT;
+-		if (unlikely(!base))
++		if (!access_ok(VERIFY_READ, base, len))
+ 			break;
+ 
+ 		/*

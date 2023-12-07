@@ -1,0 +1,34 @@
+commit e694958388c50148389b0e9b9e9e8945cf0f1b98
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Thu Aug 13 08:28:36 2009 -0700
+
+    Make sock_sendpage() use kernel_sendpage()
+    
+    kernel_sendpage() does the proper default case handling for when the
+    socket doesn't have a native sendpage implementation.
+    
+    Now, arguably this might be something that we could instead solve by
+    just specifying that all protocols should do it themselves at the
+    protocol level, but we really only care about the common protocols.
+    Does anybody really care about sendpage on something like Appletalk? Not
+    likely.
+    
+    Acked-by: David S. Miller <davem@davemloft.net>
+    Acked-by: Julien TINNES <julien@cr0.org>
+    Acked-by: Tavis Ormandy <taviso@sdf.lonestar.org>
+    Cc: stable@kernel.org
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/net/socket.c b/net/socket.c
+index 791d71a..6d47165 100644
+--- a/net/socket.c
++++ b/net/socket.c
+@@ -736,7 +736,7 @@ static ssize_t sock_sendpage(struct file *file, struct page *page,
+ 	if (more)
+ 		flags |= MSG_MORE;
+ 
+-	return sock->ops->sendpage(sock, page, offset, size, flags);
++	return kernel_sendpage(sock, page, offset, size, flags);
+ }
+ 
+ static ssize_t sock_splice_read(struct file *file, loff_t *ppos,

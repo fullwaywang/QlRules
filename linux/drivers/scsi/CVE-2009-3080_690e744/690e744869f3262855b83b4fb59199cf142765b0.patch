@@ -1,0 +1,26 @@
+commit 690e744869f3262855b83b4fb59199cf142765b0
+Author: Dave Jones <davej@redhat.com>
+Date:   Mon Oct 19 19:55:13 2009 -0400
+
+    [SCSI] gdth: Prevent negative offsets in ioctl CVE-2009-3080
+    
+    A negative offset could be used to index before the event buffer and
+    lead to a security breach.
+    
+    Signed-off-by: Dave Jones <davej@redhat.com>
+    Cc: Stable Tree <stable@kernel.org>
+    Signed-off-by: James Bottomley <James.Bottomley@suse.de>
+
+diff --git a/drivers/scsi/gdth.c b/drivers/scsi/gdth.c
+index 185e6bc..9e8fce0 100644
+--- a/drivers/scsi/gdth.c
++++ b/drivers/scsi/gdth.c
+@@ -2900,7 +2900,7 @@ static int gdth_read_event(gdth_ha_str *ha, int handle, gdth_evt_str *estr)
+         eindex = handle;
+     estr->event_source = 0;
+ 
+-    if (eindex >= MAX_EVENTS) {
++    if (eindex < 0 || eindex >= MAX_EVENTS) {
+         spin_unlock_irqrestore(&ha->smp_lock, flags);
+         return eindex;
+     }

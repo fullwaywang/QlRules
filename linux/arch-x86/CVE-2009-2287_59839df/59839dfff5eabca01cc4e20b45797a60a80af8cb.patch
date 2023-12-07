@@ -1,0 +1,48 @@
+commit 59839dfff5eabca01cc4e20b45797a60a80af8cb
+Author: Marcelo Tosatti <mtosatti@redhat.com>
+Date:   Thu Apr 16 08:30:44 2009 -0300
+
+    KVM: x86: check for cr3 validity in ioctl_set_sregs
+    
+    Matt T. Yourst notes that kvm_arch_vcpu_ioctl_set_sregs lacks validity
+    checking for the new cr3 value:
+    
+    "Userspace callers of KVM_SET_SREGS can pass a bogus value of cr3 to
+    the kernel. This will trigger a NULL pointer access in gfn_to_rmap()
+    when userspace next tries to call KVM_RUN on the affected VCPU and kvm
+    attempts to activate the new non-existent page table root.
+    
+    This happens since kvm only validates that cr3 points to a valid guest
+    physical memory page when code *inside* the guest sets cr3. However, kvm
+    currently trusts the userspace caller (e.g. QEMU) on the host machine to
+    always supply a valid page table root, rather than properly validating
+    it along with the rest of the reloaded guest state."
+    
+    http://sourceforge.net/tracker/?func=detail&atid=893831&aid=2687641&group_id=180599
+    
+    Check for a valid cr3 address in kvm_arch_vcpu_ioctl_set_sregs, triple
+    fault in case of failure.
+    
+    Cc: stable@kernel.org
+    Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+    Signed-off-by: Avi Kivity <avi@redhat.com>
+
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index ffbb2c8..2bad49b 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -3993,7 +3993,13 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+ 
+ 	vcpu->arch.cr2 = sregs->cr2;
+ 	mmu_reset_needed |= vcpu->arch.cr3 != sregs->cr3;
+-	vcpu->arch.cr3 = sregs->cr3;
++
++	down_read(&vcpu->kvm->slots_lock);
++	if (gfn_to_memslot(vcpu->kvm, sregs->cr3 >> PAGE_SHIFT))
++		vcpu->arch.cr3 = sregs->cr3;
++	else
++		set_bit(KVM_REQ_TRIPLE_FAULT, &vcpu->requests);
++	up_read(&vcpu->kvm->slots_lock);
+ 
+ 	kvm_set_cr8(vcpu, sregs->cr8);
+ 

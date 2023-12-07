@@ -1,0 +1,33 @@
+commit 67c5c6cb8129c595f21e88254a3fc6b3b841ae8e
+Author: Vasiliy Kulikov <segoon@openwall.com>
+Date:   Thu Mar 17 01:40:10 2011 +0000
+
+    econet: 4 byte infoleak to the network
+    
+    struct aunhdr has 4 padding bytes between 'pad' and 'handle' fields on
+    x86_64.  These bytes are not initialized in the variable 'ah' before
+    sending 'ah' to the network.  This leads to 4 bytes kernel stack
+    infoleak.
+    
+    This bug was introduced before the git epoch.
+    
+    Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+    Acked-by: Phil Blundell <philb@gnu.org>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/econet/af_econet.c b/net/econet/af_econet.c
+index 0c28263..116d3fd 100644
+--- a/net/econet/af_econet.c
++++ b/net/econet/af_econet.c
+@@ -435,10 +435,10 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
+ 		udpdest.sin_addr.s_addr = htonl(network | addr.station);
+ 	}
+ 
++	memset(&ah, 0, sizeof(ah));
+ 	ah.port = port;
+ 	ah.cb = cb & 0x7f;
+ 	ah.code = 2;		/* magic */
+-	ah.pad = 0;
+ 
+ 	/* tack our header on the front of the iovec */
+ 	size = sizeof(struct aunhdr);

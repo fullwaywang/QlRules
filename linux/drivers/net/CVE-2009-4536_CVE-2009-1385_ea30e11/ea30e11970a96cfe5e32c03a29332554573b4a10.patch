@@ -1,0 +1,46 @@
+commit ea30e11970a96cfe5e32c03a29332554573b4a10
+Author: Neil Horman <nhorman@tuxdriver.com>
+Date:   Tue Jun 2 01:29:58 2009 -0700
+
+    e1000: add missing length check to e1000 receive routine
+    
+    	Patch to fix bad length checking in e1000.  E1000 by default does two
+    things:
+    
+    1) Spans rx descriptors for packets that don't fit into 1 skb on recieve
+    2) Strips the crc from a frame by subtracting 4 bytes from the length prior to
+    doing an skb_put
+    
+    Since the e1000 driver isn't written to support receiving packets that span
+    multiple rx buffers, it checks the End of Packet bit of every frame, and
+    discards it if its not set.  This places us in a situation where, if we have a
+    spanning packet, the first part is discarded, but the second part is not (since
+    it is the end of packet, and it passes the EOP bit test).  If the second part of
+    the frame is small (4 bytes or less), we subtract 4 from it to remove its crc,
+    underflow the length, and wind up in skb_over_panic, when we try to skb_put a
+    huge number of bytes into the skb.  This amounts to a remote DOS attack through
+    careful selection of frame size in relation to interface MTU.  The fix for this
+    is already in the e1000e driver, as well as the e1000 sourceforge driver, but no
+    one ever pushed it to e1000.  This is lifted straight from e1000e, and prevents
+    small frames from causing the underflow described above
+    
+    Signed-off-by: Neil Horman <nhorman@tuxdriver.com>
+    Tested-by: Andy Gospodarek <andy@greyhouse.net>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/e1000/e1000_main.c b/drivers/net/e1000/e1000_main.c
+index b1419e2..fffb006 100644
+--- a/drivers/net/e1000/e1000_main.c
++++ b/drivers/net/e1000/e1000_main.c
+@@ -4027,8 +4027,9 @@ static bool e1000_clean_rx_irq(struct e1000_adapter *adapter,
+ 		                 PCI_DMA_FROMDEVICE);
+ 
+ 		length = le16_to_cpu(rx_desc->length);
+-
+-		if (unlikely(!(status & E1000_RXD_STAT_EOP))) {
++		/* !EOP means multiple descriptors were used to store a single
++		 * packet, also make sure the frame isn't just CRC only */
++		if (unlikely(!(status & E1000_RXD_STAT_EOP) || (length <= 4))) {
+ 			/* All receives must fit into a single buffer */
+ 			E1000_DBG("%s: Receive packet consumed multiple"
+ 				  " buffers\n", netdev->name);

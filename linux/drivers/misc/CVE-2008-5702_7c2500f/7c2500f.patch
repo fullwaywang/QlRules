@@ -1,0 +1,31 @@
+commit 7c2500f17d65092d93345f3996cf82ebca17e9ff
+Author: Wim Van Sebroeck <wim@iguana.be>
+Date:   Wed Oct 15 08:53:06 2008 +0000
+
+    [WATCHDOG] ib700wdt.c - fix buffer_underflow bug
+    
+    This fixes Bug 11399:
+    if ibwdt_set_heartbeat(int t) is called with value 30 then
+    the check "if ((t < 0) || (t > 30))" in ibwdt_set_heartbeat
+    is not going to fail because t == 30, but in the loop, the
+    check wd_times[i] > t is never going to be true because
+    none of the wd_times are greater than the value of t (i.e. 30).
+    So we are exiting the loop with i == -1 and therefore setting
+    wd_margin to -1 which is wrong.
+    
+    Reported-by: Zvonimir Rakamaric <zrakamar@cs.ubc.ca>
+    Signed-off-by: Wim Van Sebroeck <wim@iguana.be>
+
+diff --git a/drivers/watchdog/ib700wdt.c b/drivers/watchdog/ib700wdt.c
+index 05a2810..8782ec1 100644
+--- a/drivers/watchdog/ib700wdt.c
++++ b/drivers/watchdog/ib700wdt.c
+@@ -154,7 +154,7 @@ static int ibwdt_set_heartbeat(int t)
+ 		return -EINVAL;
+ 
+ 	for (i = 0x0F; i > -1; i--)
+-		if (wd_times[i] > t)
++		if (wd_times[i] >= t)
+ 			break;
+ 	wd_margin = i;
+ 	return 0;

@@ -1,0 +1,38 @@
+commit 13788ccc41ceea5893f9c747c59bc0b28f2416c2
+Author: Thomas Gleixner <tglx@linutronix.de>
+Date:   Fri Mar 16 13:38:20 2007 -0800
+
+    [PATCH] hrtimer: prevent overrun DoS in hrtimer_forward()
+    
+    hrtimer_forward() does not check for the possible overflow of
+    timer->expires.  This can happen on 64 bit machines with large interval
+    values and results currently in an endless loop in the softirq because the
+    expiry value becomes negative and therefor the timer is expired all the
+    time.
+    
+    Check for this condition and set the expiry value to the max.  expiry time
+    in the future.  The fix should be applied to stable kernel series as well.
+    
+    Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+    Acked-by: Ingo Molnar <mingo@elte.hu>
+    Cc: <stable@kernel.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/kernel/hrtimer.c b/kernel/hrtimer.c
+index ec4cb9f..5e7122d 100644
+--- a/kernel/hrtimer.c
++++ b/kernel/hrtimer.c
+@@ -644,6 +644,12 @@ hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
+ 		orun++;
+ 	}
+ 	timer->expires = ktime_add(timer->expires, interval);
++	/*
++	 * Make sure, that the result did not wrap with a very large
++	 * interval.
++	 */
++	if (timer->expires.tv64 < 0)
++		timer->expires = ktime_set(KTIME_SEC_MAX, 0);
+ 
+ 	return orun;
+ }

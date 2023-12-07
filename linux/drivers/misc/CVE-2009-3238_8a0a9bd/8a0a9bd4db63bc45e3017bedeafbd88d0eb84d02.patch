@@ -1,0 +1,65 @@
+commit 8a0a9bd4db63bc45e3017bedeafbd88d0eb84d02
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Tue May 5 08:17:43 2009 -0700
+
+    random: make get_random_int() more random
+    
+    It's a really simple patch that basically just open-codes the current
+    "secure_ip_id()" call, but when open-coding it we now use a _static_
+    hashing area, so that it gets updated every time.
+    
+    And to make sure somebody can't just start from the same original seed of
+    all-zeroes, and then do the "half_md4_transform()" over and over until
+    they get the same sequence as the kernel has, each iteration also mixes in
+    the same old "current->pid + jiffies" we used - so we should now have a
+    regular strong pseudo-number generator, but we also have one that doesn't
+    have a single seed.
+    
+    Note: the "pid + jiffies" is just meant to be a tiny tiny bit of noise. It
+    has no real meaning. It could be anything. I just picked the previous
+    seed, it's just that now we keep the state in between calls and that will
+    feed into the next result, and that should make all the difference.
+    
+    I made that hash be a per-cpu data just to avoid cache-line ping-pong:
+    having multiple CPU's write to the same data would be fine for randomness,
+    and add yet another layer of chaos to it, but since get_random_int() is
+    supposed to be a fast interface I did it that way instead. I considered
+    using "__raw_get_cpu_var()" to avoid any preemption overhead while still
+    getting the hash be _mostly_ ping-pong free, but in the end good taste won
+    out.
+    
+    Signed-off-by: Ingo Molnar <mingo@elte.hu>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/drivers/char/random.c b/drivers/char/random.c
+index f824ef8..b2ced39 100644
+--- a/drivers/char/random.c
++++ b/drivers/char/random.c
+@@ -1665,15 +1665,20 @@ EXPORT_SYMBOL(secure_dccp_sequence_number);
+  * value is not cryptographically secure but for several uses the cost of
+  * depleting entropy is too high
+  */
++DEFINE_PER_CPU(__u32 [4], get_random_int_hash);
+ unsigned int get_random_int(void)
+ {
+-	/*
+-	 * Use IP's RNG. It suits our purpose perfectly: it re-keys itself
+-	 * every second, from the entropy pool (and thus creates a limited
+-	 * drain on it), and uses halfMD4Transform within the second. We
+-	 * also mix it with jiffies and the PID:
+-	 */
+-	return secure_ip_id((__force __be32)(current->pid + jiffies));
++	struct keydata *keyptr;
++	__u32 *hash = get_cpu_var(get_random_int_hash);
++	int ret;
++
++	keyptr = get_keyptr();
++	hash[0] += current->pid + jiffies + get_cycles() + (int)(long)&ret;
++
++	ret = half_md4_transform(hash, keyptr->secret);
++	put_cpu_var(get_random_int_hash);
++
++	return ret;
+ }
+ 
+ /*

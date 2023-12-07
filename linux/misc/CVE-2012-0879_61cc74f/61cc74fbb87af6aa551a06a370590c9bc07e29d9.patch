@@ -1,0 +1,29 @@
+commit 61cc74fbb87af6aa551a06a370590c9bc07e29d9
+Author: Louis Rilling <louis.rilling@kerlabs.com>
+Date:   Fri Dec 4 14:52:41 2009 +0100
+
+    block: Fix io_context leak after clone with CLONE_IO
+    
+    With CLONE_IO, copy_io() increments both ioc->refcount and ioc->nr_tasks.
+    However exit_io_context() only decrements ioc->refcount if ioc->nr_tasks
+    reaches 0.
+    
+    Always call put_io_context() in exit_io_context().
+    
+    Signed-off-by: Louis Rilling <louis.rilling@kerlabs.com>
+    Signed-off-by: Jens Axboe <jens.axboe@oracle.com>
+
+diff --git a/block/blk-ioc.c b/block/blk-ioc.c
+index d4ed600..dcd0412 100644
+--- a/block/blk-ioc.c
++++ b/block/blk-ioc.c
+@@ -80,8 +80,8 @@ void exit_io_context(void)
+ 			ioc->aic->exit(ioc->aic);
+ 		cfq_exit(ioc);
+ 
+-		put_io_context(ioc);
+ 	}
++	put_io_context(ioc);
+ }
+ 
+ struct io_context *alloc_io_context(gfp_t gfp_flags, int node)

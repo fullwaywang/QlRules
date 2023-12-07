@@ -1,0 +1,43 @@
+commit 5883f57ca0008ffc93e09cbb9847a1928e50c6f3
+Author: Kees Cook <kees.cook@canonical.com>
+Date:   Wed Mar 23 16:42:53 2011 -0700
+
+    proc: protect mm start_code/end_code in /proc/pid/stat
+    
+    While mm->start_stack was protected from cross-uid viewing (commit
+    f83ce3e6b02d5 ("proc: avoid information leaks to non-privileged
+    processes")), the start_code and end_code values were not.  This would
+    allow the text location of a PIE binary to leak, defeating ASLR.
+    
+    Note that the value "1" is used instead of "0" for a protected value since
+    "ps", "killall", and likely other readers of /proc/pid/stat, take
+    start_code of "0" to mean a kernel thread and will misbehave.  Thanks to
+    Brad Spengler for pointing this out.
+    
+    Addresses CVE-2011-0726
+    
+    Signed-off-by: Kees Cook <kees.cook@canonical.com>
+    Cc: <stable@kernel.org>
+    Cc: Alexey Dobriyan <adobriyan@gmail.com>
+    Cc: David Howells <dhowells@redhat.com>
+    Cc: Eugene Teo <eugeneteo@kernel.sg>
+    Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+    Cc: Brad Spengler <spender@grsecurity.net>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/proc/array.c b/fs/proc/array.c
+index 7c99c1c..5e4f776 100644
+--- a/fs/proc/array.c
++++ b/fs/proc/array.c
+@@ -489,8 +489,8 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
+ 		vsize,
+ 		mm ? get_mm_rss(mm) : 0,
+ 		rsslim,
+-		mm ? mm->start_code : 0,
+-		mm ? mm->end_code : 0,
++		mm ? (permitted ? mm->start_code : 1) : 0,
++		mm ? (permitted ? mm->end_code : 1) : 0,
+ 		(permitted && mm) ? mm->start_stack : 0,
+ 		esp,
+ 		eip,

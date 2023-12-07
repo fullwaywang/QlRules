@@ -1,0 +1,37 @@
+commit 17b24b3c97498935a2ef9777370b1151dfed3f6f
+Author: Chas Williams <chas@cmf.nrl.navy.mil>
+Date:   Thu Dec 4 14:58:13 2008 -0800
+
+    ATM: CVE-2008-5079: duplicate listen() on socket corrupts the vcc table
+    
+    As reported by Hugo Dias that it is possible to cause a local denial
+    of service attack by calling the svc_listen function twice on the same
+    socket and reading /proc/net/atm/*vc
+    
+    Signed-off-by: Chas Williams <chas@cmf.nrl.navy.mil>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/atm/svc.c b/net/atm/svc.c
+index de1e4f2..8fb54dc 100644
+--- a/net/atm/svc.c
++++ b/net/atm/svc.c
+@@ -293,7 +293,10 @@ static int svc_listen(struct socket *sock,int backlog)
+ 		error = -EINVAL;
+ 		goto out;
+ 	}
+-	vcc_insert_socket(sk);
++	if (test_bit(ATM_VF_LISTEN, &vcc->flags)) {
++		error = -EADDRINUSE;
++		goto out;
++        }
+ 	set_bit(ATM_VF_WAITING, &vcc->flags);
+ 	prepare_to_wait(sk->sk_sleep, &wait, TASK_UNINTERRUPTIBLE);
+ 	sigd_enq(vcc,as_listen,NULL,NULL,&vcc->local);
+@@ -307,6 +310,7 @@ static int svc_listen(struct socket *sock,int backlog)
+ 		goto out;
+ 	}
+ 	set_bit(ATM_VF_LISTEN,&vcc->flags);
++	vcc_insert_socket(sk);
+ 	sk->sk_max_ack_backlog = backlog > 0 ? backlog : ATM_BACKLOG_DEFAULT;
+ 	error = -sk->sk_err;
+ out:

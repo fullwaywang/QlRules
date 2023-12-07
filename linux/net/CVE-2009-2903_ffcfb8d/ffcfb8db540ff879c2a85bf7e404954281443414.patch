@@ -1,0 +1,193 @@
+commit ffcfb8db540ff879c2a85bf7e404954281443414
+Author: Arnaldo Carvalho de Melo <acme@redhat.com>
+Date:   Fri Sep 11 11:35:22 2009 -0700
+
+    Subject: [PATCH] appletalk: Fix skb leak when ipddp interface is not loaded
+    
+    And also do a better job of returning proper NET_{RX,XMIT}_ values.
+    
+    Based on a patch and suggestions by Mark Smith.
+    
+    This fixes CVE-2009-2903
+    
+    Reported-by: Mark Smith <lk-netdev@lk-netdev.nosense.org>
+    Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/appletalk/ipddp.c b/drivers/net/appletalk/ipddp.c
+index bea87da..aaf14d3 100644
+--- a/drivers/net/appletalk/ipddp.c
++++ b/drivers/net/appletalk/ipddp.c
+@@ -177,8 +177,7 @@ static netdev_tx_t ipddp_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	dev->stats.tx_packets++;
+ 	dev->stats.tx_bytes += skb->len;
+ 
+-        if(aarp_send_ddp(rt->dev, skb, &rt->at, NULL) < 0)
+-                dev_kfree_skb(skb);
++	aarp_send_ddp(rt->dev, skb, &rt->at, NULL);
+ 
+ 	spin_unlock(&ipddp_route_lock);
+ 
+diff --git a/net/appletalk/aarp.c b/net/appletalk/aarp.c
+index 89f99d3..9d4adfd 100644
+--- a/net/appletalk/aarp.c
++++ b/net/appletalk/aarp.c
+@@ -599,7 +599,7 @@ int aarp_send_ddp(struct net_device *dev, struct sk_buff *skb,
+ 
+ 	/* Non ELAP we cannot do. */
+ 	if (dev->type != ARPHRD_ETHER)
+-		return -1;
++		goto free_it;
+ 
+ 	skb->dev = dev;
+ 	skb->protocol = htons(ETH_P_ATALK);
+@@ -634,7 +634,7 @@ int aarp_send_ddp(struct net_device *dev, struct sk_buff *skb,
+ 	if (!a) {
+ 		/* Whoops slipped... good job it's an unreliable protocol 8) */
+ 		write_unlock_bh(&aarp_lock);
+-		return -1;
++		goto free_it;
+ 	}
+ 
+ 	/* Set up the queue */
+@@ -663,15 +663,21 @@ out_unlock:
+ 	write_unlock_bh(&aarp_lock);
+ 
+ 	/* Tell the ddp layer we have taken over for this frame. */
+-	return 0;
++	goto sent;
+ 
+ sendit:
+ 	if (skb->sk)
+ 		skb->priority = skb->sk->sk_priority;
+-	dev_queue_xmit(skb);
++	if (dev_queue_xmit(skb))
++		goto drop;
+ sent:
+-	return 1;
++	return NET_XMIT_SUCCESS;
++free_it:
++	kfree_skb(skb);
++drop:
++	return NET_XMIT_DROP;
+ }
++EXPORT_SYMBOL(aarp_send_ddp);
+ 
+ /*
+  *	An entry in the aarp unresolved queue has become resolved. Send
+diff --git a/net/appletalk/ddp.c b/net/appletalk/ddp.c
+index 0d42d5d..4a6ff2b 100644
+--- a/net/appletalk/ddp.c
++++ b/net/appletalk/ddp.c
+@@ -1270,8 +1270,10 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
+ 	struct net_device_stats *stats;
+ 
+ 	/* This needs to be able to handle ipddp"N" devices */
+-	if (!dev)
+-		return -ENODEV;
++	if (!dev) {
++		kfree_skb(skb);
++		return NET_RX_DROP;
++	}
+ 
+ 	skb->protocol = htons(ETH_P_IP);
+ 	skb_pull(skb, 13);
+@@ -1281,8 +1283,7 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
+ 	stats = netdev_priv(dev);
+ 	stats->rx_packets++;
+ 	stats->rx_bytes += skb->len + 13;
+-	netif_rx(skb);  /* Send the SKB up to a higher place. */
+-	return 0;
++	return netif_rx(skb);  /* Send the SKB up to a higher place. */
+ }
+ #else
+ /* make it easy for gcc to optimize this test out, i.e. kill the code */
+@@ -1290,9 +1291,8 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
+ #define handle_ip_over_ddp(skb) 0
+ #endif
+ 
+-static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
+-			       struct ddpehdr *ddp, __u16 len_hops,
+-			       int origlen)
++static int atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
++			      struct ddpehdr *ddp, __u16 len_hops, int origlen)
+ {
+ 	struct atalk_route *rt;
+ 	struct atalk_addr ta;
+@@ -1359,8 +1359,6 @@ static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
+ 		/* 22 bytes - 12 ether, 2 len, 3 802.2 5 snap */
+ 		struct sk_buff *nskb = skb_realloc_headroom(skb, 32);
+ 		kfree_skb(skb);
+-		if (!nskb)
+-			goto out;
+ 		skb = nskb;
+ 	} else
+ 		skb = skb_unshare(skb, GFP_ATOMIC);
+@@ -1369,12 +1367,16 @@ static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
+ 	 * If the buffer didn't vanish into the lack of space bitbucket we can
+ 	 * send it.
+ 	 */
+-	if (skb && aarp_send_ddp(rt->dev, skb, &ta, NULL) == -1)
+-		goto free_it;
+-out:
+-	return;
++	if (skb == NULL)
++		goto drop;
++
++	if (aarp_send_ddp(rt->dev, skb, &ta, NULL) == NET_XMIT_DROP)
++		return NET_RX_DROP;
++	return NET_XMIT_SUCCESS;
+ free_it:
+ 	kfree_skb(skb);
++drop:
++	return NET_RX_DROP;
+ }
+ 
+ /**
+@@ -1448,8 +1450,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
+ 		/* Not ours, so we route the packet via the correct
+ 		 * AppleTalk iface
+ 		 */
+-		atalk_route_packet(skb, dev, ddp, len_hops, origlen);
+-		return NET_RX_SUCCESS;
++		return atalk_route_packet(skb, dev, ddp, len_hops, origlen);
+ 	}
+ 
+ 	/* if IP over DDP is not selected this code will be optimized out */
+@@ -1655,10 +1656,10 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr
+ 		if (skb2) {
+ 			loopback = 1;
+ 			SOCK_DEBUG(sk, "SK %p: send out(copy).\n", sk);
+-			if (aarp_send_ddp(dev, skb2,
+-					  &usat->sat_addr, NULL) == -1)
+-				kfree_skb(skb2);
+-				/* else queued/sent above in the aarp queue */
++			/*
++			 * If it fails it is queued/sent above in the aarp queue
++			 */
++			aarp_send_ddp(dev, skb2, &usat->sat_addr, NULL);
+ 		}
+ 	}
+ 
+@@ -1688,9 +1689,10 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr
+ 		    usat = &gsat;
+ 		}
+ 
+-		if (aarp_send_ddp(dev, skb, &usat->sat_addr, NULL) == -1)
+-			kfree_skb(skb);
+-		/* else queued/sent above in the aarp queue */
++		/*
++		 * If it fails it is queued/sent above in the aarp queue
++		 */
++		aarp_send_ddp(dev, skb, &usat->sat_addr, NULL);
+ 	}
+ 	SOCK_DEBUG(sk, "SK %p: Done write (%Zd).\n", sk, len);
+ 
+@@ -1868,7 +1870,6 @@ static struct packet_type ppptalk_packet_type __read_mostly = {
+ static unsigned char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };
+ 
+ /* Export symbols for use by drivers when AppleTalk is a module */
+-EXPORT_SYMBOL(aarp_send_ddp);
+ EXPORT_SYMBOL(atrtr_get_dev);
+ EXPORT_SYMBOL(atalk_find_dev_addr);
+ 

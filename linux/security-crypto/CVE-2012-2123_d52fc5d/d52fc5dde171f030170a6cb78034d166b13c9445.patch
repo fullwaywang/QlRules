@@ -1,0 +1,32 @@
+commit d52fc5dde171f030170a6cb78034d166b13c9445
+Author: Eric Paris <eparis@redhat.com>
+Date:   Tue Apr 17 16:26:54 2012 -0400
+
+    fcaps: clear the same personality flags as suid when fcaps are used
+    
+    If a process increases permissions using fcaps all of the dangerous
+    personality flags which are cleared for suid apps should also be cleared.
+    Thus programs given priviledge with fcaps will continue to have address space
+    randomization enabled even if the parent tried to disable it to make it
+    easier to attack.
+    
+    Signed-off-by: Eric Paris <eparis@redhat.com>
+    Reviewed-by: Serge Hallyn <serge.hallyn@canonical.com>
+    Signed-off-by: James Morris <james.l.morris@oracle.com>
+
+diff --git a/security/commoncap.c b/security/commoncap.c
+index 0cf4b53..0ecf4ba 100644
+--- a/security/commoncap.c
++++ b/security/commoncap.c
+@@ -505,6 +505,11 @@ int cap_bprm_set_creds(struct linux_binprm *bprm)
+ 	}
+ skip:
+ 
++	/* if we have fs caps, clear dangerous personality flags */
++	if (!cap_issubset(new->cap_permitted, old->cap_permitted))
++		bprm->per_clear |= PER_CLEAR_ON_SETID;
++
++
+ 	/* Don't let someone trace a set[ug]id/setpcap binary with the revised
+ 	 * credentials unless they have the appropriate permit
+ 	 */

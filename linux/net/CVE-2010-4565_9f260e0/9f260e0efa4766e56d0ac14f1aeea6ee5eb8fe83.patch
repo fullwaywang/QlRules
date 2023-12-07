@@ -1,0 +1,38 @@
+commit 9f260e0efa4766e56d0ac14f1aeea6ee5eb8fe83
+Author: Dan Rosenberg <drosenberg@vsecurity.com>
+Date:   Sun Dec 26 06:54:53 2010 +0000
+
+    CAN: Use inode instead of kernel address for /proc file
+    
+    Since the socket address is just being used as a unique identifier, its
+    inode number is an alternative that does not leak potentially sensitive
+    information.
+    
+    CC-ing stable because MITRE has assigned CVE-2010-4565 to the issue.
+    
+    Signed-off-by: Dan Rosenberg <drosenberg@vsecurity.com>
+    Acked-by: Oliver Hartkopp <socketcan@hartkopp.net>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/can/bcm.c b/net/can/bcm.c
+index 6faa825..9d5e8ac 100644
+--- a/net/can/bcm.c
++++ b/net/can/bcm.c
+@@ -125,7 +125,7 @@ struct bcm_sock {
+ 	struct list_head tx_ops;
+ 	unsigned long dropped_usr_msgs;
+ 	struct proc_dir_entry *bcm_proc_read;
+-	char procname [20]; /* pointer printed in ASCII with \0 */
++	char procname [32]; /* inode number in decimal with \0 */
+ };
+ 
+ static inline struct bcm_sock *bcm_sk(const struct sock *sk)
+@@ -1521,7 +1521,7 @@ static int bcm_connect(struct socket *sock, struct sockaddr *uaddr, int len,
+ 
+ 	if (proc_dir) {
+ 		/* unique socket address as filename */
+-		sprintf(bo->procname, "%p", sock);
++		sprintf(bo->procname, "%lu", sock_i_ino(sk));
+ 		bo->bcm_proc_read = proc_create_data(bo->procname, 0644,
+ 						     proc_dir,
+ 						     &bcm_proc_fops, sk);

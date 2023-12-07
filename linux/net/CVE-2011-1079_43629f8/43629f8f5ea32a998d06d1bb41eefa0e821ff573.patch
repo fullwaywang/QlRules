@@ -1,0 +1,26 @@
+commit 43629f8f5ea32a998d06d1bb41eefa0e821ff573
+Author: Vasiliy Kulikov <segoon@openwall.com>
+Date:   Mon Feb 14 13:54:31 2011 +0300
+
+    Bluetooth: bnep: fix buffer overflow
+    
+    Struct ca is copied from userspace.  It is not checked whether the "device"
+    field is NULL terminated.  This potentially leads to BUG() inside of
+    alloc_netdev_mqs() and/or information leak by creating a device with a name
+    made of contents of kernel stack.
+    
+    Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+    Signed-off-by: Gustavo F. Padovan <padovan@profusion.mobi>
+
+diff --git a/net/bluetooth/bnep/sock.c b/net/bluetooth/bnep/sock.c
+index 2862f53..d935da7 100644
+--- a/net/bluetooth/bnep/sock.c
++++ b/net/bluetooth/bnep/sock.c
+@@ -88,6 +88,7 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long
+ 			sockfd_put(nsock);
+ 			return -EBADFD;
+ 		}
++		ca.device[sizeof(ca.device)-1] = 0;
+ 
+ 		err = bnep_add_connection(&ca, nsock);
+ 		if (!err) {

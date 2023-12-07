@@ -1,0 +1,36 @@
+commit 79549c6dfda0603dba9a70a53467ce62d9335c33
+Author: Oleg Nesterov <oleg@redhat.com>
+Date:   Mon Apr 9 21:03:50 2012 +0200
+
+    cred: copy_process() should clear child->replacement_session_keyring
+    
+    keyctl_session_to_parent(task) sets ->replacement_session_keyring,
+    it should be processed and cleared by key_replace_session_keyring().
+    
+    However, this task can fork before it notices TIF_NOTIFY_RESUME and
+    the new child gets the bogus ->replacement_session_keyring copied by
+    dup_task_struct(). This is obviously wrong and, if nothing else, this
+    leads to put_cred(already_freed_cred).
+    
+    change copy_creds() to clear this member. If copy_process() fails
+    before this point the wrong ->replacement_session_keyring doesn't
+    matter, exit_creds() won't be called.
+    
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Oleg Nesterov <oleg@redhat.com>
+    Acked-by: David Howells <dhowells@redhat.com>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/kernel/cred.c b/kernel/cred.c
+index 97b36ee..e70683d 100644
+--- a/kernel/cred.c
++++ b/kernel/cred.c
+@@ -386,6 +386,8 @@ int copy_creds(struct task_struct *p, unsigned long clone_flags)
+ 	struct cred *new;
+ 	int ret;
+ 
++	p->replacement_session_keyring = NULL;
++
+ 	if (
+ #ifdef CONFIG_KEYS
+ 		!p->cred->thread_keyring &&

@@ -1,0 +1,54 @@
+commit 3eb8e74ec72736b9b9d728bad30484ec89c91dde
+Author: Timo Warns <Warns@pre-sense.de>
+Date:   Thu May 26 16:25:57 2011 -0700
+
+    fs/partitions/efi.c: corrupted GUID partition tables can cause kernel oops
+    
+    The kernel automatically evaluates partition tables of storage devices.
+    The code for evaluating GUID partitions (in fs/partitions/efi.c) contains
+    a bug that causes a kernel oops on certain corrupted GUID partition
+    tables.
+    
+    This bug has security impacts, because it allows, for example, to
+    prepare a storage device that crashes a kernel subsystem upon connecting
+    the device (e.g., a "USB Stick of (Partial) Death").
+    
+    	crc = efi_crc32((const unsigned char *) (*gpt), le32_to_cpu((*gpt)->header_size));
+    
+    computes a CRC32 checksum over gpt covering (*gpt)->header_size bytes.
+    There is no validation of (*gpt)->header_size before the efi_crc32 call.
+    
+    A corrupted partition table may have large values for (*gpt)->header_size.
+     In this case, the CRC32 computation access memory beyond the memory
+    allocated for gpt, which may cause a kernel heap overflow.
+    
+    Validate value of GUID partition table header size.
+    
+    [akpm@linux-foundation.org: fix layout and indenting]
+    Signed-off-by: Timo Warns <warns@pre-sense.de>
+    Cc: Matt Domsch <Matt_Domsch@dell.com>
+    Cc: Eugene Teo <eugeneteo@kernel.sg>
+    Cc: Dave Jones <davej@codemonkey.org.uk>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/partitions/efi.c b/fs/partitions/efi.c
+index 19d6750..6296b40 100644
+--- a/fs/partitions/efi.c
++++ b/fs/partitions/efi.c
+@@ -310,6 +310,15 @@ static int is_gpt_valid(struct parsed_partitions *state, u64 lba,
+ 		goto fail;
+ 	}
+ 
++	/* Check the GUID Partition Table header size */
++	if (le32_to_cpu((*gpt)->header_size) >
++			bdev_logical_block_size(state->bdev)) {
++		pr_debug("GUID Partition Table Header size is wrong: %u > %u\n",
++			le32_to_cpu((*gpt)->header_size),
++			bdev_logical_block_size(state->bdev));
++		goto fail;
++	}
++
+ 	/* Check the GUID Partition Table CRC */
+ 	origcrc = le32_to_cpu((*gpt)->header_crc32);
+ 	(*gpt)->header_crc32 = 0;

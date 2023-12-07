@@ -1,0 +1,30 @@
+commit a294865978b701e4d0d90135672749531b9a900d
+Author: Dan Rosenberg <drosenberg@vsecurity.com>
+Date:   Fri May 6 03:27:18 2011 +0000
+
+    dccp: handle invalid feature options length
+    
+    A length of zero (after subtracting two for the type and len fields) for
+    the DCCPO_{CHANGE,CONFIRM}_{L,R} options will cause an underflow due to
+    the subtraction.  The subsequent code may read past the end of the
+    options value buffer when parsing.  I'm unsure of what the consequences
+    of this might be, but it's probably not good.
+    
+    Signed-off-by: Dan Rosenberg <drosenberg@vsecurity.com>
+    Cc: stable@kernel.org
+    Acked-by: Gerrit Renker <gerrit@erg.abdn.ac.uk>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/dccp/options.c b/net/dccp/options.c
+index f06ffcf..4b2ab65 100644
+--- a/net/dccp/options.c
++++ b/net/dccp/options.c
+@@ -123,6 +123,8 @@ int dccp_parse_options(struct sock *sk, struct dccp_request_sock *dreq,
+ 		case DCCPO_CHANGE_L ... DCCPO_CONFIRM_R:
+ 			if (pkt_type == DCCP_PKT_DATA)      /* RFC 4340, 6 */
+ 				break;
++			if (len == 0)
++				goto out_invalid_option;
+ 			rc = dccp_feat_parse_options(sk, dreq, mandatory, opt,
+ 						    *value, value + 1, len - 1);
+ 			if (rc)

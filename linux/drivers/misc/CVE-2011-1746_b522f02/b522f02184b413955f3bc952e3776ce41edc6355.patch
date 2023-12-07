@@ -1,0 +1,53 @@
+commit b522f02184b413955f3bc952e3776ce41edc6355
+Author: Vasiliy Kulikov <segoon@openwall.com>
+Date:   Thu Apr 14 20:55:19 2011 +0400
+
+    agp: fix OOM and buffer overflow
+    
+    page_count is copied from userspace.  agp_allocate_memory() tries to
+    check whether this number is too big, but doesn't take into account the
+    wrap case.  Also agp_create_user_memory() doesn't check whether
+    alloc_size is calculated from num_agp_pages variable without overflow.
+    This may lead to allocation of too small buffer with following buffer
+    overflow.
+    
+    Another problem in agp code is not addressed in the patch - kernel memory
+    exhaustion (AGPIOC_RESERVE and AGPIOC_ALLOCATE ioctls).  It is not checked
+    whether requested pid is a pid of the caller (no check in agpioc_reserve_wrap()).
+    Each allocation is limited to 16KB, though, there is no per-process limit.
+    This might lead to OOM situation, which is not even solved in case of the
+    caller death by OOM killer - the memory is allocated for another (faked) process.
+    
+    Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+    Signed-off-by: Dave Airlie <airlied@redhat.com>
+
+diff --git a/drivers/char/agp/generic.c b/drivers/char/agp/generic.c
+index 012cba0..850a643 100644
+--- a/drivers/char/agp/generic.c
++++ b/drivers/char/agp/generic.c
+@@ -115,6 +115,9 @@ static struct agp_memory *agp_create_user_memory(unsigned long num_agp_pages)
+ 	struct agp_memory *new;
+ 	unsigned long alloc_size = num_agp_pages*sizeof(struct page *);
+ 
++	if (INT_MAX/sizeof(struct page *) < num_agp_pages)
++		return NULL;
++
+ 	new = kzalloc(sizeof(struct agp_memory), GFP_KERNEL);
+ 	if (new == NULL)
+ 		return NULL;
+@@ -234,11 +237,14 @@ struct agp_memory *agp_allocate_memory(struct agp_bridge_data *bridge,
+ 	int scratch_pages;
+ 	struct agp_memory *new;
+ 	size_t i;
++	int cur_memory;
+ 
+ 	if (!bridge)
+ 		return NULL;
+ 
+-	if ((atomic_read(&bridge->current_memory_agp) + page_count) > bridge->max_memory_agp)
++	cur_memory = atomic_read(&bridge->current_memory_agp);
++	if ((cur_memory + page_count > bridge->max_memory_agp) ||
++	    (cur_memory + page_count < page_count))
+ 		return NULL;
+ 
+ 	if (type >= AGP_USER_TYPES) {

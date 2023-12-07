@@ -1,0 +1,27 @@
+commit bc5b8a9003132ae44559edd63a1623b7b99dfb68
+Author: Dan Carpenter <dan.carpenter@oracle.com>
+Date:   Mon Nov 14 17:52:08 2011 +0300
+
+    hfs: add sanity check for file name length
+    
+    On a corrupted file system the ->len field could be wrong leading to
+    a buffer overflow.
+    
+    Reported-and-acked-by: Clement LECIGNE <clement.lecigne@netasq.com>
+    Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+    Cc: stable@kernel.org
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/hfs/trans.c b/fs/hfs/trans.c
+index e673a88..b1ce4c7 100644
+--- a/fs/hfs/trans.c
++++ b/fs/hfs/trans.c
+@@ -40,6 +40,8 @@ int hfs_mac2asc(struct super_block *sb, char *out, const struct hfs_name *in)
+ 
+ 	src = in->name;
+ 	srclen = in->len;
++	if (srclen > HFS_NAMELEN)
++		srclen = HFS_NAMELEN;
+ 	dst = out;
+ 	dstlen = HFS_MAX_NAMELEN;
+ 	if (nls_io) {

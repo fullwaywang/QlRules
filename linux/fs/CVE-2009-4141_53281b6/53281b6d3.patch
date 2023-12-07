@@ -1,0 +1,173 @@
+commit 53281b6d34d44308372d16acb7fb5327609f68b6
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Wed Dec 16 08:23:37 2009 -0800
+
+    fasync: split 'fasync_helper()' into separate add/remove functions
+    
+    Yes, the add and remove cases do share the same basic loop and the
+    locking, but the compiler can inline and then CSE some of the end result
+    anyway.  And splitting it up makes the code way easier to follow,
+    and makes it clearer exactly what the semantics are.
+    
+    In particular, we must make sure that the FASYNC flag in file->f_flags
+    exactly matches the state of "is this file on any fasync list", since
+    not only is that flag visible to user space (F_GETFL), but we also use
+    that flag to check whether we need to remove any fasync entries on file
+    close.
+    
+    We got that wrong for the case of a mixed use of file locking (which
+    tries to remove any fasync entries for file leases) and fasync.
+    
+    Splitting the function up also makes it possible to do some future
+    optimizations without making the function even messier.  In particular,
+    since the FASYNC flag has to match the state of "is this on a list", we
+    can do the following future optimizations:
+    
+     - on remove, we don't even need to get the locks and traverse the list
+       if FASYNC isn't set, since we can know a priori that there is no
+       point (this is effectively the same optimization that we already do
+       in __fput() wrt removing fasync on file close)
+    
+     - on add, we can use the FASYNC flag to decide whether we are changing
+       an existing entry or need to allocate a new one.
+    
+    but this is just the cleanup + fix for the FASYNC flag.
+    
+    Acked-by: Al Viro <viro@ZenIV.linux.org.uk>
+    Tested-by: Tavis Ormandy <taviso@google.com>
+    Cc: Jeff Dike <jdike@addtoit.com>
+    Cc: Matt Mackall <mpm@selenic.com>
+    Cc: stable@kernel.org
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/fcntl.c b/fs/fcntl.c
+index 2cf93ec..97e01dc 100644
+--- a/fs/fcntl.c
++++ b/fs/fcntl.c
+@@ -618,60 +618,90 @@ static DEFINE_RWLOCK(fasync_lock);
+ static struct kmem_cache *fasync_cache __read_mostly;
+ 
+ /*
+- * fasync_helper() is used by almost all character device drivers
+- * to set up the fasync queue. It returns negative on error, 0 if it did
+- * no changes and positive if it added/deleted the entry.
++ * Remove a fasync entry. If successfully removed, return
++ * positive and clear the FASYNC flag. If no entry exists,
++ * do nothing and return 0.
++ *
++ * NOTE! It is very important that the FASYNC flag always
++ * match the state "is the filp on a fasync list".
++ *
++ * We always take the 'filp->f_lock', in since fasync_lock
++ * needs to be irq-safe.
+  */
+-int fasync_helper(int fd, struct file * filp, int on, struct fasync_struct **fapp)
++static int fasync_remove_entry(struct file *filp, struct fasync_struct **fapp)
+ {
+ 	struct fasync_struct *fa, **fp;
+-	struct fasync_struct *new = NULL;
+ 	int result = 0;
+ 
+-	if (on) {
+-		new = kmem_cache_alloc(fasync_cache, GFP_KERNEL);
+-		if (!new)
+-			return -ENOMEM;
++	spin_lock(&filp->f_lock);
++	write_lock_irq(&fasync_lock);
++	for (fp = fapp; (fa = *fp) != NULL; fp = &fa->fa_next) {
++		if (fa->fa_file != filp)
++			continue;
++		*fp = fa->fa_next;
++		kmem_cache_free(fasync_cache, fa);
++		filp->f_flags &= ~FASYNC;
++		result = 1;
++		break;
+ 	}
++	write_unlock_irq(&fasync_lock);
++	spin_unlock(&filp->f_lock);
++	return result;
++}
++
++/*
++ * Add a fasync entry. Return negative on error, positive if
++ * added, and zero if did nothing but change an existing one.
++ *
++ * NOTE! It is very important that the FASYNC flag always
++ * match the state "is the filp on a fasync list".
++ */
++static int fasync_add_entry(int fd, struct file *filp, struct fasync_struct **fapp)
++{
++	struct fasync_struct *new, *fa, **fp;
++	int result = 0;
++
++	new = kmem_cache_alloc(fasync_cache, GFP_KERNEL);
++	if (!new)
++		return -ENOMEM;
+ 
+-	/*
+-	 * We need to take f_lock first since it's not an IRQ-safe
+-	 * lock.
+-	 */
+ 	spin_lock(&filp->f_lock);
+ 	write_lock_irq(&fasync_lock);
+ 	for (fp = fapp; (fa = *fp) != NULL; fp = &fa->fa_next) {
+-		if (fa->fa_file == filp) {
+-			if(on) {
+-				fa->fa_fd = fd;
+-				kmem_cache_free(fasync_cache, new);
+-			} else {
+-				*fp = fa->fa_next;
+-				kmem_cache_free(fasync_cache, fa);
+-				result = 1;
+-			}
+-			goto out;
+-		}
++		if (fa->fa_file != filp)
++			continue;
++		fa->fa_fd = fd;
++		kmem_cache_free(fasync_cache, new);
++		goto out;
+ 	}
+ 
+-	if (on) {
+-		new->magic = FASYNC_MAGIC;
+-		new->fa_file = filp;
+-		new->fa_fd = fd;
+-		new->fa_next = *fapp;
+-		*fapp = new;
+-		result = 1;
+-	}
++	new->magic = FASYNC_MAGIC;
++	new->fa_file = filp;
++	new->fa_fd = fd;
++	new->fa_next = *fapp;
++	*fapp = new;
++	result = 1;
++	filp->f_flags |= FASYNC;
++
+ out:
+-	if (on)
+-		filp->f_flags |= FASYNC;
+-	else
+-		filp->f_flags &= ~FASYNC;
+ 	write_unlock_irq(&fasync_lock);
+ 	spin_unlock(&filp->f_lock);
+ 	return result;
+ }
+ 
++/*
++ * fasync_helper() is used by almost all character device drivers
++ * to set up the fasync queue, and for regular files by the file
++ * lease code. It returns negative on error, 0 if it did no changes
++ * and positive if it added/deleted the entry.
++ */
++int fasync_helper(int fd, struct file * filp, int on, struct fasync_struct **fapp)
++{
++	if (!on)
++		return fasync_remove_entry(filp, fapp);
++	return fasync_add_entry(fd, filp, fapp);
++}
++
+ EXPORT_SYMBOL(fasync_helper);
+ 
+ void __kill_fasync(struct fasync_struct *fa, int sig, int band)

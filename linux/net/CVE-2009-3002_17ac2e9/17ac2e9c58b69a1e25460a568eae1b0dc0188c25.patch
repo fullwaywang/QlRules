@@ -1,0 +1,23 @@
+commit 17ac2e9c58b69a1e25460a568eae1b0dc0188c25
+Author: Eric Dumazet <eric.dumazet@gmail.com>
+Date:   Thu Aug 6 03:34:06 2009 +0000
+
+    rose: Fix rose_getname() leak
+    
+    rose_getname() can leak kernel memory to user.
+    
+    Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/rose/af_rose.c b/net/rose/af_rose.c
+index f0a76f6..e5f478c 100644
+--- a/net/rose/af_rose.c
++++ b/net/rose/af_rose.c
+@@ -954,6 +954,7 @@ static int rose_getname(struct socket *sock, struct sockaddr *uaddr,
+ 	struct rose_sock *rose = rose_sk(sk);
+ 	int n;
+ 
++	memset(srose, 0, sizeof(*srose));
+ 	if (peer != 0) {
+ 		if (sk->sk_state != TCP_ESTABLISHED)
+ 			return -ENOTCONN;

@@ -1,0 +1,34 @@
+commit 10022a6c66e199d8f61d9044543f38785713cbbd
+Author: Oliver Hartkopp <socketcan@hartkopp.net>
+Date:   Wed Apr 20 01:57:15 2011 +0000
+
+    can: add missing socket check in can/raw release
+    
+    v2: added space after 'if' according code style.
+    
+    We can get here with a NULL socket argument passed from userspace,
+    so we need to handle it accordingly.
+    
+    Thanks to Dave Jones pointing at this issue in net/can/bcm.c
+    
+    Signed-off-by: Oliver Hartkopp <socketcan@hartkopp.net>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/can/raw.c b/net/can/raw.c
+index 649acfa..0eb39a7 100644
+--- a/net/can/raw.c
++++ b/net/can/raw.c
+@@ -305,7 +305,12 @@ static int raw_init(struct sock *sk)
+ static int raw_release(struct socket *sock)
+ {
+ 	struct sock *sk = sock->sk;
+-	struct raw_sock *ro = raw_sk(sk);
++	struct raw_sock *ro;
++
++	if (!sk)
++		return 0;
++
++	ro = raw_sk(sk);
+ 
+ 	unregister_netdevice_notifier(&ro->notifier);
+ 

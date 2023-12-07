@@ -1,0 +1,111 @@
+commit 54af3bb543c071769141387a42deaaab5074da55
+Author: Trond Myklebust <Trond.Myklebust@netapp.com>
+Date:   Fri Sep 28 12:27:41 2007 -0400
+
+    NFS: Fix an Oops in encode_lookup()
+    
+    It doesn't look as if the NFS file name limit is being initialised correctly
+    in the struct nfs_server. Make sure that we limit whatever is being set in
+    nfs_probe_fsinfo() and nfs_init_server().
+    
+    Also ensure that readdirplus and nfs4_path_walk respect our file name
+    limits.
+    
+    Signed-off-by: Trond Myklebust <Trond.Myklebust@netapp.com>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+diff --git a/fs/nfs/client.c b/fs/nfs/client.c
+index a49f9fe..a204484 100644
+--- a/fs/nfs/client.c
++++ b/fs/nfs/client.c
+@@ -588,16 +588,6 @@ static int nfs_init_server(struct nfs_server *server, const struct nfs_mount_dat
+ 	server->namelen  = data->namlen;
+ 	/* Create a client RPC handle for the NFSv3 ACL management interface */
+ 	nfs_init_server_aclclient(server);
+-	if (clp->cl_nfsversion == 3) {
+-		if (server->namelen == 0 || server->namelen > NFS3_MAXNAMLEN)
+-			server->namelen = NFS3_MAXNAMLEN;
+-		if (!(data->flags & NFS_MOUNT_NORDIRPLUS))
+-			server->caps |= NFS_CAP_READDIRPLUS;
+-	} else {
+-		if (server->namelen == 0 || server->namelen > NFS2_MAXNAMLEN)
+-			server->namelen = NFS2_MAXNAMLEN;
+-	}
+-
+ 	dprintk("<-- nfs_init_server() = 0 [new %p]\n", clp);
+ 	return 0;
+ 
+@@ -794,6 +784,16 @@ struct nfs_server *nfs_create_server(const struct nfs_mount_data *data,
+ 	error = nfs_probe_fsinfo(server, mntfh, &fattr);
+ 	if (error < 0)
+ 		goto error;
++	if (server->nfs_client->rpc_ops->version == 3) {
++		if (server->namelen == 0 || server->namelen > NFS3_MAXNAMLEN)
++			server->namelen = NFS3_MAXNAMLEN;
++		if (!(data->flags & NFS_MOUNT_NORDIRPLUS))
++			server->caps |= NFS_CAP_READDIRPLUS;
++	} else {
++		if (server->namelen == 0 || server->namelen > NFS2_MAXNAMLEN)
++			server->namelen = NFS2_MAXNAMLEN;
++	}
++
+ 	if (!(fattr.valid & NFS_ATTR_FATTR)) {
+ 		error = server->nfs_client->rpc_ops->getattr(server, mntfh, &fattr);
+ 		if (error < 0) {
+@@ -984,6 +984,9 @@ struct nfs_server *nfs4_create_server(const struct nfs4_mount_data *data,
+ 	if (error < 0)
+ 		goto error;
+ 
++	if (server->namelen == 0 || server->namelen > NFS4_MAXNAMLEN)
++		server->namelen = NFS4_MAXNAMLEN;
++
+ 	BUG_ON(!server->nfs_client);
+ 	BUG_ON(!server->nfs_client->rpc_ops);
+ 	BUG_ON(!server->nfs_client->rpc_ops->file_inode_ops);
+@@ -1056,6 +1059,9 @@ struct nfs_server *nfs4_create_referral_server(struct nfs_clone_mount *data,
+ 	if (error < 0)
+ 		goto error;
+ 
++	if (server->namelen == 0 || server->namelen > NFS4_MAXNAMLEN)
++		server->namelen = NFS4_MAXNAMLEN;
++
+ 	dprintk("Referral FSID: %llx:%llx\n",
+ 		(unsigned long long) server->fsid.major,
+ 		(unsigned long long) server->fsid.minor);
+@@ -1115,6 +1121,9 @@ struct nfs_server *nfs_clone_server(struct nfs_server *source,
+ 	if (error < 0)
+ 		goto out_free_server;
+ 
++	if (server->namelen == 0 || server->namelen > NFS4_MAXNAMLEN)
++		server->namelen = NFS4_MAXNAMLEN;
++
+ 	dprintk("Cloned FSID: %llx:%llx\n",
+ 		(unsigned long long) server->fsid.major,
+ 		(unsigned long long) server->fsid.minor);
+diff --git a/fs/nfs/dir.c b/fs/nfs/dir.c
+index ea97408..e4a04d1 100644
+--- a/fs/nfs/dir.c
++++ b/fs/nfs/dir.c
+@@ -1162,6 +1162,8 @@ static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
+ 	}
+ 	if (!desc->plus || !(entry->fattr->valid & NFS_ATTR_FATTR))
+ 		return NULL;
++	if (name.len > NFS_SERVER(dir)->namelen)
++		return NULL;
+ 	/* Note: caller is already holding the dir->i_mutex! */
+ 	dentry = d_alloc(parent, &name);
+ 	if (dentry == NULL)
+diff --git a/fs/nfs/getroot.c b/fs/nfs/getroot.c
+index d1cbf0a..522e5ad 100644
+--- a/fs/nfs/getroot.c
++++ b/fs/nfs/getroot.c
+@@ -175,6 +175,9 @@ next_component:
+ 		path++;
+ 	name.len = path - (const char *) name.name;
+ 
++	if (name.len > NFS4_MAXNAMLEN)
++		return -ENAMETOOLONG;
++
+ eat_dot_dir:
+ 	while (*path == '/')
+ 		path++;

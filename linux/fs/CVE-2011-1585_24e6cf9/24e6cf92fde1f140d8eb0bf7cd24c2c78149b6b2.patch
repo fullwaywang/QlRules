@@ -1,0 +1,24 @@
+commit 24e6cf92fde1f140d8eb0bf7cd24c2c78149b6b2
+Author: Jeff Layton <jlayton@redhat.com>
+Date:   Mon Aug 23 11:38:04 2010 -0400
+
+    cifs: check for NULL session password
+    
+    It's possible for a cifsSesInfo struct to have a NULL password, so we
+    need to check for that prior to running strncmp on it.
+    
+    Signed-off-by: Jeff Layton <jlayton@redhat.com>
+    Signed-off-by: Steve French <sfrench@us.ibm.com>
+
+diff --git a/fs/cifs/connect.c b/fs/cifs/connect.c
+index 18af707..ec0ea4a 100644
+--- a/fs/cifs/connect.c
++++ b/fs/cifs/connect.c
+@@ -1673,6 +1673,7 @@ cifs_find_smb_ses(struct TCP_Server_Info *server, struct smb_vol *vol)
+ 				    MAX_USERNAME_SIZE))
+ 				continue;
+ 			if (strlen(vol->username) != 0 &&
++			    ses->password != NULL &&
+ 			    strncmp(ses->password,
+ 				    vol->password ? vol->password : "",
+ 				    MAX_PASSWORD_SIZE))

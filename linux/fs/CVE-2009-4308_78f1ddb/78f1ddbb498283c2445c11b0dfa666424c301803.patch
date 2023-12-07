@@ -1,0 +1,26 @@
+commit 78f1ddbb498283c2445c11b0dfa666424c301803
+Author: Theodore Ts'o <tytso@mit.edu>
+Date:   Mon Jul 27 23:09:47 2009 -0400
+
+    ext4: Avoid null pointer dereference when decoding EROFS w/o a journal
+    
+    We need to check to make sure a journal is present before checking the
+    journal flags in ext4_decode_error().
+    
+    Signed-off-by: Eric Sesterhenn <eric.sesterhenn@lsexperts.de>
+    Signed-off-by: "Theodore Ts'o" <tytso@mit.edu>
+
+diff --git a/fs/ext4/super.c b/fs/ext4/super.c
+index 8f4f079..fe3f376 100644
+--- a/fs/ext4/super.c
++++ b/fs/ext4/super.c
+@@ -344,7 +344,8 @@ static const char *ext4_decode_error(struct super_block *sb, int errno,
+ 		errstr = "Out of memory";
+ 		break;
+ 	case -EROFS:
+-		if (!sb || EXT4_SB(sb)->s_journal->j_flags & JBD2_ABORT)
++		if (!sb || (EXT4_SB(sb)->s_journal &&
++			    EXT4_SB(sb)->s_journal->j_flags & JBD2_ABORT))
+ 			errstr = "Journal has aborted";
+ 		else
+ 			errstr = "Readonly filesystem";

@@ -1,0 +1,52 @@
+commit 194b3da873fd334ef183806db751473512af29ce
+Author: Vasiliy Kulikov <segoon@openwall.com>
+Date:   Thu Apr 14 20:55:16 2011 +0400
+
+    agp: fix arbitrary kernel memory writes
+    
+    pg_start is copied from userspace on AGPIOC_BIND and AGPIOC_UNBIND ioctl
+    cmds of agp_ioctl() and passed to agpioc_bind_wrap().  As said in the
+    comment, (pg_start + mem->page_count) may wrap in case of AGPIOC_BIND,
+    and it is not checked at all in case of AGPIOC_UNBIND.  As a result, user
+    with sufficient privileges (usually "video" group) may generate either
+    local DoS or privilege escalation.
+    
+    Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+    Signed-off-by: Dave Airlie <airlied@redhat.com>
+
+diff --git a/drivers/char/agp/generic.c b/drivers/char/agp/generic.c
+index 850a643..b072648 100644
+--- a/drivers/char/agp/generic.c
++++ b/drivers/char/agp/generic.c
+@@ -1095,8 +1095,8 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
+ 		return -EINVAL;
+ 	}
+ 
+-	/* AK: could wrap */
+-	if ((pg_start + mem->page_count) > num_entries)
++	if (((pg_start + mem->page_count) > num_entries) ||
++	    ((pg_start + mem->page_count) < pg_start))
+ 		return -EINVAL;
+ 
+ 	j = pg_start;
+@@ -1130,7 +1130,7 @@ int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
+ {
+ 	size_t i;
+ 	struct agp_bridge_data *bridge;
+-	int mask_type;
++	int mask_type, num_entries;
+ 
+ 	bridge = mem->bridge;
+ 	if (!bridge)
+@@ -1142,6 +1142,11 @@ int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
+ 	if (type != mem->type)
+ 		return -EINVAL;
+ 
++	num_entries = agp_num_entries();
++	if (((pg_start + mem->page_count) > num_entries) ||
++	    ((pg_start + mem->page_count) < pg_start))
++		return -EINVAL;
++
+ 	mask_type = bridge->driver->agp_type_to_mask_type(bridge, type);
+ 	if (mask_type != 0) {
+ 		/* The generic routines know nothing of memory types */

@@ -1,0 +1,33 @@
+commit 3a3675b7f23f83ca8c67c9c2b6edf707fd28d1ba
+Author: Dan Rosenberg <drosenberg@vsecurity.com>
+Date:   Mon Feb 14 13:45:28 2011 +0000
+
+    xfs: prevent leaking uninitialized stack memory in FSGEOMETRY_V1
+    
+    The FSGEOMETRY_V1 ioctl (and its compat equivalent) calls out to
+    xfs_fs_geometry() with a version number of 3.  This code path does not
+    fill in the logsunit member of the passed xfs_fsop_geom_t, leading to
+    the leaking of four bytes of uninitialized stack data to potentially
+    unprivileged callers.
+    
+    v2 switches to memset() to avoid future issues if structure members
+    change, on suggestion of Dave Chinner.
+    
+    Signed-off-by: Dan Rosenberg <drosenberg@vsecurity.com>
+    Reviewed-by: Eugene Teo <eugeneteo@kernel.org>
+    Signed-off-by: Alex Elder <aelder@sgi.com>
+
+diff --git a/fs/xfs/xfs_fsops.c b/fs/xfs/xfs_fsops.c
+index cec89dd..85668ef 100644
+--- a/fs/xfs/xfs_fsops.c
++++ b/fs/xfs/xfs_fsops.c
+@@ -53,6 +53,9 @@ xfs_fs_geometry(
+ 	xfs_fsop_geom_t		*geo,
+ 	int			new_version)
+ {
++
++	memset(geo, 0, sizeof(*geo));
++
+ 	geo->blocksize = mp->m_sb.sb_blocksize;
+ 	geo->rtextsize = mp->m_sb.sb_rextsize;
+ 	geo->agblocks = mp->m_sb.sb_agblocks;

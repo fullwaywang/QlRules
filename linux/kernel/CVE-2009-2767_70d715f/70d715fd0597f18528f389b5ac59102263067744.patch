@@ -1,0 +1,43 @@
+commit 70d715fd0597f18528f389b5ac59102263067744
+Author: Hiroshi Shimamoto <h-shimamoto@ct.jp.nec.com>
+Date:   Mon Aug 3 11:48:19 2009 +0900
+
+    posix-timers: Fix oops in clock_nanosleep() with CLOCK_MONOTONIC_RAW
+    
+    Prevent calling do_nanosleep() with clockid
+    CLOCK_MONOTONIC_RAW, it may cause oops, such as NULL pointer
+    dereference.
+    
+    Signed-off-by: Hiroshi Shimamoto <h-shimamoto@ct.jp.nec.com>
+    Cc: Andrew Morton <akpm@linux-foundation.org>
+    Cc: Thomas Gleixner <tglx@linutronix.de>
+    Cc: John Stultz <johnstul@us.ibm.com>
+    Cc: <stable@kernel.org>
+    LKML-Reference: <4A764FF3.50607@ct.jp.nec.com>
+    Signed-off-by: Ingo Molnar <mingo@elte.hu>
+
+diff --git a/kernel/posix-timers.c b/kernel/posix-timers.c
+index 052ec4d..d089d05 100644
+--- a/kernel/posix-timers.c
++++ b/kernel/posix-timers.c
+@@ -202,6 +202,12 @@ static int no_timer_create(struct k_itimer *new_timer)
+ 	return -EOPNOTSUPP;
+ }
+ 
++static int no_nsleep(const clockid_t which_clock, int flags,
++		     struct timespec *tsave, struct timespec __user *rmtp)
++{
++	return -EOPNOTSUPP;
++}
++
+ /*
+  * Return nonzero if we know a priori this clockid_t value is bogus.
+  */
+@@ -254,6 +260,7 @@ static __init int init_posix_timers(void)
+ 		.clock_get = posix_get_monotonic_raw,
+ 		.clock_set = do_posix_clock_nosettime,
+ 		.timer_create = no_timer_create,
++		.nsleep = no_nsleep,
+ 	};
+ 
+ 	register_posix_clock(CLOCK_REALTIME, &clock_realtime);

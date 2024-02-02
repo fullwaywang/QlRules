@@ -1,0 +1,33 @@
+commit 7574fcdbdcb335763b6b322f6928dc0fd5730451
+Author: Xiaoming Ni <nixiaoming@huawei.com>
+Date:   Thu Mar 25 11:51:12 2021 +0800
+
+    nfc: fix memory leak in llcp_sock_connect()
+    
+    In llcp_sock_connect(), use kmemdup to allocate memory for
+     "llcp_sock->service_name". The memory is not released in the sock_unlink
+    label of the subsequent failure branch.
+    As a result, memory leakage occurs.
+    
+    fix CVE-2020-25672
+    
+    Fixes: d646960f7986 ("NFC: Initial LLCP support")
+    Reported-by: "kiyin(尹亮)" <kiyin@tencent.com>
+    Link: https://www.openwall.com/lists/oss-security/2020/11/01/1
+    Cc: <stable@vger.kernel.org> #v3.3
+    Signed-off-by: Xiaoming Ni <nixiaoming@huawei.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/nfc/llcp_sock.c b/net/nfc/llcp_sock.c
+index 9e2799ee1595..59172614b249 100644
+--- a/net/nfc/llcp_sock.c
++++ b/net/nfc/llcp_sock.c
+@@ -746,6 +746,8 @@ static int llcp_sock_connect(struct socket *sock, struct sockaddr *_addr,
+ 
+ sock_unlink:
+ 	nfc_llcp_sock_unlink(&local->connecting_sockets, sk);
++	kfree(llcp_sock->service_name);
++	llcp_sock->service_name = NULL;
+ 
+ sock_llcp_release:
+ 	nfc_llcp_put_ssap(local, llcp_sock->ssap);

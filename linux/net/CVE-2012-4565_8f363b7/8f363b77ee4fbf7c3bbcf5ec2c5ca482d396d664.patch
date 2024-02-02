@@ -1,0 +1,61 @@
+commit 8f363b77ee4fbf7c3bbcf5ec2c5ca482d396d664
+Author: Jesper Dangaard Brouer <brouer@redhat.com>
+Date:   Wed Oct 31 02:45:32 2012 +0000
+
+    net: fix divide by zero in tcp algorithm illinois
+    
+    Reading TCP stats when using TCP Illinois congestion control algorithm
+    can cause a divide by zero kernel oops.
+    
+    The division by zero occur in tcp_illinois_info() at:
+     do_div(t, ca->cnt_rtt);
+    where ca->cnt_rtt can become zero (when rtt_reset is called)
+    
+    Steps to Reproduce:
+     1. Register tcp_illinois:
+         # sysctl -w net.ipv4.tcp_congestion_control=illinois
+     2. Monitor internal TCP information via command "ss -i"
+         # watch -d ss -i
+     3. Establish new TCP conn to machine
+    
+    Either it fails at the initial conn, or else it needs to wait
+    for a loss or a reset.
+    
+    This is only related to reading stats.  The function avg_delay() also
+    performs the same divide, but is guarded with a (ca->cnt_rtt > 0) at its
+    calling point in update_params().  Thus, simply fix tcp_illinois_info().
+    
+    Function tcp_illinois_info() / get_info() is called without
+    socket lock.  Thus, eliminate any race condition on ca->cnt_rtt
+    by using a local stack variable.  Simply reuse info.tcpv_rttcnt,
+    as its already set to ca->cnt_rtt.
+    Function avg_delay() is not affected by this race condition, as
+    its called with the socket lock.
+    
+    Cc: Petr Matousek <pmatouse@redhat.com>
+    Signed-off-by: Jesper Dangaard Brouer <brouer@redhat.com>
+    Acked-by: Eric Dumazet <edumazet@google.com>
+    Acked-by: Stephen Hemminger <shemminger@vyatta.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/ipv4/tcp_illinois.c b/net/ipv4/tcp_illinois.c
+index 813b43a..834857f 100644
+--- a/net/ipv4/tcp_illinois.c
++++ b/net/ipv4/tcp_illinois.c
+@@ -313,11 +313,13 @@ static void tcp_illinois_info(struct sock *sk, u32 ext,
+ 			.tcpv_rttcnt = ca->cnt_rtt,
+ 			.tcpv_minrtt = ca->base_rtt,
+ 		};
+-		u64 t = ca->sum_rtt;
+ 
+-		do_div(t, ca->cnt_rtt);
+-		info.tcpv_rtt = t;
++		if (info.tcpv_rttcnt > 0) {
++			u64 t = ca->sum_rtt;
+ 
++			do_div(t, info.tcpv_rttcnt);
++			info.tcpv_rtt = t;
++		}
+ 		nla_put(skb, INET_DIAG_VEGASINFO, sizeof(info), &info);
+ 	}
+ }

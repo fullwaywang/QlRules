@@ -1,0 +1,301 @@
+commit 5535be3099717646781ce1540cf725965d680e7b
+Author: David Hildenbrand <david@redhat.com>
+Date:   Tue Aug 9 22:56:40 2022 +0200
+
+    mm/gup: fix FOLL_FORCE COW security issue and remove FOLL_COW
+    
+    Ever since the Dirty COW (CVE-2016-5195) security issue happened, we know
+    that FOLL_FORCE can be possibly dangerous, especially if there are races
+    that can be exploited by user space.
+    
+    Right now, it would be sufficient to have some code that sets a PTE of a
+    R/O-mapped shared page dirty, in order for it to erroneously become
+    writable by FOLL_FORCE.  The implications of setting a write-protected PTE
+    dirty might not be immediately obvious to everyone.
+    
+    And in fact ever since commit 9ae0f87d009c ("mm/shmem: unconditionally set
+    pte dirty in mfill_atomic_install_pte"), we can use UFFDIO_CONTINUE to map
+    a shmem page R/O while marking the pte dirty.  This can be used by
+    unprivileged user space to modify tmpfs/shmem file content even if the
+    user does not have write permissions to the file, and to bypass memfd
+    write sealing -- Dirty COW restricted to tmpfs/shmem (CVE-2022-2590).
+    
+    To fix such security issues for good, the insight is that we really only
+    need that fancy retry logic (FOLL_COW) for COW mappings that are not
+    writable (!VM_WRITE).  And in a COW mapping, we really only broke COW if
+    we have an exclusive anonymous page mapped.  If we have something else
+    mapped, or the mapped anonymous page might be shared (!PageAnonExclusive),
+    we have to trigger a write fault to break COW.  If we don't find an
+    exclusive anonymous page when we retry, we have to trigger COW breaking
+    once again because something intervened.
+    
+    Let's move away from this mandatory-retry + dirty handling and rely on our
+    PageAnonExclusive() flag for making a similar decision, to use the same
+    COW logic as in other kernel parts here as well.  In case we stumble over
+    a PTE in a COW mapping that does not map an exclusive anonymous page, COW
+    was not properly broken and we have to trigger a fake write-fault to break
+    COW.
+    
+    Just like we do in can_change_pte_writable() added via commit 64fe24a3e05e
+    ("mm/mprotect: try avoiding write faults for exclusive anonymous pages
+    when changing protection") and commit 76aefad628aa ("mm/mprotect: fix
+    soft-dirty check in can_change_pte_writable()"), take care of softdirty
+    and uffd-wp manually.
+    
+    For example, a write() via /proc/self/mem to a uffd-wp-protected range has
+    to fail instead of silently granting write access and bypassing the
+    userspace fault handler.  Note that FOLL_FORCE is not only used for debug
+    access, but also triggered by applications without debug intentions, for
+    example, when pinning pages via RDMA.
+    
+    This fixes CVE-2022-2590. Note that only x86_64 and aarch64 are
+    affected, because only those support CONFIG_HAVE_ARCH_USERFAULTFD_MINOR.
+    
+    Fortunately, FOLL_COW is no longer required to handle FOLL_FORCE. So
+    let's just get rid of it.
+    
+    Thanks to Nadav Amit for pointing out that the pte_dirty() check in
+    FOLL_FORCE code is problematic and might be exploitable.
+    
+    Note 1: We don't check for the PTE being dirty because it doesn't matter
+            for making a "was COWed" decision anymore, and whoever modifies the
+            page has to set the page dirty either way.
+    
+    Note 2: Kernels before extended uffd-wp support and before
+            PageAnonExclusive (< 5.19) can simply revert the problematic
+            commit instead and be safe regarding UFFDIO_CONTINUE. A backport to
+            v5.19 requires minor adjustments due to lack of
+            vma_soft_dirty_enabled().
+    
+    Link: https://lkml.kernel.org/r/20220809205640.70916-1-david@redhat.com
+    Fixes: 9ae0f87d009c ("mm/shmem: unconditionally set pte dirty in mfill_atomic_install_pte")
+    Signed-off-by: David Hildenbrand <david@redhat.com>
+    Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+    Cc: Axel Rasmussen <axelrasmussen@google.com>
+    Cc: Nadav Amit <nadav.amit@gmail.com>
+    Cc: Peter Xu <peterx@redhat.com>
+    Cc: Hugh Dickins <hughd@google.com>
+    Cc: Andrea Arcangeli <aarcange@redhat.com>
+    Cc: Matthew Wilcox <willy@infradead.org>
+    Cc: Vlastimil Babka <vbabka@suse.cz>
+    Cc: John Hubbard <jhubbard@nvidia.com>
+    Cc: Jason Gunthorpe <jgg@nvidia.com>
+    Cc: David Laight <David.Laight@ACULAB.COM>
+    Cc: <stable@vger.kernel.org>    [5.16]
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 3bedc449c14d..982f2607180b 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2885,7 +2885,6 @@ struct page *follow_page(struct vm_area_struct *vma, unsigned long address,
+ #define FOLL_MIGRATION	0x400	/* wait for page to replace migration entry */
+ #define FOLL_TRIED	0x800	/* a retry, previous pass started an IO */
+ #define FOLL_REMOTE	0x2000	/* we are working on non-current tsk/mm */
+-#define FOLL_COW	0x4000	/* internal GUP flag */
+ #define FOLL_ANON	0x8000	/* don't do file mappings */
+ #define FOLL_LONGTERM	0x10000	/* mapping lifetime is indefinite: see below */
+ #define FOLL_SPLIT_PMD	0x20000	/* split huge pmd before returning */
+diff --git a/mm/gup.c b/mm/gup.c
+index 732825157430..5abdaf487460 100644
+--- a/mm/gup.c
++++ b/mm/gup.c
+@@ -478,14 +478,42 @@ static int follow_pfn_pte(struct vm_area_struct *vma, unsigned long address,
+ 	return -EEXIST;
+ }
+ 
+-/*
+- * FOLL_FORCE can write to even unwritable pte's, but only
+- * after we've gone through a COW cycle and they are dirty.
+- */
+-static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
++/* FOLL_FORCE can write to even unwritable PTEs in COW mappings. */
++static inline bool can_follow_write_pte(pte_t pte, struct page *page,
++					struct vm_area_struct *vma,
++					unsigned int flags)
+ {
+-	return pte_write(pte) ||
+-		((flags & FOLL_FORCE) && (flags & FOLL_COW) && pte_dirty(pte));
++	/* If the pte is writable, we can write to the page. */
++	if (pte_write(pte))
++		return true;
++
++	/* Maybe FOLL_FORCE is set to override it? */
++	if (!(flags & FOLL_FORCE))
++		return false;
++
++	/* But FOLL_FORCE has no effect on shared mappings */
++	if (vma->vm_flags & (VM_MAYSHARE | VM_SHARED))
++		return false;
++
++	/* ... or read-only private ones */
++	if (!(vma->vm_flags & VM_MAYWRITE))
++		return false;
++
++	/* ... or already writable ones that just need to take a write fault */
++	if (vma->vm_flags & VM_WRITE)
++		return false;
++
++	/*
++	 * See can_change_pte_writable(): we broke COW and could map the page
++	 * writable if we have an exclusive anonymous page ...
++	 */
++	if (!page || !PageAnon(page) || !PageAnonExclusive(page))
++		return false;
++
++	/* ... and a write-fault isn't required for other reasons. */
++	if (vma_soft_dirty_enabled(vma) && !pte_soft_dirty(pte))
++		return false;
++	return !userfaultfd_pte_wp(vma, pte);
+ }
+ 
+ static struct page *follow_page_pte(struct vm_area_struct *vma,
+@@ -528,12 +556,19 @@ static struct page *follow_page_pte(struct vm_area_struct *vma,
+ 	}
+ 	if ((flags & FOLL_NUMA) && pte_protnone(pte))
+ 		goto no_page;
+-	if ((flags & FOLL_WRITE) && !can_follow_write_pte(pte, flags)) {
+-		pte_unmap_unlock(ptep, ptl);
+-		return NULL;
+-	}
+ 
+ 	page = vm_normal_page(vma, address, pte);
++
++	/*
++	 * We only care about anon pages in can_follow_write_pte() and don't
++	 * have to worry about pte_devmap() because they are never anon.
++	 */
++	if ((flags & FOLL_WRITE) &&
++	    !can_follow_write_pte(pte, page, vma, flags)) {
++		page = NULL;
++		goto out;
++	}
++
+ 	if (!page && pte_devmap(pte) && (flags & (FOLL_GET | FOLL_PIN))) {
+ 		/*
+ 		 * Only return device mapping pages in the FOLL_GET or FOLL_PIN
+@@ -986,17 +1021,6 @@ static int faultin_page(struct vm_area_struct *vma,
+ 		return -EBUSY;
+ 	}
+ 
+-	/*
+-	 * The VM_FAULT_WRITE bit tells us that do_wp_page has broken COW when
+-	 * necessary, even if maybe_mkwrite decided not to set pte_write. We
+-	 * can thus safely do subsequent page lookups as if they were reads.
+-	 * But only do so when looping for pte_write is futile: in some cases
+-	 * userspace may also be wanting to write to the gotten user page,
+-	 * which a read fault here might prevent (a readonly page might get
+-	 * reCOWed by userspace write).
+-	 */
+-	if ((ret & VM_FAULT_WRITE) && !(vma->vm_flags & VM_WRITE))
+-		*flags |= FOLL_COW;
+ 	return 0;
+ }
+ 
+diff --git a/mm/huge_memory.c b/mm/huge_memory.c
+index 8a7c1b344abe..e9414ee57c5b 100644
+--- a/mm/huge_memory.c
++++ b/mm/huge_memory.c
+@@ -1040,12 +1040,6 @@ struct page *follow_devmap_pmd(struct vm_area_struct *vma, unsigned long addr,
+ 
+ 	assert_spin_locked(pmd_lockptr(mm, pmd));
+ 
+-	/*
+-	 * When we COW a devmap PMD entry, we split it into PTEs, so we should
+-	 * not be in this function with `flags & FOLL_COW` set.
+-	 */
+-	WARN_ONCE(flags & FOLL_COW, "mm: In follow_devmap_pmd with FOLL_COW set");
+-
+ 	/* FOLL_GET and FOLL_PIN are mutually exclusive. */
+ 	if (WARN_ON_ONCE((flags & (FOLL_PIN | FOLL_GET)) ==
+ 			 (FOLL_PIN | FOLL_GET)))
+@@ -1395,14 +1389,42 @@ vm_fault_t do_huge_pmd_wp_page(struct vm_fault *vmf)
+ 	return VM_FAULT_FALLBACK;
+ }
+ 
+-/*
+- * FOLL_FORCE can write to even unwritable pmd's, but only
+- * after we've gone through a COW cycle and they are dirty.
+- */
+-static inline bool can_follow_write_pmd(pmd_t pmd, unsigned int flags)
++/* FOLL_FORCE can write to even unwritable PMDs in COW mappings. */
++static inline bool can_follow_write_pmd(pmd_t pmd, struct page *page,
++					struct vm_area_struct *vma,
++					unsigned int flags)
+ {
+-	return pmd_write(pmd) ||
+-	       ((flags & FOLL_FORCE) && (flags & FOLL_COW) && pmd_dirty(pmd));
++	/* If the pmd is writable, we can write to the page. */
++	if (pmd_write(pmd))
++		return true;
++
++	/* Maybe FOLL_FORCE is set to override it? */
++	if (!(flags & FOLL_FORCE))
++		return false;
++
++	/* But FOLL_FORCE has no effect on shared mappings */
++	if (vma->vm_flags & (VM_MAYSHARE | VM_SHARED))
++		return false;
++
++	/* ... or read-only private ones */
++	if (!(vma->vm_flags & VM_MAYWRITE))
++		return false;
++
++	/* ... or already writable ones that just need to take a write fault */
++	if (vma->vm_flags & VM_WRITE)
++		return false;
++
++	/*
++	 * See can_change_pte_writable(): we broke COW and could map the page
++	 * writable if we have an exclusive anonymous page ...
++	 */
++	if (!page || !PageAnon(page) || !PageAnonExclusive(page))
++		return false;
++
++	/* ... and a write-fault isn't required for other reasons. */
++	if (vma_soft_dirty_enabled(vma) && !pmd_soft_dirty(pmd))
++		return false;
++	return !userfaultfd_huge_pmd_wp(vma, pmd);
+ }
+ 
+ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
+@@ -1411,12 +1433,16 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
+ 				   unsigned int flags)
+ {
+ 	struct mm_struct *mm = vma->vm_mm;
+-	struct page *page = NULL;
++	struct page *page;
+ 
+ 	assert_spin_locked(pmd_lockptr(mm, pmd));
+ 
+-	if (flags & FOLL_WRITE && !can_follow_write_pmd(*pmd, flags))
+-		goto out;
++	page = pmd_page(*pmd);
++	VM_BUG_ON_PAGE(!PageHead(page) && !is_zone_device_page(page), page);
++
++	if ((flags & FOLL_WRITE) &&
++	    !can_follow_write_pmd(*pmd, page, vma, flags))
++		return NULL;
+ 
+ 	/* Avoid dumping huge zero page */
+ 	if ((flags & FOLL_DUMP) && is_huge_zero_pmd(*pmd))
+@@ -1424,10 +1450,7 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
+ 
+ 	/* Full NUMA hinting faults to serialise migration in fault paths */
+ 	if ((flags & FOLL_NUMA) && pmd_protnone(*pmd))
+-		goto out;
+-
+-	page = pmd_page(*pmd);
+-	VM_BUG_ON_PAGE(!PageHead(page) && !is_zone_device_page(page), page);
++		return NULL;
+ 
+ 	if (!pmd_write(*pmd) && gup_must_unshare(flags, page))
+ 		return ERR_PTR(-EMLINK);
+@@ -1444,7 +1467,6 @@ struct page *follow_trans_huge_pmd(struct vm_area_struct *vma,
+ 	page += (addr & ~HPAGE_PMD_MASK) >> PAGE_SHIFT;
+ 	VM_BUG_ON_PAGE(!PageCompound(page) && !is_zone_device_page(page), page);
+ 
+-out:
+ 	return page;
+ }
+ 

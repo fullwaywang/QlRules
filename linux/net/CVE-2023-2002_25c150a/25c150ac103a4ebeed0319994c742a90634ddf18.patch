@@ -1,0 +1,45 @@
+commit 25c150ac103a4ebeed0319994c742a90634ddf18
+Author: Ruihan Li <lrh2000@pku.edu.cn>
+Date:   Sun Apr 16 16:14:04 2023 +0800
+
+    bluetooth: Perform careful capability checks in hci_sock_ioctl()
+    
+    Previously, capability was checked using capable(), which verified that the
+    caller of the ioctl system call had the required capability. In addition,
+    the result of the check would be stored in the HCI_SOCK_TRUSTED flag,
+    making it persistent for the socket.
+    
+    However, malicious programs can abuse this approach by deliberately sharing
+    an HCI socket with a privileged task. The HCI socket will be marked as
+    trusted when the privileged task occasionally makes an ioctl call.
+    
+    This problem can be solved by using sk_capable() to check capability, which
+    ensures that not only the current task but also the socket opener has the
+    specified capability, thus reducing the risk of privilege escalation
+    through the previously identified vulnerability.
+    
+    Cc: stable@vger.kernel.org
+    Fixes: f81f5b2db869 ("Bluetooth: Send control open and close messages for HCI raw sockets")
+    Signed-off-by: Ruihan Li <lrh2000@pku.edu.cn>
+    Signed-off-by: Luiz Augusto von Dentz <luiz.von.dentz@intel.com>
+
+diff --git a/net/bluetooth/hci_sock.c b/net/bluetooth/hci_sock.c
+index 8d8950101cee..1d249d839819 100644
+--- a/net/bluetooth/hci_sock.c
++++ b/net/bluetooth/hci_sock.c
+@@ -1031,7 +1031,14 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
+ 	if (hci_sock_gen_cookie(sk)) {
+ 		struct sk_buff *skb;
+ 
+-		if (capable(CAP_NET_ADMIN))
++		/* Perform careful checks before setting the HCI_SOCK_TRUSTED
++		 * flag. Make sure that not only the current task but also
++		 * the socket opener has the required capability, since
++		 * privileged programs can be tricked into making ioctl calls
++		 * on HCI sockets, and the socket should not be marked as
++		 * trusted simply because the ioctl caller is privileged.
++		 */
++		if (sk_capable(sk, CAP_NET_ADMIN))
+ 			hci_sock_set_flag(sk, HCI_SOCK_TRUSTED);
+ 
+ 		/* Send event to monitor */

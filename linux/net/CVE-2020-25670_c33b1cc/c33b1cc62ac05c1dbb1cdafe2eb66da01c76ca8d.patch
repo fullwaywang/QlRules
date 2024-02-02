@@ -1,0 +1,37 @@
+commit c33b1cc62ac05c1dbb1cdafe2eb66da01c76ca8d
+Author: Xiaoming Ni <nixiaoming@huawei.com>
+Date:   Thu Mar 25 11:51:10 2021 +0800
+
+    nfc: fix refcount leak in llcp_sock_bind()
+    
+    nfc_llcp_local_get() is invoked in llcp_sock_bind(),
+    but nfc_llcp_local_put() is not invoked in subsequent failure branches.
+    As a result, refcount leakage occurs.
+    To fix it, add calling nfc_llcp_local_put().
+    
+    fix CVE-2020-25670
+    Fixes: c7aa12252f51 ("NFC: Take a reference on the LLCP local pointer when creating a socket")
+    Reported-by: "kiyin(尹亮)" <kiyin@tencent.com>
+    Link: https://www.openwall.com/lists/oss-security/2020/11/01/1
+    Cc: <stable@vger.kernel.org> #v3.6
+    Signed-off-by: Xiaoming Ni <nixiaoming@huawei.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/nfc/llcp_sock.c b/net/nfc/llcp_sock.c
+index d257ed3b732a..68832ee4b9f8 100644
+--- a/net/nfc/llcp_sock.c
++++ b/net/nfc/llcp_sock.c
+@@ -108,11 +108,13 @@ static int llcp_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
+ 					  llcp_sock->service_name_len,
+ 					  GFP_KERNEL);
+ 	if (!llcp_sock->service_name) {
++		nfc_llcp_local_put(llcp_sock->local);
+ 		ret = -ENOMEM;
+ 		goto put_dev;
+ 	}
+ 	llcp_sock->ssap = nfc_llcp_get_sdp_ssap(local, llcp_sock);
+ 	if (llcp_sock->ssap == LLCP_SAP_MAX) {
++		nfc_llcp_local_put(llcp_sock->local);
+ 		kfree(llcp_sock->service_name);
+ 		llcp_sock->service_name = NULL;
+ 		ret = -EADDRINUSE;

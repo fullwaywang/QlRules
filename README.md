@@ -45,6 +45,10 @@ The tool for generating these rules, i.e. patch2ql, is not ready for publication
 
 When using the rules here together with CodeQL CLI to analyze any projects, you should follow the restrictions of [CodeQL CLI LICENSE](https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md).
 
+## Reference
+
+Wang, Fuwei. "Patch2QL: Discover Cognate Defects in Open Source Software Supply Chain With Auto-generated Static Analysis Rules." arXiv preprint arXiv:2401.12443 (2024).
+
 ## Contact
 
 Technical representations and explanations are still on their way. To exchange ideas, feel free to contact the [maintainer](mailto:forward.wfw@hotmail.com). Any suggestions or collaborations are welcomed.

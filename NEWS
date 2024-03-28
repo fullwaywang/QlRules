@@ -1,0 +1,8 @@
+- 3/28/2023:
+  Advance to better support C++.
+  * Rules targetting Chromium V8 are added.
+    - CVE and corresponding patches info are obtained from https://issues.chromium.org/
+	- Though reverted commits have been discarded, it can be observed that there are
+	  still many commits which were announced to be the very patches got reverted in
+	  later development. As a result, rules corresponding to these commits will also
+	  generate false positives in the latest codebase.

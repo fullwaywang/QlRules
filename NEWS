@@ -6,3 +6,12 @@
 	  still many commits which were announced to be the very patches got reverted in
 	  later development. As a result, rules corresponding to these commits will also
 	  generate false positives in the latest codebase.
+- 4/7/2023:
+  Start using new QL predicates format, replace flat queries with hierarchical forms.
+  * Rules targetting Chromium main project are added.
+    - Partial CVEs starting from 2023 are included. Coverage is yet to be enhanced.
+  * Hierarchical QL predicate format is used. This makes the queries more readable and
+    less redundant.
+	- This has been experimental for a while. For older versions of CodeQL (<=2.11.2)
+	  hierarchical queries could take more time to execute in experiments, but with
+	  the latest versions the problem has somehow gone.

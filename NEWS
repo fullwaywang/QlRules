@@ -1,4 +1,4 @@
-- 3/28/2023:
+- 3/28/2024:
   Advance to better support C++.
   * Rules targetting Chromium V8 are added.
     - CVE and corresponding patches info are obtained from https://issues.chromium.org/
@@ -6,7 +6,7 @@
 	  still many commits which were announced to be the very patches got reverted in
 	  later development. As a result, rules corresponding to these commits will also
 	  generate false positives in the latest codebase.
-- 4/7/2023:
+- 4/7/2024:
   Start using new QL predicates format, replace flat queries with hierarchical forms.
   * Rules targetting Chromium main project are added.
     - Partial CVEs starting from 2023 are included. Coverage is yet to be enhanced.
@@ -15,3 +15,9 @@
 	- This has been experimental for a while. For older versions of CodeQL (<=2.11.2)
 	  hierarchical queries could take more time to execute in experiments, but with
 	  the latest versions the problem has somehow gone.
+- 5/8/2024:
+  Add rules for MySQL Server, whose CVEs have not been clearly disclosed.
+  * The disclosed CVE info of MySQL Server and some other projects do not contain enough
+    knowledge about the types, components and nature of the vulnerabilities. Thus we
+	could only infer seemingly security-related bug-fixes in the git history according
+	to commit comments, code patches, etc.

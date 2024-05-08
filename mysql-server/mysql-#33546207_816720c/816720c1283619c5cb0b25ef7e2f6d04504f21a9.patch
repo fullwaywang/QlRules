@@ -1,0 +1,22 @@
+commit 816720c1283619c5cb0b25ef7e2f6d04504f21a9	816720c1283619c5cb0b25ef7e2f6d04504f21a9
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Mon Nov 8 13:33:47 2021 +0100
+
+    Bug #33546207: crash when keyring migration fails due to an openssl issue
+    RB#27262
+    
+    Cleaning the SSL error stack before communicating to the live server.
+
+diff --git a/sql/migrate_keyring.cc b/sql/migrate_keyring.cc
+index 399d8c830cb..ba400776bb2 100644
+--- a/sql/migrate_keyring.cc
++++ b/sql/migrate_keyring.cc
+@@ -344,6 +344,8 @@ bool Migrate_keyring::execute() {
+   return false;
+ 
+ error:
++  /* clear the SSL error stack first as the connection could be encrypted */
++  ERR_clear_error();
+   /*
+    Enable keyring_operations in case of error
+   */

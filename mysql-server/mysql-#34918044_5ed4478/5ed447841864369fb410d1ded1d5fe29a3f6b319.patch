@@ -1,0 +1,28 @@
+commit 5ed447841864369fb410d1ded1d5fe29a3f6b319	5ed447841864369fb410d1ded1d5fe29a3f6b319
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Fri Feb 10 17:15:57 2023 +0200
+
+    Bug #34918044: authentication_fido_client plugin fails on Windows
+    if there's no FIDO device
+    
+    fido_dev_info_manifest always returns FIDO_OK. So we need to check
+    the length returned too.
+    
+    Fixed by adding a check as suggested by Pawel Andruszkiewicz
+    
+    Change-Id: I756a38182af76f7aa6bd212087583a80d638e3dd
+
+diff --git a/libmysql/authentication_fido/fido_registration.cc b/libmysql/authentication_fido/fido_registration.cc
+index b2288e4d747..c6da226040d 100644
+--- a/libmysql/authentication_fido/fido_registration.cc
++++ b/libmysql/authentication_fido/fido_registration.cc
+@@ -132,7 +132,8 @@ bool fido_make_cred::generate_signature() {
+   fido_init(0);
+   size_t dev_infos_len = 0;
+   fido_dev_info_t *dev_infos = fido_dev_info_new(1);
+-  if (fido_dev_info_manifest(dev_infos, 1, &dev_infos_len) != FIDO_OK) {
++  if (fido_dev_info_manifest(dev_infos, 1, &dev_infos_len) != FIDO_OK ||
++      dev_infos_len == 0) {
+     fido_dev_info_free(&dev_infos, 1);
+     get_plugin_messages("No FIDO device available on client host.",
+                         message_type::ERROR);

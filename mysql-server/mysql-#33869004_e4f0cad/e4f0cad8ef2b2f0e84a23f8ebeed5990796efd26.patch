@@ -1,0 +1,153 @@
+commit e4f0cad8ef2b2f0e84a23f8ebeed5990796efd26	e4f0cad8ef2b2f0e84a23f8ebeed5990796efd26
+Author: Sergey Glukhov <sergey.glukhov@oracle.com>
+Date:   Thu Feb 17 14:26:27 2022 +0400
+
+    Bug#33869004 Range optimizer is not aware of the session memory limit.
+    
+    Add check for THD::killed state in get_ranges_from_tree_given_base().
+    
+    Change-Id: I3a83c65cf394848dd9a6db2b0d7c565c31891fdd
+
+diff --git a/mysql-test/include/mem_cnt_common_debug.inc b/mysql-test/include/mem_cnt_common_debug.inc
+index 74652a15f68..4ede79e37dc 100644
+--- a/mysql-test/include/mem_cnt_common_debug.inc
++++ b/mysql-test/include/mem_cnt_common_debug.inc
+@@ -119,6 +119,36 @@ SET GLOBAL DEBUG = default;
+ SET GLOBAL global_connection_memory_limit = default;
+ SET GLOBAL connection_memory_limit = default;
+ SET GLOBAL global_connection_memory_tracking = default;
++
++--echo #
++--echo #  Bug#33869004 Range optimizer is not aware of the session memory limit.
++--echo #
++
++CREATE TABLE t (
++i VARBINARY(255), j VARBINARY(255), k VARBINARY(255),
++l VARBINARY(255), m VARBINARY(255), n VARBINARY(255),
++PRIMARY KEY(i, j, k, l)
++);
++
++SET GLOBAL connection_memory_limit = 10485760;
++--echo # Connection con1
++connect (con1, localhost, user1);
++
++--replace_regex /Consumed [0-9]+/Consumed SOME/
++--error ER_DA_CONN_LIMIT
++EXPLAIN SELECT * FROM t FORCE INDEX (PRIMARY) WHERE
++i IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++j IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++k IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++l IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
++
++connection default;
++disconnect con1;
++
++SET GLOBAL connection_memory_limit = default;
++DROP TABLE t;
++
++
+ DROP USER 'user1'@localhost;
+ 
+ # Wait till all disconnects are completed
+diff --git a/mysql-test/r/mem_cnt_common_debug.result b/mysql-test/r/mem_cnt_common_debug.result
+index 61f4fe8ef4b..2f73c20447d 100644
+--- a/mysql-test/r/mem_cnt_common_debug.result
++++ b/mysql-test/r/mem_cnt_common_debug.result
+@@ -64,4 +64,22 @@ SET GLOBAL DEBUG = default;
+ SET GLOBAL global_connection_memory_limit = default;
+ SET GLOBAL connection_memory_limit = default;
+ SET GLOBAL global_connection_memory_tracking = default;
++#
++#  Bug#33869004 Range optimizer is not aware of the session memory limit.
++#
++CREATE TABLE t (
++i VARBINARY(255), j VARBINARY(255), k VARBINARY(255),
++l VARBINARY(255), m VARBINARY(255), n VARBINARY(255),
++PRIMARY KEY(i, j, k, l)
++);
++SET GLOBAL connection_memory_limit = 10485760;
++# Connection con1
++EXPLAIN SELECT * FROM t FORCE INDEX (PRIMARY) WHERE
++i IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++j IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++k IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10") AND
++l IN ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
++ERROR HY000: Connection closed. Connection memory limit 10485760 bytes exceeded. Consumed SOME bytes.
++SET GLOBAL connection_memory_limit = default;
++DROP TABLE t;
+ DROP USER 'user1'@localhost;
+diff --git a/sql/range_optimizer/index_range_scan_plan.cc b/sql/range_optimizer/index_range_scan_plan.cc
+index 32dc4d364b4..9564ce28d61 100644
+--- a/sql/range_optimizer/index_range_scan_plan.cc
++++ b/sql/range_optimizer/index_range_scan_plan.cc
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2000, 2021, Oracle and/or its affiliates.
++/* Copyright (c) 2000, 2022, Oracle and/or its affiliates.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -61,7 +61,7 @@ static bool is_key_scan_ror(RANGE_OPT_PARAM *param, uint keynr, uint nparts);
+ static bool eq_ranges_exceeds_limit(const SEL_ROOT *keypart, uint *count,
+                                     uint limit);
+ static bool get_ranges_from_tree_given_base(
+-    MEM_ROOT *return_mem_root, const KEY *table_key, KEY_PART *key,
++    THD *thd, MEM_ROOT *return_mem_root, const KEY *table_key, KEY_PART *key,
+     SEL_ROOT *key_tree, uchar *const base_min_key, uchar *min_key,
+     uint min_key_flag, uchar *const base_max_key, uchar *max_key,
+     uint max_key_flag, bool first_keypart_is_asc, uint num_key_parts,
+@@ -781,9 +781,9 @@ bool get_ranges_from_tree(MEM_ROOT *return_mem_root, TABLE *table,
+   uchar max_key[MAX_KEY_LENGTH + MAX_FIELD_WIDTH];
+   *num_exact_key_parts = num_key_parts;
+   if (get_ranges_from_tree_given_base(
+-          return_mem_root, &table->key_info[keyno], key, key_tree, min_key,
+-          min_key, 0, max_key, max_key, 0, first_keypart_is_asc, num_key_parts,
+-          used_key_parts, num_exact_key_parts, ranges)) {
++          current_thd, return_mem_root, &table->key_info[keyno], key, key_tree,
++          min_key, min_key, 0, max_key, max_key, 0, first_keypart_is_asc,
++          num_key_parts, used_key_parts, num_exact_key_parts, ranges)) {
+     return true;
+   }
+   *num_exact_key_parts = std::min(*num_exact_key_parts, *used_key_parts);
+@@ -1024,6 +1024,7 @@ static inline std::basic_string_view<uchar> make_string_view(const uchar *start,
+   SYNOPSIS
+     get_ranges_from_tree_given_base()
+ 
++  @param thd            THD object
+   @param return_mem_root MEM_ROOT to use for allocating the data
+   @param key            Generate key values for this key
+   @param key_tree       SEL_ARG tree
+@@ -1052,7 +1053,7 @@ static inline std::basic_string_view<uchar> make_string_view(const uchar *start,
+ */
+ 
+ static bool get_ranges_from_tree_given_base(
+-    MEM_ROOT *return_mem_root, const KEY *table_key, KEY_PART *key,
++    THD *thd, MEM_ROOT *return_mem_root, const KEY *table_key, KEY_PART *key,
+     SEL_ROOT *key_tree, uchar *const base_min_key, uchar *min_key,
+     uint min_key_flag, uchar *const base_max_key, uchar *max_key,
+     uint max_key_flag, bool first_keypart_is_asc, uint num_key_parts,
+@@ -1088,7 +1089,7 @@ static bool get_ranges_from_tree_given_base(
+         // (a=3) in itself (which is what the rest of the function is doing),
+         // so skip to the next range after processing this one.
+         if (get_ranges_from_tree_given_base(
+-                return_mem_root, table_key, key, node->next_key_part,
++                thd, return_mem_root, table_key, key, node->next_key_part,
+                 base_min_key, tmp_min_key, min_key_flag | node->get_min_flag(),
+                 base_max_key, tmp_max_key, max_key_flag | node->get_max_flag(),
+                 first_keypart_is_asc, num_key_parts - 1, used_key_parts,
+@@ -1181,6 +1182,7 @@ static bool get_ranges_from_tree_given_base(
+       flag |= DESC_FLAG;
+     }
+ 
++    assert(!thd->mem_cnt->is_error());
+     /* Get range for retrieving rows in RowIterator::Read() */
+     QUICK_RANGE *range = new (return_mem_root) QUICK_RANGE(
+         return_mem_root, base_min_key, (uint)(tmp_min_key - base_min_key),
+@@ -1188,7 +1190,7 @@ static bool get_ranges_from_tree_given_base(
+         (uint)(tmp_max_key - base_max_key),
+         max_part >= 0 ? make_keypart_map(max_part) : 0, flag,
+         node->rkey_func_flag);
+-    if (range == nullptr) {
++    if (range == nullptr || thd->killed) {
+       return true;  // out of memory
+     }
+ 

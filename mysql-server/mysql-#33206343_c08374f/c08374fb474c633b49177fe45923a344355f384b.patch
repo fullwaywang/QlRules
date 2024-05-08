@@ -1,0 +1,244 @@
+commit c08374fb474c633b49177fe45923a344355f384b	c08374fb474c633b49177fe45923a344355f384b
+Author: Pedro Gomes <pedro.gomes@oracle.com>
+Date:   Tue Sep 14 12:37:32 2021 +0200
+
+    Bug#33206343 SHOW REPLICAS may crash with replica unregistration
+    
+    The command SHOW REPLICAS depends on an internal list of replica data.
+    The issue is that this list when accessed will look into THD fields
+    and even take THD locks that might have been deleted in the meanwhile.
+    
+    To solve this, the list elements now contain the replica UUID and
+    thread id instead of caching a pointer to the THD object so no
+    accesses to it are now required.
+    
+    There is also some method renaming done in this patch.
+    
+    ReviewBoard: 26859
+
+diff --git a/sql/rpl_source.cc b/sql/rpl_source.cc
+index 58ad63191d1..0ed11590cc7 100644
+--- a/sql/rpl_source.cc
++++ b/sql/rpl_source.cc
+@@ -80,7 +80,7 @@
+ int max_binlog_dump_events = 0;  // unlimited
+ bool opt_sporadic_binlog_dump_fail = false;
+ 
+-malloc_unordered_map<uint32, unique_ptr_my_free<SLAVE_INFO>> slave_list{
++malloc_unordered_map<uint32, unique_ptr_my_free<REPLICA_INFO>> slave_list{
+     key_memory_REPLICA_INFO};
+ extern TYPELIB binlog_checksum_typelib;
+ 
+@@ -109,18 +109,19 @@ extern TYPELIB binlog_checksum_typelib;
+     1	Error.   Error message sent to client
+ */
+ 
+-int register_slave(THD *thd, uchar *packet, size_t packet_length) {
++int register_replica(THD *thd, uchar *packet, size_t packet_length) {
+   int res;
+   uchar *p = packet, *p_end = packet + packet_length;
+-  const char *errmsg = "Wrong parameters to function register_slave";
++  const char *errmsg = "Wrong parameters when registering replica";
++  String replica_uuid;
+ 
+   CONDITIONAL_SYNC_POINT("begin_register_replica");
+ 
+   if (check_access(thd, REPL_SLAVE_ACL, any_db, nullptr, nullptr, false, false))
+     return 1;
+ 
+-  unique_ptr_my_free<SLAVE_INFO> si((SLAVE_INFO *)my_malloc(
+-      key_memory_REPLICA_INFO, sizeof(SLAVE_INFO), MYF(MY_WME)));
++  unique_ptr_my_free<REPLICA_INFO> si((REPLICA_INFO *)my_malloc(
++      key_memory_REPLICA_INFO, sizeof(REPLICA_INFO), MYF(MY_WME)));
+   if (si == nullptr) return 1;
+ 
+   /* 4 bytes for the server id */
+@@ -146,10 +147,15 @@ int register_slave(THD *thd, uchar *packet, size_t packet_length) {
+   */
+   p += 4;
+   if (!(si->master_id = uint4korr(p))) si->master_id = server_id;
+-  si->thd = thd;
++  si->thd_id = thd->thread_id();
++  si->valid_replica_uuid = false;
++  if (get_replica_uuid(thd, &replica_uuid)) {
++    si->valid_replica_uuid =
++        !si->replica_uuid.parse(replica_uuid.c_ptr(), replica_uuid.length());
++  }
+ 
+   mysql_mutex_lock(&LOCK_replica_list);
+-  unregister_slave(thd, false, false /*need_lock_slave_list=false*/);
++  unregister_replica(thd, false, false /*need_lock_slave_list=false*/);
+   res = !slave_list.emplace(si->server_id, std::move(si)).second;
+   mysql_mutex_unlock(&LOCK_replica_list);
+   return res;
+@@ -159,7 +165,7 @@ err:
+   return 1;
+ }
+ 
+-void unregister_slave(THD *thd, bool only_mine, bool need_lock_slave_list) {
++void unregister_replica(THD *thd, bool only_mine, bool need_lock_slave_list) {
+   if (thd->server_id) {
+     if (need_lock_slave_list)
+       mysql_mutex_lock(&LOCK_replica_list);
+@@ -167,7 +173,8 @@ void unregister_slave(THD *thd, bool only_mine, bool need_lock_slave_list) {
+       mysql_mutex_assert_owner(&LOCK_replica_list);
+ 
+     auto it = slave_list.find(thd->server_id);
+-    if (it != slave_list.end() && (!only_mine || it->second->thd == thd))
++    if (it != slave_list.end() &&
++        (!only_mine || it->second->thd_id == thd->thread_id()))
+       slave_list.erase(it);
+ 
+     if (need_lock_slave_list) mysql_mutex_unlock(&LOCK_replica_list);
+@@ -175,7 +182,7 @@ void unregister_slave(THD *thd, bool only_mine, bool need_lock_slave_list) {
+ }
+ 
+ /**
+-  Execute a SHOW SLAVE HOSTS statement.
++  Execute a SHOW REPLICAS / SHOW SLAVE HOSTS statement.
+ 
+   @param thd Pointer to THD object for the client thread executing the
+   statement.
+@@ -183,7 +190,7 @@ void unregister_slave(THD *thd, bool only_mine, bool need_lock_slave_list) {
+   @retval false success
+   @retval true failure
+ */
+-bool show_slave_hosts(THD *thd) {
++bool show_replicas(THD *thd) {
+   mem_root_deque<Item *> field_list(thd->mem_root);
+   Protocol *protocol = thd->get_protocol();
+   DBUG_TRACE;
+@@ -209,7 +216,7 @@ bool show_slave_hosts(THD *thd) {
+   mysql_mutex_lock(&LOCK_replica_list);
+ 
+   for (const auto &key_and_value : slave_list) {
+-    SLAVE_INFO *si = key_and_value.second.get();
++    REPLICA_INFO *si = key_and_value.second.get();
+     protocol->start_row();
+     protocol->store((uint32)si->server_id);
+     protocol->store(si->host, &my_charset_bin);
+@@ -220,10 +227,14 @@ bool show_slave_hosts(THD *thd) {
+     protocol->store((uint32)si->port);
+     protocol->store((uint32)si->master_id);
+ 
+-    /* get slave's UUID */
+-    String replica_uuid;
+-    if (get_replica_uuid(si->thd, &replica_uuid))
+-      protocol->store(replica_uuid.c_ptr_safe(), &my_charset_bin);
++    if (si->valid_replica_uuid) {
++      char text_buf[binary_log::Uuid::TEXT_LENGTH + 1];
++      si->replica_uuid.to_string(text_buf);
++      protocol->store(text_buf, &my_charset_bin);
++    } else {
++      protocol->store("", &my_charset_bin);
++    }
++
+     if (protocol->end_row()) {
+       mysql_mutex_unlock(&LOCK_replica_list);
+       return true;
+@@ -913,7 +924,7 @@ bool com_binlog_dump(THD *thd, char *packet, size_t packet_length) {
+   mysql_binlog_send(thd, thd->mem_strdup(packet + 10), (my_off_t)pos, nullptr,
+                     flags);
+ 
+-  unregister_slave(thd, true, true /*need_lock_slave_list=true*/);
++  unregister_replica(thd, true, true /*need_lock_slave_list=true*/);
+   /*  fake COM_QUIT -- if we get here, the thread needs to terminate */
+   return true;
+ 
+@@ -970,7 +981,7 @@ bool com_binlog_dump_gtid(THD *thd, char *packet, size_t packet_length) {
+   my_free(gtid_string);
+   mysql_binlog_send(thd, name, (my_off_t)pos, &slave_gtid_executed, flags);
+ 
+-  unregister_slave(thd, true, true /*need_lock_slave_list=true*/);
++  unregister_replica(thd, true, true /*need_lock_slave_list=true*/);
+   /*  fake COM_QUIT -- if we get here, the thread needs to terminate */
+   return true;
+ 
+diff --git a/sql/rpl_source.h b/sql/rpl_source.h
+index 4930d6dfe2e..7b666e453dd 100644
+--- a/sql/rpl_source.h
++++ b/sql/rpl_source.h
+@@ -26,10 +26,12 @@
+ #include <stddef.h>
+ #include <string>  // std::string
+ 
+-#include "my_hostname.h"  // HOSTNAME_LENGTH
++#include "libbinlogevents/include/uuid.h"  // UUID
++#include "my_hostname.h"                   // HOSTNAME_LENGTH
+ #include "my_inttypes.h"
+-#include "mysql_com.h"      // USERNAME_LENGTH
+-#include "sql/sql_const.h"  // MAX_PASSWORD_LENGTH
++#include "my_thread_local.h"  // my_thread_id
++#include "mysql_com.h"        // USERNAME_LENGTH
++#include "sql/sql_const.h"    // MAX_PASSWORD_LENGTH
+ 
+ class Gtid_set;
+ class String;
+@@ -40,19 +42,21 @@ extern int max_binlog_dump_events;
+ extern bool opt_sporadic_binlog_dump_fail;
+ extern bool opt_show_replica_auth_info;
+ 
+-struct SLAVE_INFO {
++struct REPLICA_INFO {
+   uint32 server_id;
+   uint32 rpl_recovery_rank, master_id;
+   char host[HOSTNAME_LENGTH + 1];
+   char user[USERNAME_LENGTH + 1];
+   char password[MAX_PASSWORD_LENGTH + 1];
+   uint16 port;
+-  THD *thd;
++  my_thread_id thd_id;
++  binary_log::Uuid replica_uuid;
++  bool valid_replica_uuid;
+ };
+ 
+-int register_slave(THD *thd, uchar *packet, size_t packet_length);
+-void unregister_slave(THD *thd, bool only_mine, bool need_lock_slave_list);
+-bool show_slave_hosts(THD *thd);
++int register_replica(THD *thd, uchar *packet, size_t packet_length);
++void unregister_replica(THD *thd, bool only_mine, bool need_lock_slave_list);
++bool show_replicas(THD *thd);
+ String *get_replica_uuid(THD *thd, String *value);
+ bool show_master_status(THD *thd);
+ bool show_binlogs(THD *thd);
+diff --git a/sql/sql_class.cc b/sql/sql_class.cc
+index 622379258a2..fb42819a16a 100644
+--- a/sql/sql_class.cc
++++ b/sql/sql_class.cc
+@@ -1213,7 +1213,7 @@ THD::~THD() {
+     but then need to be removed on error scenarios, we call this method
+     here
+   */
+-  unregister_slave(this, true, true);
++  unregister_replica(this, true, true);
+ 
+   main_mem_root.Clear();
+ 
+diff --git a/sql/sql_parse.cc b/sql/sql_parse.cc
+index 96b6e101f7f..6f61d0baf7f 100644
+--- a/sql/sql_parse.cc
++++ b/sql/sql_parse.cc
+@@ -1721,8 +1721,8 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
+     }
+     case COM_REGISTER_SLAVE: {
+       // TODO: access of protocol_classic should be removed
+-      if (!register_slave(thd, thd->get_protocol_classic()->get_raw_packet(),
+-                          thd->get_protocol_classic()->get_packet_length()))
++      if (!register_replica(thd, thd->get_protocol_classic()->get_raw_packet(),
++                            thd->get_protocol_classic()->get_packet_length()))
+         my_ok(thd);
+       break;
+     }
+diff --git a/sql/sql_show.cc b/sql/sql_show.cc
+index 0974c003b42..86fbbc31e74 100644
+--- a/sql/sql_show.cc
++++ b/sql/sql_show.cc
+@@ -633,7 +633,7 @@ bool Sql_cmd_show_replicas::check_privileges(THD *thd) {
+ }
+ 
+ bool Sql_cmd_show_replicas::execute_inner(THD *thd) {
+-  return show_slave_hosts(thd);
++  return show_replicas(thd);
+ }
+ 
+ bool Sql_cmd_show_replica_status::check_privileges(THD *thd) {

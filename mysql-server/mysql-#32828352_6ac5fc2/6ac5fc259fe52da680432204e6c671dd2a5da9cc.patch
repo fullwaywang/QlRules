@@ -1,0 +1,47 @@
+commit 6ac5fc259fe52da680432204e6c671dd2a5da9cc	6ac5fc259fe52da680432204e6c671dd2a5da9cc
+Author: Yasufumi Kinoshita <yasufumi.kinoshita@oracle.com>
+Date:   Tue May 18 12:12:48 2021 +0900
+
+    Bug#32828352: ZDI-CAN-13551: HEAP OVERFLOW EXISTS IN INNODB_GET
+    
+    report_table_switch path of innodb_get() doesn't support "multiple get" enough.
+    (only for single get assumed)
+    
+    The row_buf should be extended if its free area is not satisfy for the table_name size.
+    
+    RB: 26405
+    Reviewed-by: Sunny Bains <Sunny.Bains@oracle.com>
+
+diff --git a/plugin/innodb_memcached/innodb_memcache/src/innodb_engine.cc b/plugin/innodb_memcached/innodb_memcache/src/innodb_engine.cc
+index 86f694f39ea..8848b86c5dd 100644
+--- a/plugin/innodb_memcached/innodb_memcache/src/innodb_engine.cc
++++ b/plugin/innodb_memcached/innodb_memcache/src/innodb_engine.cc
+@@ -1876,12 +1876,26 @@ search_done:
+     snprintf(table_name, sizeof(table_name), "%s/%s", dbname, name);
+ #endif
+ 
+-    assert(!conn_data->result_in_use);
++    if (conn_data->row_buf_used + strlen(table_name) >= REC_BUF_SLOT_SIZE) {
++      conn_data->row_buf_slot++;
++
++      /* Limit the record buffer size to 16 MB */
++      if (conn_data->row_buf_slot >= 1024) {
++        err_ret = ENGINE_KEY_ENOENT;
++        goto func_exit;
++      }
++
++      if (conn_data->row_buf[conn_data->row_buf_slot] == nullptr) {
++        conn_data->row_buf[conn_data->row_buf_slot] = malloc(REC_BUF_SLOT_SIZE);
++      }
++
++      conn_data->row_buf_used = 0;
++    }
++
+     conn_data->result_in_use = true;
+     result = (mci_item_t *)(conn_data->result);
+ 
+     memset(result, 0, sizeof(*result));
+-    assert(conn_data->row_buf_used + strlen(table_name) < REC_BUF_SLOT_SIZE);
+     memcpy((char *)(conn_data->row_buf[conn_data->row_buf_slot]) +
+                conn_data->row_buf_used,
+            table_name, strlen(table_name));

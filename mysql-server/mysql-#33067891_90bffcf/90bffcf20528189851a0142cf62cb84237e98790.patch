@@ -1,0 +1,121 @@
+commit 90bffcf20528189851a0142cf62cb84237e98790	90bffcf20528189851a0142cf62cb84237e98790
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Wed Feb 2 22:40:56 2022 +0100
+
+    Bug #33067891 ASSERTION : M_ID != LATCH_ID_NONE IN SYNC0TYPES.H
+    
+    The `innobase_init_files()` was calling `srv_start()` -> `create_log_files()` -> `log_write_encryption()` -> `log_file_header_fill_encryption()` -> `Encryption::fill_encryption_info()` ->  `Encryption::get_master_key()` which tried to acquire a the `master_key_id_mutex`, which wasn't initialized yet, as `innobase_init_files()` calls `mutex_create(LATCH_ID_MASTER_KEY_ID_MUTEX, &master_key_id_mutex)` a few lines below the call to `srv_start()`.
+    
+    This could be identified by running `./mtr --mysqld=--innodb-sync-debug=1 innodb_undo.encrypt_explicit` unfortunatelly, we didn't include this suite in our weekly testing, as it is in `innodb_undo`, not `innodb` suite.
+    Also, this could be identified by noticing that the "magic field" of the MutexDebug is not initialized, alas, we never really check its value.
+    
+    This patch fixes these problems by:
+    - adding all `*innodb*` suites to the weekly run
+    - adding checks for `MUTEX_MAGIC_N` during `MutexDebug<Mutex>::enter(..)` and `destroy()`
+    - changes the `MUTEX_MAGIC_N` value to something which uses all 32 bits, not just 21
+    - changes the type of `m_magic_n` to match `MUTEX_MAGIC_N`
+    - moves the call to `mutex_create` to the place where the mutex types are already defined, so we can actually call `mutex_create`, yet we are still before calling `create_log_files()`
+    
+    Reviewed by: Paweł Olchawa <pawel.olchawa@oracle.com>
+    RB:27617
+    
+    Change-Id: I3b1195a2392c7b25a2f1fa7f0f9e94964ecca2bb
+
+diff --git a/mysql-test/collections/default.weekly b/mysql-test/collections/default.weekly
+index 863709a3ff1..7685d3ca27c 100644
+--- a/mysql-test/collections/default.weekly
++++ b/mysql-test/collections/default.weekly
+@@ -145,7 +145,7 @@ perl mysql-test-run.pl --timer  --force  --comment=innodb_undo_32_16k --testcase
+ perl mysql-test-run.pl --timer  --force  --comment=innodb_undo_32_64k --testcase-timeout=60 --debug-server --vardir=var-innodb-undo-32-64k  --suite=innodb_zip,innodb --initialize=--init-file=std_data/explicit_undo_32.sql --initialize=--innodb-page-size=64k --no-skip
+ 
+ # Run innodb suite with --innodb_sync_debug=1
+-perl mysql-test-run.pl --timer  --force  --comment=innodb_sync_debug --testcase-timeout=60 --debug-server --vardir=var-innodb-sync-debug  --suite=innodb --mysqld=--innodb_sync_debug=1 --no-skip
++perl mysql-test-run.pl --timer  --force  --comment=innodb_sync_debug --testcase-timeout=60 --debug-server --vardir=var-innodb-sync-debug  --suite=innodb,innodb_fts,innodb_undo,innodb_zip --mysqld=--innodb_sync_debug=1 --no-skip
+ 
+ ######################END OF SECTION 6 (INNODB(EXTENDED-WEEKLY))#######
+ #
+diff --git a/storage/innobase/handler/ha_innodb.cc b/storage/innobase/handler/ha_innodb.cc
+index e5626397016..48ef9772881 100644
+--- a/storage/innobase/handler/ha_innodb.cc
++++ b/storage/innobase/handler/ha_innodb.cc
+@@ -5414,9 +5414,6 @@ static int innobase_init_files(dict_init_mode_t dict_init_mode,
+     return innodb_init_abort();
+   }
+ 
+-  /* Create mutex to protect encryption master_key_id. */
+-  mutex_create(LATCH_ID_MASTER_KEY_ID_MUTEX, &master_key_id_mutex);
+-
+   innobase_old_blocks_pct = static_cast<uint>(
+       buf_LRU_old_ratio_update(innobase_old_blocks_pct, true));
+ 
+diff --git a/storage/innobase/include/sync0policy.h b/storage/innobase/include/sync0policy.h
+index 0a31f8cec4b..4ed67a4e5db 100644
+--- a/storage/innobase/include/sync0policy.h
++++ b/storage/innobase/include/sync0policy.h
+@@ -44,7 +44,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
+ #ifndef UNIV_LIBRARY
+ #ifdef UNIV_DEBUG
+ 
+-constexpr uint32_t MUTEX_MAGIC_N = 979585;
++constexpr uint32_t MUTEX_MAGIC_N{0xb251b04bU};
+ 
+ template <typename Mutex>
+ class MutexDebug {
+@@ -138,6 +138,7 @@ class MutexDebug {
+   /** Mutex is being destroyed. */
+   void destroy() UNIV_NOTHROW {
+     ut_ad(m_context.m_thread_id == std::thread::id{});
++    ut_ad(m_magic_n == MUTEX_MAGIC_N);
+ 
+     m_magic_n = 0;
+ 
+@@ -185,7 +186,7 @@ class MutexDebug {
+   }
+ 
+   /** Magic number to check for memory corruption. */
+-  ulint m_magic_n;
++  uint32_t m_magic_n;
+ 
+   /** Latch state of the mutex owner */
+   Context m_context;
+diff --git a/storage/innobase/include/sync0policy.ic b/storage/innobase/include/sync0policy.ic
+index 47b019cc92d..44d308265cb 100644
+--- a/storage/innobase/include/sync0policy.ic
++++ b/storage/innobase/include/sync0policy.ic
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 2012, 2021, Oracle and/or its affiliates.
++Copyright (c) 2012, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify it under
+ the terms of the GNU General Public License, version 2.0, as published by the
+@@ -60,6 +60,7 @@ template <typename Mutex>
+ void MutexDebug<Mutex>::enter(const Mutex *mutex, const char *name,
+                               ulint line) UNIV_NOTHROW {
+   ut_ad(!is_owned());
++  ut_ad(m_magic_n == MUTEX_MAGIC_N);
+ 
+   Context context(m_context.get_id());
+ 
+diff --git a/storage/innobase/srv/srv0srv.cc b/storage/innobase/srv/srv0srv.cc
+index 5db9b55bd75..983e86288f3 100644
+--- a/storage/innobase/srv/srv0srv.cc
++++ b/storage/innobase/srv/srv0srv.cc
+@@ -1106,6 +1106,16 @@ static void srv_init(void) {
+   ulint n_sys_threads = 0;
+   ulint srv_sys_sz = sizeof(*srv_sys);
+ 
++  /* Create mutex to protect encryption master_key_id. */
++  {
++    /* This is defined in ha_innodb.cc and used during create_log_files(), which
++    we call after calling srv_boot() which defines types of mutexes, so we have
++    to create this mutex in between the two calls. */
++    extern ib_mutex_t master_key_id_mutex;
++
++    mutex_create(LATCH_ID_MASTER_KEY_ID_MUTEX, &master_key_id_mutex);
++  }
++
+   mutex_create(LATCH_ID_SRV_INNODB_MONITOR, &srv_innodb_monitor_mutex);
+ 
+   ut_d(srv_threads.m_shutdown_cleanup_dbg = os_event_create());

@@ -1,0 +1,102 @@
+commit 7d0be530b3828428b5d80760ad43dc4bce0adfda	7d0be530b3828428b5d80760ad43dc4bce0adfda
+Author: Michal Jankowski <michal.jankowski@oracle.com>
+Date:   Wed Nov 22 21:45:02 2023 +0100
+
+    Bug#35889261: Error when executing prepared statement containing UDF
+    
+       Item_param::fix_fields(): set data type MYSQL_TYPE_NULL when a parameter
+       has the NULL value, instead of skipping to set data type.
+    
+       Item_param::val_str(): set null_value for the result string when
+       the parameter has the NULL value.
+    
+       udf_handler::fix_fields: add shortcut to is_in_prepare and
+       propagate setting of data type for a parameter.
+    
+       In Item_param::copy_param_actual_type() do the type and value
+       modifications to clones too.
+    
+    Change-Id: I1039600ec957df7b0a2becbce8c8bd076a43a8a8
+
+diff --git a/sql/item.cc b/sql/item.cc
+index d12617a30ff..ff31b283582 100644
+--- a/sql/item.cc
++++ b/sql/item.cc
+@@ -3683,6 +3683,7 @@ bool Item_param::fix_fields(THD *, Item **) {
+   }
+   if (param_state() == NULL_VALUE) {
+     // Parameter data type may be ignored, keep existing type
++    set_data_type_null();
+     fixed = true;
+     return false;
+   }
+@@ -4247,6 +4248,7 @@ String *Item_param::val_str(String *str) {
+   assert(param_state() != NO_VALUE);
+ 
+   if (param_state() == NULL_VALUE) {
++    null_value = true;
+     return nullptr;
+   }
+   switch (data_type_actual()) {
+@@ -4321,6 +4323,7 @@ void Item_param::copy_param_actual_type(Item_param *from) {
+     default:
+       break;
+   }
++  sync_clones();
+ }
+ 
+ /**
+diff --git a/sql/item.h b/sql/item.h
+index bd37fe3d778..fbed00d0804 100644
+--- a/sql/item.h
++++ b/sql/item.h
+@@ -1392,6 +1392,13 @@ class Item : public Parse_tree_node {
+     m_data_type = static_cast<uint8>(data_type);
+   }
+ 
++  inline void set_data_type_null() {
++    set_data_type(MYSQL_TYPE_NULL);
++    collation.set(&my_charset_bin, DERIVATION_IGNORABLE);
++    max_length = 0;
++    set_nullable(true);
++  }
++
+   inline void set_data_type_bool() {
+     set_data_type(MYSQL_TYPE_LONGLONG);
+     collation.set_numeric();
+diff --git a/sql/item_func.cc b/sql/item_func.cc
+index 6a06099094a..12a8dfdc9e9 100644
+--- a/sql/item_func.cc
++++ b/sql/item_func.cc
+@@ -4488,6 +4488,8 @@ bool udf_handler::fix_fields(THD *thd, Item_result_field *func, uint arg_count,
+   args = arguments;
+ 
+   m_initialized = true;  // Use count was incremented by find_udf()
++  const bool is_in_prepare =
++      thd->stmt_arena->is_stmt_prepare() && !thd->stmt_arena->is_repreparing;
+   /*
+     RAII wrapper to free the memory allocated in case of any failure while
+     initializing the UDF
+@@ -4523,6 +4525,12 @@ bool udf_handler::fix_fields(THD *thd, Item_result_field *func, uint arg_count,
+       if (!(*arg)->fixed && (*arg)->fix_fields(thd, arg)) {
+         return true;
+       }
++
++      if ((*arg)->data_type() == MYSQL_TYPE_INVALID &&
++          (*arg)->propagate_type(thd, MYSQL_TYPE_VARCHAR)) {
++        return true;
++      }
++
+       // we can't assign 'item' before, because fix_fields() can change arg
+       Item *item = *arg;
+       if (item->check_cols(1)) {
+@@ -4597,8 +4605,7 @@ bool udf_handler::fix_fields(THD *thd, Item_result_field *func, uint arg_count,
+   initid.ptr = nullptr;
+   initid.extension = &m_return_value_extension;
+ 
+-  if (thd->stmt_arena->is_stmt_prepare() && !thd->stmt_arena->is_repreparing &&
+-      !initid.const_item) {
++  if (is_in_prepare && !initid.const_item) {
+     udf_fun_guard.defer();
+     return false;
+   }

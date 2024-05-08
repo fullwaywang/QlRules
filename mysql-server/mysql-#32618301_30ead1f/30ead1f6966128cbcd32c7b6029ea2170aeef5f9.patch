@@ -1,0 +1,579 @@
+commit 30ead1f6966128cbcd32c7b6029ea2170aeef5f9	30ead1f6966128cbcd32c7b6029ea2170aeef5f9
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Thu Mar 25 12:53:07 2021 +0100
+
+    Bug #32618301 INNODB SHOULD REPORT CHANGES IN WAIT-FOR GRAPH TO SERVER LAYER
+    
+    InnoDB's lock system only informed server about the first t2 -waits-for-> t1 edge which caused t2 to go to sleep, but when t1 released the lock and t2 still had to wait for another transaction, say t2 -waits-for-> t3, InnoDB did not inform the server about this.
+    This could impact replication, as coordinator was not aware that t2 waits for t3, and thus could not detect a conflict with the intended commit-oder (t1, t2, t3).
+    
+    RB: 26060
+    Reviewed-by: Debarun Banerjee <debarun.banerjee@oracle.com>
+    Reviewed-by: Pedro Figueiredo <pedro.figueiredo@oracle.com>
+
+diff --git a/include/mysql/service_thd_engine_lock.h b/include/mysql/service_thd_engine_lock.h
+index dddcc5996ac..e2dd8dde4c8 100644
+--- a/include/mysql/service_thd_engine_lock.h
++++ b/include/mysql/service_thd_engine_lock.h
+@@ -27,16 +27,32 @@
+   @file include/mysql/service_thd_engine_lock.h
+   This service provides functions for storage engines to report
+   lock related activities.
+-
+-  SYNOPSIS
+-  thd_row_lock_wait() - call it just when the engine find a transaction should
+-  wait another transaction to realease a row lock thd                   The
+-  session which is waiting  for the row lock to release. thd_wait_for
+-  The session which is holding the row lock.
+ */
+ 
+ class THD;
+ 
++/** @deprecated Please use thd_report_lock_wait(self, wait_for, true) instead.
++@see thd_report_lock_wait
++Call it just when the engine find a transaction should wait another transaction
++to release a row lock.
++@param[in]   self      The thd session which is waiting for the lock to release
++@param[in]   wait_for  The session which is holding the lock
++*/
+ void thd_report_row_lock_wait(THD *self, THD *wait_for);
+ 
++/**
++Call it just when the engine find a transaction should wait another transaction
++to release a lock.
++Interface for Engine to report lock conflict.
++The caller should guarantee self and thd_wait_for does not be freed,
++while it is called.
++@param[in]   self      The thd session which is waiting for the lock to release
++@param[in]   wait_for  The session which is holding the lock
++@param[in]   may_survive_prepare  true:  edge MAY remain even after wait_for
++                                         session PREPAREs its transaction,
++                                  false: edge CERTAINLY will be removed before
++                                         or during PREPARE of transaction run
++                                         by the wait_for session.
++*/
++void thd_report_lock_wait(THD *self, THD *wait_for, bool may_survive_prepare);
+ #endif
+diff --git a/mysql-test/suite/innodb/r/lock_collision_report.result b/mysql-test/suite/innodb/r/lock_collision_report.result
+new file mode 100644
+index 00000000000..660a1410034
+--- /dev/null
++++ b/mysql-test/suite/innodb/r/lock_collision_report.result
+@@ -0,0 +1,181 @@
++CREATE TABLE t (
++id INT PRIMARY KEY
++) ENGINE=InnoDB;
++INSERT INTO t VALUES (10), (20), (30), (40), (50);
++# Adding debug point 'syncpoint_report_lock_collision' to @@GLOBAL.debug
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++id
++20
++BEGIN;
++INSERT INTO t VALUES (60), (70), (80), (90), (100), (110), (120);
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR UPDATE;
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE;
++# expect 25 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 24 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 23 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 22 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 21 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 20 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 19 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 18 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 17 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 16 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 15 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 14 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 13 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 12 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 11 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 10 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 9 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 8 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 7 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 6 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 5 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 4 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 3 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 2 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# expect 1 more edges to be reported
++SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++# excpecting that connection 13 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 12 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 11 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 10 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 9 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 8 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 7 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 6 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 5 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 4 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 3 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 2 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++# excpecting that connection 1 was rolled back as a deadlock victim
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++id
++20
++ROLLBACK;
++# Removing debug point 'syncpoint_report_lock_collision' from @@GLOBAL.debug
++DROP TABLE t;
+diff --git a/mysql-test/suite/innodb/t/lock_collision_report.test b/mysql-test/suite/innodb/t/lock_collision_report.test
+new file mode 100644
+index 00000000000..da13bf79c13
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/lock_collision_report.test
+@@ -0,0 +1,113 @@
++# BUG#32586458 INNODB CLUSTER SLOWNESS SEEING SESSIONS WITH STATUS "WAITING
++#              FOR HANDLER TO COMMIT"
++#
++--source include/have_debug_sync.inc
++
++# This scenario demonstrates that when there are N reasons for a lock wait,
++# (connections rk_1,..,rk_N hold S lock on a row needed by rt_wait)
++# which go away one by one (as rk_$k get rolled back), then InnoDB correctly
++# reports one of the remaining reasons for wait.
++# InnoDB either grants a requested lock or picks one of conflicting transactions
++# as the current reason it has to wait. If there is more than one conflicting
++# transaction, the choice is non-deterministic. Thus, this test uses a trick:
++# it relies on the InnoDB deadlock checker's logic, which rolls back a
++# transaction which is part of a deadlock cycle consisting of edges that are
++# "current reason for wait".
++# Therefore this MTR does not have to know in which order it should rollback the
++# transactions rt_1,...,rt_N to follow the order of picking "current reason for
++# wait". Instead this MTR simply arranges it so that there are N small deadlock
++# cycles, k-th of them involving rt_k and rt_wait only:
++#
++# rt_wait <--x-locked-by----- 100 <---has-requested-s-lock---\
++#   |                                                        |
++#   |                                                      / | \
++#   |                                                  rt_1 ... rt_N
++#   |                                                     ^  ^  ^
++#   |                                                      \ | /
++#   |                                                        |
++#   \--has-requested-x-lock--> 20 --s-locked-----------------/
++#
++# The wait-for graph between transactions inspected by InnoDB's deadlock checker
++# is a sparse subgraph of the above: only one of the paths from rt_wait to one
++# rt_k is picked. It is the same edge which is reported to Server layer.
++# As it is a part of a deadlock cycle, the victim will be chosen, cycle removed,
++# and another edge will be picked and so on.
++# We make sure rt_wait is never chosen as a victim, by making its TRX_WEIGHT
++# high, by INSERTing several records.
++# What remains is to count that the number of reported wait-for edges is N*2.
++
++# Create a table
++CREATE TABLE t (
++  id INT PRIMARY KEY
++) ENGINE=InnoDB;
++INSERT INTO t VALUES (10), (20), (30), (40), (50);
++
++# We want to be informed about any lock waits reported to Server layer
++--let $debug_point = syncpoint_report_lock_collision
++--source include/add_debug_point.inc
++
++--let $n_blockers = 13
++
++# Create N connections to the server.
++# Using connections 1..N, start a transaction, acquire shared lock over a given
++# record using `SELECT ... FOR SHARE`
++--let $k = $n_blockers
++while ($k != 0)
++{
++  --connect (rt_$k,127.0.0.1,root,,test,,)
++    BEGIN;
++    SELECT id FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR SHARE;
++    --dec $k
++}
++
++
++# Using connection N + 1, acquire exclusive lock over the same record
++# using `SELECT ... FOR UPDATE`. This will cause the rt_wait to wait on a lock.
++--connect (rt_wait,127.0.0.1,root,,test,,)
++  BEGIN;
++  # make it heavy by inserting a lot of records
++  INSERT INTO t VALUES (60), (70), (80), (90), (100), (110), (120);
++  --send SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id = 20 FOR UPDATE
++
++
++# Verify that the first reason for wait was reported
++--connection default
++  SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++  SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++
++# create N small deadlocks cycles between rt_$k and and rt_wait
++while ($k != $n_blockers)
++{
++  --inc $k
++  --connection rt_$k
++    --send SELECT * FROM t FORCE INDEX (PRIMARY) WHERE id=100 FOR SHARE
++}
++
++--connection default
++
++--let expected_reports = `SELECT $n_blockers * 2 - 1`
++while ($expected_reports != 0)
++{
++  --echo # expect $expected_reports more edges to be reported
++  SET DEBUG_SYNC = 'now WAIT_FOR reached_report_lock_collision';
++  SET DEBUG_SYNC = 'now SIGNAL continue_report_lock_collision';
++  --dec $expected_reports
++}
++while ($k != 0)
++{
++  --echo # excpecting that connection $k was rolled back as a deadlock victim
++  --connection rt_$k
++    --error ER_LOCK_DEADLOCK
++    --reap
++  --disconnect rt_$k
++  --dec $k
++}
++
++# Clean up
++--connection rt_wait
++  --reap
++  ROLLBACK;
++--connection default
++--disconnect rt_wait
++--source include/remove_debug_point.inc
++DROP TABLE t;
+diff --git a/sql/sql_thd_api.cc b/sql/sql_thd_api.cc
+index ba9baa9de62..a198e278527 100644
+--- a/sql/sql_thd_api.cc
++++ b/sql/sql_thd_api.cc
+@@ -38,6 +38,7 @@
+ #include "mysql/components/services/psi_thread_bits.h"
+ #include "mysql/plugin.h"
+ #include "mysql/psi/mysql_mutex.h"
++#include "mysql/service_thd_engine_lock.h"
+ #include "mysql_com.h"
+ #include "sql/auth/auth_acls.h"
+ #include "sql/auth/sql_security_ctx.h"
+@@ -622,13 +623,15 @@ void thd_wait_end(MYSQL_THD thd) {
+ //
+ //////////////////////////////////////////////////////////
+ 
+-/**
+-   Interface for Engine to report row lock conflict.
+-   The caller should guarantee thd_wait_for does not be freed, when it is
+-   called.
+-*/
+ void thd_report_row_lock_wait(THD *self, THD *wait_for) {
+   DBUG_TRACE;
++  thd_report_lock_wait(self, wait_for, true);
++}
++
++void thd_report_lock_wait(THD *self, THD *wait_for,
++                          bool /* may_survive_prepare*/) {
++  DBUG_TRACE;
++  conditional_sync_point("report_lock_collision");
+ 
+   if (self != nullptr && wait_for != nullptr && is_mts_worker(self) &&
+       is_mts_worker(wait_for))
+diff --git a/storage/innobase/include/trx0trx.h b/storage/innobase/include/trx0trx.h
+index f22a2179b37..621f2bdc7a2 100644
+--- a/storage/innobase/include/trx0trx.h
++++ b/storage/innobase/include/trx0trx.h
+@@ -1252,6 +1252,10 @@ struct trx_t {
+     return (isolation_level == READ_UNCOMMITTED);
+   }
+ 
++  bool releases_gap_locks_at_prepare() const {
++    return isolation_level <= READ_COMMITTED;
++  }
++
+   bool skip_gap_locks() const {
+     switch (isolation_level) {
+       case READ_UNCOMMITTED:
+diff --git a/storage/innobase/lock/lock0lock.cc b/storage/innobase/lock/lock0lock.cc
+index 695d825578a..5641481bf86 100644
+--- a/storage/innobase/lock/lock0lock.cc
++++ b/storage/innobase/lock/lock0lock.cc
+@@ -1241,11 +1241,52 @@ static void lock_mark_trx_for_rollback(hit_list_t &hit_list, trx_id_t hp_trx_id,
+   }
+ #endif /* UNIV_DEBUG */
+ }
++/**
++Checks if the waits-for edge between waiting_lock and blocking_lock may
++survive PREPARE of the blocking_lock->trx. For transactions in low
++isolation levels we release some of the locks during PREPARE.
++@param[in]    waiting_lock    A lock waiting in queue, blocked by blocking_lock
++@param[in]    blocking_lock   A lock which is a reason the waiting_lock has to
++                              wait
++@return if the waiting_lock->trx MAY have to wait for blocking_lock->trx
++        even if blocking_lock->trx PREPAREs. The nondeterminism comes from
++        situations like when X lock conflicts with S lock on a delete-marked
++        record - purgining it might convert both to non-conflicitng gap locks
++@retval true    the waiting_lock->trx MAY have to wait for blocking_lock->trx
++                even if blocking_lock->trx PREPAREs.
++@retval false   the waiting_lock->trx CERTAINLY will not have to wait for
++                blocking_lock->trx for this particular reason.
++*/
++static bool lock_edge_may_survive_prepare(const lock_t *waiting_lock,
++                                          const lock_t *blocking_lock) {
++  /* Keep in sync with lock_relase_read_lock(blocking_lock, only_gap)
++  for the only_gap value currently used in the call from trx_prepare().
++  Currently some transactions release locks on gaps and a lock on a gap blocks
++  only Insert Intention, and II is only blocked by locks on a gap.
++  A "lock on a gap" can be either a LOCK_GAP, or a part of LOCK_ORDINARY. */
++  if (blocking_lock->trx->releases_gap_locks_at_prepare() &&
++      waiting_lock->is_insert_intention()) {
++    ut_ad(blocking_lock->is_record_lock());
++    ut_ad(waiting_lock->is_record_lock());
+ 
++    return false;
++  }
++  return true;
++}
++static void lock_report_wait_for_edge_to_server(const lock_t *waiting_lock,
++                                                const lock_t *blocking_lock) {
++  thd_report_lock_wait(
++      waiting_lock->trx->mysql_thd, blocking_lock->trx->mysql_thd,
++      lock_edge_may_survive_prepare(waiting_lock, blocking_lock));
++}
+ /** Creates a new edge in wait-for graph, from waiter to blocker
+-@param[in]  waiter    The transaction that has to wait for blocker
+-@param[in]  blocker   The transaction which causes waiter to wait */
+-static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker) {
++@param[in]    waiting_lock    A lock waiting in queue, blocked by blocking_lock
++@param[in]    blocking_lock   A lock which is a reason the waiting_lock has to
++                          wait */
++static void lock_create_wait_for_edge(const lock_t *waiting_lock,
++                                      const lock_t *blocking_lock) {
++  trx_t *waiter = waiting_lock->trx;
++  trx_t *blocker = blocking_lock->trx;
+   ut_ad(trx_mutex_own(waiter));
+   ut_ad(waiter->lock.wait_lock != nullptr);
+   ut_ad(locksys::owns_lock_shard(waiter->lock.wait_lock));
+@@ -1258,6 +1299,7 @@ static void lock_create_wait_for_edge(trx_t *waiter, trx_t *blocker) {
+   lock_wait_request_check_for_cycles() once it insert the trx to a
+   slot.*/
+   waiter->lock.blocking_trx.store(blocker);
++  lock_report_wait_for_edge_to_server(waiting_lock, blocking_lock);
+ }
+ 
+ /**
+@@ -1303,7 +1345,7 @@ dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
+   /* Don't queue the lock to hash table, if high priority transaction. */
+   lock_t *lock = create(m_trx, prdt);
+ 
+-  lock_create_wait_for_edge(m_trx, wait_for->trx);
++  lock_create_wait_for_edge(lock, wait_for);
+ 
+   ut_ad(lock_get_wait(lock));
+ 
+@@ -1311,11 +1353,6 @@ dberr_t RecLock::add_to_waitq(const lock_t *wait_for, const lock_prdt_t *prdt) {
+ 
+   MONITOR_INC(MONITOR_LOCKREC_WAIT);
+ 
+-  /* m_trx->mysql_thd is NULL if it's an internal trx. So current_thd
+-   is used */
+-
+-  thd_report_row_lock_wait(current_thd, wait_for->trx->mysql_thd);
+-
+   return (DB_LOCK_WAIT);
+ }
+ /** Moves a granted lock to the front of the queue for a given record by
+@@ -1962,6 +1999,7 @@ static void lock_update_wait_for_edge(const lock_t *waiting_lock,
+     wait_lock->trx has changed it's endpoint and we need to analyze the
+     wait-for-graph again. */
+     lock_wait_request_check_for_cycles();
++    lock_report_wait_for_edge_to_server(waiting_lock, blocking_lock);
+   }
+ }
+ 
+@@ -3416,13 +3454,14 @@ void lock_table_remove_low(lock_t *lock) /*!< in/out: table lock */
+ 
+ /** Enqueues a waiting request for a table lock which cannot be granted
+  immediately. Checks for deadlocks.
++ @param[in] mode           lock mode this transaction is requesting
++ @param[in] table          the table to be locked
++ @param[in] thr            the query thread requesting the lock
++ @param[in] blocking_lock  the lock which is the reason this request has to wait
+  @return DB_LOCK_WAIT or DB_DEADLOCK */
+-static dberr_t lock_table_enqueue_waiting(
+-    ulint mode,          /*!< in: lock mode this transaction is
+-                         requesting */
+-    dict_table_t *table, /*!< in/out: table */
+-    que_thr_t *thr)      /*!< in: query thread */
+-{
++static dberr_t lock_table_enqueue_waiting(ulint mode, dict_table_t *table,
++                                          que_thr_t *thr,
++                                          const lock_t *blocking_lock) {
+   trx_t *trx;
+ 
+   ut_ad(locksys::owns_table_shard(*table));
+@@ -3455,7 +3494,7 @@ static dberr_t lock_table_enqueue_waiting(
+   }
+ 
+   /* Enqueue the lock request that will wait to be granted */
+-  lock_table_create(table, mode | LOCK_WAIT, trx);
++  lock_t *lock = lock_table_create(table, mode | LOCK_WAIT, trx);
+ 
+   trx->lock.que_state = TRX_QUE_LOCK_WAIT;
+ 
+@@ -3466,7 +3505,7 @@ static dberr_t lock_table_enqueue_waiting(
+   ut_a(stopped);
+ 
+   MONITOR_INC(MONITOR_TABLELOCK_WAIT);
+-
++  lock_create_wait_for_edge(lock, blocking_lock);
+   return (DB_LOCK_WAIT);
+ }
+ 
+@@ -3602,10 +3641,7 @@ dberr_t lock_table(ulint flags, /*!< in: if BTR_NO_LOCKING_FLAG bit is set,
+   mode: this trx may have to wait */
+ 
+   if (wait_for != nullptr) {
+-    err = lock_table_enqueue_waiting(mode | flags, table, thr);
+-    if (err == DB_LOCK_WAIT) {
+-      lock_create_wait_for_edge(trx, wait_for->trx);
+-    }
++    err = lock_table_enqueue_waiting(mode | flags, table, thr, wait_for);
+   } else {
+     lock_table_create(table, mode | flags, trx);
+ 
+@@ -3914,6 +3950,7 @@ released if rules permit it.
+ @param[in]   only_gap   true if we don't want to release records,
+                         just the gaps between them */
+ static void lock_release_read_lock(lock_t *lock, bool only_gap) {
++  /* Keep in sync with lock_edge_may_survive_prepare() */
+   if (!lock->is_record_lock() || lock->is_insert_intention() ||
+       lock->is_predicate()) {
+     /* DO NOTHING */
+diff --git a/storage/innobase/trx/trx0trx.cc b/storage/innobase/trx/trx0trx.cc
+index 074de0ff511..2af6415663e 100644
+--- a/storage/innobase/trx/trx0trx.cc
++++ b/storage/innobase/trx/trx0trx.cc
+@@ -2830,7 +2830,7 @@ static void trx_prepare(trx_t *trx) /*!< in/out: transaction */
+ 
+   /* Release read locks after PREPARE for READ COMMITTED
+   and lower isolation. */
+-  if (trx->isolation_level <= TRX_ISO_READ_COMMITTED) {
++  if (trx->releases_gap_locks_at_prepare()) {
+     /* Stop inheriting GAP locks. */
+     trx->skip_lock_inheritance = true;
+ 

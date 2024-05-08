@@ -1,0 +1,85 @@
+commit e73385cac2c08db54574aea8ed21c799764e8359	e73385cac2c08db54574aea8ed21c799764e8359
+Author: Roy Lyseng <roy.lyseng@oracle.com>
+Date:   Fri Jun 4 12:36:47 2021 +0200
+
+    Bug#32803211: 8.0.22+ triggers fail in Item::mark_field_in_map
+    
+    The problem was that when INSERT ... SET ... statement or UPDATE
+    statement was used in a trigger we have accepted reference to column
+    in the table on which trigger was defined (using NEW or OLD designator)
+    as an assigment target in its SET clause. This always led to
+    assertion failures in debug builds and sometimes server failures
+    in production builds.
+    
+    The problem stemmed from two facts: 1) INSERT and UPDATE statement code
+    expects only references to their target table columns as assignment
+    targets of the SET clause 2) we didn't block usage of trigger
+    fields as target for such assignment, due to omission which has
+    happened during early days of implementation of triggers.
+    
+    This patch solves the problem by rejecting trigger fields as
+    SET clause assignment targets in both INSERT and UPDATE.
+    
+    This is an incompatible change which breaks rare user's triggers
+    which use this syntax (which might have been working somehow due
+    to luck). Such triggers produce an error during attempt to execute
+    them.
+    
+    However, the new behavior is in line with both our documentation
+    and SQL standard, and supporting old non-standard and non-documented
+    behavor will require quite some efforts.
+    The fix for the problem is to reject trigger fields as SET clause
+    assignment targets in INSERT and UPDATE statements.
+    
+    Reviewed by: Dmitry Lenev <Dmitry.Lenev@oracle.com>
+
+diff --git a/share/messages_to_clients.txt b/share/messages_to_clients.txt
+index 1306d40c613..6bb99cd45f1 100644
+--- a/share/messages_to_clients.txt
++++ b/share/messages_to_clients.txt
+@@ -9571,6 +9571,9 @@ ER_DA_ERROR_LOG_COMPONENT_FLUSH_FAILED
+ ER_WARN_SQL_AFTER_MTS_GAPS_GAP_NOT_CALCULATED
+   eng "The until clause SQL_AFTER_MTS_GAPS is being used for channel '%.192s' when GTID_MODE = ON and SOURCE_AUTO_POSITION=1 meaning the server did not compute internally what gaps may exist in the relay log transaction execution. To close any execution gaps use either the SQL_BEFORE_GTIDS or SQL_AFTER_GTIDS until clause."
+ 
++ER_INVALID_ASSIGNMENT_TARGET 42000
++  eng "Invalid target for assignment in INSERT or UPDATE statement '%.192s'."
++
+ #
+ #  End of 8.0 error messages (server-to-client).
+ #  Do NOT add messages intended for the error log above!
+diff --git a/sql/parse_tree_items.cc b/sql/parse_tree_items.cc
+index a28a4ea4c18..4801c30973a 100644
+--- a/sql/parse_tree_items.cc
++++ b/sql/parse_tree_items.cc
+@@ -410,9 +410,9 @@ bool PTI_simple_ident_q_2d::itemize(Parse_context *pc, Item **res) {
+   sp_head *sp = lex->sphead;
+ 
+   /*
+-    FIXME This will work ok in simple_ident_nospvar case because
+-    we can't meet simple_ident_nospvar in trigger now. But it
+-    should be changed in future.
++    References with OLD and NEW designators can be used in expressions in
++    triggers. Semantic checks must ensure they are not used in invalid
++    contexts, such as assignment targets.
+   */
+   if (sp && sp->m_type == enum_sp_type::TRIGGER &&
+       (!my_strcasecmp(system_charset_info, table, "NEW") ||
+diff --git a/sql/sql_base.cc b/sql/sql_base.cc
+index c57f967cc0a..14af25e0b57 100644
+--- a/sql/sql_base.cc
++++ b/sql/sql_base.cc
+@@ -9033,6 +9033,14 @@ bool setup_fields(THD *thd, ulong want_privilege, bool allow_sum_func,
+         my_error(ER_NONUPDATEABLE_COLUMN, MYF(0), item->item_name.ptr());
+         return true;
+       }
++      if (item->type() == Item::TRIGGER_FIELD_ITEM) {
++        char buff[NAME_LEN * 2];
++        String str(buff, sizeof(buff), &my_charset_bin);
++        str.length(0);
++        item->print(thd, &str, QT_ORDINARY);
++        my_error(ER_INVALID_ASSIGNMENT_TARGET, MYF(0), str.c_ptr());
++        return true;
++      }
+       TABLE_LIST *tr = field->table_ref;
+       if ((want_privilege & UPDATE_ACL) && !tr->is_updatable()) {
+         /*

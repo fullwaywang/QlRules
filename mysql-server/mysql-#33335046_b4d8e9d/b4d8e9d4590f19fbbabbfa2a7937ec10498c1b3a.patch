@@ -1,0 +1,52 @@
+commit b4d8e9d4590f19fbbabbfa2a7937ec10498c1b3a	b4d8e9d4590f19fbbabbfa2a7937ec10498c1b3a
+Author: Jan Kneschke <jan.kneschke@oracle.com>
+Date:   Fri Sep 10 13:45:36 2021 +0200
+
+    Bug#33335046 mysql_real_connect() leaks memory with openssl 1.0.1
+    
+    Issue
+    =====
+    
+    $ valgrind mysql --host=somehost -e 'DO 1'
+    ...
+    ==35==    by 0x557DF24: EC_KEY_new_by_curve_name (in
+    /usr/lib64/libcrypto.so.1.0.1e)
+    ==35==    by 0x43AECA: new_VioSSLFd (viosslfactories.cc:738)
+    ...
+    
+    Root Cause
+    ----------
+    
+    mysql_real_connect() calls new_VioSSLFd() which calls:
+    
+      /* We choose P-256 curve. */
+      eckey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+      // ...
+      if (SSL_CTX_set_tmp_ecdh(ssl_fd->ssl_context, eckey) != 1) {
+         // error-handling
+         goto ...;
+      }
+    
+    - EC_KEY_new_by_curve_name() increments the ref-count on 'eckey'
+    - SSL_CTX_set_tmp_ecdh() takes increments the ref-count on 'eckey'
+    - when the connection gets closed, the ref-count gets decremented.
+    
+    Change
+    ======
+    
+    - after SSL_CTX_set_tmp_ecdh() is called, always call EC_KEY_free()
+    
+    RB: 26999
+
+diff --git a/vio/viosslfactories.cc b/vio/viosslfactories.cc
+index 3c837cbc28f..618be151143 100644
+--- a/vio/viosslfactories.cc
++++ b/vio/viosslfactories.cc
+@@ -760,6 +760,7 @@ static struct st_VioSSLFd *new_VioSSLFd(
+     *error = SSL_INITERR_ECDHFAIL;
+     goto error;
+   }
++  EC_KEY_free(eckey);
+ #else
+   if (SSL_CTX_set_ecdh_auto(ssl_fd->ssl_context, 1) == 0) {
+     *error = SSL_INITERR_ECDHFAIL;

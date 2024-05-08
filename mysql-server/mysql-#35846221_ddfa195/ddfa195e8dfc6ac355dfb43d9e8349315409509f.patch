@@ -1,0 +1,86 @@
+commit ddfa195e8dfc6ac355dfb43d9e8349315409509f	ddfa195e8dfc6ac355dfb43d9e8349315409509f
+Author: Roy Lyseng <roy.lyseng@oracle.com>
+Date:   Sat Nov 4 16:22:13 2023 +0100
+
+    Bug#35846221: Assertion Failure in /mysql-8.0.34/sql/field.cc:7119
+    
+    Problem is due to missing implementation of
+    Item_func_make_set::fix_after_pullout(), which makes this particular
+    MAKE_SET function be regarded as const and may thus be evaluated
+    during resolving.
+    
+    Fixed by implementing a proper fix_after_pullout() function.
+    
+    Change-Id: I7094869588ce4133c4a925e1a237a37866a5bb3c
+
+diff --git a/sql/item_strfunc.cc b/sql/item_strfunc.cc
+index 3a04399cb1b..c9096e4b3a0 100644
+--- a/sql/item_strfunc.cc
++++ b/sql/item_strfunc.cc
+@@ -2388,6 +2388,35 @@ void Item_func_make_set::split_sum_func(THD *thd, Ref_item_array ref_item_array,
+   Item_str_func::split_sum_func(thd, ref_item_array, fields);
+ }
+ 
++bool Item_func_make_set::fix_fields(THD *thd, Item **ref) {
++  assert(!fixed);
++  if (!item->fixed && item->fix_fields(thd, &item)) {
++    return true;
++  }
++  if (item->check_cols(1)) {
++    return true;
++  }
++  if (Item_func::fix_fields(thd, ref)) {
++    return true;
++  }
++  if (item->is_nullable()) {
++    set_nullable(true);
++  }
++  used_tables_cache |= item->used_tables();
++  if (null_on_null) not_null_tables_cache |= item->not_null_tables();
++  add_accum_properties(item);
++
++  return false;
++}
++
++void Item_func_make_set::fix_after_pullout(Query_block *parent_query_block,
++                                           Query_block *removed_query_block) {
++  Item_func::fix_after_pullout(parent_query_block, removed_query_block);
++  item->fix_after_pullout(parent_query_block, removed_query_block);
++  used_tables_cache |= item->used_tables();
++  if (null_on_null) not_null_tables_cache |= item->not_null_tables();
++}
++
+ bool Item_func_make_set::resolve_type(THD *thd) {
+   if (item->propagate_type(thd, MYSQL_TYPE_LONGLONG)) return true;
+   if (param_type_is_default(thd, 0, -1)) return true;
+@@ -2399,9 +2428,6 @@ bool Item_func_make_set::resolve_type(THD *thd) {
+   for (uint i = 0; i < arg_count; i++)
+     char_length += args[i]->max_char_length();
+   set_data_type_string(char_length);
+-  used_tables_cache |= item->used_tables();
+-  not_null_tables_cache &= item->not_null_tables();
+-  add_accum_properties(item);
+ 
+   return false;
+ }
+diff --git a/sql/item_strfunc.h b/sql/item_strfunc.h
+index 02fcb961fc9..1a970fb14b7 100644
+--- a/sql/item_strfunc.h
++++ b/sql/item_strfunc.h
+@@ -723,13 +723,9 @@ class Item_func_make_set final : public Item_str_func {
+ 
+   bool itemize(Parse_context *pc, Item **res) override;
+   String *val_str(String *str) override;
+-  bool fix_fields(THD *thd, Item **ref) override {
+-    assert(fixed == 0);
+-    bool res = ((!item->fixed && item->fix_fields(thd, &item)) ||
+-                item->check_cols(1) || Item_func::fix_fields(thd, ref));
+-    set_nullable(is_nullable() || item->is_nullable());
+-    return res;
+-  }
++  bool fix_fields(THD *thd, Item **ref) override;
++  void fix_after_pullout(Query_block *parent_query_block,
++                         Query_block *removed_query_block) override;
+   void split_sum_func(THD *thd, Ref_item_array ref_item_array,
+                       mem_root_deque<Item *> *fields) override;
+   bool resolve_type(THD *) override;

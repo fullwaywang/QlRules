@@ -1,0 +1,60 @@
+commit b4a9deaa3dd3c901b70f604b596a82c4309e3054	b4a9deaa3dd3c901b70f604b596a82c4309e3054
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Thu Dec 16 07:20:56 2021 +0530
+
+    Bug#33044886: STOP GROUP REPLICATION SPORADICALLY STUCK FOR EVER
+     AFTER REBOOT
+    
+     Description:
+     ------------
+     Stop group replication on a node during reboot stuck for ever.
+     This issue is happening on 3 node / 5 node cluster sporadically.
+    
+     Analysis:
+     ------------
+     The issue is due to m_network_provider_tcp_server thread is stuck at
+     'Network_provider::set_new_conection' loop for ever.
+    
+     Scenario:
+     1) Gcs_xcom_network_provider_m_network_provider_tcp_server thread is
+        stuck at 'set_new_conection'. It is in a loop waiting for
+        m_shared_connection to become null.
+     2) When the network_provider is being stopped,
+        Gcs_xcom_control_m_xcom_thread is waiting for
+        Gcs_xcom_network_provider_m_network_provider_tcp_server thread to
+        finish.
+     3) Gcs_xcom_engine_m_engine_thread is waiting for
+        Gcs_xcom_control_m_xcom_thread.
+     4) Delayed_initialization_thread is holding plugin_running_mutex and
+        waiting for Gcs_xcom_engine_m_engine_thread.
+     5) Stop_group_replication thread is waiting for lock
+        lv.plugin_running_mutex.
+    
+    
+     Fix:
+     ----
+     When the network_provider is being stopped, reset the connection
+     before calling m_network_provider_tcp_server.join(). This will set
+     m_shared_connection to null and allows
+     Gcs_xcom_network_provider_m_network_provider_tcp_server thread to
+     come out of the Network_provider::set_new_connection while loop.
+    
+     RB:27157
+
+diff --git a/plugin/group_replication/libmysqlgcs/src/bindings/xcom/xcom/network/xcom_network_provider.cc b/plugin/group_replication/libmysqlgcs/src/bindings/xcom/xcom/network/xcom_network_provider.cc
+index e1b468d15f0..aabbfbd3856 100644
+--- a/plugin/group_replication/libmysqlgcs/src/bindings/xcom/xcom/network/xcom_network_provider.cc
++++ b/plugin/group_replication/libmysqlgcs/src/bindings/xcom/xcom/network/xcom_network_provider.cc
+@@ -441,10 +441,10 @@ std::pair<bool, int> Xcom_network_provider::stop() {
+   std::lock_guard<std::mutex> lck(m_init_lock);
+   m_initialized = false;
+ 
++  this->reset_new_connection();
++
+   if (m_network_provider_tcp_server.joinable())
+     m_network_provider_tcp_server.join();
+ 
+-  this->reset_new_connection();
+-
+   return std::make_pair(false, 0);
+ }

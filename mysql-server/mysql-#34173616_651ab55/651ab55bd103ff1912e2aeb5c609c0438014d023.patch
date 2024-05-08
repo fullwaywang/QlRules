@@ -1,0 +1,64 @@
+commit 651ab55bd103ff1912e2aeb5c609c0438014d023	651ab55bd103ff1912e2aeb5c609c0438014d023
+Author: Ramakrishnan Kamalakannan <ramakrishnan.kamalakannan@oracle.com>
+Date:   Thu Jun 2 07:14:52 2022 +0200
+
+    Bug #34173616 Assertion failure: rem0rec.ic:946:row_version <= MAX_ROW_VERSION
+     thread 14041892
+    
+    Problem:
+    - Version is fetched before checking if index has row version.
+    
+    Solution:
+    - Ensure that calls to this function checks if the row has version
+    - Verified that 4 call sites check for row version and updated 3
+    call sites to check if row is versioned
+    - Verified by replaying the ntest
+    
+    Change-Id: I3130ed0fe43c542e3cdd96782b00cbb6ef61905f
+
+diff --git a/storage/innobase/rem/rem0wrec.cc b/storage/innobase/rem/rem0wrec.cc
+index cac9e07cddd..0d361cb819c 100644
+--- a/storage/innobase/rem/rem0wrec.cc
++++ b/storage/innobase/rem/rem0wrec.cc
+@@ -49,8 +49,12 @@ ulint rec_get_nth_field_size(const dict_index_t *index, const rec_t *rec,
+                              ulint n) {
+   if (index) {
+     ut_ad(!dict_table_is_comp(index->table));
+-    uint8_t version = rec_get_instant_row_version_old(rec);
+     if (index->has_row_versions()) {
++      uint8_t version = UINT8_UNDEFINED;
++      if (rec_old_is_versioned(rec)) {
++        version = rec_get_instant_row_version_old(rec);
++      }
++
+       n = index->get_field_phy_pos(n, version);
+     }
+   }
+@@ -71,8 +75,12 @@ ulint rec_get_nth_field_offs_old(const dict_index_t *index, const rec_t *rec,
+                                  ulint n, ulint *len) {
+   if (index) {
+     ut_ad(!dict_table_is_comp(index->table));
+-    uint8_t version = rec_get_instant_row_version_old(rec);
+     if (index->has_row_versions()) {
++      uint8_t version = UINT8_UNDEFINED;
++      if (rec_old_is_versioned(rec)) {
++        version = rec_get_instant_row_version_old(rec);
++      }
++
+       n = index->get_field_phy_pos(n, version);
+     }
+   }
+@@ -138,8 +146,12 @@ ulint rec_2_is_field_extern(const dict_index_t *index, const rec_t *rec,
+                             ulint n) {
+   if (index) {
+     ut_ad(!dict_table_is_comp(index->table));
+-    uint8_t version = rec_get_instant_row_version_old(rec);
+     if (index->has_row_versions()) {
++      uint8_t version = UINT8_UNDEFINED;
++      if (rec_old_is_versioned(rec)) {
++        version = rec_get_instant_row_version_old(rec);
++      }
++
+       n = index->get_field_phy_pos(n, version);
+     }
+   }

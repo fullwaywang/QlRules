@@ -1,0 +1,22 @@
+commit 0afebf8146a3b52bc82bf48ba273a5ecc71ad995	0afebf8146a3b52bc82bf48ba273a5ecc71ad995
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Fri Oct 29 13:59:52 2021 +0200
+
+    Bug #33012398: FUZZER CAUSES: SSL_HANDSHAKE_LOOP:
+    ASSERTION `ERR_PEEK_ERROR() == 0' FAILED. WITH THREAD_POOL
+    RB#27208
+    
+    More actively cleans up the SSL error queue pre-SSL_accept/SSL_connect.
+
+diff --git a/vio/viossl.cc b/vio/viossl.cc
+index c63bbd8989e..70d150f74d2 100644
+--- a/vio/viossl.cc
++++ b/vio/viossl.cc
+@@ -667,6 +667,7 @@ static int ssl_do(struct st_VioSSLFd *ptr, Vio *vio, long timeout,
+   } else {
+     ssl = *sslptr;
+   }
++  ERR_clear_error();
+ 
+   size_t loop_ret;
+   if ((loop_ret = ssl_handshake_loop(vio, ssl, func, ssl_errno_holder))) {

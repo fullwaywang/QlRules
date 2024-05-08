@@ -1,0 +1,26 @@
+commit adcd7d4fafc6a8cbefce23e49265eede21466a4f	adcd7d4fafc6a8cbefce23e49265eede21466a4f
+Author: Ramakrishnan Kamalakannan <ramakrishnan.kamalakannan@oracle.com>
+Date:   Fri Jun 3 12:48:08 2022 +0200
+
+    Bug #34173425 Assertion failure: mtr0log.cc:NNN:n_inst > 0 thread NNN
+    
+    Problem:
+        read_2_bytes may return nullptr if ptr exceeds end_ptr. Any calls to read_2_bytes must check if nullptr is returned.
+    
+    Solution:
+        Updated one instance where this check is required. Verified other call sites as well
+    
+    Change-Id: I5460aa47940db64365e85fe9e63ad24bed48c9b5
+
+diff --git a/storage/innobase/mtr/mtr0log.cc b/storage/innobase/mtr/mtr0log.cc
+index 047925477b6..6609d37f7f1 100644
+--- a/storage/innobase/mtr/mtr0log.cc
++++ b/storage/innobase/mtr/mtr0log.cc
+@@ -1017,6 +1017,7 @@ static byte *parse_index_versioned_fields(byte *ptr, const byte *end_ptr,
+                                           uint16_t &crv, size_t &n_dropped) {
+   uint16_t n_inst = 0;
+   ptr = read_2_bytes(ptr, end_ptr, n_inst);
++  if (ptr == nullptr) return (nullptr);
+   ut_ad(n_inst > 0);
+ 
+   for (auto i = n_inst; i > 0; --i) {

@@ -1,0 +1,414 @@
+commit ef051ecaec7451b0aa2a9f4416488693bc62a680	ef051ecaec7451b0aa2a9f4416488693bc62a680
+Author: Ole John Aske <ole.john.aske@oracle.com>
+Date:   Wed Oct 27 18:52:31 2021 +0200
+
+    Bug#33157531 ZDI-CAN-14487: Oracle MySQL Cluster Data Node Improper Validation of Array Index ....
+    
+    Several of the signals received by the SPJ block contain an 'i-pointer', which is
+    used to look up real memory object to be operated upon.
+    
+    The ::getPtr() method used to translate between such 'i-pointers' and real pointers,
+    offers very limited validations of the 'i-pointers', thus we can end up in different
+    'out of bounds' situations if the received pointers are garbage.
+    
+    This patch introduce an additional hash-structure for the TreeNode and ScanFraghandle
+    objects which can be externally refered from such i-pointers. Whenever translating
+    an incomming i-pointer to a real pointer we noe use these hash structures to find
+    the real object, instead of using the somewhat unsafe getPtr(). That ensures that
+    only signals containing an i-pointer known to SPJ will be able to locate the memory
+    object.
+    
+    If the received i-pointer can not found via the hash lists a 'ndbrequire' will fail
+    and the datanode crash (Fail fast, as we usually do in such situations)
+    
+    Note that we only apply this mechanism for such pointers received in signals.
+    There are also several SPJ internal usage of these 'i-pointers', but they are
+    assumed to be trusted.
+    
+    Reviewed By: Mauritz Sundell <mauritz.sundell@oracle.com>
+    
+    Change-Id: I9d2b925b712ea328fb3ea1db84aa24e9c7fbb7de
+
+diff --git a/storage/ndb/src/kernel/blocks/dbspj/Dbspj.hpp b/storage/ndb/src/kernel/blocks/dbspj/Dbspj.hpp
+index 3f3d755a8bd..83c7b484fbe 100644
+--- a/storage/ndb/src/kernel/blocks/dbspj/Dbspj.hpp
++++ b/storage/ndb/src/kernel/blocks/dbspj/Dbspj.hpp
+@@ -33,6 +33,7 @@
+ #include <ArenaPool.hpp>
+ #include <DataBuffer.hpp>
+ #include <Bitmask.hpp>
++#include <KeyTable.hpp>
+ #include <signaldata/DbspjErr.hpp>
+ #include "../dbtup/tuppage.hpp"
+ 
+@@ -52,6 +53,8 @@ public:
+ 
+   struct Request;
+   struct TreeNode;
++  struct ScanFragHandle;
++
+ private:
+   BLOCK_DEFINES(Dbspj);
+ 
+@@ -101,11 +104,23 @@ private:
+ 
+   void sendSTTORRY(Signal* signal);
+ 
+-protected:
+-  //virtual bool getParam(const char* name, Uint32* count);
++  /**
++   * Security layer:
++   *   Provide verification of 'i-pointers' used in the signaling protocol.
++   *   - 'insert' the GuardedPtr to allow it to be referred.
++   *   - 'remove' at end of lifecycle.
++   *   - 'get' will fetch the 'real' pointer to the object.
++   * Crash if ptrI is unknow to us.
++   */
++  void insertGuardedPtr(Ptr<Request>, Ptr<TreeNode>);
++  void removeGuardedPtr(Ptr<TreeNode>);
++  bool getGuardedPtr(Ptr<TreeNode>&, Uint32 ptrI);
++
++  void insertGuardedPtr(Ptr<Request>, Ptr<ScanFragHandle>);
++  void removeGuardedPtr(Ptr<ScanFragHandle>);
++  bool getGuardedPtr(Ptr<ScanFragHandle>&, Uint32 ptrI);
+ 
+ public:
+-  struct ScanFragHandle;
+   typedef DataBuffer<14, LocalArenaPool<DataBufferSegment<14> > > Correlation_list;
+   typedef LocalDataBuffer<14, LocalArenaPool<DataBufferSegment<14> > > Local_correlation_list;
+   typedef DataBuffer<14, LocalArenaPool<DataBufferSegment<14> > > Dependency_map;
+@@ -705,6 +720,18 @@ public:
+       Uint16 m_range_cnt; // too set bounds info correctly
+     } m_range_builder;
+     Uint32 m_rangePtrI;
++
++    // Below are requirements for the hash lists
++    bool equal(const ScanFragHandle &other) const {
++      return key == other.key;
++    }
++    Uint32 hashValue() const {
++      return key;
++    }
++
++    Uint32 key;  // Its own ptrI, used as hash key
++    Uint32 nextHash, prevHash;
++
+     union {
+       Uint32 nextList;
+       Uint32 nextPool;
+@@ -714,6 +741,7 @@ public:
+   typedef RecordPool<ArenaPool<ScanFragHandle> > ScanFragHandle_pool;
+   typedef SLFifoList<ScanFragHandle_pool> ScanFragHandle_list;
+   typedef LocalSLFifoList<ScanFragHandle_pool> Local_ScanFragHandle_list;
++  typedef KeyTable<ScanFragHandle_pool> ScanFragHandle_hash;
+ 
+   /**
+    * This class computes mean and standard deviation incrementally for a series
+@@ -1151,6 +1179,18 @@ public:
+       Uint32 m_attrInfoPtrI;     // attrInfoSection
+     } m_send;
+ 
++
++    // Below are requirements for the hash lists
++    bool equal(const TreeNode &other) const {
++      return key == other.key;
++    }
++    Uint32 hashValue() const {
++      return key;
++    }
++
++    Uint32 key;  // Its own ptrI, used as hash key
++    Uint32 nextHash, prevHash;
++
+     union {
+       Uint32 nextList;
+       Uint32 nextPool;
+@@ -1161,6 +1201,7 @@ public:
+   static const Ptr<TreeNode> NullTreeNodePtr;
+ 
+   typedef RecordPool<ArenaPool<TreeNode> > TreeNode_pool;
++  typedef KeyTable<TreeNode_pool> TreeNode_hash;
+   typedef DLFifoList<TreeNode_pool> TreeNode_list;
+   typedef LocalDLFifoList<TreeNode_pool> Local_TreeNode_list;
+ 
+@@ -1383,7 +1424,9 @@ private:
+   Request_hash m_lookup_request_hash;
+   ArenaPool<DataBufferSegment<14> > m_dependency_map_pool;
+   TreeNode_pool m_treenode_pool;
++  TreeNode_hash m_treenode_hash;
+   ScanFragHandle_pool m_scanfraghandle_pool;
++  ScanFragHandle_hash m_scanfraghandle_hash;
+ 
+   TableRecord *m_tableRecord;
+   UintR c_tabrecFilesize;
+diff --git a/storage/ndb/src/kernel/blocks/dbspj/DbspjInit.cpp b/storage/ndb/src/kernel/blocks/dbspj/DbspjInit.cpp
+index 872d0445760..a5c1ef2cbb7 100644
+--- a/storage/ndb/src/kernel/blocks/dbspj/DbspjInit.cpp
++++ b/storage/ndb/src/kernel/blocks/dbspj/DbspjInit.cpp
+@@ -37,6 +37,8 @@ Dbspj::Dbspj(Block_context& ctx, Uint32 instanceNumber):
+   SimulatedBlock(DBSPJ, ctx, instanceNumber),
+   m_scan_request_hash(m_request_pool),
+   m_lookup_request_hash(m_request_pool),
++  m_treenode_hash(m_treenode_pool),
++  m_scanfraghandle_hash(m_scanfraghandle_pool),
+   m_tableRecord(NULL),
+   c_tabrecFilesize(0),
+   m_load_balancer_location(0)
+diff --git a/storage/ndb/src/kernel/blocks/dbspj/DbspjMain.cpp b/storage/ndb/src/kernel/blocks/dbspj/DbspjMain.cpp
+index 6120e488f4d..5c0bedffdfb 100644
+--- a/storage/ndb/src/kernel/blocks/dbspj/DbspjMain.cpp
++++ b/storage/ndb/src/kernel/blocks/dbspj/DbspjMain.cpp
+@@ -94,6 +94,77 @@ const Ptr<Dbspj::TreeNode> Dbspj::NullTreeNodePtr(0, RNIL );
+ const Dbspj::RowRef Dbspj::NullRowRef = { RNIL, GLOBAL_PAGE_SIZE_WORDS, { 0 } };
+ 
+ 
++/**
++ * The guarded pointers add an extra level of safety where incomming
++ * signals refers internal objects via an 'i-pointer'. The getPtr()
++ * method itself offer little protection agains 'out of bounds' i-pointers.
++ * Thus we maintain the guarded pointers in an internal hash list as well.
++ * Using the hash list for looking up untrusty 'i-pointer' guarantees that
++ * only valid i-pointers will find their real objects.
++ */
++void Dbspj::insertGuardedPtr(Ptr<Request> requestPtr, Ptr<TreeNode> treeNodePtr)
++{
++  treeNodePtr.p->key = treeNodePtr.i;
++  m_treenode_hash.add(treeNodePtr);
++}
++
++void Dbspj::removeGuardedPtr(Ptr<TreeNode> treeNodePtr)
++{
++  m_treenode_hash.remove(treeNodePtr);
++}
++
++inline
++bool Dbspj::getGuardedPtr(Ptr<TreeNode> &treeNodePtr, Uint32 ptrI)
++{
++  /**
++   * We could have looked up the pointer directly with getPtr(). However that
++   * is regarded unsafe for a 'guarded pointer', as there is no checks
++   * in getPtr() for the page_no / pos being within legal bounds.
++   * So we use our internal (trusted) hash structures instead and search
++   * for an object with the specified 'i-pointer'.
++   */
++  const bool found = m_treenode_hash.find(treeNodePtr, ptrI);
++#if !defined(NDEBUG)
++  if (found)
++  {
++    Ptr<TreeNode> check;
++    m_treenode_pool.getPtr(check, ptrI);
++    ndbassert(check.p == treeNodePtr.p);
++    ndbassert(check.i == treeNodePtr.i);
++  }
++#endif
++  return found;
++}
++
++
++void Dbspj::insertGuardedPtr(Ptr<Request> requestPtr, Ptr<ScanFragHandle> scanFragPtr)
++{
++  scanFragPtr.p->key = scanFragPtr.i;
++  m_scanfraghandle_hash.add(scanFragPtr);
++}
++
++void Dbspj::removeGuardedPtr(Ptr<ScanFragHandle> scanFragPtr)
++{
++  m_scanfraghandle_hash.remove(scanFragPtr);
++}
++
++inline
++bool Dbspj::getGuardedPtr(Ptr<ScanFragHandle> &scanFragPtr, Uint32 ptrI)
++{
++  const bool found = m_scanfraghandle_hash.find(scanFragPtr, ptrI);
++#if !defined(NDEBUG)
++  if (found)
++  {
++    Ptr<ScanFragHandle> check;
++    m_scanfraghandle_pool.getPtr(check, ptrI);
++    ndbassert(check.p == scanFragPtr.p);
++    ndbassert(check.i == scanFragPtr.i);
++  }
++#endif
++  return found;
++}
++
++
+ void Dbspj::execSIGNAL_DROPPED_REP(Signal* signal)
+ {
+   /* An incoming signal was dropped, handle it.
+@@ -145,7 +216,7 @@ void Dbspj::execSIGNAL_DROPPED_REP(Signal* signal)
+     const Uint32 ptrI = truncatedTransIdAI->connectPtr;
+ 
+     Ptr<TreeNode> treeNodePtr;
+-    m_treenode_pool.getPtr(treeNodePtr, ptrI);
++    ndbrequire(getGuardedPtr(treeNodePtr, ptrI));
+     Ptr<Request> requestPtr;
+     m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+   
+@@ -482,6 +553,8 @@ void Dbspj::execREAD_CONFIG_REQ(Signal* signal)
+   m_scanfraghandle_pool.arena_pool_init(&m_arenaAllocator, RT_SPJ_SCANFRAG, pc);
+   m_lookup_request_hash.setSize(16);
+   m_scan_request_hash.setSize(16);
++  m_treenode_hash.setSize(257);         // Prime number near 256
++  m_scanfraghandle_hash.setSize(1021);  // Prime number near 1024
+   void* ptr = m_ctx.m_mm.get_memroot();
+   m_page_pool.set((RowPage*)ptr, (Uint32)~0);
+ 
+@@ -772,7 +845,7 @@ Dbspj::execCONTINUEB(Signal* signal)
+   {
+     Ptr<TreeNode> treeNodePtr;
+     Ptr<Request> requestPtr;
+-    m_treenode_pool.getPtr(treeNodePtr, signal->theData[1]);
++    ndbrequire(getGuardedPtr(treeNodePtr, signal->theData[1]));
+     m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+     scanFrag_sendDihGetNodesReq(signal, requestPtr, treeNodePtr);
+     checkPrepareComplete(signal, requestPtr);
+@@ -2422,6 +2495,7 @@ Dbspj::createNode(Build_context& ctx, Ptr<Request> requestPtr,
+     Local_TreeNode_list list(m_treenode_pool, requestPtr.p->m_nodes);
+     list.addLast(treeNodePtr);
+     treeNodePtr.p->m_node_no = ctx.m_cnt;
++    insertGuardedPtr(requestPtr, treeNodePtr);
+     return 0;
+   }
+   return DbspjErr::OutOfOperations;
+@@ -3406,6 +3480,7 @@ Dbspj::cleanup(Ptr<Request> requestPtr)
+       ndbrequire(nodePtr.p->m_info != 0 && nodePtr.p->m_info->m_cleanup != 0);
+       (this->*(nodePtr.p->m_info->m_cleanup))(requestPtr, nodePtr);
+ 
++      removeGuardedPtr(nodePtr);
+       m_treenode_pool.release(nodePtr);
+     }
+   }
+@@ -3564,7 +3639,7 @@ Dbspj::execLQHKEYREF(Signal* signal)
+   const LqhKeyRef* ref = reinterpret_cast<const LqhKeyRef*>(signal->getDataPtr());
+ 
+   Ptr<TreeNode> treeNodePtr;
+-  m_treenode_pool.getPtr(treeNodePtr, ref->connectPtr);
++  ndbrequire(getGuardedPtr(treeNodePtr, ref->connectPtr));
+ 
+   Ptr<Request> requestPtr;
+   m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+@@ -3593,7 +3668,7 @@ Dbspj::execLQHKEYCONF(Signal* signal)
+ 
+   const LqhKeyConf* conf = reinterpret_cast<const LqhKeyConf*>(signal->getDataPtr());
+   Ptr<TreeNode> treeNodePtr;
+-  m_treenode_pool.getPtr(treeNodePtr, conf->opPtr);
++  ndbrequire(getGuardedPtr(treeNodePtr, conf->opPtr));
+ 
+   Ptr<Request> requestPtr;
+   m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+@@ -3619,7 +3694,7 @@ Dbspj::execSCAN_FRAGREF(Signal* signal)
+   const ScanFragRef* ref = reinterpret_cast<const ScanFragRef*>(signal->getDataPtr());
+ 
+   Ptr<ScanFragHandle> scanFragHandlePtr;
+-  m_scanfraghandle_pool.getPtr(scanFragHandlePtr, ref->senderData);
++  ndbrequire(getGuardedPtr(scanFragHandlePtr, ref->senderData));
+   Ptr<TreeNode> treeNodePtr;
+   m_treenode_pool.getPtr(treeNodePtr, scanFragHandlePtr.p->m_treeNodePtrI);
+   Ptr<Request> requestPtr;
+@@ -3652,7 +3727,7 @@ Dbspj::execSCAN_HBREP(Signal* signal)
+   //Uint32 transId[2] = { signal->theData[1], signal->theData[2] };
+ 
+   Ptr<ScanFragHandle> scanFragHandlePtr;
+-  m_scanfraghandle_pool.getPtr(scanFragHandlePtr, senderData);
++  ndbrequire(getGuardedPtr(scanFragHandlePtr, senderData));
+   Ptr<TreeNode> treeNodePtr;
+   m_treenode_pool.getPtr(treeNodePtr, scanFragHandlePtr.p->m_treeNodePtrI);
+   Ptr<Request> requestPtr;
+@@ -3682,7 +3757,7 @@ Dbspj::execSCAN_FRAGCONF(Signal* signal)
+ #endif
+ 
+   Ptr<ScanFragHandle> scanFragHandlePtr;
+-  m_scanfraghandle_pool.getPtr(scanFragHandlePtr, conf->senderData);
++  ndbrequire(getGuardedPtr(scanFragHandlePtr, conf->senderData));
+   Ptr<TreeNode> treeNodePtr;
+   m_treenode_pool.getPtr(treeNodePtr, scanFragHandlePtr.p->m_treeNodePtrI);
+   Ptr<Request> requestPtr;
+@@ -3849,7 +3924,7 @@ Dbspj::execTRANSID_AI(Signal* signal)
+   Uint32 ptrI = req->connectPtr;
+ 
+   Ptr<TreeNode> treeNodePtr;
+-  m_treenode_pool.getPtr(treeNodePtr, ptrI);
++  ndbrequire(getGuardedPtr(treeNodePtr, ptrI));
+   Ptr<Request> requestPtr;
+   m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+   
+@@ -6487,6 +6562,7 @@ Dbspj::scanFrag_build(Build_context& ctx,
+               fragPtr.p->m_treeNodePtrI = treeNodePtr.i;
+               fragPtr.p->m_ref = ref;
+               list.addLast(fragPtr);
++              insertGuardedPtr(requestPtr, fragPtr);
+             }
+             else
+             {
+@@ -6515,6 +6591,7 @@ Dbspj::scanFrag_build(Build_context& ctx,
+             fragPtr.p->m_treeNodePtrI = treeNodePtr.i;
+             fragPtr.p->m_ref = ref;
+             list.addLast(fragPtr);
++            insertGuardedPtr(requestPtr, fragPtr);
+           }
+           else
+           {
+@@ -6777,7 +6854,7 @@ Dbspj::execDIH_SCAN_TAB_REF(Signal* signal)
+   DihScanTabRef * ref = (DihScanTabRef*)signal->getDataPtr();
+ 
+   Ptr<TreeNode> treeNodePtr;
+-  m_treenode_pool.getPtr(treeNodePtr, ref->senderData);
++  ndbrequire(getGuardedPtr(treeNodePtr, ref->senderData));
+   Ptr<Request> requestPtr;
+   m_request_pool.getPtr(requestPtr, treeNodePtr.p->m_requestPtrI);
+ 
+@@ -6795,8 +6872,7 @@ Dbspj::execDIH_SCAN_TAB_CONF(Signal* signal)
+   DihScanTabConf * conf = (DihScanTabConf*)signal->getDataPtr();
+ 
+   Ptr<TreeNode> treeNodePtr;
+-  m_treenode_pool.getPtr(treeNodePtr, conf->senderData);
+-
++  ndbrequire(getGuardedPtr(treeNodePtr, conf->senderData));
+   ndbrequire(treeNodePtr.p->m_info == &g_ScanFragOpInfo);
+ 
+   ScanFragData& data = treeNodePtr.p->m_scanFrag_data;
+@@ -6842,7 +6918,7 @@ Dbspj::execDIH_SCAN_TAB_CONF(Signal* signal)
+   {
+     Ptr<ScanFragHandle> fragPtr;
+ 
+-    /** Allocate & init all 'fragCnt' fragment desriptors */
++    /** Allocate & init all 'fragCnt' fragment descriptors */
+     {
+       Local_ScanFragHandle_list list(m_scanfraghandle_pool, data.m_fragments);
+ 
+@@ -6864,6 +6940,7 @@ Dbspj::execDIH_SCAN_TAB_CONF(Signal* signal)
+           fragPtr.p->init(fragNo, readBackup);
+           fragPtr.p->m_treeNodePtrI = treeNodePtr.i;
+           list.addLast(fragPtr);
++          insertGuardedPtr(requestPtr, fragPtr);
+         }
+         else
+         {
+@@ -8494,7 +8571,6 @@ Dbspj::scanFrag_execNODE_FAILREP(Signal* signal,
+     break;
+   }
+ 
+-
+   Uint32 sum = 0;
+   ScanFragData& data = treeNodePtr.p->m_scanFrag_data;
+   Local_ScanFragHandle_list list(m_scanfraghandle_pool, data.m_fragments);
+@@ -8637,6 +8713,18 @@ Dbspj::scanFrag_cleanup(Ptr<Request> requestPtr,
+    */
+   scanFrag_release_rangekeys(requestPtr,treeNodePtr);
+ 
++  /**
++   * Disallow refering the fragPtr memory object from incomming signals.
++   */
++  {
++    Local_ScanFragHandle_list list(m_scanfraghandle_pool, data.m_fragments);
++    Ptr<ScanFragHandle> fragPtr;
++    for (list.first(fragPtr); !fragPtr.isNull(); list.next(fragPtr))
++    {
++      removeGuardedPtr(fragPtr);
++    }
++  }
++
+   if (treeNodePtr.p->m_bits & TreeNode::T_PRUNE_PATTERN)
+   {
+     jam();

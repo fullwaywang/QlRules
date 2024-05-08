@@ -1,0 +1,473 @@
+commit 60cfdb2127c821ab92269b3fa3f9d7dabebbb637	60cfdb2127c821ab92269b3fa3f9d7dabebbb637
+Author: Marc Alff <marc.alff@oracle.com>
+Date:   Thu Feb 17 14:49:27 2022 +0100
+
+    Bug#33869388 performance_schema.processlist returns no rows
+      for anonymous account with PROCESS privs
+    
+    Problem
+    =======
+    
+    When the following conditions are true:
+    - the client connects with an anonymous account (user = '')
+    - the anonymous account is granted the PROCESS privilege
+    
+    the statement:
+      SELECT * FROM performance_schema.processlist
+    
+    returns no rows.
+    
+    This is incorrect, because the user has the PROCESS privilege,
+    all rows should be returned.
+    
+    Root cause
+    ==========
+    
+    table_processlist::set_access()
+    check various conditions in an incorrect order.
+    
+    When the user is an anonymous account:
+      if (client_priv_user.length == 0)
+    the code set:
+      m_row_priv.m_auth = PROCESSLIST_DENIED
+    in effect making the table appear empty.
+    
+    This happens regardless of the PROCESS_ACL privilege.
+    
+    Fix
+    ===
+    
+    Reorder checks in table_processlist::set_access(),
+    to test:
+    - PROCESS_ACL first, possibly allowing all rows
+    - then an anonymous account second, possibly filtering all rows
+    
+    This is the expected behavior,
+    per the historical implementation of SHOW PROCESSLIST.
+    
+    Added test case performance_schema.processlist_anonymous
+    to cover this use case.
+    
+    Also, added test case performance_schema.processlist_reg_user,
+    to improve test coverage of PROCESS_ACL for a regular user.
+    
+    Change-Id: Ic5e504b25ee34170d29ecebaea56e670839e6d3f
+
+diff --git a/mysql-test/suite/perfschema/r/processlist_anonymous.result b/mysql-test/suite/perfschema/r/processlist_anonymous.result
+new file mode 100644
+index 00000000000..07b3c65e9be
+--- /dev/null
++++ b/mysql-test/suite/perfschema/r/processlist_anonymous.result
+@@ -0,0 +1,60 @@
++##
++## Test the Performance Schema-based implementation of SHOW PROCESSLIST.
++## Verify behavior for anonymous users and PROCESS_ACL.
++##
++SELECT @@global.performance_schema_show_processlist INTO @save_processlist;
++SET @@global.performance_schema_show_processlist = OFF;
++SHOW GRANTS;
++Grants for @localhost
++GRANT USAGE ON *.* TO ``@`localhost`
++SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST;
++ID	USER	HOST	DB	COMMAND	TIME	STATE	INFO
++SELECT * FROM performance_schema.processlist;
++ID	USER	HOST	DB	COMMAND	TIME	STATE	INFO	EXECUTION_ENGINE
++SHOW PROCESSLIST;
++ERROR 42000: Access denied; you need (at least one of) the PROCESS privilege(s) for this operation
++SET @@global.performance_schema_show_processlist = ON;
++SHOW GRANTS;
++Grants for @localhost
++GRANT USAGE ON *.* TO ``@`localhost`
++SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST;
++ID	USER	HOST	DB	COMMAND	TIME	STATE	INFO
++SELECT * FROM performance_schema.processlist;
++ID	USER	HOST	DB	COMMAND	TIME	STATE	INFO	EXECUTION_ENGINE
++SHOW PROCESSLIST;
++ERROR 42000: Access denied; you need (at least one of) the PROCESS privilege(s) for this operation
++GRANT PROCESS ON *.* TO ''@'localhost';
++SET @@global.performance_schema_show_processlist = OFF;
++SHOW GRANTS;
++Grants for @localhost
++GRANT PROCESS ON *.* TO ``@`localhost`
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++count(*) >= 2
++1
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++count(*) >= 2
++1
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	BROKEN_ROWS_SENT
++statement/sql/show_processlist	SHOW PROCESSLIST	0
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++SHOW GRANTS;
++Grants for @localhost
++GRANT PROCESS ON *.* TO ``@`localhost`
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++count(*) >= 2
++1
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++count(*) >= 2
++1
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT >= 2
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	ROWS_SENT >= 2
++statement/sql/show_processlist	SHOW PROCESSLIST	1
++SET @@global.performance_schema_show_processlist = @save_processlist;
+diff --git a/mysql-test/suite/perfschema/r/processlist_reg_user.result b/mysql-test/suite/perfschema/r/processlist_reg_user.result
+new file mode 100644
+index 00000000000..db2b9b3e184
+--- /dev/null
++++ b/mysql-test/suite/perfschema/r/processlist_reg_user.result
+@@ -0,0 +1,77 @@
++##
++## Test the Performance Schema-based implementation of SHOW PROCESSLIST.
++## Verify behavior for regular users and PROCESS_ACL.
++##
++SELECT @@global.performance_schema_show_processlist INTO @save_processlist;
++SET @@global.performance_schema_show_processlist = OFF;
++CREATE USER 'regular'@'localhost';
++SHOW GRANTS;
++Grants for regular@localhost
++GRANT USAGE ON *.* TO `regular`@`localhost`
++SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST;
++USER	HOST	INFO
++regular	localhost	SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
++SELECT USER, HOST, INFO FROM performance_schema.processlist;
++USER	HOST	INFO
++regular	localhost	SELECT USER, HOST, INFO FROM performance_schema.processlist
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	BROKEN_ROWS_SENT
++statement/sql/show_processlist	SHOW PROCESSLIST	0
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++SHOW GRANTS;
++Grants for regular@localhost
++GRANT USAGE ON *.* TO `regular`@`localhost`
++SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST;
++USER	HOST	INFO
++regular	localhost	SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST
++SELECT USER, HOST, INFO FROM performance_schema.processlist;
++USER	HOST	INFO
++regular	localhost	SELECT USER, HOST, INFO FROM performance_schema.processlist
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	ROWS_SENT
++statement/sql/show_processlist	SHOW PROCESSLIST	1
++TRUNCATE TABLE performance_schema.events_statements_history;
++GRANT PROCESS ON *.* TO 'regular'@'localhost';
++SET @@global.performance_schema_show_processlist = OFF;
++SHOW GRANTS;
++Grants for regular@localhost
++GRANT PROCESS ON *.* TO `regular`@`localhost`
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++count(*) >= 2
++1
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++count(*) >= 2
++1
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	BROKEN_ROWS_SENT
++statement/sql/show_processlist	SHOW PROCESSLIST	0
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++SHOW GRANTS;
++Grants for regular@localhost
++GRANT PROCESS ON *.* TO `regular`@`localhost`
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++count(*) >= 2
++1
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++count(*) >= 2
++1
++SHOW PROCESSLIST;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT >= 2
++FROM performance_schema.events_statements_history
++WHERE SQL_TEXT = "SHOW PROCESSLIST";
++EVENT_NAME	SQL_TEXT	ROWS_SENT >= 2
++statement/sql/show_processlist	SHOW PROCESSLIST	1
++TRUNCATE TABLE performance_schema.events_statements_history;
++SET @@global.performance_schema_show_processlist = @save_processlist;
++DROP USER 'regular'@'localhost';
+diff --git a/mysql-test/suite/perfschema/t/processlist_anonymous.test b/mysql-test/suite/perfschema/t/processlist_anonymous.test
+new file mode 100644
+index 00000000000..09cb5e56889
+--- /dev/null
++++ b/mysql-test/suite/perfschema/t/processlist_anonymous.test
+@@ -0,0 +1,106 @@
++--echo ##
++--echo ## Test the Performance Schema-based implementation of SHOW PROCESSLIST.
++--echo ## Verify behavior for anonymous users and PROCESS_ACL.
++--echo ##
++
++--source include/no_protocol.inc
++
++SELECT @@global.performance_schema_show_processlist INTO @save_processlist;
++
++--source include/add_anonymous_users.inc
++
++SET @@global.performance_schema_show_processlist = OFF;
++
++connect (anon,localhost,test,,test,$MASTER_MYPORT,$MASTER_MYSOCK);
++
++SHOW GRANTS;
++
++# Empty
++SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Empty
++SELECT * FROM performance_schema.processlist;
++
++--error ER_SPECIFIC_ACCESS_DENIED_ERROR
++SHOW PROCESSLIST;
++
++connection default;
++
++SET @@global.performance_schema_show_processlist = ON;
++
++connection anon;
++
++SHOW GRANTS;
++
++# Empty
++SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Empty
++SELECT * FROM performance_schema.processlist;
++
++--error ER_SPECIFIC_ACCESS_DENIED_ERROR
++SHOW PROCESSLIST;
++
++disconnect anon;
++connection default;
++
++GRANT PROCESS ON *.* TO ''@'localhost';
++
++SET @@global.performance_schema_show_processlist = OFF;
++
++connect (anon2,localhost,test,,test,$MASTER_MYPORT,$MASTER_MYSOCK);
++
++SHOW GRANTS;
++
++# Full rows
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Full rows
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++
++# Full rows
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++# Returns ROWS_SENT = 0 even when SHOW PROCESSLIST has rows
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++connection anon2;
++
++
++connection default;
++
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++
++
++connection anon2;
++
++SHOW GRANTS;
++
++# Full rows
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Full rows
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++
++# Full rows
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT >= 2
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++
++disconnect anon2;
++connection default;
++
++--source include/delete_anonymous_users.inc
++
++SET @@global.performance_schema_show_processlist = @save_processlist;
++
+diff --git a/mysql-test/suite/perfschema/t/processlist_reg_user.test b/mysql-test/suite/perfschema/t/processlist_reg_user.test
+new file mode 100644
+index 00000000000..ea12211a322
+--- /dev/null
++++ b/mysql-test/suite/perfschema/t/processlist_reg_user.test
+@@ -0,0 +1,121 @@
++--echo ##
++--echo ## Test the Performance Schema-based implementation of SHOW PROCESSLIST.
++--echo ## Verify behavior for regular users and PROCESS_ACL.
++--echo ##
++
++--source include/no_protocol.inc
++
++SELECT @@global.performance_schema_show_processlist INTO @save_processlist;
++
++SET @@global.performance_schema_show_processlist = OFF;
++
++CREATE USER 'regular'@'localhost';
++
++connect (reg,localhost,regular,,test,$MASTER_MYPORT,$MASTER_MYSOCK);
++
++SHOW GRANTS;
++
++# Self rows only
++SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Self rows only
++SELECT USER, HOST, INFO FROM performance_schema.processlist;
++
++# Self rows only
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++
++# Returns ROWS_SENT = 0 even when SHOW PROCESSLIST has rows
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++
++connection reg;
++
++SHOW GRANTS;
++
++# Self rows only
++SELECT USER, HOST, INFO FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Self rows only
++SELECT USER, HOST, INFO FROM performance_schema.processlist;
++
++# Self rows only
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++
++TRUNCATE TABLE performance_schema.events_statements_history;
++
++disconnect reg;
++
++GRANT PROCESS ON *.* TO 'regular'@'localhost';
++
++SET @@global.performance_schema_show_processlist = OFF;
++
++connect (reg2,localhost,regular,,test,$MASTER_MYPORT,$MASTER_MYSOCK);
++
++SHOW GRANTS;
++
++# Full rows
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Full rows
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++
++# Full rows
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++
++# Returns ROWS_SENT = 0 even when SHOW PROCESSLIST has rows
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT as BROKEN_ROWS_SENT
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++
++TRUNCATE TABLE performance_schema.events_statements_history;
++set @@global.performance_schema_show_processlist = ON;
++
++connection reg2;
++
++SHOW GRANTS;
++
++# Full rows
++SELECT count(*) >= 2 FROM INFORMATION_SCHEMA.PROCESSLIST;
++
++# Full rows
++SELECT count(*) >= 2 FROM performance_schema.processlist;
++
++# Full rows
++--disable_result_log
++SHOW PROCESSLIST;
++--enable_result_log
++
++connection default;
++
++SELECT EVENT_NAME, SQL_TEXT, ROWS_SENT >= 2
++  FROM performance_schema.events_statements_history
++  WHERE SQL_TEXT = "SHOW PROCESSLIST";
++
++TRUNCATE TABLE performance_schema.events_statements_history;
++
++disconnect reg2;
++
++SET @@global.performance_schema_show_processlist = @save_processlist;
++
++DROP USER 'regular'@'localhost';
++
+diff --git a/storage/perfschema/table_processlist.cc b/storage/perfschema/table_processlist.cc
+index c9885103943..80c3ca0dc97 100644
+--- a/storage/perfschema/table_processlist.cc
++++ b/storage/perfschema/table_processlist.cc
+@@ -103,6 +103,12 @@ int table_processlist::set_access(void) {
+     return 0;
+   }
+ 
++  if (thd->security_context()->check_access(PROCESS_ACL)) {
++    /* PROCESS_ACL granted. */
++    m_row_priv.m_auth = PROCESSLIST_ALL;
++    return 0;
++  }
++
+   LEX_CSTRING client_priv_user = thd->security_context()->priv_user();
+   if (client_priv_user.length == 0) {
+     /* Anonymous user. */
+@@ -110,12 +116,6 @@ int table_processlist::set_access(void) {
+     return 0;
+   }
+ 
+-  if (thd->security_context()->check_access(PROCESS_ACL)) {
+-    /* PROCESS_ACL granted. */
+-    m_row_priv.m_auth = PROCESSLIST_ALL;
+-    return 0;
+-  }
+-
+   /* Authenticated user, PROCESS_ACL not granted. */
+   m_row_priv.m_auth = PROCESSLIST_USER_ONLY;
+   m_row_priv.m_priv_user_length =

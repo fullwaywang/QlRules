@@ -1,0 +1,24 @@
+commit a30f3915ce65eb3a98ab6953c1c201c453392b19	a30f3915ce65eb3a98ab6953c1c201c453392b19
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Thu Mar 25 14:59:49 2021 +0100
+
+    Post-push fix for Bug #32618301 INNODB SHOULD REPORT CHANGES IN WAIT-FOR GRAPH TO SERVER LAYER
+    
+    conditional_sync_point is debug only - changed to CONDITIONAL_SYNC_POINT wrapper,
+    which is defined as empty in release builds.
+    
+    Reviewed-by: Erlend Dahl <erlend.dahl@oracle.com> over IM
+
+diff --git a/sql/sql_thd_api.cc b/sql/sql_thd_api.cc
+index a198e278527..62dc0200767 100644
+--- a/sql/sql_thd_api.cc
++++ b/sql/sql_thd_api.cc
+@@ -631,7 +631,7 @@ void thd_report_row_lock_wait(THD *self, THD *wait_for) {
+ void thd_report_lock_wait(THD *self, THD *wait_for,
+                           bool /* may_survive_prepare*/) {
+   DBUG_TRACE;
+-  conditional_sync_point("report_lock_collision");
++  CONDITIONAL_SYNC_POINT("report_lock_collision");
+ 
+   if (self != nullptr && wait_for != nullptr && is_mts_worker(self) &&
+       is_mts_worker(wait_for))

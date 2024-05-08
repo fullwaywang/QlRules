@@ -1,0 +1,44 @@
+commit 95bd6e0246b770b8a0019ca143458c1d5ea7b064	95bd6e0246b770b8a0019ca143458c1d5ea7b064
+Author: Andrzej Religa <andrzej.religa@oracle.com>
+Date:   Tue May 23 13:16:45 2023 +0200
+
+    Bug#35414464 Single TLS connection triggers 2 sessions
+    cache hits
+    
+    Patch for "Bug#35339886 Use compliant primes for DH and
+    curves for ECDH" limited the list of the supported curves
+    groups to the 3 elements: secp256r1, secp521r1, secp384r1.
+    This causes the client (Router in this case) list to be
+    incomaptible as the first group on the Router's list is
+    ecdh_x25519 which the server does not support now. As
+    a result the handshake procedure is restarted and the
+    Router uses supported secp256r1 the second time.
+    
+    This patch limits the curves groups on the Router side
+    to the same 3 elements to match the server's list and
+    avoid the additional TLS handshake round-trip.
+    
+    Change-Id: Ib3a976d06aa6d61e2d627ffeda59882e45ff61fd
+
+diff --git a/router/src/harness/src/tls_client_context.cc b/router/src/harness/src/tls_client_context.cc
+index ab4db882e67..cde4e484cba 100644
+--- a/router/src/harness/src/tls_client_context.cc
++++ b/router/src/harness/src/tls_client_context.cc
+@@ -30,6 +30,8 @@
+ #include "mysql/harness/tls_error.h"
+ #include "openssl_version.h"
+ 
++#include <dh_ecdh_config.h>
++
+ #if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 1, 0)
+ #define TLS_CLIENT_METHOD() TLS_client_method()
+ #else
+@@ -38,6 +40,8 @@
+ 
+ TlsClientContext::TlsClientContext(TlsVerify mode)
+     : TlsContext(TLS_CLIENT_METHOD()) {
++  (void)set_ecdh(ssl_ctx_.get());
++  (void)set_dh(ssl_ctx_.get());
+   verify(mode);
+ }
+ 

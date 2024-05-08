@@ -1,0 +1,225 @@
+commit 56df561e994d5d9f6a95ee3faed976ebf522f85a	56df561e994d5d9f6a95ee3faed976ebf522f85a
+Author: Ramakrishnan Kamalakannan <ramakrishnan.kamalakannan@oracle.com>
+Date:   Wed Jun 29 08:25:38 2022 +0200
+
+    Bug #34243694   DROP COLUMN with ALGORITHM=INSTANT causing sporadic table corruption
+    
+    Issue:
+      When a table is upgraded from 8.0.28 and has INSTANT ADD columns,
+      nullable columns calculation was wrong after this table is further
+      ALTERed to ADD/DROP with ALGORITHM=INSTANT. Because of which
+      existing rows were not interpreted correctly and "check table"
+      reported corruption.
+    
+    Fix:
+      Corrected the nullable column calculation for these rows so that
+      they can be interpreted correctly.
+      Added 4 test cases to
+      - Test the table with INSTANT ADD columns before upgrade and after
+        upgrade ADD/DROP at various places
+      - Test above scenario with recovery as well
+      - Test the table with INSTANT ADD columns before upgrade with various
+        datatypes and after upgrade ADD/DROP at various places with various datatypes
+      - Test above scenario with recovery as well
+    
+    Change-Id: Idce52ce589c1616790ee4d21e9b0adc5fbcdd0c8
+
+diff --git a/storage/innobase/dict/dict0dd.cc b/storage/innobase/dict/dict0dd.cc
+index 51cba486637..b6a2ca25f40 100644
+--- a/storage/innobase/dict/dict0dd.cc
++++ b/storage/innobase/dict/dict0dd.cc
+@@ -1861,9 +1861,13 @@ bool dd_instant_columns_consistent(const dd::Table &dd_table) {
+          (n_version_drop_cols >= (n_inst_cols - n_non_instant_cols)));
+ 
+   ut_ad(exp);
+-  ut_ad(found);
+ 
+-  return (found && exp);
++  /* found will be false iff after upgrade INSTANT ADD column was INSTANT
++  DROP. */
++  bool exp2 = found || dd_table_has_row_versions(dd_table);
++  ut_ad(exp2);
++
++  return (exp && exp2);
+ }
+ #endif /* UNIV_DEBUG */
+ 
+diff --git a/storage/innobase/dict/dict0dict.cc b/storage/innobase/dict/dict0dict.cc
+index 65da74ab299..c0a257a5a3b 100644
+--- a/storage/innobase/dict/dict0dict.cc
++++ b/storage/innobase/dict/dict0dict.cc
+@@ -2598,15 +2598,17 @@ dberr_t dict_index_add_to_cache_w_vcol(dict_table_t *table, dict_index_t *index,
+   new_index->set_instant_nullable(new_index->n_nullable);
+ 
+   if (new_index->is_clustered()) {
++    if (new_index->table->has_row_versions()) {
++      new_index->row_versions = true;
++    }
++
+     if (new_index->table->has_instant_cols()) {
+       ut_ad(new_index->table->is_upgraded_instant());
+       new_index->instant_cols = true;
+-      new_index->set_instant_nullable(
+-          new_index->get_n_nullable_before(new_index->get_instant_fields()));
+-    }
+-
+-    if (new_index->table->has_row_versions()) {
+-      new_index->row_versions = true;
++      const size_t n_instant_fields = new_index->get_instant_fields();
++      size_t new_n_nullable =
++          new_index->calculate_n_instant_nullable(n_instant_fields);
++      new_index->set_instant_nullable(new_n_nullable);
+     }
+   }
+ 
+diff --git a/storage/innobase/include/dict0mem.h b/storage/innobase/include/dict0mem.h
+index d4fdf5df760..ca6379edbfe 100644
+--- a/storage/innobase/include/dict0mem.h
++++ b/storage/innobase/include/dict0mem.h
+@@ -1331,7 +1331,11 @@ struct dict_index_t {
+     ut_ad(nth <= n_total_fields);
+ 
+     for (size_t i = 0; i < nth; ++i) {
+-      if (get_field(i)->col->is_nullable()) {
++      dict_col_t *col = get_field(i)->col;
++
++      ut_ad(!col->is_instant_dropped());
++
++      if (col->is_nullable()) {
+         nullable++;
+       }
+     }
+@@ -1349,6 +1353,42 @@ struct dict_index_t {
+   needed only for V1 INSTANT ADD. */
+   uint32_t get_instant_fields() const;
+ 
++  size_t calculate_n_instant_nullable(size_t _n_fields) const {
++    if (!has_row_versions()) {
++      ut_ad(has_instant_cols());
++      return get_n_nullable_before(_n_fields);
++    }
++
++    size_t n_drop_nullable_cols = 0;
++    size_t new_n_nullable = 0;
++    for (size_t i = 0; i < n_def; i++) {
++      const dict_field_t *field = &fields[i];
++      const dict_col_t *col = field->col;
++
++      if (col->is_instant_added()) {
++        continue;
++      }
++
++      if (col->is_instant_dropped()) {
++        if (col->get_col_phy_pos() < _n_fields && col->is_nullable()) {
++          n_drop_nullable_cols++;
++        }
++        continue;
++      }
++
++      /* This is regular column */
++      if (col->get_col_phy_pos() < _n_fields) {
++        if (col->is_nullable()) {
++          new_n_nullable++;
++        }
++      }
++    }
++
++    new_n_nullable += n_drop_nullable_cols;
++
++    return new_n_nullable;
++  }
++
+   /** Create nullables array.
+   @param[in]    current_row_version     current row version of table */
+   void create_nullables(uint32_t current_row_version);
+@@ -2425,6 +2465,15 @@ detect this and will eventually quit sooner. */
+     return static_cast<uint16_t>(n_instant_cols - get_n_sys_cols());
+   }
+ 
++  size_t get_n_instant_added_col_v1() const {
++    size_t n_cols_dropped = get_n_instant_drop_cols();
++    size_t n_cols_added = get_n_instant_add_cols();
++    size_t n_instant_added_cols =
++        n_cols + n_cols_dropped - n_cols_added - n_instant_cols;
++
++    return (n_instant_added_cols);
++  }
++
+   /** Get number of columns added instantly */
+   uint32_t get_n_instant_add_cols() const {
+     ut_ad(total_col_count >= initial_col_count);
+diff --git a/storage/innobase/include/dict0mem.ic b/storage/innobase/include/dict0mem.ic
+index 37f8a80e4e3..fb5f63ea9ae 100644
+--- a/storage/innobase/include/dict0mem.ic
++++ b/storage/innobase/include/dict0mem.ic
+@@ -86,8 +86,16 @@ static inline void dict_mem_fill_index_struct(
+ #endif /* UNIV_DEBUG */
+ }
+ 
+-/** Returns the number of fields before first instant ADD COLUMN */
++/** Returns the number of fields before first instant ADD COLUMN. It includes
++dropped fields also (if any) */
+ inline uint32_t dict_index_t::get_instant_fields() const {
+   ut_ad(has_instant_cols());
+-  return (n_fields - (table->n_cols - table->n_instant_cols));
++
++  size_t n_inst_cols_v1 = table->get_n_instant_added_col_v1();
++  size_t n_drop_cols = table->get_n_instant_drop_cols();
++  size_t n_add_cols = table->get_n_instant_add_cols();
++  size_t n_instant_fields =
++      n_fields + n_drop_cols - n_add_cols - n_inst_cols_v1;
++
++  return n_instant_fields;
+ }
+diff --git a/storage/innobase/mtr/mtr0log.cc b/storage/innobase/mtr/mtr0log.cc
+index 714a5d42a35..d67409919ba 100644
+--- a/storage/innobase/mtr/mtr0log.cc
++++ b/storage/innobase/mtr/mtr0log.cc
+@@ -1110,6 +1110,7 @@ static void update_instant_info(instant_fields_list_t f, dict_index_t *index) {
+ 
+   index->table->initial_col_count -= n_added;
+   index->table->current_col_count -= n_dropped;
++  index->table->n_cols -= n_dropped;
+ }
+ 
+ /** To populate dummy fields. Used only in case of REDUNDANT row format.
+@@ -1273,8 +1274,9 @@ byte *mlog_parse_index(byte *ptr, const byte *end_ptr, dict_index_t **index) {
+   /* For upgraded table from v1, set following */
+   if (inst_cols > 0) {
+     ind->instant_cols = true;
+-    ind->n_instant_nullable =
+-        ind->get_n_nullable_before(ind->get_instant_fields());
++    const size_t n_instant_fields = ind->get_instant_fields();
++    size_t new_n_nullable = ind->calculate_n_instant_nullable(n_instant_fields);
++    ind->set_instant_nullable(new_n_nullable);
+   }
+ 
+   ind->n_fields = n - n_dropped;
+diff --git a/storage/innobase/rem/rec.h b/storage/innobase/rem/rec.h
+index 86d6d7fd63e..cb4cf54d8e2 100644
+--- a/storage/innobase/rem/rec.h
++++ b/storage/innobase/rem/rec.h
+@@ -351,11 +351,13 @@ current index.
+       that record might not have all the fields in index. So get it now from
+       index. */
+ #ifdef UNIV_DEBUG
+-      if (index->has_instant_cols()) {
++      if (index->has_instant_cols() && !index->has_row_versions()) {
++        ut_ad(dict_index_get_n_fields(index) >= n);
+         ulint rec_diff = dict_index_get_n_fields(index) - n;
+         ulint col_diff = index->table->n_cols - index->table->n_instant_cols;
+         ut_ad(rec_diff <= col_diff);
+       }
++
+       if (n != dict_index_get_n_fields(index)) {
+         ut_ad(index->has_instant_cols_or_row_versions());
+       }
+@@ -869,7 +871,7 @@ static inline uint16_t rec_init_null_and_len_comp(const rec_t *rec,
+ 
+     /* Reposition nulls */
+     *nulls -= length;
+-    *n_null = index->get_n_nullable_before(non_default_fields);
++    *n_null = index->calculate_n_instant_nullable(non_default_fields);
+     ret = non_default_fields;
+   } else if (index->table->has_instant_cols()) {
+     /* Row inserted before first INSTANT ADD COLUMN in V1 */

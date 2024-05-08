@@ -1,0 +1,191 @@
+commit e243dd337bae86cd5f23a5eb671c94f17d5300c5	e243dd337bae86cd5f23a5eb671c94f17d5300c5
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Thu Feb 16 15:34:02 2023 +0200
+
+    Bug#34906592: CREATE USER IF NOT EXISTS adds a password history entry
+    
+    CREATE USER IF NOT EXIST was running almost to completion before it
+    detects the user exists and return without inisisting on adding it to
+    mysql.user.
+    This caused all the clauses in the CREATE USER to be verified too and,
+    unfortunately, password history to be both checked, pruned and updated.
+    This is extra work that should not be done.
+    Fixed by exiting early in check() if the user exists and the IF NOT
+    EXISTS clause is specified.
+    Added tests.
+    Some existing tests adjusted to reflect the lack of checking.
+    
+    Change-Id: I19997e21952afd6bb6ab1339488cdcd6424b039d
+
+diff --git a/mysql-test/r/user_if_exists.result b/mysql-test/r/user_if_exists.result
+index af49cbca0c6..25b4544c432 100644
+--- a/mysql-test/r/user_if_exists.result
++++ b/mysql-test/r/user_if_exists.result
+@@ -255,6 +255,7 @@ ne_user2@localhost,ne_user3@localhost;
+ Warnings:
+ Note	3162	Authorization ID 'ne_user2'@'localhost' does not exist.
+ Note	3162	Authorization ID 'ne_user3'@'localhost' does not exist.
++# restart:
+ #
+ # Bug #21807286: "CREATE USER IF NOT EXISTS" REPORTS AN ERROR
+ #
+@@ -269,4 +270,23 @@ ALTER USER IF EXISTS b21807286@localhost IDENTIFIED BY 'xyz';
+ Warnings:
+ Note	3162	Authorization ID 'b21807286'@'localhost' does not exist.
+ # End of 5.7 tests
+-# restart:
++#
++# Bug #34906592: CREATE USER IF NOT EXISTS adds a password history entry
++#
++SET GLOBAL password_history = 5;
++CREATE USER IF NOT EXISTS b34906592@localhost IDENTIFIED BY 'password';
++# Test: should return 0 rows.
++SELECT User,Host FROM mysql.password_history WHERE User = 'b34906592';
++User	Host
++b34906592	localhost
++# Test: shouls succeed with a warning that user exists
++CREATE USER IF NOT EXISTS b34906592@localhost IDENTIFIED BY 'password';
++Warnings:
++Note	3163	Authorization ID 'b34906592'@'localhost' already exists.
++# Test: should return 0 rows.
++SELECT User,Host FROM mysql.password_history WHERE User = 'b34906592';
++User	Host
++b34906592	localhost
++DROP USER b34906592@localhost;
++SET GLOBAL password_history = default;
++# End of 8.0 tests
+diff --git a/mysql-test/suite/rpl/r/rpl_user_if_exists.result b/mysql-test/suite/rpl/r/rpl_user_if_exists.result
+index 9165226f815..1925f9adb74 100644
+--- a/mysql-test/suite/rpl/r/rpl_user_if_exists.result
++++ b/mysql-test/suite/rpl/r/rpl_user_if_exists.result
+@@ -265,9 +265,6 @@ CREATE USER IF NOT EXISTS u1 IDENTIFIED WITH 'shsh',u2 IDENTIFIED BY 'pass',u3 I
+ ERROR HY000: Plugin 'shsh' is not loaded
+ include/assert.inc [assert that the above Event has not been added to binlog]
+ CREATE USER u1;
+-CREATE USER IF NOT EXISTS u1 IDENTIFIED WITH 'shsh',u2 IDENTIFIED BY 'pass',u3 IDENTIFIED BY 'nw';
+-ERROR HY000: Plugin 'shsh' is not loaded
+-include/assert.inc [assert that the above Event has not been added to binlog]
+ DROP USER u3;
+ # Errors scenarios related to password_history
+ SET @old_password_history= @@GLOBAL.password_history;
+diff --git a/mysql-test/suite/rpl/t/rpl_user_if_exists.test b/mysql-test/suite/rpl/t/rpl_user_if_exists.test
+index ef008d572c7..49b6b37245c 100644
+--- a/mysql-test/suite/rpl/t/rpl_user_if_exists.test
++++ b/mysql-test/suite/rpl/t/rpl_user_if_exists.test
+@@ -267,19 +267,7 @@ CREATE USER IF NOT EXISTS u1 IDENTIFIED WITH 'shsh',u2 IDENTIFIED BY 'pass',u3 I
+ --let $assert_cond= [SHOW MASTER STATUS, Position,1] = $pos_before
+ --source include/assert.inc
+ 
+-# User u1 exists
+-
+ CREATE USER u1;
+---let $pos_before= query_get_value(show master status,Position,1)
+-# CREATE gets ERROR since shsh auth_plugin do not exists
+---error ER_PLUGIN_IS_NOT_LOADED
+-CREATE USER IF NOT EXISTS u1 IDENTIFIED WITH 'shsh',u2 IDENTIFIED BY 'pass',u3 IDENTIFIED BY 'nw';
+-
+-# Check that  the above statement has not been logged
+---let $assert_text= assert that the above Event has not been added to binlog
+---let $assert_cond= [SHOW MASTER STATUS, Position,1] = $pos_before
+---source include/assert.inc
+-
+ DROP USER u3;
+ 
+ --echo # Errors scenarios related to password_history
+diff --git a/mysql-test/t/user_if_exists.test b/mysql-test/t/user_if_exists.test
+index 2c37b8dfbbd..20ee9eca7e8 100644
+--- a/mysql-test/t/user_if_exists.test
++++ b/mysql-test/t/user_if_exists.test
+@@ -184,6 +184,11 @@ ALTER USER IF EXISTS user1@localhost,ne_user3@localhost
+ DROP USER IF EXISTS user1@localhost,user2@localhost,ne_user1@localhost,
+                     ne_user2@localhost,ne_user3@localhost;
+ 
++# restore --log-raw option
++let $restart_parameters = restart:;
++--source include/restart_mysqld.inc
++
++
+ --echo #
+ --echo # Bug #21807286: "CREATE USER IF NOT EXISTS" REPORTS AN ERROR
+ --echo #
+@@ -195,9 +200,23 @@ DROP USER b21807286@localhost;
+ --echo # Must not fail but return a warning
+ ALTER USER IF EXISTS b21807286@localhost IDENTIFIED BY 'xyz';
+ 
+-
+ --echo # End of 5.7 tests
+ 
+-# restore --log-raw option
+-let $restart_parameters = restart:;
+---source include/restart_mysqld.inc
++--echo #
++--echo # Bug #34906592: CREATE USER IF NOT EXISTS adds a password history entry
++--echo #
++
++SET GLOBAL password_history = 5;
++CREATE USER IF NOT EXISTS b34906592@localhost IDENTIFIED BY 'password';
++--echo # Test: should return 0 rows.
++SELECT User,Host FROM mysql.password_history WHERE User = 'b34906592';
++--echo # Test: shouls succeed with a warning that user exists
++CREATE USER IF NOT EXISTS b34906592@localhost IDENTIFIED BY 'password';
++--echo # Test: should return 0 rows.
++SELECT User,Host FROM mysql.password_history WHERE User = 'b34906592';
++
++#cleanup
++DROP USER b34906592@localhost;
++SET GLOBAL password_history = default;
++
++--echo # End of 8.0 tests
+diff --git a/sql/auth/auth_internal.h b/sql/auth/auth_internal.h
+index 25ba4185384..2b1cf5324b4 100644
+--- a/sql/auth/auth_internal.h
++++ b/sql/auth/auth_internal.h
+@@ -305,7 +305,7 @@ bool set_and_validate_user_attributes(
+     THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
+     bool is_privileged_user, bool is_role, Table_ref *history_table,
+     bool *history_check_done, const char *cmd, Userhostpassword_list &,
+-    I_multi_factor_auth **mfa = nullptr);
++    I_multi_factor_auth **mfa = nullptr, bool if_not_exists = false);
+ typedef std::pair<std::string, bool> Grant_privilege;
+ typedef std::unordered_multimap<Role_id, Grant_privilege, role_id_hash>
+     User_to_dynamic_privileges_map;
+diff --git a/sql/auth/sql_user.cc b/sql/auth/sql_user.cc
+index 15c874ead41..a2d20003cae 100644
+--- a/sql/auth/sql_user.cc
++++ b/sql/auth/sql_user.cc
+@@ -1245,7 +1245,8 @@ bool set_and_validate_user_attributes(
+     THD *thd, LEX_USER *Str, acl_table::Pod_user_what_to_update &what_to_set,
+     bool is_privileged_user, bool is_role, Table_ref *history_table,
+     bool *history_check_done, const char *cmd,
+-    Userhostpassword_list &generated_passwords, I_multi_factor_auth **i_mfa) {
++    Userhostpassword_list &generated_passwords, I_multi_factor_auth **i_mfa,
++    bool if_not_exists) {
+   bool user_exists = false;
+   ACL_USER *acl_user;
+   plugin_ref plugin = nullptr;
+@@ -1295,6 +1296,16 @@ bool set_and_validate_user_attributes(
+     }
+   }
+ 
++  if (user_exists && if_not_exists) {
++    /*
++      CREATE USER/ROLE IF NOT EXISTS ... when the account exists
++      should be a no-op and be ignored.
++    */
++    assert(command == SQLCOM_CREATE_USER || command == SQLCOM_CREATE_ROLE);
++    what_to_set.m_what = NONE_ATTR;
++    return false;
++  }
++
+   mysql_mutex_lock(&LOCK_password_history);
+   Str->alter_status.password_history_length =
+       Str->alter_status.use_default_password_history
+@@ -2690,7 +2701,7 @@ bool mysql_create_user(THD *thd, List<LEX_USER> &list, bool if_not_exists,
+       if (set_and_validate_user_attributes(
+               thd, user_name, what_to_update, true, is_role,
+               &tables[ACL_TABLES::TABLE_PASSWORD_HISTORY], &history_check_done,
+-              "CREATE USER", generated_passwords, &mfa)) {
++              "CREATE USER", generated_passwords, &mfa, if_not_exists)) {
+         result = 1;
+         log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+         continue;

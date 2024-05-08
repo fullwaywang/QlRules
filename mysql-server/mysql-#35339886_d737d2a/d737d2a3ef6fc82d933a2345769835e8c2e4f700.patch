@@ -1,0 +1,838 @@
+commit d737d2a3ef6fc82d933a2345769835e8c2e4f700	d737d2a3ef6fc82d933a2345769835e8c2e4f700
+Author: Harin Vadodaria <harin.vadodaria@oracle.com>
+Date:   Wed May 17 12:11:04 2023 +0200
+
+    Bug#35339886: Use compliant primes for DH and curves for ECDH
+    
+    Description:
+    - Added RFC7919 support for DH
+    - Added NIST P-256 and above for ECDH
+    - Removed deprecated API usage
+    
+    Change-Id: I59d082c59968b0d2278fa96a513ccf7e6d4ba04a
+
+diff --git a/include/dh_ecdh_config.h b/include/dh_ecdh_config.h
+new file mode 100644
+index 00000000000..bdbe246d024
+--- /dev/null
++++ b/include/dh_ecdh_config.h
+@@ -0,0 +1,351 @@
++/*
++  Copyright (c) 2018, 2023, Oracle and/or its affiliates.
++
++  This program is free software; you can redistribute it and/or modify
++  it under the terms of the GNU General Public License, version 2.0,
++  as published by the Free Software Foundation.
++
++  This program is also distributed with certain software (including
++  but not limited to OpenSSL) that is licensed under separate terms,
++  as designated in a particular file or component or in included license
++  documentation.  The authors of MySQL hereby grant you an additional
++  permission to link the program and your derivative works with the
++  separately licensed software that they have included with MySQL.
++
++  This program is distributed in the hope that it will be useful,
++  but WITHOUT ANY WARRANTY; without even the implied warranty of
++  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++  GNU General Public License for more details.
++
++  You should have received a copy of the GNU General Public License
++  along with this program; if not, write to the Free Software
++  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++*/
++
++#ifndef DH_KEYS_INCLUDED
++#define DH_KEYS_INCLUDED
++
++#include "my_dbug.h"
++
++#include <openssl/dh.h>
++#include <openssl/evp.h>
++#include <openssl/ssl.h>
++
++#if OPENSSL_VERSION_NUMBER < 0x10002000L
++#include <openssl/ec.h>
++#endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
++
++namespace {
++#if OPENSSL_VERSION_NUMBER < 0x10100000L
++/* Following primes are from https://www.rfc-editor.org/rfc/rfc7919#appendix-A
++ */
++
++const unsigned char rfc7919_ffdhe2048_p[] = {
++    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58,
++    0xA2, 0xBB, 0x4A, 0x9A, 0xAF, 0xDC, 0x56, 0x20, 0x27, 0x3D, 0x3C, 0xF1,
++    0xD8, 0xB9, 0xC5, 0x83, 0xCE, 0x2D, 0x36, 0x95, 0xA9, 0xE1, 0x36, 0x41,
++    0x14, 0x64, 0x33, 0xFB, 0xCC, 0x93, 0x9D, 0xCE, 0x24, 0x9B, 0x3E, 0xF9,
++    0x7D, 0x2F, 0xE3, 0x63, 0x63, 0x0C, 0x75, 0xD8, 0xF6, 0x81, 0xB2, 0x02,
++    0xAE, 0xC4, 0x61, 0x7A, 0xD3, 0xDF, 0x1E, 0xD5, 0xD5, 0xFD, 0x65, 0x61,
++    0x24, 0x33, 0xF5, 0x1F, 0x5F, 0x06, 0x6E, 0xD0, 0x85, 0x63, 0x65, 0x55,
++    0x3D, 0xED, 0x1A, 0xF3, 0xB5, 0x57, 0x13, 0x5E, 0x7F, 0x57, 0xC9, 0x35,
++    0x98, 0x4F, 0x0C, 0x70, 0xE0, 0xE6, 0x8B, 0x77, 0xE2, 0xA6, 0x89, 0xDA,
++    0xF3, 0xEF, 0xE8, 0x72, 0x1D, 0xF1, 0x58, 0xA1, 0x36, 0xAD, 0xE7, 0x35,
++    0x30, 0xAC, 0xCA, 0x4F, 0x48, 0x3A, 0x79, 0x7A, 0xBC, 0x0A, 0xB1, 0x82,
++    0xB3, 0x24, 0xFB, 0x61, 0xD1, 0x08, 0xA9, 0x4B, 0xB2, 0xC8, 0xE3, 0xFB,
++    0xB9, 0x6A, 0xDA, 0xB7, 0x60, 0xD7, 0xF4, 0x68, 0x1D, 0x4F, 0x42, 0xA3,
++    0xDE, 0x39, 0x4D, 0xF4, 0xAE, 0x56, 0xED, 0xE7, 0x63, 0x72, 0xBB, 0x19,
++    0x0B, 0x07, 0xA7, 0xC8, 0xEE, 0x0A, 0x6D, 0x70, 0x9E, 0x02, 0xFC, 0xE1,
++    0xCD, 0xF7, 0xE2, 0xEC, 0xC0, 0x34, 0x04, 0xCD, 0x28, 0x34, 0x2F, 0x61,
++    0x91, 0x72, 0xFE, 0x9C, 0xE9, 0x85, 0x83, 0xFF, 0x8E, 0x4F, 0x12, 0x32,
++    0xEE, 0xF2, 0x81, 0x83, 0xC3, 0xFE, 0x3B, 0x1B, 0x4C, 0x6F, 0xAD, 0x73,
++    0x3B, 0xB5, 0xFC, 0xBC, 0x2E, 0xC2, 0x20, 0x05, 0xC5, 0x8E, 0xF1, 0x83,
++    0x7D, 0x16, 0x83, 0xB2, 0xC6, 0xF3, 0x4A, 0x26, 0xC1, 0xB2, 0xEF, 0xFA,
++    0x88, 0x6B, 0x42, 0x38, 0x61, 0x28, 0x5C, 0x97, 0xFF, 0xFF, 0xFF, 0xFF,
++    0xFF, 0xFF, 0xFF, 0xFF};
++
++const unsigned char rfc7919_ffdhe3072_p[] = {
++    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58,
++    0xA2, 0xBB, 0x4A, 0x9A, 0xAF, 0xDC, 0x56, 0x20, 0x27, 0x3D, 0x3C, 0xF1,
++    0xD8, 0xB9, 0xC5, 0x83, 0xCE, 0x2D, 0x36, 0x95, 0xA9, 0xE1, 0x36, 0x41,
++    0x14, 0x64, 0x33, 0xFB, 0xCC, 0x93, 0x9D, 0xCE, 0x24, 0x9B, 0x3E, 0xF9,
++    0x7D, 0x2F, 0xE3, 0x63, 0x63, 0x0C, 0x75, 0xD8, 0xF6, 0x81, 0xB2, 0x02,
++    0xAE, 0xC4, 0x61, 0x7A, 0xD3, 0xDF, 0x1E, 0xD5, 0xD5, 0xFD, 0x65, 0x61,
++    0x24, 0x33, 0xF5, 0x1F, 0x5F, 0x06, 0x6E, 0xD0, 0x85, 0x63, 0x65, 0x55,
++    0x3D, 0xED, 0x1A, 0xF3, 0xB5, 0x57, 0x13, 0x5E, 0x7F, 0x57, 0xC9, 0x35,
++    0x98, 0x4F, 0x0C, 0x70, 0xE0, 0xE6, 0x8B, 0x77, 0xE2, 0xA6, 0x89, 0xDA,
++    0xF3, 0xEF, 0xE8, 0x72, 0x1D, 0xF1, 0x58, 0xA1, 0x36, 0xAD, 0xE7, 0x35,
++    0x30, 0xAC, 0xCA, 0x4F, 0x48, 0x3A, 0x79, 0x7A, 0xBC, 0x0A, 0xB1, 0x82,
++    0xB3, 0x24, 0xFB, 0x61, 0xD1, 0x08, 0xA9, 0x4B, 0xB2, 0xC8, 0xE3, 0xFB,
++    0xB9, 0x6A, 0xDA, 0xB7, 0x60, 0xD7, 0xF4, 0x68, 0x1D, 0x4F, 0x42, 0xA3,
++    0xDE, 0x39, 0x4D, 0xF4, 0xAE, 0x56, 0xED, 0xE7, 0x63, 0x72, 0xBB, 0x19,
++    0x0B, 0x07, 0xA7, 0xC8, 0xEE, 0x0A, 0x6D, 0x70, 0x9E, 0x02, 0xFC, 0xE1,
++    0xCD, 0xF7, 0xE2, 0xEC, 0xC0, 0x34, 0x04, 0xCD, 0x28, 0x34, 0x2F, 0x61,
++    0x91, 0x72, 0xFE, 0x9C, 0xE9, 0x85, 0x83, 0xFF, 0x8E, 0x4F, 0x12, 0x32,
++    0xEE, 0xF2, 0x81, 0x83, 0xC3, 0xFE, 0x3B, 0x1B, 0x4C, 0x6F, 0xAD, 0x73,
++    0x3B, 0xB5, 0xFC, 0xBC, 0x2E, 0xC2, 0x20, 0x05, 0xC5, 0x8E, 0xF1, 0x83,
++    0x7D, 0x16, 0x83, 0xB2, 0xC6, 0xF3, 0x4A, 0x26, 0xC1, 0xB2, 0xEF, 0xFA,
++    0x88, 0x6B, 0x42, 0x38, 0x61, 0x1F, 0xCF, 0xDC, 0xDE, 0x35, 0x5B, 0x3B,
++    0x65, 0x19, 0x03, 0x5B, 0xBC, 0x34, 0xF4, 0xDE, 0xF9, 0x9C, 0x02, 0x38,
++    0x61, 0xB4, 0x6F, 0xC9, 0xD6, 0xE6, 0xC9, 0x07, 0x7A, 0xD9, 0x1D, 0x26,
++    0x91, 0xF7, 0xF7, 0xEE, 0x59, 0x8C, 0xB0, 0xFA, 0xC1, 0x86, 0xD9, 0x1C,
++    0xAE, 0xFE, 0x13, 0x09, 0x85, 0x13, 0x92, 0x70, 0xB4, 0x13, 0x0C, 0x93,
++    0xBC, 0x43, 0x79, 0x44, 0xF4, 0xFD, 0x44, 0x52, 0xE2, 0xD7, 0x4D, 0xD3,
++    0x64, 0xF2, 0xE2, 0x1E, 0x71, 0xF5, 0x4B, 0xFF, 0x5C, 0xAE, 0x82, 0xAB,
++    0x9C, 0x9D, 0xF6, 0x9E, 0xE8, 0x6D, 0x2B, 0xC5, 0x22, 0x36, 0x3A, 0x0D,
++    0xAB, 0xC5, 0x21, 0x97, 0x9B, 0x0D, 0xEA, 0xDA, 0x1D, 0xBF, 0x9A, 0x42,
++    0xD5, 0xC4, 0x48, 0x4E, 0x0A, 0xBC, 0xD0, 0x6B, 0xFA, 0x53, 0xDD, 0xEF,
++    0x3C, 0x1B, 0x20, 0xEE, 0x3F, 0xD5, 0x9D, 0x7C, 0x25, 0xE4, 0x1D, 0x2B,
++    0x66, 0xC6, 0x2E, 0x37, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
++
++const unsigned char rfc7919_ffdhe8192_p[] = {
++    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xAD, 0xF8, 0x54, 0x58,
++    0xA2, 0xBB, 0x4A, 0x9A, 0xAF, 0xDC, 0x56, 0x20, 0x27, 0x3D, 0x3C, 0xF1,
++    0xD8, 0xB9, 0xC5, 0x83, 0xCE, 0x2D, 0x36, 0x95, 0xA9, 0xE1, 0x36, 0x41,
++    0x14, 0x64, 0x33, 0xFB, 0xCC, 0x93, 0x9D, 0xCE, 0x24, 0x9B, 0x3E, 0xF9,
++    0x7D, 0x2F, 0xE3, 0x63, 0x63, 0x0C, 0x75, 0xD8, 0xF6, 0x81, 0xB2, 0x02,
++    0xAE, 0xC4, 0x61, 0x7A, 0xD3, 0xDF, 0x1E, 0xD5, 0xD5, 0xFD, 0x65, 0x61,
++    0x24, 0x33, 0xF5, 0x1F, 0x5F, 0x06, 0x6E, 0xD0, 0x85, 0x63, 0x65, 0x55,
++    0x3D, 0xED, 0x1A, 0xF3, 0xB5, 0x57, 0x13, 0x5E, 0x7F, 0x57, 0xC9, 0x35,
++    0x98, 0x4F, 0x0C, 0x70, 0xE0, 0xE6, 0x8B, 0x77, 0xE2, 0xA6, 0x89, 0xDA,
++    0xF3, 0xEF, 0xE8, 0x72, 0x1D, 0xF1, 0x58, 0xA1, 0x36, 0xAD, 0xE7, 0x35,
++    0x30, 0xAC, 0xCA, 0x4F, 0x48, 0x3A, 0x79, 0x7A, 0xBC, 0x0A, 0xB1, 0x82,
++    0xB3, 0x24, 0xFB, 0x61, 0xD1, 0x08, 0xA9, 0x4B, 0xB2, 0xC8, 0xE3, 0xFB,
++    0xB9, 0x6A, 0xDA, 0xB7, 0x60, 0xD7, 0xF4, 0x68, 0x1D, 0x4F, 0x42, 0xA3,
++    0xDE, 0x39, 0x4D, 0xF4, 0xAE, 0x56, 0xED, 0xE7, 0x63, 0x72, 0xBB, 0x19,
++    0x0B, 0x07, 0xA7, 0xC8, 0xEE, 0x0A, 0x6D, 0x70, 0x9E, 0x02, 0xFC, 0xE1,
++    0xCD, 0xF7, 0xE2, 0xEC, 0xC0, 0x34, 0x04, 0xCD, 0x28, 0x34, 0x2F, 0x61,
++    0x91, 0x72, 0xFE, 0x9C, 0xE9, 0x85, 0x83, 0xFF, 0x8E, 0x4F, 0x12, 0x32,
++    0xEE, 0xF2, 0x81, 0x83, 0xC3, 0xFE, 0x3B, 0x1B, 0x4C, 0x6F, 0xAD, 0x73,
++    0x3B, 0xB5, 0xFC, 0xBC, 0x2E, 0xC2, 0x20, 0x05, 0xC5, 0x8E, 0xF1, 0x83,
++    0x7D, 0x16, 0x83, 0xB2, 0xC6, 0xF3, 0x4A, 0x26, 0xC1, 0xB2, 0xEF, 0xFA,
++    0x88, 0x6B, 0x42, 0x38, 0x61, 0x1F, 0xCF, 0xDC, 0xDE, 0x35, 0x5B, 0x3B,
++    0x65, 0x19, 0x03, 0x5B, 0xBC, 0x34, 0xF4, 0xDE, 0xF9, 0x9C, 0x02, 0x38,
++    0x61, 0xB4, 0x6F, 0xC9, 0xD6, 0xE6, 0xC9, 0x07, 0x7A, 0xD9, 0x1D, 0x26,
++    0x91, 0xF7, 0xF7, 0xEE, 0x59, 0x8C, 0xB0, 0xFA, 0xC1, 0x86, 0xD9, 0x1C,
++    0xAE, 0xFE, 0x13, 0x09, 0x85, 0x13, 0x92, 0x70, 0xB4, 0x13, 0x0C, 0x93,
++    0xBC, 0x43, 0x79, 0x44, 0xF4, 0xFD, 0x44, 0x52, 0xE2, 0xD7, 0x4D, 0xD3,
++    0x64, 0xF2, 0xE2, 0x1E, 0x71, 0xF5, 0x4B, 0xFF, 0x5C, 0xAE, 0x82, 0xAB,
++    0x9C, 0x9D, 0xF6, 0x9E, 0xE8, 0x6D, 0x2B, 0xC5, 0x22, 0x36, 0x3A, 0x0D,
++    0xAB, 0xC5, 0x21, 0x97, 0x9B, 0x0D, 0xEA, 0xDA, 0x1D, 0xBF, 0x9A, 0x42,
++    0xD5, 0xC4, 0x48, 0x4E, 0x0A, 0xBC, 0xD0, 0x6B, 0xFA, 0x53, 0xDD, 0xEF,
++    0x3C, 0x1B, 0x20, 0xEE, 0x3F, 0xD5, 0x9D, 0x7C, 0x25, 0xE4, 0x1D, 0x2B,
++    0x66, 0x9E, 0x1E, 0xF1, 0x6E, 0x6F, 0x52, 0xC3, 0x16, 0x4D, 0xF4, 0xFB,
++    0x79, 0x30, 0xE9, 0xE4, 0xE5, 0x88, 0x57, 0xB6, 0xAC, 0x7D, 0x5F, 0x42,
++    0xD6, 0x9F, 0x6D, 0x18, 0x77, 0x63, 0xCF, 0x1D, 0x55, 0x03, 0x40, 0x04,
++    0x87, 0xF5, 0x5B, 0xA5, 0x7E, 0x31, 0xCC, 0x7A, 0x71, 0x35, 0xC8, 0x86,
++    0xEF, 0xB4, 0x31, 0x8A, 0xED, 0x6A, 0x1E, 0x01, 0x2D, 0x9E, 0x68, 0x32,
++    0xA9, 0x07, 0x60, 0x0A, 0x91, 0x81, 0x30, 0xC4, 0x6D, 0xC7, 0x78, 0xF9,
++    0x71, 0xAD, 0x00, 0x38, 0x09, 0x29, 0x99, 0xA3, 0x33, 0xCB, 0x8B, 0x7A,
++    0x1A, 0x1D, 0xB9, 0x3D, 0x71, 0x40, 0x00, 0x3C, 0x2A, 0x4E, 0xCE, 0xA9,
++    0xF9, 0x8D, 0x0A, 0xCC, 0x0A, 0x82, 0x91, 0xCD, 0xCE, 0xC9, 0x7D, 0xCF,
++    0x8E, 0xC9, 0xB5, 0x5A, 0x7F, 0x88, 0xA4, 0x6B, 0x4D, 0xB5, 0xA8, 0x51,
++    0xF4, 0x41, 0x82, 0xE1, 0xC6, 0x8A, 0x00, 0x7E, 0x5E, 0x0D, 0xD9, 0x02,
++    0x0B, 0xFD, 0x64, 0xB6, 0x45, 0x03, 0x6C, 0x7A, 0x4E, 0x67, 0x7D, 0x2C,
++    0x38, 0x53, 0x2A, 0x3A, 0x23, 0xBA, 0x44, 0x42, 0xCA, 0xF5, 0x3E, 0xA6,
++    0x3B, 0xB4, 0x54, 0x32, 0x9B, 0x76, 0x24, 0xC8, 0x91, 0x7B, 0xDD, 0x64,
++    0xB1, 0xC0, 0xFD, 0x4C, 0xB3, 0x8E, 0x8C, 0x33, 0x4C, 0x70, 0x1C, 0x3A,
++    0xCD, 0xAD, 0x06, 0x57, 0xFC, 0xCF, 0xEC, 0x71, 0x9B, 0x1F, 0x5C, 0x3E,
++    0x4E, 0x46, 0x04, 0x1F, 0x38, 0x81, 0x47, 0xFB, 0x4C, 0xFD, 0xB4, 0x77,
++    0xA5, 0x24, 0x71, 0xF7, 0xA9, 0xA9, 0x69, 0x10, 0xB8, 0x55, 0x32, 0x2E,
++    0xDB, 0x63, 0x40, 0xD8, 0xA0, 0x0E, 0xF0, 0x92, 0x35, 0x05, 0x11, 0xE3,
++    0x0A, 0xBE, 0xC1, 0xFF, 0xF9, 0xE3, 0xA2, 0x6E, 0x7F, 0xB2, 0x9F, 0x8C,
++    0x18, 0x30, 0x23, 0xC3, 0x58, 0x7E, 0x38, 0xDA, 0x00, 0x77, 0xD9, 0xB4,
++    0x76, 0x3E, 0x4E, 0x4B, 0x94, 0xB2, 0xBB, 0xC1, 0x94, 0xC6, 0x65, 0x1E,
++    0x77, 0xCA, 0xF9, 0x92, 0xEE, 0xAA, 0xC0, 0x23, 0x2A, 0x28, 0x1B, 0xF6,
++    0xB3, 0xA7, 0x39, 0xC1, 0x22, 0x61, 0x16, 0x82, 0x0A, 0xE8, 0xDB, 0x58,
++    0x47, 0xA6, 0x7C, 0xBE, 0xF9, 0xC9, 0x09, 0x1B, 0x46, 0x2D, 0x53, 0x8C,
++    0xD7, 0x2B, 0x03, 0x74, 0x6A, 0xE7, 0x7F, 0x5E, 0x62, 0x29, 0x2C, 0x31,
++    0x15, 0x62, 0xA8, 0x46, 0x50, 0x5D, 0xC8, 0x2D, 0xB8, 0x54, 0x33, 0x8A,
++    0xE4, 0x9F, 0x52, 0x35, 0xC9, 0x5B, 0x91, 0x17, 0x8C, 0xCF, 0x2D, 0xD5,
++    0xCA, 0xCE, 0xF4, 0x03, 0xEC, 0x9D, 0x18, 0x10, 0xC6, 0x27, 0x2B, 0x04,
++    0x5B, 0x3B, 0x71, 0xF9, 0xDC, 0x6B, 0x80, 0xD6, 0x3F, 0xDD, 0x4A, 0x8E,
++    0x9A, 0xDB, 0x1E, 0x69, 0x62, 0xA6, 0x95, 0x26, 0xD4, 0x31, 0x61, 0xC1,
++    0xA4, 0x1D, 0x57, 0x0D, 0x79, 0x38, 0xDA, 0xD4, 0xA4, 0x0E, 0x32, 0x9C,
++    0xCF, 0xF4, 0x6A, 0xAA, 0x36, 0xAD, 0x00, 0x4C, 0xF6, 0x00, 0xC8, 0x38,
++    0x1E, 0x42, 0x5A, 0x31, 0xD9, 0x51, 0xAE, 0x64, 0xFD, 0xB2, 0x3F, 0xCE,
++    0xC9, 0x50, 0x9D, 0x43, 0x68, 0x7F, 0xEB, 0x69, 0xED, 0xD1, 0xCC, 0x5E,
++    0x0B, 0x8C, 0xC3, 0xBD, 0xF6, 0x4B, 0x10, 0xEF, 0x86, 0xB6, 0x31, 0x42,
++    0xA3, 0xAB, 0x88, 0x29, 0x55, 0x5B, 0x2F, 0x74, 0x7C, 0x93, 0x26, 0x65,
++    0xCB, 0x2C, 0x0F, 0x1C, 0xC0, 0x1B, 0xD7, 0x02, 0x29, 0x38, 0x88, 0x39,
++    0xD2, 0xAF, 0x05, 0xE4, 0x54, 0x50, 0x4A, 0xC7, 0x8B, 0x75, 0x82, 0x82,
++    0x28, 0x46, 0xC0, 0xBA, 0x35, 0xC3, 0x5F, 0x5C, 0x59, 0x16, 0x0C, 0xC0,
++    0x46, 0xFD, 0x82, 0x51, 0x54, 0x1F, 0xC6, 0x8C, 0x9C, 0x86, 0xB0, 0x22,
++    0xBB, 0x70, 0x99, 0x87, 0x6A, 0x46, 0x0E, 0x74, 0x51, 0xA8, 0xA9, 0x31,
++    0x09, 0x70, 0x3F, 0xEE, 0x1C, 0x21, 0x7E, 0x6C, 0x38, 0x26, 0xE5, 0x2C,
++    0x51, 0xAA, 0x69, 0x1E, 0x0E, 0x42, 0x3C, 0xFC, 0x99, 0xE9, 0xE3, 0x16,
++    0x50, 0xC1, 0x21, 0x7B, 0x62, 0x48, 0x16, 0xCD, 0xAD, 0x9A, 0x95, 0xF9,
++    0xD5, 0xB8, 0x01, 0x94, 0x88, 0xD9, 0xC0, 0xA0, 0xA1, 0xFE, 0x30, 0x75,
++    0xA5, 0x77, 0xE2, 0x31, 0x83, 0xF8, 0x1D, 0x4A, 0x3F, 0x2F, 0xA4, 0x57,
++    0x1E, 0xFC, 0x8C, 0xE0, 0xBA, 0x8A, 0x4F, 0xE8, 0xB6, 0x85, 0x5D, 0xFE,
++    0x72, 0xB0, 0xA6, 0x6E, 0xDE, 0xD2, 0xFB, 0xAB, 0xFB, 0xE5, 0x8A, 0x30,
++    0xFA, 0xFA, 0xBE, 0x1C, 0x5D, 0x71, 0xA8, 0x7E, 0x2F, 0x74, 0x1E, 0xF8,
++    0xC1, 0xFE, 0x86, 0xFE, 0xA6, 0xBB, 0xFD, 0xE5, 0x30, 0x67, 0x7F, 0x0D,
++    0x97, 0xD1, 0x1D, 0x49, 0xF7, 0xA8, 0x44, 0x3D, 0x08, 0x22, 0xE5, 0x06,
++    0xA9, 0xF4, 0x61, 0x4E, 0x01, 0x1E, 0x2A, 0x94, 0x83, 0x8F, 0xF8, 0x8C,
++    0xD6, 0x8C, 0x8B, 0xB7, 0xC5, 0xC6, 0x42, 0x4C, 0xFF, 0xFF, 0xFF, 0xFF,
++    0xFF, 0xFF, 0xFF, 0xFF};
++
++const unsigned char rfc7919_g[] = {0x02};
++
++#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
++
++/**
++  Set DH paramenter for given SSL context
++
++  @param [in] ctx SSL context
++
++  @return status of operation
++    @retval false Success
++    @retval true  Failure
++*/
++bool set_dh(SSL_CTX *ctx) {
++  int security_level = 2;
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++  security_level = SSL_CTX_get_security_level(ctx);
++  assert(security_level <= 5);
++  if (security_level < 2) security_level = 2;
++#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++  DBUG_EXECUTE_IF("crypto_policy_3", security_level = 3;);
++
++#if OPENSSL_VERSION_NUMBER >= 0x30000000L
++  OSSL_PARAM params[2];
++  EVP_PKEY *dh_pkey = nullptr;
++  EVP_PKEY_CTX *pctx = nullptr;
++  const char *rfc7919_primes[] = {"ffdhe2048", "ffdhe3072", "ffdhe8192"};
++  unsigned int prime_index = 0;
++  switch (security_level) {
++    case 1:
++      [[fallthrough]];
++    case 2:
++      prime_index = 0;
++      break;
++    case 3:
++      prime_index = 1;
++      break;
++    case 4:
++      prime_index = 2;
++      break;
++    case 5:
++      /* there is no RFC7919 approved prime for sec level 5 */
++      [[fallthrough]];
++    default:
++      EVP_PKEY_CTX_free(pctx);
++      return true;
++  };
++
++  pctx = EVP_PKEY_CTX_new_from_name(NULL, "DH", NULL);
++  params[0] = OSSL_PARAM_construct_utf8_string(
++      "group", const_cast<char *>(rfc7919_primes[prime_index]), 0);
++  params[1] = OSSL_PARAM_construct_end();
++  EVP_PKEY_keygen_init(pctx);
++  EVP_PKEY_CTX_set_params(pctx, params);
++  EVP_PKEY_generate(pctx, &dh_pkey);
++  if (SSL_CTX_set0_tmp_dh_pkey(ctx, dh_pkey) == 0) {
++    EVP_PKEY_free(dh_pkey);
++    EVP_PKEY_CTX_free(pctx);
++    return true;
++  }
++  EVP_PKEY_CTX_free(pctx);
++#else /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
++
++  DH *dh = nullptr;
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++  switch (security_level) {
++    case 1:
++      [[fallthrough]];
++    case 2:
++      dh = DH_new_by_nid(NID_ffdhe2048);
++      break;
++    case 3:
++      dh = DH_new_by_nid(NID_ffdhe3072);
++      break;
++    case 4:
++      dh = DH_new_by_nid(NID_ffdhe8192);
++      break;
++    case 5:
++      /* there is no RFC7919 approved prime for sec level 5 */
++      [[fallthrough]];
++    default:
++      break;
++  };
++#else  /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++  dh = DH_new();
++  if (!dh) return true;
++
++  switch (security_level) {
++    case 1:
++      [[fallthrough]];
++    case 2:
++      dh->p =
++          BN_bin2bn(rfc7919_ffdhe2048_p, sizeof(rfc7919_ffdhe2048_p), nullptr);
++      break;
++    case 3:
++      dh->p =
++          BN_bin2bn(rfc7919_ffdhe3072_p, sizeof(rfc7919_ffdhe3072_p), nullptr);
++      break;
++    case 4:
++      dh->p =
++          BN_bin2bn(rfc7919_ffdhe8192_p, sizeof(rfc7919_ffdhe8192_p), nullptr);
++      break;
++    case 5:
++      /* There is no RFC7919 approved prime for sec level 5 */
++      [[fallthrough]];
++    default:
++      DH_free(dh);
++      return true;
++  };
++
++  dh->g = BN_bin2bn(rfc7919_g, sizeof(rfc7919_g), nullptr);
++  if (!dh->p || !dh->g) {
++    DH_free(dh);
++    return true;
++  }
++#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++  if (SSL_CTX_set_tmp_dh(ctx, dh) == 0) {
++    if (dh) DH_free(dh);
++    return true;
++  }
++  DH_free(dh);
++
++#endif /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
++  return false;
++}
++
++/**
++  Set EC curve details
++
++  @param [in] ctx  SSL Context
++
++  @returns status of operation
++    @retval false Success
++    @retval true  Error
++*/
++bool set_ecdh(SSL_CTX *ctx) {
++#if OPENSSL_VERSION_NUMBER < 0x10002000L
++  EC_KEY *eckey = nullptr;
++  /* We choose NID_secp384r1 curve. */
++  eckey = EC_KEY_new_by_curve_name(NID_secp384r1);
++  if (SSL_CTX_set_tmp_ecdh(ctx, eckey) != 1) {
++    if (eckey) EC_KEY_free(eckey);
++    return true;
++  }
++  if (eckey) EC_KEY_free(eckey);
++#else /* OPENSSL_VERSION_NUMBER < 0x10002000L */
++
++  int groups[] = {NID_X9_62_prime256v1, NID_secp384r1, NID_secp521r1};
++  int group_size = sizeof(groups) / sizeof(int);
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++  if (SSL_CTX_set1_groups(ctx, groups, group_size) == 0) return true;
++#else  /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++  if (SSL_CTX_set1_curves(ctx, groups, group_size) == 0) return true;
++  if (SSL_CTX_set_ecdh_auto(ctx, 1) == 0) return true;
++#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++
++#endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
++  return false;
++}
++
++}  // namespace
++
++#endif /* DH_KEYS_INCLUDED */
+diff --git a/include/dh_keys.h b/include/dh_keys.h
+deleted file mode 100644
+index b7901e405db..00000000000
+--- a/include/dh_keys.h
++++ /dev/null
+@@ -1,185 +0,0 @@
+-/*
+-  Copyright (c) 2018, 2023, Oracle and/or its affiliates.
+-
+-  This program is free software; you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License, version 2.0,
+-  as published by the Free Software Foundation.
+-
+-  This program is also distributed with certain software (including
+-  but not limited to OpenSSL) that is licensed under separate terms,
+-  as designated in a particular file or component or in included license
+-  documentation.  The authors of MySQL hereby grant you an additional
+-  permission to link the program and your derivative works with the
+-  separately licensed software that they have included with MySQL.
+-
+-  This program is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-
+-  You should have received a copy of the GNU General Public License
+-  along with this program; if not, write to the Free Software
+-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+-*/
+-
+-/**
+- *
+- * Contains Diffie-Hellman Keys.
+- * Positioned in the array as per the security level.
+- *
+- * +------------------------------+
+- * | sec-level |   min-key-size   |
+- * +-----------+------------------+
+- * |         1 |             1024 |
+- * |         2 |             2048 |
+- * |         3 |             3072 |
+- * |         4 |             7680 |
+- * |         5 |            15360 |
+- * +------------------------------+
+- *
+- * Minimum key size for security level 0 and 1
+- * should be 2048.
+- *
+- */
+-
+-#ifndef DH_KEYS_INCLUDED
+-#define DH_KEYS_INCLUDED
+-
+-#include <array>
+-#include <string_view>
+-
+-namespace {
+-constexpr const std::array<std::string_view, 6> dh_keys{
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 2048
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "MIIBCAKCAQEAil36wGZ2TmH6ysA3V1xtP4MKofXx5n88xq/aiybmGnReZMviCPEJ\n"
+-    "46+7VCktl/RZ5iaDH1XNG1dVQmznt9pu2G3usU+k1/VB4bQL4ZgW4u0Wzxh9PyXD\n"
+-    "glm99I9Xyj4Z5PVE4MyAsxCRGA1kWQpD9/zKAegUBPLNqSo886Uqg9hmn8ksyU9E\n"
+-    "BV5eAEciCuawh6V0O+Sj/C3cSfLhgA0GcXp3OqlmcDu6jS5gWjn3LdP1U0duVxMB\n"
+-    "h/neTSCSvtce4CAMYMjKNVh9P1nu+2d9ZH2Od2xhRIqMTfAS1KTqF3VmSWzPFCjG\n"
+-    "mjxx/bg6bOOjpgZapvB6ABWlWmRmAAWFtwIBBQ==\n"
+-    "-----END DH PARAMETERS-----",
+-
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 2048
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "MIIBCAKCAQEAil36wGZ2TmH6ysA3V1xtP4MKofXx5n88xq/aiybmGnReZMviCPEJ\n"
+-    "46+7VCktl/RZ5iaDH1XNG1dVQmznt9pu2G3usU+k1/VB4bQL4ZgW4u0Wzxh9PyXD\n"
+-    "glm99I9Xyj4Z5PVE4MyAsxCRGA1kWQpD9/zKAegUBPLNqSo886Uqg9hmn8ksyU9E\n"
+-    "BV5eAEciCuawh6V0O+Sj/C3cSfLhgA0GcXp3OqlmcDu6jS5gWjn3LdP1U0duVxMB\n"
+-    "h/neTSCSvtce4CAMYMjKNVh9P1nu+2d9ZH2Od2xhRIqMTfAS1KTqF3VmSWzPFCjG\n"
+-    "mjxx/bg6bOOjpgZapvB6ABWlWmRmAAWFtwIBBQ==\n"
+-    "-----END DH PARAMETERS-----",
+-
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 2048
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "MIIBCAKCAQEAil36wGZ2TmH6ysA3V1xtP4MKofXx5n88xq/aiybmGnReZMviCPEJ\n"
+-    "46+7VCktl/RZ5iaDH1XNG1dVQmznt9pu2G3usU+k1/VB4bQL4ZgW4u0Wzxh9PyXD\n"
+-    "glm99I9Xyj4Z5PVE4MyAsxCRGA1kWQpD9/zKAegUBPLNqSo886Uqg9hmn8ksyU9E\n"
+-    "BV5eAEciCuawh6V0O+Sj/C3cSfLhgA0GcXp3OqlmcDu6jS5gWjn3LdP1U0duVxMB\n"
+-    "h/neTSCSvtce4CAMYMjKNVh9P1nu+2d9ZH2Od2xhRIqMTfAS1KTqF3VmSWzPFCjG\n"
+-    "mjxx/bg6bOOjpgZapvB6ABWlWmRmAAWFtwIBBQ==\n"
+-    "-----END DH PARAMETERS-----",
+-
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 3072
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "MIIBiAKCAYEA9sjCgCPIir/lzSpWNH4VfgSp+j2/0oJpUuF9U3m5GDCc8j1CBXvT\n"
+-    "utOtuysTXYXtcbsHwVAwM0QD1iFThIfeI1omUFUuCiOir3zHJCNfPu2K6qRb4avz\n"
+-    "TxXf5Lco9UpPxE4vYgMGMdV41y0N+U3uocQ/S76BPKxQebr3euNAwqupn2jjrEbd\n"
+-    "Ensi5kB25wcxFUTAqziArcseE/UDgCFCmIg3UUaQIWKpiOpxJGR/4dBFlU1l7jtn\n"
+-    "kGlKR0LuKkmhP8y3nFzJqpP2ItGUupkUpseleSStl2rgaUGG8sdNpJNWGZq9wJcu\n"
+-    "+KVB5BwdpijM+eCAMhUXae7H3ShvyD/GQnc1ugHGHN9/Rtu88z9KOGEsn98W6KjD\n"
+-    "AMiQUXzNLWCtBkWpYheGOAAcgZgtAFtoUJ/aKztx6V+tS/5C4yr2K7OhJ157enax\n"
+-    "gvbM01aAN2xlEglmGdxEKhlRFdrgBVw3R8qHwwX2m8QFV15nwl2ZVBr7hC+cMx9A\n"
+-    "c1cfbUBAIe0/AgEF\n"
+-    "-----END DH PARAMETERS-----",
+-
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 7680
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "MIIDyAKCA8EAqs4RjZyRCVK5Cy19YqdCBg3zIy7fuBOjA19D1dtVBBGvHxvGpY91\n"
+-    "B44SlbxfYBYdJjm9xGR0fV5PRjHqmbSg0e9y7+rFVtKFLjVMLO02/ywgHAl4iohe\n"
+-    "1RwXilxInXiEhxhvsdfvyHEK+JJNo+wSprfJXZ4jN/YnTWgQQZK2n8QnVJFaZK0n\n"
+-    "Thg8fQtFH4+oXSUNY+ad8xM5qx6lo2UU/bc4CoE0/FqE0OFIrwCcOotOs0t8NyeG\n"
+-    "vY7uhezaEmJVTGZzIVJbb/Qc/w1dFzlWvgA8mIP8cs1Y/FfvcxYCWi0B34M0ZQlE\n"
+-    "eScFq/fMkLq/gWagvXYtmu+Mb6BGghfhpHbhw+cNkXMIMLsHl8EnXfgHsAR4I3gE\n"
+-    "sGsOEu59e0aWpImhaYJWBpRHeaLKpLalqwzhYrVFvvhJ8wLXzvuKTyuvUWLrafAy\n"
+-    "M26zIxHu+jUTanWY8BI9GRhJ8Cqt9DCvRUt0+CMkvWoxK0DqWoOT09oAYrlHnL1/\n"
+-    "U3iJ7oMgNFNG3JSfDOI7rWUu04FPMzLx+Ue72TuaLqDau6KsEyBtREdNNwEZTuCT\n"
+-    "WJc99b9tl+VZX5uEib1iWKbLJWVgjg1VDB1bJaiNpedsN+l6x7Ia37OtwMJI+KCS\n"
+-    "NHiWGIsPyYESq/gBX7Sb8QK20TF9Gz1I73pykrntU4O209htfrSKRFu+A6dG8AjG\n"
+-    "jvnILhw5X2YEevH+O+2kj6hlbF5Ztx/yqc6h6+hYTo7xxNUNVDZp0b9VeXmzWnjK\n"
+-    "LphMsn6QGi4mF/rtSoLDWqRlrA2oZPwK3bAUjTS1Xlfwn2SOkU/NNbg4MvFIU0up\n"
+-    "isRZmxkAmPXUv8nAk8kosB9svNPg6Us0iA1wT/t/bW5KAf61KEcX8YqN9jLCx2Fo\n"
+-    "mLu4C9dKPcfteDni4/KrdhTSO7wE39CwS9MjuaJNiZy3gxn8u9LgLGp8syCnN4WL\n"
+-    "qPgBqsi78OlAAURMf/xhCNNg2Wm9a5b52qK9q422AwYKoJezlonBoAe7DfnBbbXp\n"
+-    "TiaJsOBbHqc9xlyMhz1gQqZVwENGYtyT1U1syd/mWpwNciVTsfKk9lfmja7x4xNc\n"
+-    "w4jFNYykhIaYJZXUCTP/1TDFd6hRCpLq1MMaVJwUKASa8dcbjXPmXjW/ZavHqtHv\n"
+-    "0//Isr/QZjhk3VmfRGSlOJ7NQsx7MXgcJ8KCwvZVjz8D9SIg+6UMmbJxHXrO5jUW\n"
+-    "0+L4TWN6ZmBlkW+vTrEDZvlhGOHcutmPvTsn+DL1twybjzQ7UNqQMKS3HsoETEMi\n"
+-    "Qx7+mW52N5RvAgEF\n"
+-    "-----END DH PARAMETERS-----",
+-
+-    /*
+-       Diffie-Hellman key.
+-       Generated using: >openssl dhparam -5 -C 15360
+-    */
+-    "-----BEGIN DH PARAMETERS-----\n"
+-    "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\n"
+-    "3Zk3+OFVkhFDAgEF\n"
+-    "-----END DH PARAMETERS-----"};
+-}  // namespace
+-
+-#endif
+diff --git a/mysql-test/suite/rpl/r/rpl_fips.result b/mysql-test/suite/rpl/r/rpl_fips.result
+index 9a65d6b5a67..8925a86974d 100644
+--- a/mysql-test/suite/rpl/r/rpl_fips.result
++++ b/mysql-test/suite/rpl/r/rpl_fips.result
+@@ -32,7 +32,7 @@ include/check_slave_no_error.inc
+ [on slave]
+ include/stop_slave.inc
+ # R2: Set the ssl connection ON  and weak cipher CAMELLIA256-SHA
+-CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'CAMELLIA256-SHA', SOURCE_RETRY_COUNT = 1;;
++CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'CAMELLIA256-SHA', SOURCE_RETRY_COUNT = 1;
+ Warnings:
+ Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+ Note	1760	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+@@ -45,7 +45,7 @@ SERVICE_STATE	LAST_ERROR_NUMBER
+ OFF	2026
+ # R3: Set the ssl connection ON and strong cipher
+ include/stop_slave.inc
+-CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'AES128-SHA';;
++CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'ECDHE-RSA-AES128-GCM-SHA256';
+ Warnings:
+ Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
+ Note	1760	Storing MySQL user name or password information in the connection metadata repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START REPLICA; see the 'START REPLICA Syntax' in the MySQL Manual for more information.
+diff --git a/mysql-test/suite/rpl/t/rpl_fips-master.opt b/mysql-test/suite/rpl/t/rpl_fips-master.opt
+index 3af9336404c..61cbfa1333d 100644
+--- a/mysql-test/suite/rpl/t/rpl_fips-master.opt
++++ b/mysql-test/suite/rpl/t/rpl_fips-master.opt
+@@ -1 +1 @@
+---ssl_cipher='CAMELLIA256-SHA:AES128-SHA'
++--ssl_cipher='CAMELLIA256-SHA:ECDHE-RSA-AES128-GCM-SHA256'
+diff --git a/mysql-test/suite/rpl/t/rpl_fips.test b/mysql-test/suite/rpl/t/rpl_fips.test
+index 7019849e68a..3245d0f1bf9 100644
+--- a/mysql-test/suite/rpl/t/rpl_fips.test
++++ b/mysql-test/suite/rpl/t/rpl_fips.test
+@@ -53,7 +53,7 @@ connection slave;
+ source include/stop_slave.inc;
+ --echo # R2: Set the ssl connection ON  and weak cipher CAMELLIA256-SHA
+ --replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+---eval CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'CAMELLIA256-SHA', SOURCE_RETRY_COUNT = 1;
++--eval CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'CAMELLIA256-SHA', SOURCE_RETRY_COUNT = 1
+ START SLAVE;
+ --let $slave_io_errno= 2026
+ --source include/wait_for_slave_io_error.inc
+@@ -64,7 +64,7 @@ select SERVICE_STATE, LAST_ERROR_NUMBER from performance_schema.replication_conn
+ connection slave;
+ --source include/stop_slave.inc
+ --replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR
+---eval CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'AES128-SHA';
++--eval CHANGE REPLICATION SOURCE TO SOURCE_USER = 'root', SOURCE_PASSWORD = '', SOURCE_SSL = 1, SOURCE_TLS_VERSION = 'TLSv1.2', SOURCE_SSL_CIPHER = 'ECDHE-RSA-AES128-GCM-SHA256'
+ source include/start_slave.inc;
+ --source include/check_slave_no_error.inc
+ 
+diff --git a/router/src/harness/src/CMakeLists.txt b/router/src/harness/src/CMakeLists.txt
+index 7c654981b60..713432f77f6 100644
+--- a/router/src/harness/src/CMakeLists.txt
++++ b/router/src/harness/src/CMakeLists.txt
+@@ -283,7 +283,7 @@ TARGET_INCLUDE_DIRECTORIES(harness_tls
+   ${CMAKE_CURRENT_BINARY_DIR}/../include/
+   )
+ TARGET_LINK_LIBRARIES(harness_tls
+-  PUBLIC ${SSL_LIBRARIES}
++  PUBLIC mysys ${SSL_LIBRARIES}
+   )
+ SET_TARGET_PROPERTIES(harness_tls PROPERTIES
+   OUTPUT_NAME "mysqlharness_tls"
+diff --git a/router/src/harness/src/tls_server_context.cc b/router/src/harness/src/tls_server_context.cc
+index c902fa3130a..1d3c965258e 100644
+--- a/router/src/harness/src/tls_server_context.cc
++++ b/router/src/harness/src/tls_server_context.cc
+@@ -50,9 +50,7 @@
+ #include <openssl/decoder.h>     // OSSL_DECODER...
+ #endif
+ 
+-#if OPENSSL_VERSION_NUMBER < ROUTER_OPENSSL_VERSION(3, 0, 0)
+-#include <dh_keys.h>
+-#endif
++#include <dh_ecdh_config.h>
+ 
+ // type == decltype(BN_num_bits())
+ #if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 0, 2)
+@@ -272,46 +270,9 @@ stdx::expected<void, std::error_code> set_dh_params_from_filename(
+  * set auto DH params at SSL_CTX.
+  */
+ stdx::expected<void, std::error_code> set_auto_dh_params(SSL_CTX *ssl_ctx) {
+-#if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(3, 0, 0)
+-  SSL_CTX_set_dh_auto(ssl_ctx, 1);
+-#else
+-#if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 1, 0)
+-  int sec_level = SSL_CTX_get_security_level(ssl_ctx);
+-
+-  assert(sec_level <= kMaxSecurityLevel);
+-
+-  /* current range for security level is [1,5] */
+-  if (sec_level > kMaxSecurityLevel)
+-    sec_level = kMaxSecurityLevel;
+-  else if (sec_level <= 1)
+-    sec_level = 2;
+-
+-  static_assert(dh_keys.size() >= 5);
+-
+-  OsslUniquePtr<BIO> bio_storage{
+-      BIO_new_mem_buf(const_cast<char *>(dh_keys[sec_level].data()),
+-                      dh_keys[sec_level].size())};
+-  auto *bio = bio_storage.get();
+-
+-  OsslUniquePtr<DH> dh_storage(PEM_read_bio_DHparams(bio, NULL, NULL, NULL));
+-#else
+-  const int default_sec_level = 2;
+-
+-  static_assert(dh_keys.size() >= 5);
+-
+-  OsslUniquePtr<BIO> bio_storage{
+-      BIO_new_mem_buf(const_cast<char *>(dh_keys[default_sec_level].data()),
+-                      dh_keys[default_sec_level].size())};
+-  auto *bio = bio_storage.get();
+-
+-  OsslUniquePtr<DH> dh_storage(PEM_read_bio_DHparams(bio, NULL, NULL, NULL));
+-#endif
+-  DH *dh = dh_storage.get();
+-
+-  if (1 != SSL_CTX_set_tmp_dh(ssl_ctx, dh)) {
++  if (false != set_dh(ssl_ctx)) {
+     return stdx::make_unexpected(make_tls_error());
+   }
+-#endif
+ 
+   return {};
+ }
+@@ -320,16 +281,7 @@ stdx::expected<void, std::error_code> set_auto_dh_params(SSL_CTX *ssl_ctx) {
+ TlsServerContext::TlsServerContext(TlsVersion min_ver, TlsVersion max_ver)
+     : TlsContext(server_method) {
+   version_range(min_ver, max_ver);
+-#if OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 0, 2)
+-  (void)SSL_CTX_set_ecdh_auto(ssl_ctx_.get(), 1);
+-#elif OPENSSL_VERSION_NUMBER >= ROUTER_OPENSSL_VERSION(1, 0, 1)
+-  // openssl 1.0.1 has no ecdh_auto(), and needs an explicit EC curve set
+-  // to make ECDHE ciphers work out of the box.
+-  {
+-    OsslUniquePtr<EC_KEY> curve(EC_KEY_new_by_curve_name(NID_X9_62_prime256v1));
+-    if (curve) SSL_CTX_set_tmp_ecdh(ssl_ctx_.get(), curve.get());
+-  }
+-#endif
++  (void)set_ecdh(ssl_ctx_.get());
+   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_COMPRESSION);
+   cipher_list("ALL");  // ALL - unacceptable ciphers
+ }
+diff --git a/vio/viosslfactories.cc b/vio/viosslfactories.cc
+index 2955aab4708..04565e71053 100644
+--- a/vio/viosslfactories.cc
++++ b/vio/viosslfactories.cc
+@@ -25,6 +25,7 @@
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+ 
++#include <memory>
+ #include <sstream>
+ #include <string>
+ 
+@@ -39,15 +40,7 @@
+ #include "mysys_err.h"
+ #include "vio/vio_priv.h"
+ 
+-#include <openssl/dh.h>
+-
+-#if OPENSSL_VERSION_NUMBER < 0x10002000L
+-#include <openssl/ec.h>
+-#endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
+-
+-#if OPENSSL_VERSION_NUMBER < 0x30000000L
+-#include <dh_keys.h>
+-#endif /* OPENSSL_VERSION_NUMBER < 0x30000000L */
++#include <dh_ecdh_config.h>
+ 
+ #include "my_openssl_fips.h"
+ #define TLS_VERSION_OPTION_SIZE 256
+@@ -145,35 +138,6 @@ static bool ssl_initialized = false;
+ 
+ /* Helper functions */
+ 
+-int vio_security_level(void) {
+-  int vio_security_level = 2;
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+-  /*
+-    create a temporary SSL_CTX, we're going to use it to fetch
+-    the current OpenSSL security level. So that we can generate
+-    keys accordingly.
+-  */
+-  SSL_CTX *temp_ssl_ctx = SSL_CTX_new(TLS_server_method());
+-
+-  /* get the current security level */
+-  vio_security_level = SSL_CTX_get_security_level(temp_ssl_ctx);
+-
+-  assert(vio_security_level <= 5);
+-
+-  /* current range for security level is [1,5] */
+-  if (vio_security_level > 5)
+-    vio_security_level = 5;
+-  else if (vio_security_level <= 1)
+-    vio_security_level = 2;
+-
+-  /* get rid of temp_ssl_ctx, we're done with it */
+-  SSL_CTX_free(temp_ssl_ctx);
+-#endif
+-
+-  DBUG_EXECUTE_IF("crypto_policy_3", vio_security_level = 3;);
+-  return vio_security_level;
+-}
+-
+ static void report_errors() {
+   unsigned long l;
+   const char *file;
+@@ -505,9 +469,6 @@ static struct st_VioSSLFd *new_VioSSLFd(
+       SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1;
+   int ret_set_cipherlist = 0;
+   std::string cipher_list;
+-#if OPENSSL_VERSION_NUMBER < 0x10002000L
+-  EC_KEY *eckey = nullptr;
+-#endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
+   DBUG_TRACE;
+   DBUG_PRINT(
+       "enter",
+@@ -643,53 +604,17 @@ static struct st_VioSSLFd *new_VioSSLFd(
+   }
+ 
+   /* DH stuff */
+-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+-  if (SSL_CTX_set_dh_auto(ssl_fd->ssl_context, 1) != 1) {
++  if (set_dh(ssl_fd->ssl_context)) {
++    printf("%s\n", ERR_error_string(ERR_get_error(), NULL));
+     *error = SSL_INITERR_DHFAIL;
+     goto error;
+   }
+-#else  /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
+-  {
+-    int sec_level = vio_security_level();
+-
+-    BIO *bio_storage =
+-        BIO_new_mem_buf(const_cast<char *>(dh_keys[sec_level].data()),
+-                        dh_keys[sec_level].size());
+-
+-    DH *dh = PEM_read_bio_DHparams(bio_storage, NULL, NULL, NULL);
+-
+-    if (SSL_CTX_set_tmp_dh(ssl_fd->ssl_context, dh) == 0) {
+-      printf("%s\n", ERR_error_string(ERR_get_error(), NULL));
+-      DH_free(dh);
+-      BIO_free(bio_storage);
+-      *error = SSL_INITERR_DHFAIL;
+-      goto error;
+-    }
+-    DH_free(dh);
+-    BIO_free(bio_storage);
+-  }
+-#endif /* OPENSSL_VERSION_NUMBER >= 0x30000000L */
+ 
+   /* ECDH stuff */
+-#if OPENSSL_VERSION_NUMBER < 0x10002000L
+-  /* We choose P-256 curve. */
+-  eckey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+-  if (!eckey) {
+-    *error = SSL_INITERR_ECDHFAIL;
+-    goto error;
+-  }
+-  if (SSL_CTX_set_tmp_ecdh(ssl_fd->ssl_context, eckey) != 1) {
+-    EC_KEY_free(eckey);
+-    *error = SSL_INITERR_ECDHFAIL;
+-    goto error;
+-  }
+-  EC_KEY_free(eckey);
+-#else
+-  if (SSL_CTX_set_ecdh_auto(ssl_fd->ssl_context, 1) == 0) {
++  if (set_ecdh(ssl_fd->ssl_context)) {
+     *error = SSL_INITERR_ECDHFAIL;
+     goto error;
+   }
+-#endif /* OPENSSL_VERSION_NUMBER < 0x10002000L */
+ 
+ #if OPENSSL_VERSION_NUMBER >= 0x10002000L
+   /*

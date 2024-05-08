@@ -1,0 +1,133 @@
+commit 4ff84b4470578773882d24bb1ec67c1a75b99eb9	4ff84b4470578773882d24bb1ec67c1a75b99eb9
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Thu Jul 21 16:49:43 2022 +0200
+
+    Bug #33723597: Connect timeout not enforced on the full packet.
+    
+    A connect packet can read in chunks. But the connect_timeout applies
+    to reading the individual chunks. And not to the full packet being read.
+    This can lead to very long reads in the client is taking its time to
+    write the full packet.
+    Fixed by also enforcing connect_timeout on the full packet read and not
+    only to the individual chunks.
+    
+    Change-Id: I970760cd137325a25eeeaed336d42805298f6a1b
+
+diff --git a/include/mysql_com_server.h b/include/mysql_com_server.h
+index 59c8d3d9824..75e384cf38c 100644
+--- a/include/mysql_com_server.h
++++ b/include/mysql_com_server.h
+@@ -61,6 +61,7 @@ typedef struct NET_SERVER {
+   void *m_user_data;
+   struct compression_attributes compression;
+   mysql_compress_context compress_ctx;
++  bool timeout_on_full_packet;
+ } NET_SERVER;
+ 
+ #endif
+diff --git a/sql-common/net_serv.cc b/sql-common/net_serv.cc
+index ecd17936eb1..6306aa4e00e 100644
+--- a/sql-common/net_serv.cc
++++ b/sql-common/net_serv.cc
+@@ -1344,7 +1344,15 @@ static bool net_read_raw_loop(NET *net, size_t count) {
+   bool eof = false;
+   unsigned int retry_count = 0;
+   uchar *buf = net->buff + net->where_b;
++  bool timeout_on_full_packet = false;
++  bool is_packet_timeout = false;
++#ifdef MYSQL_SERVER
++  NET_SERVER *server_ext = static_cast<NET_SERVER *>(net->extension);
++  if (server_ext) timeout_on_full_packet = server_ext->timeout_on_full_packet;
++#endif
+ 
++  time_t start_time;
++  if (timeout_on_full_packet) start_time = time(&start_time);
+   while (count) {
+     size_t recvcnt = vio_read(net->vio, buf, count);
+ 
+@@ -1367,19 +1375,26 @@ static bool net_read_raw_loop(NET *net, size_t count) {
+ #ifdef MYSQL_SERVER
+     thd_increment_bytes_received(recvcnt);
+ #endif
++    if (timeout_on_full_packet) {
++      time_t current_time = time(&current_time);
++      if (current_time - start_time > net->read_timeout) {
++        is_packet_timeout = true;
++        break;
++      }
++    }
+   }
+ 
+   /* On failure, propagate the error code. */
+   if (count) {
+     /* Interrupted by a timeout? */
+-    if (!eof && vio_was_timeout(net->vio))
++    if (!eof && (vio_was_timeout(net->vio) || is_packet_timeout))
+       net->last_errno = ER_NET_READ_INTERRUPTED;
+     else
+       net->last_errno = ER_NET_READ_ERROR;
+ 
+ #ifdef MYSQL_SERVER
+     /* First packet always wait for net_wait_timeout */
+-    if (net->pkt_nr == 0 && vio_was_timeout(net->vio)) {
++    if (net->pkt_nr == 0 && (vio_was_timeout(net->vio) || is_packet_timeout)) {
+       net->last_errno = ER_CLIENT_INTERACTION_TIMEOUT;
+       /* Socket should be closed after trying to write/send error. */
+       THD *thd = current_thd;
+diff --git a/sql/conn_handler/init_net_server_extension.cc b/sql/conn_handler/init_net_server_extension.cc
+index 339e146cf19..1bc5d85190d 100644
+--- a/sql/conn_handler/init_net_server_extension.cc
++++ b/sql/conn_handler/init_net_server_extension.cc
+@@ -123,6 +123,7 @@ void init_net_server_extension(THD *thd) {
+   thd->m_net_server_extension.m_before_header = net_before_header_psi;
+   thd->m_net_server_extension.m_after_header = net_after_header_psi;
+   thd->m_net_server_extension.compress_ctx.algorithm = MYSQL_UNCOMPRESSED;
++  thd->m_net_server_extension.timeout_on_full_packet = false;
+   /* Activate this private extension for the mysqld server. */
+   thd->get_protocol_classic()->get_net()->extension =
+       &thd->m_net_server_extension;
+diff --git a/sql/protocol_classic.cc b/sql/protocol_classic.cc
+index e3bab7a336e..640532793ba 100644
+--- a/sql/protocol_classic.cc
++++ b/sql/protocol_classic.cc
+@@ -1356,8 +1356,12 @@ bool Protocol_classic::send_error(uint sql_errno, const char *err_msg,
+   return retval;
+ }
+ 
+-void Protocol_classic::set_read_timeout(ulong read_timeout) {
++void Protocol_classic::set_read_timeout(ulong read_timeout,
++                                        bool on_full_packet) {
+   my_net_set_read_timeout(&m_thd->net, read_timeout);
++  NET_SERVER *ext = static_cast<NET_SERVER *>(m_thd->net.extension);
++  assert(ext);
++  ext->timeout_on_full_packet = on_full_packet;
+ }
+ 
+ void Protocol_classic::set_write_timeout(ulong write_timeout) {
+diff --git a/sql/protocol_classic.h b/sql/protocol_classic.h
+index 776c0b64a70..1f6eb8b4d40 100644
+--- a/sql/protocol_classic.h
++++ b/sql/protocol_classic.h
+@@ -198,7 +198,8 @@ class Protocol_classic : public Protocol {
+   /* Return raw packet buffer */
+   uchar *get_raw_packet() { return input_raw_packet; }
+   /* Set read timeout */
+-  virtual void set_read_timeout(ulong read_timeout);
++  virtual void set_read_timeout(ulong read_timeout,
++                                bool on_full_packet = false);
+   /* Set write timeout */
+   virtual void set_write_timeout(ulong write_timeout);
+ 
+diff --git a/sql/sql_connect.cc b/sql/sql_connect.cc
+index 7c346984c30..f57b1f3359d 100644
+--- a/sql/sql_connect.cc
++++ b/sql/sql_connect.cc
+@@ -699,7 +699,7 @@ static bool login_connection(THD *thd) {
+              ("login_connection called by thread %u", thd->thread_id()));
+ 
+   /* Use "connect_timeout" value during connection phase */
+-  thd->get_protocol_classic()->set_read_timeout(connect_timeout);
++  thd->get_protocol_classic()->set_read_timeout(connect_timeout, true);
+   thd->get_protocol_classic()->set_write_timeout(connect_timeout);
+ 
+   error = check_connection(thd);

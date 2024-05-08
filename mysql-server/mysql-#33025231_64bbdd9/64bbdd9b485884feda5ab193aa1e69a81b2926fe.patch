@@ -1,0 +1,1680 @@
+commit 64bbdd9b485884feda5ab193aa1e69a81b2926fe	64bbdd9b485884feda5ab193aa1e69a81b2926fe
+Author: Anibal Pinto <anibal.pinto@oracle.com>
+Date:   Wed Sep 1 11:17:25 2021 +0200
+
+    BUG#33025231: UNRESPONSIVE SERVER: SHELL HANGS FOR 2H IN ADDINSTANCE() (GR+CLONE)
+    
+    Problem:
+    ========
+    The issues in this case are as following:
+    1. ACL statements, like CREATE USER do acquire a exclusive lock on
+       MDL_key::ACL_CACHE from the beginning of the statement until it is
+       committed.  On Group Replication transactions are sent to the group
+       during the commit stage so that we have a global order, from which the
+       transaction GTID is inferred. The transactions are intercept on the
+       primary and will wait until the Group Communication Service (GCS)
+       acknowledges that the transactions was delivered to all members.  This
+       extends the time that the MDL_key::ACL_CACHE exclusive lock is
+       acquired, which means that during the start of the ACL statement, the
+       time GCS takes to deliver to all member and the ACL statement commits
+       locally, no other operations that do require any kind of lock on
+       MDL_key::ACL_CACHE will execute.
+    2. Get system variables service has to be execute on a MySQL configured
+       thread.
+    
+    Solution:
+    =========
+    The issues are fixed as below:
+    1. The solution for first issue is to rewrite the steps that do read
+       the GTID_EXECUTED and GTID_PURGED to do not rely on SQL API, thence
+       not requiring a MDL_key::ACL_CACHE lock acquire. We rewrite the SQL
+       API using server services to access to system variables.
+       When XCOM uses MySQL stack for communication it will uses retries until
+       lock is released.
+    2. GCS thread is not a full MySQL thread, so we have to create a thread queue
+       handler to accept tasks which will run it synchronously. We are using this
+       thread for all service requests.
+    
+    RB: 26671
+
+diff --git a/mysql-test/r/mysqld--help-notwin.result b/mysql-test/r/mysqld--help-notwin.result
+index 63f0c717dcf..5bd9c869434 100644
+--- a/mysql-test/r/mysqld--help-notwin.result
++++ b/mysql-test/r/mysqld--help-notwin.result
+@@ -1845,7 +1845,7 @@ performance-schema-max-file-instances -1
+ performance-schema-max-index-stat -1
+ performance-schema-max-memory-classes 450
+ performance-schema-max-metadata-locks -1
+-performance-schema-max-mutex-classes 300
++performance-schema-max-mutex-classes 350
+ performance-schema-max-mutex-instances -1
+ performance-schema-max-prepared-statements-instances -1
+ performance-schema-max-program-instances -1
+diff --git a/mysql-test/r/mysqld--help-win.result b/mysql-test/r/mysqld--help-win.result
+index de444482d8b..93e2afbf22a 100644
+--- a/mysql-test/r/mysqld--help-win.result
++++ b/mysql-test/r/mysqld--help-win.result
+@@ -1857,7 +1857,7 @@ performance-schema-max-file-instances -1
+ performance-schema-max-index-stat -1
+ performance-schema-max-memory-classes 450
+ performance-schema-max-metadata-locks -1
+-performance-schema-max-mutex-classes 300
++performance-schema-max-mutex-classes 350
+ performance-schema-max-mutex-instances -1
+ performance-schema-max-prepared-statements-instances -1
+ performance-schema-max-program-instances -1
+diff --git a/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.result b/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.result
+new file mode 100644
+index 00000000000..2588e091619
+--- /dev/null
++++ b/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.result
+@@ -0,0 +1,71 @@
++include/group_replication.inc [rpl_server_count=3]
++Warnings:
++Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
++Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
++[connection server1]
++
++############################################################
++# 1. Deploy a group in single-primary mode with 2 members.
++[connection server1]
++include/start_and_bootstrap_group_replication.inc
++[connection server2]
++include/start_group_replication.inc
++
++############################################################
++# 2. Hold a ACL statement, CREATE USER, on its propagation
++#    to the group. The ACL_CACHE lock is acquired by the
++#    ACL statement.
++[connection server1]
++SET @debug_save= @@GLOBAL.DEBUG;
++SET @@GLOBAL.DEBUG='+d,group_replication_pause_on_before_commit_hook';
++[connection server_1]
++CREATE USER 'user';
++[connection server1]
++SET GLOBAL DEBUG= @debug_save;
++
++############################################################
++# 3. Add a 3rd member to the group.
++#    BUG: the view install on server1 will be blocked by the
++#         ACL statement.
++[connection server3]
++SET SESSION sql_log_bin = 0;
++call mtr.add_suppression("There was an error when connecting to the donor server. Please check that group_replication_recovery channel credentials.*");
++call mtr.add_suppression("For details please check performance_schema.replication_connection_status table and error log messages of Slave I/O for channel group_replication_recovery.");
++call mtr.add_suppression("Member was expelled from the group due to network failures, changing member status to ERROR.");
++call mtr.add_suppression("The server was automatically set into read only mode after an error was detected.");
++SET SESSION sql_log_bin = 1;
++SET GLOBAL group_replication_group_name= "GROUP_REPLICATION_GROUP_NAME";
++START GROUP_REPLICATION;
++
++############################################################
++# 4. Wait until the group has 3 members and then resume the
++#    ACL statement.
++#    server3 may be in RECOVERING state but it will be part of
++#    the group.
++[connection server1]
++include/rpl_gr_wait_for_number_of_members.inc
++[connection server_1]
++
++############################################################
++# 5. Wait server3 to be ONLINE
++[connection server3]
++include/gr_wait_for_member_state.inc
++
++############################################################
++# 6. An extra view can be generated when auto rejoin occurs,
++#    so define event_sequence for assert_binlog_events.inc
++[connection server1]
++
++############################################################
++# 7. Verify that all members data is equal.
++include/assert_binlog_events.inc
++[connection server2]
++include/assert_binlog_events.inc
++[connection server3]
++include/assert_binlog_events.inc
++
++############################################################
++# 8. Clean up.
++[connection server1]
++DROP USER 'user';
++include/group_replication_end.inc
+diff --git a/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.result b/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.result
+new file mode 100644
+index 00000000000..b0180c3d248
+--- /dev/null
++++ b/mysql-test/suite/group_replication/r/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.result
+@@ -0,0 +1,65 @@
++include/group_replication.inc [rpl_server_count=3]
++Warnings:
++Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
++Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
++[connection server1]
++
++############################################################
++# 1. Deploy a group in single-primary mode with 2 members.
++[connection server1]
++include/start_and_bootstrap_group_replication.inc
++[connection server2]
++include/start_group_replication.inc
++
++############################################################
++# 2. Hold a ACL statement, CREATE USER, on its propagation
++#    to the group. The ACL_CACHE lock is acquired by the
++#    ACL statement.
++[connection server1]
++SET @debug_save= @@GLOBAL.DEBUG;
++SET @@GLOBAL.DEBUG='+d,group_replication_pause_on_before_commit_hook';
++[connection server_1]
++CREATE USER 'user';
++[connection server1]
++SET GLOBAL DEBUG= @debug_save;
++
++############################################################
++# 3. Add a 3rd member to the group.
++#    BUG: the view install on server1 will be blocked by the
++#         ACL statement.
++[connection server3]
++SET SESSION sql_log_bin = 0;
++call mtr.add_suppression("There was an error when connecting to the donor server. Please check that group_replication_recovery channel credentials.*");
++call mtr.add_suppression("For details please check performance_schema.replication_connection_status table and error log messages of Slave I/O for channel group_replication_recovery.");
++SET SESSION sql_log_bin = 1;
++SET GLOBAL group_replication_group_name= "GROUP_REPLICATION_GROUP_NAME";
++START GROUP_REPLICATION;
++
++############################################################
++# 4. Wait until the group has 3 members and then resume the
++#    ACL statement.
++#    server3 may be in RECOVERING state but it will be part of
++#    the group.
++[connection server1]
++include/rpl_gr_wait_for_number_of_members.inc
++[connection server_1]
++
++############################################################
++# 5. Verify that all members data is equal.
++[connection server3]
++include/gr_wait_for_member_state.inc
++[connection server1]
++include/assert.inc [GTID_EXECUTED must contain 4 transactions]
++include/assert_binlog_events.inc [Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # !Q(CREATE.*)]
++[connection server2]
++include/assert.inc [GTID_EXECUTED must contain 4 transactions]
++include/assert_binlog_events.inc [Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # !Q(CREATE.*)]
++[connection server3]
++include/assert.inc [GTID_EXECUTED must contain 4 transactions]
++include/assert_binlog_events.inc [Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # Query/BEGIN # View_change # Query/COMMIT # Gtid # !Q(CREATE.*)]
++
++############################################################
++# 6. Clean up.
++[connection server1]
++DROP USER 'user';
++include/group_replication_end.inc
+diff --git a/mysql-test/suite/group_replication/r/gr_psi_keys_mysql.result b/mysql-test/suite/group_replication/r/gr_psi_keys_mysql.result
+index 71ac183291d..60fdf53ea93 100644
+--- a/mysql-test/suite/group_replication/r/gr_psi_keys_mysql.result
++++ b/mysql-test/suite/group_replication/r/gr_psi_keys_mysql.result
+@@ -65,6 +65,8 @@ wait/synch/mutex/group_rpl/LOCK_write_lock_protection	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_mysql_thread_run	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_mysql_thread_dispatcher_run	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_connection_map	YES	YES	singleton	0	NULL
++wait/synch/mutex/group_rpl/LOCK_mysql_handler_thread_run	YES	YES	singleton	0	NULL
++wait/synch/mutex/group_rpl/LOCK_mysql_thread_handler_dispatcher_run	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_certifier_stable_gtid_set	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_channel_observation_list	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_gcs_operations	YES	YES	singleton	0	NULL
+@@ -157,6 +159,7 @@ thread/group_rpl/THD_Gcs_xcom_control::m_xcom_thread	BACKGROUND	YES
+ thread/group_rpl/THD_Gcs_xcom_engine::m_engine_thread	BACKGROUND	YES
+ thread/group_rpl/THD_message_service_handler	BACKGROUND	YES
+ thread/group_rpl/THD_mysql_thread	BACKGROUND	YES
++thread/group_rpl/THD_mysql_thread_handler	BACKGROUND	YES
+ 
+ ############################################################
+ # 5. Test end.
+diff --git a/mysql-test/suite/group_replication/r/gr_psi_keys_xcom.result b/mysql-test/suite/group_replication/r/gr_psi_keys_xcom.result
+index 71ac183291d..60fdf53ea93 100644
+--- a/mysql-test/suite/group_replication/r/gr_psi_keys_xcom.result
++++ b/mysql-test/suite/group_replication/r/gr_psi_keys_xcom.result
+@@ -65,6 +65,8 @@ wait/synch/mutex/group_rpl/LOCK_write_lock_protection	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_mysql_thread_run	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_mysql_thread_dispatcher_run	YES	YES	singleton	0	NULL
+ wait/synch/mutex/group_rpl/LOCK_connection_map	YES	YES	singleton	0	NULL
++wait/synch/mutex/group_rpl/LOCK_mysql_handler_thread_run	YES	YES	singleton	0	NULL
++wait/synch/mutex/group_rpl/LOCK_mysql_thread_handler_dispatcher_run	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_certifier_stable_gtid_set	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_channel_observation_list	YES	YES	singleton	0	NULL
+ wait/synch/rwlock/group_rpl/RWLOCK_gcs_operations	YES	YES	singleton	0	NULL
+@@ -157,6 +159,7 @@ thread/group_rpl/THD_Gcs_xcom_control::m_xcom_thread	BACKGROUND	YES
+ thread/group_rpl/THD_Gcs_xcom_engine::m_engine_thread	BACKGROUND	YES
+ thread/group_rpl/THD_message_service_handler	BACKGROUND	YES
+ thread/group_rpl/THD_mysql_thread	BACKGROUND	YES
++thread/group_rpl/THD_mysql_thread_handler	BACKGROUND	YES
+ 
+ ############################################################
+ # 5. Test end.
+diff --git a/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.cnf b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.cnf
+new file mode 100644
+index 00000000000..30847abcd9c
+--- /dev/null
++++ b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.cnf
+@@ -0,0 +1,11 @@
++!include ../my.cnf
++
++[mysqld.1]
++
++[mysqld.2]
++
++[mysqld.3]
++
++[ENV]
++SERVER_MYPORT_3=		@mysqld.3.port
++SERVER_MYSOCK_3=		@mysqld.3.socket
+diff --git a/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.test b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.test
+new file mode 100644
+index 00000000000..2cfd09538eb
+--- /dev/null
++++ b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_mysql.test
+@@ -0,0 +1,180 @@
++###########################################################
++#
++#  This tests verifies that a new view will not be blocked, for a member
++#  holding an ACL lock.
++#
++#  When group_replication_communication_stack is configured as MySQL the XCOM
++#  connection will fail to authenticate and then retry.
++#  The retry may happen in two ways:
++#   1) internal XCOM retries, which does not cause differences on the server logs
++#   2) auto-rejoin, which will log a extra View_change:
++#
++#  The tests confirm if group logged an extra view before asserting log events
++#  to work on both ways.
++#
++#  Test:
++#  0. The test requires three servers.
++#  1. Deploy a group in single-primary mode with 2 members.
++#  2. Hold a ACL statement, CREATE USER, on its propagation
++#     to the group. The ACL_CACHE lock is acquired by the
++#     ACL statement.
++#  3. Add a 3rd member to the group.
++#     BUG: the view install on server1 will be blocked by the
++#          ACL statement.
++#  4. Wait until the group has 3 members and then resume the
++#     ACL statement.
++#     server3 may be in RECOVERING state but it will be part of
++#     the group.
++#  5. Wait server3 to be ONLINE
++#  6. An extra view can be generated when auto rejoin occurs,
++#     so define event_sequence for assert_binlog_events.inc
++#  7. Verify that all members data is equal.
++#  8. Clean up.
++###########################################################
++
++--source include/big_test.inc
++--source include/have_debug.inc
++--source include/have_group_replication_mysql_communication_stack.inc
++--source include/have_group_replication_plugin.inc
++--let $rpl_group_replication_single_primary_mode=1
++--let $rpl_skip_group_replication_start= 1
++--let $rpl_server_count= 3
++--source include/group_replication.inc
++
++--let $vcle_seq= Gtid # Query/BEGIN # View_change # Query/COMMIT
++
++--echo
++--echo ############################################################
++--echo # 1. Deploy a group in single-primary mode with 2 members.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++--source include/start_and_bootstrap_group_replication.inc
++
++--let $rpl_connection_name= server2
++--source include/rpl_connection.inc
++--source include/start_group_replication.inc
++
++
++--echo
++--echo ############################################################
++--echo # 2. Hold a ACL statement, CREATE USER, on its propagation
++--echo #    to the group. The ACL_CACHE lock is acquired by the
++--echo #    ACL statement.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++SET @debug_save= @@GLOBAL.DEBUG;
++SET @@GLOBAL.DEBUG='+d,group_replication_pause_on_before_commit_hook';
++
++--let $rpl_connection_name= server_1
++--source include/rpl_connection.inc
++--send CREATE USER 'user'
++
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE User="root" AND State="waiting for handler commit" AND Info="CREATE USER 'user'@'%'"
++--source include/wait_condition.inc
++
++SET GLOBAL DEBUG= @debug_save;
++
++
++--echo
++--echo ############################################################
++--echo # 3. Add a 3rd member to the group.
++--echo #    BUG: the view install on server1 will be blocked by the
++--echo #         ACL statement.
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++
++SET SESSION sql_log_bin = 0;
++call mtr.add_suppression("There was an error when connecting to the donor server. Please check that group_replication_recovery channel credentials.*");
++call mtr.add_suppression("For details please check performance_schema.replication_connection_status table and error log messages of Slave I/O for channel group_replication_recovery.");
++call mtr.add_suppression("Member was expelled from the group due to network failures, changing member status to ERROR.");
++call mtr.add_suppression("The server was automatically set into read only mode after an error was detected.");
++SET SESSION sql_log_bin = 1;
++
++# ACL_CACHE lock hold on server1 is also also acquired by dump thread, which
++# means that if server2 recovery channel connects to server1 it will fail and
++# retry until the ACL_CACHE lock is released or server3 connects to server2.
++--replace_result $group_replication_group_name GROUP_REPLICATION_GROUP_NAME
++--eval SET GLOBAL group_replication_group_name= "$group_replication_group_name"
++--source include/start_group_replication_command.inc
++
++
++--echo
++--echo ############################################################
++--echo # 4. Wait until the group has 3 members and then resume the
++--echo #    ACL statement.
++--echo #    server3 may be in RECOVERING state but it will be part of
++--echo #    the group.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++--let $group_replication_number_of_members= 3
++--source include/gr_wait_for_number_of_members.inc
++
++--let $rpl_connection_name= server_1
++--source include/rpl_connection.inc
++--reap
++
++
++--echo
++--echo ############################################################
++--echo # 5. Wait server3 to be ONLINE
++
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++--let $group_replication_member_state = ONLINE
++--source include/gr_wait_for_member_state.inc
++
++
++--echo
++--echo ############################################################
++--echo # 6. An extra view can be generated when auto rejoin occurs,
++--echo #    so define event_sequence for assert_binlog_events.inc
++
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++--let $gtid_with_extra_view=$group_replication_group_name:1-5
++--let $gtid_executed=`SELECT @@GLOBAL.GTID_EXECUTED`
++
++if ( $gtid_executed == $gtid_with_extra_view)
++{
++  --let $event_sequence= $vcle_seq # $vcle_seq # $vcle_seq # $vcle_seq # Gtid # !Q(CREATE.*)
++}
++
++if ( $gtid_executed != $gtid_with_extra_view)
++{
++  --let $event_sequence= $vcle_seq # $vcle_seq # $vcle_seq # Gtid # !Q(CREATE.*)
++}
++
++--echo
++--echo ############################################################
++--echo # 7. Verify that all members data is equal.
++
++--let $dont_print_pattern= 1
++--source include/assert_binlog_events.inc
++
++--let $rpl_connection_name= server2
++--source include/rpl_connection.inc
++
++# previously defined event_sequence
++--let $dont_print_pattern= 1
++--source include/assert_binlog_events.inc
++
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++
++# previously defined event_sequence
++--let $dont_print_pattern= 1
++--source include/assert_binlog_events.inc
++
++--echo
++--echo ############################################################
++--echo # 8. Clean up.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++DROP USER 'user';
++
++--source include/group_replication_end.inc
+diff --git a/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.cnf b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.cnf
+new file mode 100644
+index 00000000000..30847abcd9c
+--- /dev/null
++++ b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.cnf
+@@ -0,0 +1,11 @@
++!include ../my.cnf
++
++[mysqld.1]
++
++[mysqld.2]
++
++[mysqld.3]
++
++[ENV]
++SERVER_MYPORT_3=		@mysqld.3.port
++SERVER_MYSOCK_3=		@mysqld.3.socket
+diff --git a/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.test b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.test
+new file mode 100644
+index 00000000000..4a1155c304f
+--- /dev/null
++++ b/mysql-test/suite/group_replication/t/gr_lock_acl_cache_followed_by_view_change_comm_stack_xcom.test
+@@ -0,0 +1,153 @@
++###########################################################
++#
++#  This tests verifies that a new view will not be blocked, for a member
++#  holding an ACL lock.
++#
++#  Test:
++#  0. The test requires three servers.
++#  1. Deploy a group in single-primary mode with 2 members.
++#  2. Hold a ACL statement, CREATE USER, on its propagation
++#     to the group. The ACL_CACHE lock is acquired by the
++#     ACL statement.
++#  3. Add a 3rd member to the group.
++#     BUG: the view install on server1 will be blocked by the
++#          ACL statement.
++#  4. Wait until the group has 3 members and then resume the
++#     ACL statement.
++#     server3 may be in RECOVERING state but it will be part of
++#     the group.
++#  5. Verify that all members data is equal.
++#  6. Clean up.
++###########################################################
++
++--source include/big_test.inc
++--source include/have_debug.inc
++--source include/have_group_replication_xcom_communication_stack.inc
++--source include/have_group_replication_plugin.inc
++--let $rpl_group_replication_single_primary_mode=1
++--let $rpl_skip_group_replication_start= 1
++--let $rpl_server_count= 3
++--source include/group_replication.inc
++
++--let $vcle_seq= Gtid # Query/BEGIN # View_change # Query/COMMIT
++
++--echo
++--echo ############################################################
++--echo # 1. Deploy a group in single-primary mode with 2 members.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++--source include/start_and_bootstrap_group_replication.inc
++
++--let $rpl_connection_name= server2
++--source include/rpl_connection.inc
++--source include/start_group_replication.inc
++
++
++--echo
++--echo ############################################################
++--echo # 2. Hold a ACL statement, CREATE USER, on its propagation
++--echo #    to the group. The ACL_CACHE lock is acquired by the
++--echo #    ACL statement.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++SET @debug_save= @@GLOBAL.DEBUG;
++SET @@GLOBAL.DEBUG='+d,group_replication_pause_on_before_commit_hook';
++
++--let $rpl_connection_name= server_1
++--source include/rpl_connection.inc
++--send CREATE USER 'user'
++
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++--let $wait_condition=SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE User="root" AND State="waiting for handler commit" AND Info="CREATE USER 'user'@'%'"
++--source include/wait_condition.inc
++
++SET GLOBAL DEBUG= @debug_save;
++
++
++--echo
++--echo ############################################################
++--echo # 3. Add a 3rd member to the group.
++--echo #    BUG: the view install on server1 will be blocked by the
++--echo #         ACL statement.
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++
++SET SESSION sql_log_bin = 0;
++call mtr.add_suppression("There was an error when connecting to the donor server. Please check that group_replication_recovery channel credentials.*");
++call mtr.add_suppression("For details please check performance_schema.replication_connection_status table and error log messages of Slave I/O for channel group_replication_recovery.");
++SET SESSION sql_log_bin = 1;
++
++# ACL_CACHE lock hold on server1 is also also acquired by dump thread, which
++# means that if server2 recovery channel connects to server1 it will fail and
++# retry until the ACL_CACHE lock is released or server3 connects to server2.
++--replace_result $group_replication_group_name GROUP_REPLICATION_GROUP_NAME
++--eval SET GLOBAL group_replication_group_name= "$group_replication_group_name"
++--source include/start_group_replication_command.inc
++
++
++--echo
++--echo ############################################################
++--echo # 4. Wait until the group has 3 members and then resume the
++--echo #    ACL statement.
++--echo #    server3 may be in RECOVERING state but it will be part of
++--echo #    the group.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++--let $group_replication_number_of_members= 3
++--source include/gr_wait_for_number_of_members.inc
++
++--let $rpl_connection_name= server_1
++--source include/rpl_connection.inc
++--reap
++
++
++--echo
++--echo ############################################################
++--echo # 5. Verify that all members data is equal.
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++--let $group_replication_member_state = ONLINE
++--source include/gr_wait_for_member_state.inc
++
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++
++--let $assert_text = GTID_EXECUTED must contain 4 transactions
++--let $assert_cond= "[SELECT @@GLOBAL.GTID_EXECUTED]" = "$group_replication_group_name:1-4";
++--source include/assert.inc
++
++--let $event_sequence= $vcle_seq # $vcle_seq # $vcle_seq # Gtid # !Q(CREATE.*)
++--source include/assert_binlog_events.inc
++
++--let $rpl_connection_name= server2
++--source include/rpl_connection.inc
++
++--let $assert_text = GTID_EXECUTED must contain 4 transactions
++--let $assert_cond= "[SELECT @@GLOBAL.GTID_EXECUTED]" = "$group_replication_group_name:1-4";
++--source include/assert.inc
++
++--let $event_sequence= $vcle_seq # $vcle_seq # $vcle_seq # Gtid # !Q(CREATE.*)
++--source include/assert_binlog_events.inc
++
++--let $rpl_connection_name= server3
++--source include/rpl_connection.inc
++
++--let $assert_text = GTID_EXECUTED must contain 4 transactions
++--let $assert_cond= "[SELECT @@GLOBAL.GTID_EXECUTED]" = "$group_replication_group_name:1-4";
++--source include/assert.inc
++
++--let $event_sequence= $vcle_seq # $vcle_seq # $vcle_seq # Gtid # !Q(CREATE.*)
++--source include/assert_binlog_events.inc
++
++
++--echo
++--echo ############################################################
++--echo # 6. Clean up.
++--let $rpl_connection_name= server1
++--source include/rpl_connection.inc
++DROP USER 'user';
++
++--source include/group_replication_end.inc
+diff --git a/mysql-test/suite/perfschema/r/start_server_no_mutex_inst.result b/mysql-test/suite/perfschema/r/start_server_no_mutex_inst.result
+index a2a34a19ce2..99c23db0acd 100644
+--- a/mysql-test/suite/perfschema/r/start_server_no_mutex_inst.result
++++ b/mysql-test/suite/perfschema/r/start_server_no_mutex_inst.result
+@@ -115,7 +115,7 @@ show engine PERFORMANCE_SCHEMA status;
+ show global status like "performance_schema%";
+ show global variables like "performance_schema_max_mutex_classes";
+ Variable_name	Value
+-performance_schema_max_mutex_classes	300
++performance_schema_max_mutex_classes	350
+ select count(*) > 0 from performance_schema.setup_instruments
+ where name like "wait/synch/mutex/%";
+ count(*) > 0
+diff --git a/plugin/group_replication/CMakeLists.txt b/plugin/group_replication/CMakeLists.txt
+index b3f2ad69258..6bdad54b51a 100644
+--- a/plugin/group_replication/CMakeLists.txt
++++ b/plugin/group_replication/CMakeLists.txt
+@@ -108,6 +108,7 @@ SET(GROUP_REPLICATION_SOURCES
+   src/recovery_channel_state_observer.cc
+   src/recovery_state_transfer.cc
+   src/replication_threads_api.cc
++  src/services/get_system_variable/get_system_variable.cc
+   src/services/message_service/message_service.cc
+   src/services/notification/notification.cc
+   src/services/status_service/status_service.cc
+diff --git a/plugin/group_replication/include/plugin.h b/plugin/group_replication/include/plugin.h
+index e066c532128..2020b5f0de0 100644
+--- a/plugin/group_replication/include/plugin.h
++++ b/plugin/group_replication/include/plugin.h
+@@ -56,6 +56,7 @@ class Autorejoin_thread;
+ class Transaction_consistency_manager;
+ class Member_actions_handler;
+ class Consensus_leaders_handler;
++class Mysql_thread;
+ 
+ // Definition of system var structures
+ 
+@@ -115,6 +116,7 @@ struct gr_modules {
+     MESSAGE_SERVICE_HANDLER,
+     BINLOG_DUMP_THREAD_KILL,
+     MEMBER_ACTIONS_HANDLER,
++    MYSQL_THREAD_HANDLER,
+     NUM_MODULES
+   };
+   using mask = std::bitset<NUM_MODULES>;
+@@ -170,6 +172,7 @@ extern Primary_election_handler *primary_election_handler;
+ extern Autorejoin_thread *autorejoin_module;
+ extern Message_service_handler *message_service_handler;
+ extern Member_actions_handler *member_actions_handler;
++extern Mysql_thread *mysql_thread_handler;
+ 
+ // Auxiliary Functionality
+ extern Plugin_gcs_events_handler *events_handler;
+diff --git a/plugin/group_replication/include/plugin_psi.h b/plugin/group_replication/include/plugin_psi.h
+index ae26cfe7233..be83a49814d 100644
+--- a/plugin/group_replication/include/plugin_psi.h
++++ b/plugin/group_replication/include/plugin_psi.h
+@@ -127,7 +127,9 @@ extern PSI_mutex_key key_GR_LOCK_applier_module_run,
+     key_GR_LOCK_primary_promotion_policy,
+     key_GR_LOCK_mysql_thread_run,
+     key_GR_LOCK_mysql_thread_dispatcher_run,
+-    key_GR_LOCK_connection_map;
++    key_GR_LOCK_connection_map,
++    key_GR_LOCK_mysql_thread_handler_run,
++    key_GR_LOCK_mysql_thread_handler_dispatcher_run;
+ 
+ extern PSI_cond_key key_GR_COND_applier_module_run,
+     key_GR_COND_applier_module_suspend,
+@@ -163,7 +165,9 @@ extern PSI_cond_key key_GR_COND_applier_module_run,
+     key_GR_COND_write_lock_protection,
+     key_GR_COND_primary_promotion_policy,
+     key_GR_COND_mysql_thread_run,
+-    key_GR_COND_mysql_thread_dispatcher_run;
++    key_GR_COND_mysql_thread_dispatcher_run,
++    key_GR_COND_mysql_thread_handler_run,
++    key_GR_COND_mysql_thread_handler_dispatcher_run;
+ 
+ extern PSI_thread_key key_GR_THD_applier_module_receiver,
+     key_GR_THD_autorejoin,
+@@ -177,7 +181,8 @@ extern PSI_thread_key key_GR_THD_applier_module_receiver,
+     key_GR_THD_group_partition_handler,
+     key_GR_THD_recovery,
+     key_GR_THD_message_service_handler,
+-    key_GR_THD_mysql_thread;
++    key_GR_THD_mysql_thread,
++    key_GR_THD_mysql_thread_handler;
+ 
+ extern PSI_rwlock_key key_GR_RWLOCK_cert_stable_gtid_set,
+     key_GR_RWLOCK_channel_observation_list,
+diff --git a/plugin/group_replication/include/services/get_system_variable/get_system_variable.h b/plugin/group_replication/include/services/get_system_variable/get_system_variable.h
+new file mode 100644
+index 00000000000..e2318bb6a81
+--- /dev/null
++++ b/plugin/group_replication/include/services/get_system_variable/get_system_variable.h
+@@ -0,0 +1,125 @@
++/* Copyright (c) 2021, Oracle and/or its affiliates.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License, version 2.0,
++   as published by the Free Software Foundation.
++
++   This program is also distributed with certain software (including
++   but not limited to OpenSSL) that is licensed under separate terms,
++   as designated in a particular file or component or in included license
++   documentation.  The authors of MySQL hereby grant you an additional
++   permission to link the program and your derivative works with the
++   separately licensed software that they have included with MySQL.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License, version 2.0, for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
++
++#ifndef GR_GET_SYSTEM_VARIABLE
++#define GR_GET_SYSTEM_VARIABLE
++
++#include <mysql/components/services/component_sys_var_service.h>
++#include <mysql/components/services/registry.h>
++#include <string>
++#include "plugin/group_replication/include/thread/mysql_thread.h"
++
++class Get_system_variable_parameters : public Mysql_thread_body_parameters {
++ public:
++  enum System_variable_service { VAR_GTID_EXECUTED, VAR_GTID_PURGED };
++
++  Get_system_variable_parameters(System_variable_service service)
++      : m_result(""), m_service(service), m_error(1){};
++  virtual ~Get_system_variable_parameters(){};
++
++  /**
++    Get value for class private member error.
++
++    @return the error value returned
++    @retval 0      OK
++    @retval !=0    Error
++    */
++  int get_error();
++
++  /**
++    Set value for class private member error.
++
++    @param [in] error Set value of error
++    */
++  void set_error(int error);
++
++  /**
++    Set value for class private member service.
++
++    @return System defined to run
++    */
++  Get_system_variable_parameters::System_variable_service get_service();
++
++  // to avoid multiple copies on get and set methods we define it as public
++  std::string m_result{""};
++
++ private:
++  System_variable_service m_service{System_variable_service::VAR_GTID_EXECUTED};
++  // error returned by service executed
++  int m_error{1};
++};
++
++class Get_system_variable : Mysql_thread_body {
++ public:
++  Get_system_variable();
++
++  virtual ~Get_system_variable();
++
++  /**
++    Method to return the server gtid_executed by executing the get_variables
++    component service.
++
++    @param [out] gtid_executed The string where the result will be appended
++
++    @return the error value returned
++    @retval 0      OK
++    @retval !=0    Error
++    */
++  int get_server_gtid_executed(std::string &gtid_executed);
++
++  /**
++    Method to return the server gtid_purged by executing the get_variables
++    component service.
++
++    @param [out] gtid_purged The string where the result will be appended
++
++    @return the error value returned
++    @retval 0      OK
++    @retval !=0    Error
++    */
++  int get_server_gtid_purged(std::string &gtid_purged);
++
++  /**
++    Method that will be run on mysql_thread.
++
++    @param [in, out] parameters Values used by method to get service variable.
++
++    */
++  void run(Mysql_thread_body_parameters *parameters);
++
++ private:
++  /**
++    Method to return the server system variable specified on variable.
++
++    @param [in]  variable The system variable name to be retrieved
++    @param [out] value    The string where the result will be set
++
++    @return the error value returned
++    @retval 0      OK
++    @retval !=0    Error
++    */
++  int internal_get_system_variable(std::string variable, std::string &value);
++
++  my_h_service component_sys_variable_register_service_handler{nullptr};
++};
++
++#endif  // GR_GET_SYSTEM_VARIABLE
+diff --git a/plugin/group_replication/include/sql_service/sql_service_command.h b/plugin/group_replication/include/sql_service/sql_service_command.h
+index cbb5088f21f..f25f6187e68 100644
+--- a/plugin/group_replication/include/sql_service/sql_service_command.h
++++ b/plugin/group_replication/include/sql_service/sql_service_command.h
+@@ -107,34 +107,6 @@ class Sql_service_commands {
+   long internal_get_server_read_only(Sql_service_interface *sql_interface,
+                                      void *arg = nullptr);
+ 
+-  /**
+-    Method to return the server gtid_executed by executing the corresponding
+-    sql query.
+-
+-    @param sql_interface        the server session interface for query execution
+-    @param [out] gtid_executed  The string where the result will be appended
+-
+-    @return the error value returned
+-      @retval 0      OK
+-      @retval !=0    Error
+-  */
+-  long internal_get_server_gtid_executed(Sql_service_interface *sql_interface,
+-                                         void *gtid_executed);
+-
+-  /**
+-    Method to return the server gtid_purged by executing the corresponding
+-    sql query.
+-
+-    @param sql_interface        the server session interface for query execution
+-    @param [out] gtid_purged    The string where the result will be appended
+-
+-    @return the error value returned
+-      @retval 0      OK
+-      @retval !=0    Error
+-  */
+-  long internal_get_server_gtid_purged(Sql_service_interface *sql_interface,
+-                                       void *gtid_purged);
+-
+   /**
+     Method to wait for the server gtid_executed to match the given GTID string
+ 
+@@ -441,30 +413,6 @@ class Sql_service_command_interface {
+   */
+   long reset_read_only();
+ 
+-  /**
+-    Method to return the server gtid_executed by executing the corresponding
+-    sql query.
+-
+-    @param [out] gtid_executed The string where the result will be appended
+-
+-    @return the error value returned
+-      @retval 0      OK
+-      @retval !=0    Error
+-  */
+-  int get_server_gtid_executed(std::string &gtid_executed);
+-
+-  /**
+-    Method to return the server gtid_purged by executing the corresponding
+-    sql query.
+-
+-    @param [out] gtid_purged The string where the result will be appended
+-
+-    @return the error value returned
+-      @retval 0      OK
+-      @retval !=0    Error
+-  */
+-  int get_server_gtid_purged(std::string &gtid_purged);
+-
+   /**
+     Method to wait for the server gtid_executed to match the given GTID string
+ 
+diff --git a/plugin/group_replication/include/thread/mysql_thread.h b/plugin/group_replication/include/thread/mysql_thread.h
+index 7353c138eb1..28d7e57d8b9 100644
+--- a/plugin/group_replication/include/thread/mysql_thread.h
++++ b/plugin/group_replication/include/thread/mysql_thread.h
+@@ -50,6 +50,27 @@ class Mysql_thread_body {
+   virtual void run(Mysql_thread_body_parameters *parameters) = 0;
+ };
+ 
++class Mysql_thread_task {
++ public:
++  Mysql_thread_task(Mysql_thread_body *body,
++                    Mysql_thread_body_parameters *parameters)
++      : m_body(body), m_parameters(parameters){};
++  virtual ~Mysql_thread_task() {
++    delete m_parameters;
++    m_parameters = nullptr;
++  };
++
++  /**
++    Execute task, calling body function with parameters
++    */
++  void execute();
++
++ private:
++  // cannot be deleted, represent class where method will run
++  Mysql_thread_body *m_body{nullptr};
++  Mysql_thread_body_parameters *m_parameters{nullptr};
++};
++
+ /**
+   @class Mysql_thread
+ 
+@@ -60,7 +81,9 @@ class Mysql_thread {
+   /**
+     Mysql_thread constructor
+   */
+-  Mysql_thread(Mysql_thread_body *body);
++  Mysql_thread(PSI_thread_key thread_key, PSI_mutex_key run_mutex_key,
++               PSI_cond_key run_cond_key, PSI_mutex_key dispatcher_mutex_key,
++               PSI_cond_key dispatcher_cond_key);
+   virtual ~Mysql_thread();
+ 
+   /**
+@@ -95,9 +118,15 @@ class Mysql_thread {
+       @retval false  Successful
+       @retval true   Error
+   */
+-  bool trigger(Mysql_thread_body_parameters *parameters);
++  bool trigger(Mysql_thread_task *task);
+ 
+  private:
++  PSI_thread_key m_thread_key;
++  PSI_mutex_key m_mutex_key;
++  PSI_cond_key m_cond_key;
++  PSI_mutex_key m_dispatcher_mutex_key;
++  PSI_cond_key m_dispatcher_cond_key;
++
+   THD *m_thd{nullptr};
+   my_thread_handle m_pthd;
+   mysql_mutex_t m_run_lock;
+@@ -109,9 +138,7 @@ class Mysql_thread {
+   mysql_cond_t m_dispatcher_cond;
+   bool m_trigger_run_complete{false};
+ 
+-  Mysql_thread_body *m_body{nullptr};
+-  Abortable_synchronized_queue<Mysql_thread_body_parameters *> *m_trigger_queue{
+-      nullptr};
++  Abortable_synchronized_queue<Mysql_thread_task *> *m_trigger_queue{nullptr};
+ };
+ 
+ #endif /* MYSQL_THREAD_INCLUDE */
+diff --git a/plugin/group_replication/src/certifier.cc b/plugin/group_replication/src/certifier.cc
+index c5770bfcad4..ee76adec10d 100644
+--- a/plugin/group_replication/src/certifier.cc
++++ b/plugin/group_replication/src/certifier.cc
+@@ -31,7 +31,7 @@
+ #include "plugin/group_replication/include/certifier.h"
+ #include "plugin/group_replication/include/observer_trans.h"
+ #include "plugin/group_replication/include/plugin.h"
+-#include "plugin/group_replication/include/sql_service/sql_service_command.h"
++#include "plugin/group_replication/include/services/get_system_variable/get_system_variable.h"
+ 
+ const std::string Certifier::GTID_EXTRACTED_NAME = "gtid_extracted";
+ const std::string Certifier::CERTIFICATION_INFO_ERROR_NAME =
+@@ -320,7 +320,7 @@ int Certifier::initialize_server_gtid_set(bool get_server_gtid_retrieved) {
+   DBUG_TRACE;
+   mysql_mutex_assert_owner(&LOCK_certification_info);
+   int error = 0;
+-  Sql_service_command_interface *sql_command_interface = nullptr;
++  Get_system_variable *get_system_variable = nullptr;
+   std::string gtid_executed;
+   std::string applier_retrieved_gtids;
+ 
+@@ -405,16 +405,9 @@ int Certifier::initialize_server_gtid_set(bool get_server_gtid_retrieved) {
+     }
+   }
+ 
+-  sql_command_interface = new Sql_service_command_interface();
+-  if (sql_command_interface->establish_session_connection(PSESSION_USE_THREAD,
+-                                                          GROUPREPL_USER)) {
+-    LogPluginErr(ERROR_LEVEL,
+-                 ER_GRP_RPL_SERVER_CONN_ERROR); /* purecov: inspected */
+-    error = 1;                                  /* purecov: inspected */
+-    goto end;                                   /* purecov: inspected */
+-  }
++  get_system_variable = new Get_system_variable();
+ 
+-  error = sql_command_interface->get_server_gtid_executed(gtid_executed);
++  error = get_system_variable->get_server_gtid_executed(gtid_executed);
+   DBUG_EXECUTE_IF("gr_server_gtid_executed_extraction_error", error = 1;);
+   if (error) {
+     LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_ERROR_FETCHING_GTID_EXECUTED_SET);
+@@ -454,7 +447,7 @@ int Certifier::initialize_server_gtid_set(bool get_server_gtid_retrieved) {
+   compute_group_available_gtid_intervals();
+ 
+ end:
+-  delete sql_command_interface;
++  delete get_system_variable;
+ 
+   return error;
+ }
+diff --git a/plugin/group_replication/src/gcs_event_handlers.cc b/plugin/group_replication/src/gcs_event_handlers.cc
+index 439d8599642..fae36a02566 100644
+--- a/plugin/group_replication/src/gcs_event_handlers.cc
++++ b/plugin/group_replication/src/gcs_event_handlers.cc
+@@ -46,6 +46,7 @@
+ #include "plugin/group_replication/include/plugin_messages/sync_before_execution_message.h"
+ #include "plugin/group_replication/include/plugin_messages/transaction_prepared_message.h"
+ #include "plugin/group_replication/include/plugin_messages/transaction_with_guarantee_message.h"
++#include "plugin/group_replication/include/services/get_system_variable/get_system_variable.h"
+ 
+ using std::vector;
+ 
+@@ -1271,24 +1272,15 @@ Gcs_message_data *Plugin_gcs_events_handler::get_exchangeable_data() const {
+   std::string applier_retrieved_gtids;
+   Replication_thread_api applier_channel("group_replication_applier");
+ 
+-  Sql_service_command_interface *sql_command_interface =
+-      new Sql_service_command_interface();
++  Get_system_variable *get_system_variable = new Get_system_variable();
+ 
+-  if (sql_command_interface->establish_session_connection(
+-          PSESSION_DEDICATED_THREAD, GROUPREPL_USER, get_plugin_pointer())) {
+-    /* purecov: begin inspected */
+-    LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_GRP_CHANGE_INFO_EXTRACT_ERROR);
+-    goto sending;
+-    /* purecov: end */
+-  }
+-
+-  if (sql_command_interface->get_server_gtid_executed(server_executed_gtids)) {
++  if (get_system_variable->get_server_gtid_executed(server_executed_gtids)) {
+     /* purecov: begin inspected */
+     LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_GTID_EXECUTED_EXTRACT_ERROR);
+     goto sending;
+     /* purecov: inspected */
+   }
+-  if (sql_command_interface->get_server_gtid_purged(server_purged_gtids)) {
++  if (get_system_variable->get_server_gtid_purged(server_purged_gtids)) {
+     /* purecov: begin inspected */
+     LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_GTID_PURGED_EXTRACT_ERROR);
+     goto sending;
+@@ -1304,7 +1296,7 @@ Gcs_message_data *Plugin_gcs_events_handler::get_exchangeable_data() const {
+                                      applier_retrieved_gtids);
+ sending:
+ 
+-  delete sql_command_interface;
++  delete get_system_variable;
+ 
+   std::vector<uchar> data;
+ 
+diff --git a/plugin/group_replication/src/observer_trans.cc b/plugin/group_replication/src/observer_trans.cc
+index bc0f3bc3803..e8f2a87a97b 100644
+--- a/plugin/group_replication/src/observer_trans.cc
++++ b/plugin/group_replication/src/observer_trans.cc
+@@ -177,6 +177,12 @@ int group_replication_trans_before_commit(Trans_param *param) {
+     assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+   });
+ 
++  DBUG_EXECUTE_IF("group_replication_pause_on_before_commit_hook", {
++    // DBUG_SYNC are hold by same MDL lock test is using
++    const uint sleep_time_seconds = VIEW_MODIFICATION_TIMEOUT * 1.5;
++    my_sleep(sleep_time_seconds * 1000000);
++  });
++
+   /*
+     If the originating id belongs to a thread in the plugin, the transaction
+     was already certified. Channel operations can deadlock against
+diff --git a/plugin/group_replication/src/plugin.cc b/plugin/group_replication/src/plugin.cc
+index c7ce8381932..bdbecbb4b27 100644
+--- a/plugin/group_replication/src/plugin.cc
++++ b/plugin/group_replication/src/plugin.cc
+@@ -46,6 +46,7 @@
+ #include "plugin/group_replication/include/services/message_service/message_service.h"
+ #include "plugin/group_replication/include/services/status_service/status_service.h"
+ #include "plugin/group_replication/include/sql_service/sql_service_interface.h"
++#include "plugin/group_replication/include/thread/mysql_thread.h"
+ #include "plugin/group_replication/include/udf/udf_registration.h"
+ #include "plugin/group_replication/include/udf/udf_utils.h"
+ 
+@@ -123,6 +124,8 @@ Message_service_handler *message_service_handler = nullptr;
+ /** Handle validation of advertised recovery endpoints */
+ Advertised_recovery_endpoints *advertised_recovery_endpoints = nullptr;
+ Member_actions_handler *member_actions_handler = nullptr;
++/** Handle tasks on mysql_thread */
++Mysql_thread *mysql_thread_handler = nullptr;
+ 
+ Plugin_gcs_events_handler *events_handler = nullptr;
+ Plugin_gcs_view_modification_notifier *view_change_notifier = nullptr;
+@@ -1300,6 +1303,20 @@ int initialize_plugin_modules(gr_modules::mask modules_to_init) {
+   DBUG_EXECUTE_IF("group_replication_rejoin_long_retry",
+                   { lv.rejoin_timeout = 60ULL; };);
+ 
++  /*
++    Mysql thread handler.
++  */
++  if (modules_to_init[gr_modules::MYSQL_THREAD_HANDLER]) {
++    mysql_thread_handler = new Mysql_thread(
++        key_GR_THD_mysql_thread_handler, key_GR_LOCK_mysql_thread_handler_run,
++        key_GR_COND_mysql_thread_handler_run,
++        key_GR_LOCK_mysql_thread_handler_dispatcher_run,
++        key_GR_COND_mysql_thread_handler_dispatcher_run);
++    if (mysql_thread_handler->initialize()) {
++      return GROUP_REPLICATION_CONFIGURATION_ERROR;
++    }
++  }
++
+   /*
+     Registry module.
+   */
+@@ -1655,6 +1672,17 @@ int terminate_plugin_modules(gr_modules::mask modules_to_terminate,
+     }
+   }
+ 
++  /*
++    Mysql thread handler.
++  */
++  if (modules_to_terminate[gr_modules::MYSQL_THREAD_HANDLER]) {
++    if (nullptr != mysql_thread_handler) {
++      mysql_thread_handler->terminate();
++      delete mysql_thread_handler;
++      mysql_thread_handler = nullptr;
++    }
++  }
++
+   return error;
+ }
+ 
+@@ -1675,6 +1703,7 @@ bool attempt_rejoin() {
+   modules_mask.set(gr_modules::GCS_EVENTS_HANDLER, true);
+   modules_mask.set(gr_modules::REMOTE_CLONE_HANDLER, true);
+   modules_mask.set(gr_modules::MEMBER_ACTIONS_HANDLER, true);
++  modules_mask.set(gr_modules::MYSQL_THREAD_HANDLER, true);
+   modules_mask.set(gr_modules::MESSAGE_SERVICE_HANDLER, true);
+   modules_mask.set(gr_modules::BINLOG_DUMP_THREAD_KILL, true);
+   modules_mask.set(gr_modules::RECOVERY_MODULE, true);
+diff --git a/plugin/group_replication/src/plugin_handlers/member_actions_handler.cc b/plugin/group_replication/src/plugin_handlers/member_actions_handler.cc
+index 5393221f30b..597389efdb0 100644
+--- a/plugin/group_replication/src/plugin_handlers/member_actions_handler.cc
++++ b/plugin/group_replication/src/plugin_handlers/member_actions_handler.cc
+@@ -52,7 +52,10 @@ bool Member_actions_handler::init() {
+ 
+   // Create worker thread.
+   assert(nullptr == m_mysql_thread);
+-  m_mysql_thread = new Mysql_thread(this);
++  m_mysql_thread = new Mysql_thread(
++      key_GR_THD_mysql_thread, key_GR_LOCK_mysql_thread_run,
++      key_GR_COND_mysql_thread_run, key_GR_LOCK_mysql_thread_dispatcher_run,
++      key_GR_COND_mysql_thread_dispatcher_run);
+   if (m_mysql_thread->initialize()) {
+     return true; /* purecov: inspected */
+   }
+@@ -293,9 +296,10 @@ void Member_actions_handler::trigger_actions(
+   DBUG_TRACE;
+   assert(local_member_info->in_primary_mode());
+ 
+-  Member_actions_trigger_parameters *parameters =
+-      new Member_actions_trigger_parameters(event);
+-  m_mysql_thread->trigger(parameters);
++  Mysql_thread_task *task =
++      new Mysql_thread_task(this, new Member_actions_trigger_parameters(event));
++  m_mysql_thread->trigger(task);
++  delete task;
+ }
+ 
+ void Member_actions_handler::run(Mysql_thread_body_parameters *parameters) {
+@@ -309,7 +313,6 @@ void Member_actions_handler::run(Mysql_thread_body_parameters *parameters) {
+          trigger_parameters->get_event());
+   const std::string event =
+       Member_actions::get_event_name(trigger_parameters->get_event());
+-  delete trigger_parameters;
+ 
+   // Get the actions for the event.
+   protobuf_replication_group_member_actions::ActionList action_list;
+diff --git a/plugin/group_replication/src/plugin_handlers/primary_election_invocation_handler.cc b/plugin/group_replication/src/plugin_handlers/primary_election_invocation_handler.cc
+index e18bf9137b8..eb838b93216 100644
+--- a/plugin/group_replication/src/plugin_handlers/primary_election_invocation_handler.cc
++++ b/plugin/group_replication/src/plugin_handlers/primary_election_invocation_handler.cc
+@@ -24,6 +24,7 @@
+ #include "plugin/group_replication/include/plugin.h"
+ #include "plugin/group_replication/include/plugin_handlers/member_actions_handler.h"
+ #include "plugin/group_replication/include/plugin_handlers/primary_election_utils.h"
++#include "plugin/group_replication/include/services/get_system_variable/get_system_variable.h"
+ 
+ Primary_election_handler::Primary_election_handler(
+     ulong components_stop_timeout)
+@@ -213,16 +214,9 @@ void Primary_election_handler::print_gtid_info_in_log() {
+   Replication_thread_api applier_channel("group_replication_applier");
+   std::string applier_retrieved_gtids;
+   std::string server_executed_gtids;
+-  Sql_service_command_interface *sql_command_interface =
+-      new Sql_service_command_interface();
+-  if (sql_command_interface->establish_session_connection(
+-          PSESSION_DEDICATED_THREAD, GROUPREPL_USER, get_plugin_pointer())) {
+-    /* purecov: begin inspected */
+-    LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_CONN_INTERNAL_PLUGIN_FAIL);
+-    goto err;
+-    /* purecov: end */
+-  }
+-  if (sql_command_interface->get_server_gtid_executed(server_executed_gtids)) {
++  Get_system_variable *get_system_variable = new Get_system_variable();
++
++  if (get_system_variable->get_server_gtid_executed(server_executed_gtids)) {
+     /* purecov: begin inspected */
+     LogPluginErr(WARNING_LEVEL, ER_GRP_RPL_GTID_EXECUTED_EXTRACT_ERROR);
+     goto err;
+@@ -241,7 +235,7 @@ void Primary_election_handler::print_gtid_info_in_log() {
+                "applier channel received_transaction_set",
+                applier_retrieved_gtids.c_str());
+ err:
+-  delete sql_command_interface;
++  delete get_system_variable;
+ }
+ 
+ int Primary_election_handler::internal_primary_election(
+diff --git a/plugin/group_replication/src/plugin_psi.cc b/plugin/group_replication/src/plugin_psi.cc
+index 6d246362e73..888eb5eb660 100644
+--- a/plugin/group_replication/src/plugin_psi.cc
++++ b/plugin/group_replication/src/plugin_psi.cc
+@@ -80,7 +80,9 @@ PSI_mutex_key key_GR_LOCK_applier_module_run,
+     key_GR_LOCK_write_lock_protection,
+     key_GR_LOCK_mysql_thread_run,
+     key_GR_LOCK_mysql_thread_dispatcher_run,
+-    key_GR_LOCK_connection_map;
++    key_GR_LOCK_connection_map,
++    key_GR_LOCK_mysql_thread_handler_run,
++    key_GR_LOCK_mysql_thread_handler_dispatcher_run;
+ 
+ PSI_cond_key key_GR_COND_applier_module_run,
+     key_GR_COND_applier_module_suspend,
+@@ -116,7 +118,9 @@ PSI_cond_key key_GR_COND_applier_module_run,
+     key_GR_COND_wait_ticket,
+     key_GR_COND_write_lock_protection,
+     key_GR_COND_mysql_thread_run,
+-    key_GR_COND_mysql_thread_dispatcher_run;
++    key_GR_COND_mysql_thread_dispatcher_run,
++    key_GR_COND_mysql_thread_handler_run,
++    key_GR_COND_mysql_thread_handler_dispatcher_run;
+ 
+ PSI_thread_key key_GR_THD_applier_module_receiver,
+     key_GR_THD_autorejoin,
+@@ -130,7 +134,8 @@ PSI_thread_key key_GR_THD_applier_module_receiver,
+     key_GR_THD_group_partition_handler,
+     key_GR_THD_recovery,
+     key_GR_THD_message_service_handler,
+-    key_GR_THD_mysql_thread;
++    key_GR_THD_mysql_thread,
++    key_GR_THD_mysql_thread_handler;
+ 
+ PSI_rwlock_key key_GR_RWLOCK_cert_stable_gtid_set,
+     key_GR_RWLOCK_channel_observation_list,
+@@ -346,6 +351,11 @@ static PSI_mutex_info all_group_replication_psi_mutex_keys[] = {
+      "LOCK_mysql_thread_dispatcher_run", PSI_FLAG_SINGLETON, 0,
+      PSI_DOCUMENT_ME},
+     {&key_GR_LOCK_connection_map, "LOCK_connection_map", PSI_FLAG_SINGLETON, 0,
++     PSI_DOCUMENT_ME},
++    {&key_GR_LOCK_mysql_thread_handler_run, "LOCK_mysql_handler_thread_run",
++     PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME},
++    {&key_GR_LOCK_mysql_thread_handler_dispatcher_run,
++     "LOCK_mysql_thread_handler_dispatcher_run", PSI_FLAG_SINGLETON, 0,
+      PSI_DOCUMENT_ME}};
+ 
+ static PSI_cond_info all_group_replication_psi_condition_keys[] = {
+@@ -462,6 +472,8 @@ static PSI_thread_info all_group_replication_psi_thread_keys[] = {
+     {&key_GR_THD_message_service_handler, "THD_message_service_handler",
+      "gr_msg", PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
+     {&key_GR_THD_mysql_thread, "THD_mysql_thread", "gr_mysql",
++     PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME},
++    {&key_GR_THD_mysql_thread_handler, "THD_mysql_thread_handler", "gr_handler",
+      PSI_FLAG_SINGLETON | PSI_FLAG_THREAD_SYSTEM, 0, PSI_DOCUMENT_ME}};
+ 
+ static PSI_rwlock_info all_group_replication_psi_rwlock_keys[] = {
+diff --git a/plugin/group_replication/src/services/get_system_variable/get_system_variable.cc b/plugin/group_replication/src/services/get_system_variable/get_system_variable.cc
+new file mode 100644
+index 00000000000..05500470541
+--- /dev/null
++++ b/plugin/group_replication/src/services/get_system_variable/get_system_variable.cc
+@@ -0,0 +1,148 @@
++/* Copyright (c) 2021, Oracle and/or its affiliates.
++
++   This program is free software; you can redistribute it and/or modify
++   it under the terms of the GNU General Public License, version 2.0,
++   as published by the Free Software Foundation.
++
++   This program is also distributed with certain software (including
++   but not limited to OpenSSL) that is licensed under separate terms,
++   as designated in a particular file or component or in included license
++   documentation.  The authors of MySQL hereby grant you an additional
++   permission to link the program and your derivative works with the
++   separately licensed software that they have included with MySQL.
++
++   This program is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU General Public License, version 2.0, for more details.
++
++   You should have received a copy of the GNU General Public License
++   along with this program; if not, write to the Free Software
++   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
++
++#include "plugin/group_replication/include/services/get_system_variable/get_system_variable.h"
++#include "plugin/group_replication/include/plugin.h"
++
++#include "sql/sql_class.h"
++
++// safeguard due unknown gtid_executed or gtid_purged length
++#define GTID_VALUES_FETCH_BUFFER_SIZE 500000
++
++int Get_system_variable_parameters::get_error() { return m_error; }
++
++void Get_system_variable_parameters::set_error(int error) { m_error = error; }
++
++Get_system_variable_parameters::System_variable_service
++Get_system_variable_parameters::get_service() {
++  return m_service;
++}
++
++Get_system_variable::Get_system_variable() {
++  get_plugin_registry()->acquire(
++      "component_sys_variable_register",
++      &component_sys_variable_register_service_handler);
++}
++
++Get_system_variable::~Get_system_variable() {
++  if (component_sys_variable_register_service_handler != nullptr) {
++    get_plugin_registry()->release(
++        component_sys_variable_register_service_handler);
++  }
++}
++
++int Get_system_variable::get_server_gtid_executed(std::string &gtid_executed) {
++  int error = 1;
++
++  if (nullptr == mysql_thread_handler) {
++    return 1;
++  }
++
++  Get_system_variable_parameters *parameter =
++      new Get_system_variable_parameters(
++          Get_system_variable_parameters::VAR_GTID_EXECUTED);
++  Mysql_thread_task *task = new Mysql_thread_task(this, parameter);
++  error = mysql_thread_handler->trigger(task);
++  error |= parameter->get_error();
++
++  if (!error) {
++    gtid_executed.assign(parameter->m_result);
++  }
++
++  delete task;
++  return error;
++}
++
++int Get_system_variable::get_server_gtid_purged(std::string &gtid_purged) {
++  int error = 1;
++
++  if (nullptr == mysql_thread_handler) {
++    return 1;
++  }
++
++  Get_system_variable_parameters *parameter =
++      new Get_system_variable_parameters(
++          Get_system_variable_parameters::VAR_GTID_PURGED);
++  Mysql_thread_task *task = new Mysql_thread_task(this, parameter);
++  error = mysql_thread_handler->trigger(task);
++  error |= parameter->get_error();
++
++  if (!error) {
++    gtid_purged.assign(parameter->m_result);
++  }
++
++  delete task;
++  return error;
++}
++
++void Get_system_variable::run(Mysql_thread_body_parameters *parameters) {
++  Get_system_variable_parameters *param =
++      (Get_system_variable_parameters *)parameters;
++  switch (param->get_service()) {
++    case Get_system_variable_parameters::VAR_GTID_EXECUTED:
++      param->set_error(internal_get_system_variable(
++          std::string("gtid_executed"), param->m_result));
++      break;
++    case Get_system_variable_parameters::VAR_GTID_PURGED:
++      param->set_error(internal_get_system_variable(std::string("gtid_purged"),
++                                                    param->m_result));
++      break;
++    default:
++      param->set_error(1);
++  }
++}
++
++int Get_system_variable::internal_get_system_variable(std::string variable,
++                                                      std::string &value) {
++  SERVICE_TYPE(component_sys_variable_register)
++  *component_sys_variable_register_service{nullptr};
++  char *var_value = nullptr;
++  size_t var_len = GTID_VALUES_FETCH_BUFFER_SIZE;
++  bool error = false;
++
++  if (nullptr == component_sys_variable_register_service_handler) {
++    error = true; /* purecov: inspected */
++    goto end;     /* purecov: inspected */
++  }
++
++  component_sys_variable_register_service =
++      reinterpret_cast<SERVICE_TYPE(component_sys_variable_register) *>(
++          component_sys_variable_register_service_handler);
++
++  if ((var_value = new (std::nothrow) char[var_len + 1]) == nullptr) {
++    error = true; /* purecov: inspected */
++    goto end;     /* purecov: inspected */
++  }
++
++  if (component_sys_variable_register_service->get_variable(
++          "mysql_server", variable.c_str(),
++          reinterpret_cast<void **>(&var_value), &var_len)) {
++    error = true; /* purecov: inspected */
++    goto end;     /* purecov: inspected */
++  }
++
++  value.assign(var_value, var_len);
++
++end:
++  delete[] var_value;
++  return error;
++}
+diff --git a/plugin/group_replication/src/sql_service/sql_service_command.cc b/plugin/group_replication/src/sql_service/sql_service_command.cc
+index e1397b25df1..ba0d0cb7ffa 100644
+--- a/plugin/group_replication/src/sql_service/sql_service_command.cc
++++ b/plugin/group_replication/src/sql_service/sql_service_command.cc
+@@ -358,79 +358,6 @@ long Sql_service_commands::internal_get_server_read_only(
+   return server_read_only;
+ }
+ 
+-int Sql_service_command_interface::get_server_gtid_executed(
+-    string &gtid_executed) {
+-  DBUG_TRACE;
+-  long error = 0;
+-
+-  if (connection_thread_isolation != PSESSION_DEDICATED_THREAD) {
+-    error = sql_service_commands.internal_get_server_gtid_executed(
+-        m_server_interface, static_cast<void *>(&gtid_executed));
+-  } else {
+-    m_plugin_session_thread->set_return_pointer(
+-        static_cast<void *>(&gtid_executed));
+-    m_plugin_session_thread->queue_new_method_for_application(
+-        &Sql_service_commands::internal_get_server_gtid_executed);
+-    error = m_plugin_session_thread->wait_for_method_execution();
+-  }
+-
+-  return error;
+-}
+-
+-long Sql_service_commands::internal_get_server_gtid_executed(
+-    Sql_service_interface *sql_interface, void *gtid_executed_arg) {
+-  DBUG_TRACE;
+-
+-  assert(sql_interface != nullptr);
+-
+-  std::string *gtid_executed = static_cast<std::string *>(gtid_executed_arg);
+-
+-  Sql_resultset rset;
+-  long srv_err =
+-      sql_interface->execute_query("SELECT @@GLOBAL.gtid_executed", &rset);
+-  if (srv_err == 0 && rset.get_rows() > 0) {
+-    gtid_executed->assign(rset.getString(0));
+-    return 0;
+-  }
+-  return 1;
+-}
+-
+-int Sql_service_command_interface::get_server_gtid_purged(string &gtid_purged) {
+-  DBUG_TRACE;
+-  long error = 0;
+-
+-  if (connection_thread_isolation != PSESSION_DEDICATED_THREAD) {
+-    error = sql_service_commands.internal_get_server_gtid_purged(
+-        m_server_interface, static_cast<void *>(&gtid_purged));
+-  } else {
+-    m_plugin_session_thread->set_return_pointer(
+-        static_cast<void *>(&gtid_purged));
+-    m_plugin_session_thread->queue_new_method_for_application(
+-        &Sql_service_commands::internal_get_server_gtid_purged);
+-    error = m_plugin_session_thread->wait_for_method_execution();
+-  }
+-
+-  return error;
+-}
+-
+-long Sql_service_commands::internal_get_server_gtid_purged(
+-    Sql_service_interface *sql_interface, void *gtid_purged_arg) {
+-  DBUG_TRACE;
+-
+-  assert(sql_interface != nullptr);
+-
+-  std::string *gtid_purged = static_cast<std::string *>(gtid_purged_arg);
+-
+-  Sql_resultset rset;
+-  long srv_err =
+-      sql_interface->execute_query("SELECT @@GLOBAL.GTID_PURGED", &rset);
+-  if (srv_err == 0 && rset.get_rows() > 0) {
+-    gtid_purged->assign(rset.getString(0));
+-    return 0;
+-  }
+-  return 1;
+-}
+-
+ long Sql_service_command_interface::wait_for_server_gtid_executed(
+     std::string &gtid_executed, int timeout) {
+   DBUG_TRACE;
+diff --git a/plugin/group_replication/src/thread/mysql_thread.cc b/plugin/group_replication/src/thread/mysql_thread.cc
+index c453f56e4db..514adbef0c0 100644
+--- a/plugin/group_replication/src/thread/mysql_thread.cc
++++ b/plugin/group_replication/src/thread/mysql_thread.cc
+@@ -32,18 +32,28 @@ static void *launch_thread(void *arg) {
+   return nullptr;
+ }
+ 
+-Mysql_thread::Mysql_thread(Mysql_thread_body *body)
+-    : m_state(), m_aborted(false), m_trigger_run_complete(false), m_body(body) {
+-  mysql_mutex_init(key_GR_LOCK_mysql_thread_run, &m_run_lock,
++void Mysql_thread_task::execute() { m_body->run(m_parameters); }
++
++Mysql_thread::Mysql_thread(PSI_thread_key thread_key,
++                           PSI_mutex_key run_mutex_key,
++                           PSI_cond_key run_cond_key,
++                           PSI_mutex_key dispatcher_mutex_key,
++                           PSI_cond_key dispatcher_cond_key)
++    : m_thread_key(thread_key),
++      m_mutex_key(run_mutex_key),
++      m_cond_key(run_cond_key),
++      m_dispatcher_mutex_key(dispatcher_mutex_key),
++      m_dispatcher_cond_key(dispatcher_cond_key),
++      m_state(),
++      m_aborted(false),
++      m_trigger_run_complete(false) {
++  mysql_mutex_init(m_mutex_key, &m_run_lock, MY_MUTEX_INIT_FAST);
++  mysql_cond_init(m_cond_key, &m_run_cond);
++  mysql_mutex_init(m_dispatcher_mutex_key, &m_dispatcher_lock,
+                    MY_MUTEX_INIT_FAST);
+-  mysql_cond_init(key_GR_COND_mysql_thread_run, &m_run_cond);
+-  mysql_mutex_init(key_GR_LOCK_mysql_thread_dispatcher_run, &m_dispatcher_lock,
+-                   MY_MUTEX_INIT_FAST);
+-  mysql_cond_init(key_GR_COND_mysql_thread_dispatcher_run, &m_dispatcher_cond);
+-  m_trigger_queue =
+-      new Abortable_synchronized_queue<Mysql_thread_body_parameters *>();
++  mysql_cond_init(m_dispatcher_cond_key, &m_dispatcher_cond);
++  m_trigger_queue = new Abortable_synchronized_queue<Mysql_thread_task *>();
+ }
+-
+ Mysql_thread::~Mysql_thread() {
+   mysql_mutex_destroy(&m_run_lock);
+   mysql_cond_destroy(&m_run_cond);
+@@ -53,9 +63,9 @@ Mysql_thread::~Mysql_thread() {
+   if (nullptr != m_trigger_queue) {
+     while (m_trigger_queue->size() > 0) {
+       /* purecov: begin inspected */
+-      Mysql_thread_body_parameters *parameters = nullptr;
+-      m_trigger_queue->pop(&parameters);
+-      delete parameters;
++      Mysql_thread_task *task = nullptr;
++      m_trigger_queue->pop(&task);
++      delete task;
+       /* purecov: end */
+     }
+   }
+@@ -75,9 +85,8 @@ bool Mysql_thread::initialize() {
+ 
+   m_aborted = false;
+ 
+-  if ((mysql_thread_create(key_GR_THD_mysql_thread, &m_pthd,
+-                           get_connection_attrib(), launch_thread,
+-                           (void *)this))) {
++  if ((mysql_thread_create(m_thread_key, &m_pthd, get_connection_attrib(),
++                           launch_thread, (void *)this))) {
+     /* purecov: begin inspected */
+     mysql_mutex_unlock(&m_run_lock);
+     return true;
+@@ -150,12 +159,12 @@ void Mysql_thread::dispatcher() {
+       break;
+     }
+ 
+-    Mysql_thread_body_parameters *parameters = nullptr;
+-    if (m_trigger_queue->pop(&parameters)) {
++    Mysql_thread_task *task = nullptr;
++    if (m_trigger_queue->pop(&task)) {
+       break;
+     }
+ 
+-    m_body->run(parameters);
++    task->execute();
+ 
+     mysql_mutex_lock(&m_dispatcher_lock);
+     m_trigger_run_complete = true;
+@@ -187,14 +196,13 @@ void Mysql_thread::dispatcher() {
+   my_thread_exit(nullptr);
+ }
+ 
+-bool Mysql_thread::trigger(Mysql_thread_body_parameters *parameters) {
++bool Mysql_thread::trigger(Mysql_thread_task *task) {
+   DBUG_TRACE;
+ 
+   mysql_mutex_lock(&m_dispatcher_lock);
+-  if (m_trigger_queue->push(parameters)) {
++  if (m_trigger_queue->push(task)) {
+     /* purecov: begin inspected */
+     mysql_mutex_unlock(&m_dispatcher_lock);
+-    delete parameters;
+     return true;
+     /* purecov: end */
+   }
+diff --git a/share/messages_to_error_log.txt b/share/messages_to_error_log.txt
+index f2a7a1eabdd..76f40aa997a 100644
+--- a/share/messages_to_error_log.txt
++++ b/share/messages_to_error_log.txt
+@@ -4607,7 +4607,7 @@ ER_GRP_RPL_DATA_NOT_PROVIDED_BY_MEM
+ ER_GRP_RPL_MEMBER_ALREADY_EXISTS
+   eng "There is already a member with server_uuid %s. The member will now exit the group."
+ 
+-ER_GRP_RPL_GRP_CHANGE_INFO_EXTRACT_ERROR
++OBSOLETE_ER_GRP_RPL_GRP_CHANGE_INFO_EXTRACT_ERROR
+   eng "Error when extracting information for group change. Operations and checks made to group joiners may be incomplete."
+ 
+ ER_GRP_RPL_GTID_EXECUTED_EXTRACT_ERROR
+diff --git a/storage/perfschema/pfs_server.h b/storage/perfschema/pfs_server.h
+index 547ed0ab29b..6a7569b3d2e 100644
+--- a/storage/perfschema/pfs_server.h
++++ b/storage/perfschema/pfs_server.h
+@@ -55,7 +55,7 @@
+ #define PFS_AUTOSIZE_VALUE (-1)
+ 
+ #ifndef PFS_MAX_MUTEX_CLASS
+-#define PFS_MAX_MUTEX_CLASS 300
++#define PFS_MAX_MUTEX_CLASS 350
+ #endif
+ #ifndef PFS_MAX_RWLOCK_CLASS
+ #define PFS_MAX_RWLOCK_CLASS 60

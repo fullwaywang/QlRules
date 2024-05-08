@@ -1,0 +1,56 @@
+commit 297057b5358eb6966a95cd1bd73378f8da943e51	297057b5358eb6966a95cd1bd73378f8da943e51
+Author: Annamalai Gurusami <annamalai.gurusami@oracle.com>
+Date:   Fri Jun 3 10:38:58 2022 +0200
+
+    Bug #34148143 Assertion failure: buf0dblwr.cc:3097:ib::fatal triggered thread
+    
+    Problem:
+    
+    During recovery, pages of the undo tablespace was fetched from the
+    disk.  These pages were encrypted and the corresponding fil_space_t
+    object did not contain encryption keys. Even the space->flags was not
+    having the encryption flag enabled.
+    
+    Because of the missing encryption keys, decryption of the these pages
+    failed.  So it cannot be verified if the data read from the disk is
+    valid or not. This resulted in fatal error.
+    
+    Analysis:
+    
+    During recovery the encryption keys of tablespaces were recovered and
+    placed in recv_sys->keys.  But these are propagated to the
+    corresponding tablespaces only if the encryption flags of the
+    tablespace is enabled in the fil_space_t object.
+    
+    But in the current scenario, the fil_space_t object did not have the
+    encryption flag enabled. Because of this even when the encryption keys
+    were recovered and available in recv_sys->keys it was not copied to
+    the fil_space_t object.
+    
+    Solution:
+    
+    In the case of undo tablespace, propagate the encryption keys from
+    recv_sys->keys to its fil_space_t object irrespective of the
+    encryption flag in space->flags.  This is a special case of undo
+    tablespace.
+    
+    Change-Id: I7f0f9da2e4797435404973312dd7aa9bb900d349
+
+diff --git a/storage/innobase/fil/fil0fil.cc b/storage/innobase/fil/fil0fil.cc
+index 886f877729c..39bf9b693ef 100644
+--- a/storage/innobase/fil/fil0fil.cc
++++ b/storage/innobase/fil/fil0fil.cc
+@@ -9853,7 +9853,12 @@ dberr_t Fil_system::open_for_recovery(space_id_t space_id) {
+   dberr_t err = DB_SUCCESS;
+ 
+   if (status == FIL_LOAD_OK) {
+-    if ((FSP_FLAGS_GET_ENCRYPTION(space->flags) ||
++    /* In the case of undo tablespace, even if the encryption flag is not
++    enabled in space->flags, the encryption keys needs to be restored from
++    recv_sys->keys to the corresponding fil_space_t object. */
++    const bool is_undo = fsp_is_undo_tablespace(space_id);
++
++    if ((FSP_FLAGS_GET_ENCRYPTION(space->flags) || is_undo ||
+          space->encryption_op_in_progress ==
+              Encryption::Progress::ENCRYPTION) &&
+         recv_sys->keys != nullptr) {

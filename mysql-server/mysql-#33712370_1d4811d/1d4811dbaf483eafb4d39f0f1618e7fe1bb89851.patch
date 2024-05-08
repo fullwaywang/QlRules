@@ -1,0 +1,146 @@
+commit 1d4811dbaf483eafb4d39f0f1618e7fe1bb89851	1d4811dbaf483eafb4d39f0f1618e7fe1bb89851
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Mon Jan 10 10:24:56 2022 +0100
+
+    Bug #33712370 MySQL 8.0.23 SLAVE HUNG AFTER SEMAPHORE WAIT
+    
+    An "ABA"-like race condition was possible in `Batch_segment::write_complete()` function - if the thread got scheduled out in between its two instructions:
+    ```
+    const auto n = m_written.fetch_add(1, std::memory_order_relaxed);
+    return n + 1 == m_batch_size.load(std::memory_order_relaxed);
+    ```
+    then it could happen that another thread has already completed the batch segment, called `reset()` and `enqueue()`d it, the segment got `dequeue()`d again, and used for batch with size exactly matching `n+1`.
+    This would lead to `write_complete()` erroneusly reporting that the batch has completed, and subsequently could lead to NPE or infinite wait.
+    
+    One possible fix would be to change the order of the two operations.
+    
+    One can also view this mechanisms as a variant of reference counting, where we consider the segment no longer needed when `m_written` reaches `m_batch_size`.
+    This patch reimplements this using a single atomic for refcouning: `m_uncompleted` which is set to match `m_batch_size` when starting the batch, and decremented whenever a page write is completed.
+    This simpler aproach makes it impossible to mess up the order of the two operations, as there's only one operation now.
+    
+    The `m_batch_size` field is now only used for statistics, and no longer needs to be atomic (see proof in doxygen).
+    
+    The `m_dblwr_id` field was marked as `private` as it probably always should given we only access it via getter and setter. I was considering changing it to atomic, so that `set_dblwr_batch_id()` in thread requesting the IO write could synchronize-with `get_dblwr_batch_id()` in IO completer, and thus make all of the fields `s_segments[batch_id]` available for reading, but then I've realized, that if we can not assume that IO completion happens-after IO request, then we have bigger troubles to worry about than that. We can assume this happens-before relation not only because it makes intuitive sense that IO can't finish before it started, but also because our own code synchronizes access to the slots array (in particular: to pass `m1` and `m2` meta-data from write requestor to completer).
+    
+    All accesses to `m_uncompleted` to are `std::memory_order_relaxed` because as stated above we rely on happens-before relation between writer requestor and completer, and the code before the fix seemed to be avoiding synchronization wherever possible and I don't want to introduce a slowdown.
+    
+    RB:27537
+    Reviewed by: Marcin Babij <marcin.babij@oracle.com>
+    
+    Change-Id: Ie56bbe2da8c3ae84d10df72326659d2c95336d80
+
+diff --git a/storage/innobase/buf/buf0dblwr.cc b/storage/innobase/buf/buf0dblwr.cc
+index 78212fbeebc..0f1c70f3055 100644
+--- a/storage/innobase/buf/buf0dblwr.cc
++++ b/storage/innobase/buf/buf0dblwr.cc
+@@ -747,8 +747,8 @@ class Batch_segment : public Segment {
+ 
+   /** Destructor. */
+   ~Batch_segment() noexcept override {
+-    ut_a(m_written.load(std::memory_order_relaxed) == 0);
+-    ut_a(m_batch_size.load(std::memory_order_relaxed) == 0);
++    ut_a(m_uncompleted.load(std::memory_order_relaxed) == 0);
++    ut_a(m_batch_size == 0);
+   }
+ 
+   /** @return the batch segment ID. */
+@@ -761,26 +761,33 @@ class Batch_segment : public Segment {
+   /** Called on page write completion.
+   @return if batch ended. */
+   [[nodiscard]] bool write_complete() noexcept {
+-    const auto n = m_written.fetch_add(1, std::memory_order_relaxed);
+-    return n + 1 == m_batch_size.load(std::memory_order_relaxed);
++    /* We "release our reference" here, so can't access the segment after this
++    fetch_sub() unless we decreased it to 0 and handle requeuing it. */
++    const auto n = m_uncompleted.fetch_sub(1, std::memory_order_relaxed);
++    ut_ad(0 < n);
++    return n == 1;
+   }
+ 
+   /** Reset the state. */
+   void reset() noexcept {
+-    m_written.store(0, std::memory_order_relaxed);
+-    m_batch_size.store(0, std::memory_order_relaxed);
++    /* We shouldn't reset() the batch while it's being processed. */
++    ut_ad(m_uncompleted.load(std::memory_order_relaxed) == 0);
++    m_uncompleted.store(0, std::memory_order_relaxed);
++    m_batch_size = 0;
+   }
+ 
+   /** Set the batch size.
+   @param[in] size               Number of pages to write to disk. */
+   void set_batch_size(uint32_t size) noexcept {
+-    m_batch_size.store(size, std::memory_order_release);
++    /* We should only call set_batch_size() on new or reset()ed instance. */
++    ut_ad(m_uncompleted.load(std::memory_order_relaxed) == 0);
++    ut_ad(m_batch_size == 0);
++    m_batch_size = size;
++    m_uncompleted.store(size, std::memory_order_relaxed);
+   }
+ 
+   /** @return the batch size. */
+-  uint32_t batch_size() const noexcept {
+-    return m_batch_size.load(std::memory_order_acquire);
+-  }
++  uint32_t batch_size() const noexcept { return m_batch_size; }
+ 
+   /** Note that the batch has started for the double write instance.
+   @param[in] dblwr              Instance for which batch has started. */
+@@ -803,13 +810,36 @@ class Batch_segment : public Segment {
+ 
+   byte m_pad1[ut::INNODB_CACHE_LINE_SIZE];
+ 
+-  /** Size of the batch. */
+-  std::atomic_int m_batch_size{};
++  /** Size of the batch.
++  Set to number of pages to be written with set_batch_size() before scheduling
++  writes to data pages.
++  Reset to zero with reset() after all IOs are completed.
++  Read only by the thread which has observed the last IO completion, the one
++  which will reset it back to zero and enqueue the segment for future reuse.
++  Accesses to this field are ordered by happens-before relation:
++  set_batch_size() sequenced-before
++    fil_io()  happens-before
++    dblwr::write_complete() entry sequenced-before
++  batch_size() sequenced-before
++  reset() sequenced-before
++    enqueue() synchronizes-with
++    dequeue() sequenced-before
++  set_batch_size() ...
++  */
++  uint32_t m_batch_size{};
+ 
+   byte m_pad2[ut::INNODB_CACHE_LINE_SIZE];
+ 
+-  /** Number of pages to write. */
+-  std::atomic_int m_written{};
++  /** Number of page writes in the batch which are still not completed.
++  Set to equal m_batch_size by set_batch_size(), and decremented when a page
++  write is finished (either by failing/not attempting or in IO completion).
++  It serves a role of a reference counter: when it drops to zero, the segment
++  can be enqueued back to the pool of available segments.
++  Accessing a segment which has m_uncompleted == 0 is safe only from the thread
++  which knows it can not be recycled - for example because it's the thread which
++  has caused the m_uncompleted drop to 0 and will enqueue it, or it's the thread
++  which has just dequeued it, or it is handling shutdown.*/
++  std::atomic_int m_uncompleted{};
+ };
+ 
+ uint32_t Double_write::s_n_instances{};
+diff --git a/storage/innobase/include/buf0buf.h b/storage/innobase/include/buf0buf.h
+index 8b0040004cb..f31306a13ac 100644
+--- a/storage/innobase/include/buf0buf.h
++++ b/storage/innobase/include/buf0buf.h
+@@ -1613,10 +1613,12 @@ class buf_page_t {
+   buffer pool. Protected by block mutex */
+   std::chrono::steady_clock::time_point access_time;
+ 
++ private:
+   /** Double write instance ordinal value during writes. This is used
+   by IO completion (writes) to select the double write instance.*/
+   uint16_t m_dblwr_id{};
+ 
++ public:
+   /** true if the block is in the old blocks in buf_pool->LRU_old */
+   bool old;
+ 

@@ -1,0 +1,35 @@
+commit 00588604267fdf9328e3b52f3794964177eed476	00588604267fdf9328e3b52f3794964177eed476
+Author: Nuno Carvalho <nuno.carvalho@oracle.com>
+Date:   Mon Jul 4 17:04:22 2022 +0200
+
+    BUG#33784022: Missing sid initialization on invalid Gtid_log_event
+    
+    rpl_sid type, which in reality is binary_log::UUID, is a POD (Plain
+    Old Data), as such it does not have a constructor. The
+    responsibility to initialize variables of this type belong to who
+    does create them.
+    That initialization was missing on the case that a invalid
+    Gtid_log_event is read from a binary (or relay) log. Operations over
+    the sid of a invalid Gtid_log_event could cause undefined behavior.
+    
+    To solve the above issue, the sid of invalid Gtid_log_events is now
+    initialized.
+    
+    Change-Id: I5d591e480a8338c7619b6573fae022a7e4521e02
+
+diff --git a/sql/log_event.cc b/sql/log_event.cc
+index 1bd7ae06d74..7fd334bf28d 100644
+--- a/sql/log_event.cc
++++ b/sql/log_event.cc
+@@ -12743,7 +12743,10 @@ Gtid_log_event::Gtid_log_event(
+     : binary_log::Gtid_event(buffer, description_event),
+       Log_event(header(), footer()) {
+   DBUG_TRACE;
+-  if (!is_valid()) return;
++  if (!is_valid()) {
++    sid.clear();
++    return;
++  }
+ 
+ #ifndef NDEBUG
+   uint8_t const common_header_len = description_event->common_header_len;

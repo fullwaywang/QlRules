@@ -1,0 +1,111 @@
+commit 1df69b2aa278a706d241ffb34c085917423e1ca7	1df69b2aa278a706d241ffb34c085917423e1ca7
+Author: Mohammad Tafzeel Shams <mohammad.tafzeel.shams@oracle.com>
+Date:   Tue Mar 1 06:25:25 2022 +0100
+
+    BUG #32586721 : SERVER CRASH IN FIL_SPACE_IS_BEING_TRUNCATED
+    
+    Problem:
+    - If we start server with keyring and delete record from encrypted table,
+      keeping innodb_purge_stop_now=ON.
+    - On restarting the server, purge threads will try to process undo records
+      of encrypted table. However tablespace for encrypted table will not be
+      loaded.
+    - This will result in termination of the server.
+    
+    Fix:
+      Skip undo records for which tablespace is missing.
+    
+    Reviewed by : Annamalai Gurusami (annamalai.gurusami@oracle.com)
+    RB  #27559
+
+diff --git a/mysql-test/suite/innodb/r/innodb-truncate-debug.result b/mysql-test/suite/innodb/r/innodb-truncate-debug.result
+index a9293f91c39..978ccaabb3d 100644
+--- a/mysql-test/suite/innodb/r/innodb-truncate-debug.result
++++ b/mysql-test/suite/innodb/r/innodb-truncate-debug.result
+@@ -112,6 +112,6 @@ SET DEBUG_SYNC= 'now SIGNAL finish_scan';
+ connection con1
+ connection default
+ drop table t1;
+-Pattern "InnoDB: Record with space id \d+ belongs to table which is being truncated therefore skipping this undo record." found
++Pattern "InnoDB: Record with space id \d+ belongs to table which is being truncated or tablespace which is missing therefore skipping this undo record." found
+ # restart server
+ # restart:
+diff --git a/mysql-test/suite/innodb/t/innodb-truncate-debug.test b/mysql-test/suite/innodb/t/innodb-truncate-debug.test
+index b165b1990b6..7a34cafa939 100644
+--- a/mysql-test/suite/innodb/t/innodb-truncate-debug.test
++++ b/mysql-test/suite/innodb/t/innodb-truncate-debug.test
+@@ -180,7 +180,7 @@ disconnect con1;
+ drop table t1;
+ 
+ let SEARCH_FILE = $MYSQLTEST_VARDIR/log/mysqld.1.err;
+-let SEARCH_PATTERN = InnoDB: Record with space id \d+ belongs to table which is being truncated therefore skipping this undo record.;
++let SEARCH_PATTERN = InnoDB: Record with space id \d+ belongs to table which is being truncated or tablespace which is missing therefore skipping this undo record.;
+ --source include/search_pattern.inc
+ 
+ #cleanup
+diff --git a/storage/innobase/fil/fil0fil.cc b/storage/innobase/fil/fil0fil.cc
+index 511406854b4..282b5e1913b 100644
+--- a/storage/innobase/fil/fil0fil.cc
++++ b/storage/innobase/fil/fil0fil.cc
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 1995, 2021, Oracle and/or its affiliates.
++Copyright (c) 1995, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License, version 2.0,
+@@ -1637,18 +1637,23 @@ fil_space_get_flags(
+ 	return(flags);
+ }
+ 
+-/** Check if table is mark for truncate.
++/** Check if tablespace exists and is marked for truncation.
+ @param[in]	id	space id
++@return true if tablespace is missing.
+ @return true if tablespace is marked for truncate. */
+ bool
+ fil_space_is_being_truncated(
+ 	ulint id)
+ {
+-	bool	mark_for_truncate;
++	bool flag = true;
++	fil_space_t* space;
+ 	mutex_enter(&fil_system->mutex);
+-	mark_for_truncate = fil_space_get_by_id(id)->is_being_truncated;
++	space = fil_space_get_space(id);
++	if (space != NULL) {
++		flag = space->is_being_truncated;
++        }
+ 	mutex_exit(&fil_system->mutex);
+-	return(mark_for_truncate);
++	return(flag);
+ }
+ 
+ /** Open each fil_node_t of a named fil_space_t if not already open.
+diff --git a/storage/innobase/row/row0purge.cc b/storage/innobase/row/row0purge.cc
+index 25ff4bf4842..cf5058ec764 100644
+--- a/storage/innobase/row/row0purge.cc
++++ b/storage/innobase/row/row0purge.cc
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 1997, 2021, Oracle and/or its affiliates.
++Copyright (c) 1997, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License, version 2.0,
+@@ -895,7 +895,13 @@ try_again:
+ 		ib::info() << "Record with space id "
+ 			   << node->table->space
+ 			   << " belongs to table which is being truncated"
++			   << " or tablespace which is missing"
+ 			   << " therefore skipping this undo record.";
++		if (dict_table_is_encrypted(node->table)) {
++
++			ib::info() << "Skipped record belongs to encrypted tablespace,"
++				   << " Check if the keyring plugin is loaded.";
++		}
+ #endif
+ 		ut_ad(dict_table_is_file_per_table(node->table));
+ 		dict_table_close(node->table, FALSE, FALSE);

@@ -1,0 +1,48 @@
+commit 749f476cf6c30cfda260355375a49263d13c2ab1	749f476cf6c30cfda260355375a49263d13c2ab1
+Author: Nuno Carvalho <nuno.carvalho@oracle.com>
+Date:   Fri Jul 29 10:27:05 2022 +0200
+
+    BUG#33818238: Signal 11 occured while ran an insert statement.
+    
+    Through code analysis it was observed that
+    `MYSQL_BIN_LOG::ordered_commit()` was calling
+    `update_binlog_end_pos(binlog_file, pos);` when the `binlog_file` and
+    `pos` could be invalid. This situation is unlikely since that
+    should be considered a flush or sync error, but the implementation
+    was not considering that hypothesis which could cause unpredictable
+    results.
+    
+    To solve the above issue, the implementation now only calls
+    `update_binlog_end_pos(binlog_file, pos);` when `binlog_file` and
+    `pos` parameters are valid.
+    
+    Change-Id: I7d7921eb80181cf632170746fa4a27ad86fef985
+
+diff --git a/sql/binlog.cc b/sql/binlog.cc
+index f86e27fda7d..eea5aad3b10 100644
+--- a/sql/binlog.cc
++++ b/sql/binlog.cc
+@@ -8930,14 +8930,19 @@ int MYSQL_BIN_LOG::ordered_commit(THD *thd, bool all, bool skip_commit) {
+     sync_error = result.first;
+   }
+ 
+-  if (update_binlog_end_pos_after_sync) {
++  if (update_binlog_end_pos_after_sync && flush_error == 0 && sync_error == 0) {
+     THD *tmp_thd = final_queue;
+     const char *binlog_file = nullptr;
+     my_off_t pos = 0;
+-    while (tmp_thd->next_to_commit != nullptr)
++
++    while (tmp_thd != nullptr) {
++      if (tmp_thd->commit_error == THD::CE_NONE) {
++        tmp_thd->get_trans_fixed_pos(&binlog_file, &pos);
++      }
+       tmp_thd = tmp_thd->next_to_commit;
+-    if (flush_error == 0 && sync_error == 0) {
+-      tmp_thd->get_trans_fixed_pos(&binlog_file, &pos);
++    }
++
++    if (binlog_file != nullptr && pos > 0) {
+       update_binlog_end_pos(binlog_file, pos);
+     }
+   }

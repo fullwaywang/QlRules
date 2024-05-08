@@ -1,0 +1,198 @@
+commit 72e5d52d0e8d35f153a9ae3dac4c3f42e8be8382	72e5d52d0e8d35f153a9ae3dac4c3f42e8be8382
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Wed Aug 11 06:40:07 2021 +0530
+
+    BUG#32986721:REPLICA SERVER FAILS WITH ASSERTION `!IS_SET() ||
+     M_CAN_OVERWRITE_STATUS
+    
+     Description:
+     ------------
+     If the replica server doesn't have the time_zone tables populated and
+     attempts to replicate a query which sets the session value of
+     time_zone to some value say 'UTC' which is unknown for the replica,
+     the replica results in below assertion failure:
+     "Diagnostics_area::set_error_status(uint, const char*, const char*):
+     Assertion `!is_set() || m_can_overwrite_status'".
+    
+     Analysis:
+     ------------
+     While executing events, after setting Diagnostics_area status to OK,
+     sql_thread is not resetting it to empty before executing the next
+     event. It causes assertion failure if any subsequent update on
+     Diagnostics_area::status.
+     In this bug scenario:
+     1. sql_thread read/executed 'CREATE DATABASE' event successfully and
+        set Diagnostics_area::Status=OK.
+     2. sql_thread reads next event 'CREATE USER' but failed to process
+        due to invalid time_zone and tries to set
+        Diagnostics_area::Status=ERROR
+     3. Caught in the assert because Diagnostics_area::Status still
+        remains in OK (set in step-1)
+     It is expected that Diagnostics_area::status should be EMPTY before
+     setting any specific value(OK,EOF or ERROR) to it.
+    
+     Fix:
+     ----
+     Fix is to reset diagnostics_area before the execution of query event.
+    
+     RB:26788
+
+diff --git a/mysql-test/suite/rpl_gtid/r/rpl_replica_invalid_time_zone.result b/mysql-test/suite/rpl_gtid/r/rpl_replica_invalid_time_zone.result
+new file mode 100644
+index 00000000000..cc295853dca
+--- /dev/null
++++ b/mysql-test/suite/rpl_gtid/r/rpl_replica_invalid_time_zone.result
+@@ -0,0 +1,50 @@
++#
++# 1. Create source-replica topology
++include/master-slave.inc
++Warnings:
++Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
++Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
++[connection master]
++#
++# 2. Configure source with time_zone value to 'UTC'
++SET @save.time_zone= @@time_zone;
++SET time_zone='UTC';
++#
++# 3. Configure replica without time_zone table
++[connection slave]
++RENAME TABLE mysql.time_zone TO mysql.time_zone_bkup;
++[connection master]
++#
++# 4. Execute a transaction which doesn't use time_zone
++CREATE DATABASE IF NOT EXISTS db1;
++#
++# 5. Execute a transaction which does use time_zone
++CREATE USER u1 IDENTIFIED BY 'Root@123';
++#
++# 6. Start replica
++[connection slave]
++call mtr.add_suppression("Slave SQL for channel '': ... The slave coordinator and worker threads are stopped.*");
++call mtr.add_suppression("Slave SQL for channel '':.*failed executing transaction.*");
++call mtr.add_suppression("Slave SQL for channel '': Error 'Table 'mysql.time_zone' doesn't exist' on query.*");
++call mtr.add_suppression("Slave: Unknown or incorrect time zone: 'UTC'.*");
++include/start_slave_io.inc
++include/wait_for_slave_io_to_start.inc
++START REPLICA SQL_THREAD;
++#
++# 7. Verify that replica sql thread failed with error
++include/wait_for_slave_sql_error.inc [errno=1146]
++#
++# 8. Cleanup
++include/stop_slave_io.inc
++RESET REPLICA ALL;
++CHANGE REPLICATION SOURCE TO SOURCE_USER= 'root', SOURCE_HOST= "127.0.0.1", SOURCE_PORT= MASTER_MYPORT;;
++Warnings:
++Note	1759	Sending passwords in plain text without SSL/TLS is extremely insecure.
++Note	1760	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
++RENAME TABLE mysql.time_zone_bkup TO mysql.time_zone;
++include/start_slave.inc
++[connection master]
++DROP USER u1;
++DROP DATABASE db1;
++set time_zone= @save.time_zone;
++include/rpl_end.inc
+diff --git a/mysql-test/suite/rpl_gtid/t/rpl_replica_invalid_time_zone.test b/mysql-test/suite/rpl_gtid/t/rpl_replica_invalid_time_zone.test
+new file mode 100644
+index 00000000000..c237aebf13b
+--- /dev/null
++++ b/mysql-test/suite/rpl_gtid/t/rpl_replica_invalid_time_zone.test
+@@ -0,0 +1,83 @@
++##############################################################################
++# ==== Purpose ====
++# The purpose of this test is to verify that when time_zone value is unknown
++# for the replica, an attempt to replicate a transaction which sets the value
++# of time_zone should not throw any assertion failure.
++#
++# ==== Requirement ====
++# When attempting to replicate a transaction that sets the session value of
++# time_zone which is unknown for the replica, replica should throw an error
++# and stop gracefully.
++#
++# ==== Implementation ====
++# 1. Create source-replica topology
++# 2. Configure source with time_zone value to 'UTC'
++# 3. Configure replica without time_zone table
++# 4. Execute a transaction which doesn't use time_zone
++# 5. Execute a transaction which does use time_zone
++# 6: Start replica
++# 7. Verify that replica sql thread failed with error
++# 8. Cleanup
++#
++# ==== References ====
++# Bug #32986721: REPLICA SERVER FAILS WITH ASSERTION `!IS_SET() ||
++#                M_CAN_OVERWRITE_STATUS
++###############################################################################
++
++--source include/have_binlog_format_row.inc
++
++--echo #
++--echo # 1. Create source-replica topology
++--let $rpl_skip_start_slave= 1
++--source include/master-slave.inc
++
++--echo #
++--echo # 2. Configure source with time_zone value to 'UTC'
++SET @save.time_zone= @@time_zone;
++SET time_zone='UTC';
++
++--echo #
++--echo # 3. Configure replica without time_zone table
++--source include/rpl_connection_slave.inc
++RENAME TABLE mysql.time_zone TO mysql.time_zone_bkup;
++
++--source include/rpl_connection_master.inc
++--echo #
++--echo # 4. Execute a transaction which doesn't use time_zone
++CREATE DATABASE IF NOT EXISTS db1;
++
++--echo #
++--echo # 5. Execute a transaction which does use time_zone
++CREATE USER u1 IDENTIFIED BY 'Root@123';
++
++--echo #
++--echo # 6. Start replica
++--source include/rpl_connection_slave.inc
++call mtr.add_suppression("Slave SQL for channel '': ... The slave coordinator and worker threads are stopped.*");
++call mtr.add_suppression("Slave SQL for channel '':.*failed executing transaction.*");
++call mtr.add_suppression("Slave SQL for channel '': Error 'Table 'mysql.time_zone' doesn't exist' on query.*");
++call mtr.add_suppression("Slave: Unknown or incorrect time zone: 'UTC'.*");
++--source include/start_slave_io.inc
++--source include/wait_for_slave_io_to_start.inc
++START REPLICA SQL_THREAD;
++
++--echo #
++--echo # 7. Verify that replica sql thread failed with error
++--let $slave_sql_errno= convert_error(ER_NO_SUCH_TABLE)
++--source include/wait_for_slave_sql_error.inc
++
++--echo #
++--echo # 8. Cleanup
++--source include/stop_slave_io.inc
++RESET REPLICA ALL;
++--replace_result $MASTER_MYPORT MASTER_MYPORT
++--eval CHANGE REPLICATION SOURCE TO SOURCE_USER= 'root', SOURCE_HOST= "127.0.0.1", SOURCE_PORT= $MASTER_MYPORT;
++RENAME TABLE mysql.time_zone_bkup TO mysql.time_zone;
++--source include/start_slave.inc
++
++--source include/rpl_connection_master.inc
++DROP USER u1;
++DROP DATABASE db1;
++set time_zone= @save.time_zone;
++
++--source include/rpl_end.inc
+diff --git a/sql/log_event.cc b/sql/log_event.cc
+index dbd43b00d09..cf009372ad8 100644
+--- a/sql/log_event.cc
++++ b/sql/log_event.cc
+@@ -4553,6 +4553,9 @@ int Query_log_event::do_apply_event(Relay_log_info const *rli,
+           is preferable at a common with other event pre-execution point
+   */
+   clear_all_errors(thd, const_cast<Relay_log_info *>(rli));
++  thd->get_stmt_da()->reset_diagnostics_area();
++  thd->get_stmt_da()->reset_statement_cond_count();
++
+   if (strcmp("COMMIT", query) == 0 && rli->tables_to_lock != nullptr) {
+     /*
+       Cleaning-up the last statement context:

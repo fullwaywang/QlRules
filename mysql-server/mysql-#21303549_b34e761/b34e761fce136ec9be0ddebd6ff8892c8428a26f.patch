@@ -1,0 +1,76 @@
+commit b34e761fce136ec9be0ddebd6ff8892c8428a26f	b34e761fce136ec9be0ddebd6ff8892c8428a26f
+Author: Omar Sharieff <omar.sharieff@oracle.com>
+Date:   Tue Nov 29 10:38:22 2022 +0530
+
+    Bug#21303549 : MYSQLPUMP: EXCLUDED TABLE TRIGGERS AND
+                   VIEW DUMPED IN OUTPUT FILE
+    
+    Description:
+    User specified view exclusions or inclusions using mysqlpump
+    options --exclude-tables or --include-tables not handled.
+    
+    Fix:
+    User specified view exclusions and inclusions handled with a check.
+    
+    Gerrit#18974
+    
+    Change-Id: I9feb7f892531d6d023065dd66943ead411fb0f12
+
+diff --git a/client/dump/object_filter.cc b/client/dump/object_filter.cc
+index 39b34ab8f56..224c1026afe 100644
+--- a/client/dump/object_filter.cc
++++ b/client/dump/object_filter.cc
+@@ -33,6 +33,7 @@
+ #include "client/dump/stored_procedure.h"
+ #include "client/dump/table.h"
+ #include "client/dump/trigger.h"
++#include "client/dump/view.h"
+ #endif
+ #include <stddef.h>
+ #include <boost/algorithm/string.hpp>
+@@ -215,7 +216,8 @@ bool Object_filter::is_object_included_in_dump(Abstract_data_object *object) {
+   std::vector<std::pair<std::string, std::string>> *exclude_list;
+   bool *dump_switch = nullptr;
+ 
+-  if (dynamic_cast<Table *>(object) != nullptr) {
++  if (dynamic_cast<Table *>(object) != nullptr ||
++      dynamic_cast<View *>(object) != nullptr) {
+     include_list = &m_tables_included;
+     exclude_list = &m_tables_excluded;
+   } else if (dynamic_cast<Database *>(object) != nullptr) {
+diff --git a/mysql-test/r/mysqlpump_filters.result b/mysql-test/r/mysqlpump_filters.result
+index 7c2edcca052..f745800c5bb 100644
+--- a/mysql-test/r/mysqlpump_filters.result
++++ b/mysql-test/r/mysqlpump_filters.result
+@@ -319,6 +319,8 @@ Warning	1681	Integer display width is deprecated and will be removed in a future
+ 
+ DROP DATABASE db3;
+ DROP DATABASE db1_1gb;
++Pattern "VIEW `db1`.`v1`" not found
++Pattern "VIEW `db1`.`v1`" found
+ DROP DATABASE db1;
+ DROP DATABASE db2;
+ DROP DATABASE db3;
+diff --git a/mysql-test/t/mysqlpump_filters.test b/mysql-test/t/mysqlpump_filters.test
+index 118b75a30cf..03802cd3572 100644
+--- a/mysql-test/t/mysqlpump_filters.test
++++ b/mysql-test/t/mysqlpump_filters.test
+@@ -46,6 +46,18 @@ DROP DATABASE db1_1gb;
+ --exec $MYSQL_PUMP --parallel-schemas=2:db1 --exclude-databases=mtr,mysql,sys,test --include-databases=db3,db1 --skip-dump-rows --include-triggers=trig2 > $MYSQLTEST_VARDIR/tmp/include_triggers_1.sql
+ --exec $MYSQL_PUMP --parallel-schemas=2:db3 --exclude-databases=mtr,mysql,sys,test --include-databases=db3,db1 --skip-dump-rows --exclude-triggers=trig3 > $MYSQLTEST_VARDIR/tmp/exclude_triggers_2.sql
+ 
++# exclude view
++--exec $MYSQL_PUMP -u root --exclude-tables='v1' --result-file=$MYSQLTEST_VARDIR/tmp/exclude_view.sql
++--let SEARCH_FILE = $MYSQLTEST_VARDIR/tmp/exclude_view.sql
++--let SEARCH_PATTERN = VIEW `db1`.`v1`
++--source include/search_pattern.inc
++
++# include view
++--exec $MYSQL_PUMP -u root --include-tables='v1' --result-file=$MYSQLTEST_VARDIR/tmp/include_view.sql
++--let SEARCH_FILE = $MYSQLTEST_VARDIR/tmp/include_view.sql
++--let SEARCH_PATTERN = VIEW `db1`.`v1`
++--source include/search_pattern.inc
++
+ # include/exclude-routines
+ --exec $MYSQL_PUMP --parallel-schemas=1:db1 --exclude-databases=mtr,mysql,sys,test --include-databases=db3,db1 --skip-dump-rows --include-routines=db1t_cache,db1_f1 > $MYSQLTEST_VARDIR/tmp/include_routines_1.sql
+ --exec $MYSQL_PUMP --parallel-schemas=1:db3 --exclude-databases=mtr,mysql,sys,test --include-databases=db3,db1 --skip-dump-rows --exclude-routines=d3t_cache > $MYSQLTEST_VARDIR/tmp/exclude_routines_2.sql

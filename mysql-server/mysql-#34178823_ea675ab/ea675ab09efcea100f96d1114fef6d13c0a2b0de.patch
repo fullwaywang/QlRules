@@ -1,0 +1,48 @@
+commit ea675ab09efcea100f96d1114fef6d13c0a2b0de	ea675ab09efcea100f96d1114fef6d13c0a2b0de
+Author: Salman Khan <salman.s.khan@oracle.com>
+Date:   Fri Jun 10 11:50:04 2022 +0530
+
+    BUG#34178823 CREATE USER WITH COMMENT LEAD REPLICATION ERROR
+    
+    Description: When a user was created on a master with the comment
+    that contained quotes, it led to the replication error as slave
+    could not create the same user.
+    
+    Analysis: Slave reads the events from Binlog written by master.
+    When a user is created on master with a comment that contain the
+    quotes, It did not escape the quotes in the comment while writing
+    to binlog. When slave reads this query and tries to execute it
+    on itself, it fails with the syntax error since the quotes are not
+    escaped.
+    
+    Fix: This is fixed by escaping quotes in the Comment/Attribute
+    while writing to binlog.
+    
+    Change-Id: I18c88a971869044b8159f6d8094bc0200a8d5bf1
+
+diff --git a/sql/sql_rewrite.cc b/sql/sql_rewrite.cc
+index 325ef79c78d..fe416d7565e 100644
+--- a/sql/sql_rewrite.cc
++++ b/sql/sql_rewrite.cc
+@@ -458,15 +458,17 @@ void Rewriter_user::rewrite_in_memory_user_application_user_metadata(
+     const LEX *lex, String *str) const {
+   if (lex->alter_user_attribute ==
+       enum_alter_user_attribute::ALTER_USER_ATTRIBUTE) {
+-    str->append(" ATTRIBUTE '");
++    str->append(" ATTRIBUTE ");
+   } else if (lex->alter_user_attribute ==
+              enum_alter_user_attribute::ALTER_USER_COMMENT) {
+-    str->append(" COMMENT '");
++    str->append(" COMMENT ");
+   }
+   if (lex->alter_user_attribute !=
+       enum_alter_user_attribute::ALTER_USER_COMMENT_NOT_USED) {
+-    str->append(lex->alter_user_comment_text);
+-    str->append("'");
++    String comment_text(lex->alter_user_comment_text.str,
++                        lex->alter_user_comment_text.length,
++                        system_charset_info);
++    append_query_string(m_thd, system_charset_info, &comment_text, str);
+   }
+ }
+ 

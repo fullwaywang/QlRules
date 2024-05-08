@@ -1,0 +1,276 @@
+commit 01cd60767c8a98782a3871addec60f32ae1e1337	01cd60767c8a98782a3871addec60f32ae1e1337
+Author: Bharathy Satish <bharathy.x.satish@oracle.com>
+Date:   Tue Feb 15 13:30:10 2022 +0100
+
+    Bug #33830493: SET PERSIST statement is not atomic
+    
+    Problem: During SET PERSIST, after mysqld-auto.cnf file is opened for write
+    operation, if server crashes before server can properly close this file, this
+    file is empty, which causes failure during server restart.
+    
+    Fix: Fix is to always write persisted variables to a backup file, and only after
+    backup file is written successfully, rename backup file to mysqld-auto.cnf. In
+    case of server crash, original mysqld-auto.cnf is still in correct format.
+    Also as part of server restart, read and load from backup file if its contents
+    are still valid, else read from original file and delete the backup file.
+    
+    RB#27677
+
+diff --git a/mysql-test/r/persisted_variables_bugs_debug_only.result b/mysql-test/r/persisted_variables_bugs_debug_only.result
+new file mode 100644
+index 00000000000..929bfceaeb4
+--- /dev/null
++++ b/mysql-test/r/persisted_variables_bugs_debug_only.result
+@@ -0,0 +1,42 @@
++#
++# Bug #33830493: SET PERSIST statement is not atomic
++#
++SET PERSIST max_connections=42;
++SET @@debug='+d,crash_after_open_persist_file';
++SET PERSIST max_heap_table_size=887808, replica_net_timeout=160;
++ERROR HY000: Lost connection to MySQL server during query
++# restart
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++@@max_connections	@@max_heap_table_size	@@replica_net_timeout
++42	16777216	60
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++variable_name
++max_connections
++SET @@debug='-d,crash_after_open_persist_file';
++SET @@debug='+d,crash_after_write_persist_file';
++SET PERSIST replica_net_timeout=160;
++ERROR HY000: Lost connection to MySQL server during query
++# restart
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++@@max_connections	@@max_heap_table_size	@@replica_net_timeout
++42	16777216	60
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++variable_name
++max_connections
++SET @@debug='-d,crash_after_write_persist_file';
++SET @@debug='+d,crash_after_close_persist_file';
++SET PERSIST replica_net_timeout=124;
++ERROR HY000: Lost connection to MySQL server during query
++# restart
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++@@max_connections	@@max_heap_table_size	@@replica_net_timeout
++42	16777216	124
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++variable_name
++max_connections
++replica_net_timeout
++slave_net_timeout
++SET @@debug='-d,crash_after_close_persist_file';
++RESET PERSIST;
++SET GLOBAL max_connections = default, replica_net_timeout = default, max_heap_table_size = default;
++# restart:
+diff --git a/mysql-test/t/persisted_variables_bugs_debug_only.test b/mysql-test/t/persisted_variables_bugs_debug_only.test
+new file mode 100644
+index 00000000000..5e6a14b72bf
+--- /dev/null
++++ b/mysql-test/t/persisted_variables_bugs_debug_only.test
+@@ -0,0 +1,47 @@
++--source include/have_debug.inc
++
++--echo #
++--echo # Bug #33830493: SET PERSIST statement is not atomic
++--echo #
++
++SET PERSIST max_connections=42;
++SET @@debug='+d,crash_after_open_persist_file';
++--source include/expect_crash.inc
++--error CR_SERVER_LOST
++SET PERSIST max_heap_table_size=887808, replica_net_timeout=160;
++let $restart_parameters =;
++--source include/start_mysqld.inc
++
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++
++SET @@debug='-d,crash_after_open_persist_file';
++SET @@debug='+d,crash_after_write_persist_file';
++--source include/expect_crash.inc
++--error CR_SERVER_LOST
++SET PERSIST replica_net_timeout=160;
++let $restart_parameters =;
++--source include/start_mysqld.inc
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++
++SET @@debug='-d,crash_after_write_persist_file';
++SET @@debug='+d,crash_after_close_persist_file';
++--source include/expect_crash.inc
++--error CR_SERVER_LOST
++SET PERSIST replica_net_timeout=124;
++# backup file has latest contents, server restart should succeed in reading backup file.
++let $restart_parameters =;
++--source include/start_mysqld.inc
++SELECT @@max_connections, @@max_heap_table_size, @@replica_net_timeout;
++SELECT variable_name FROM performance_schema.variables_info WHERE variable_source='PERSISTED';
++SET @@debug='-d,crash_after_close_persist_file';
++
++#cleanup
++RESET PERSIST;
++# restore to default
++SET GLOBAL max_connections = default, replica_net_timeout = default, max_heap_table_size = default;
++
++# set to default
++--let $restart_parameters=restart:
++--source include/restart_mysqld.inc
+diff --git a/sql/persisted_variable.cc b/sql/persisted_variable.cc
+index 4e35dd8e4bd..41b02c908e7 100644
+--- a/sql/persisted_variable.cc
++++ b/sql/persisted_variable.cc
+@@ -308,6 +308,7 @@ int Persisted_variables_cache::init(int *argc, char ***argv) {
+                 MY_UNPACK_FILENAME | MY_SAFE_PATH) == nullptr)
+     return 1;
+   m_persist_filename = string(dir);
++  m_persist_backup_filename = m_persist_filename + ".backup";
+ 
+   mysql_mutex_init(key_persist_variables, &m_LOCK_persist_variables,
+                    MY_MUTEX_INIT_FAST);
+@@ -802,23 +803,26 @@ bool Persisted_variables_cache::flush_to_file() {
+     unlock();
+     return ret;
+   }
+-
+   /*
+-    If file does not exists create one. When persisted_globals_load is 0
+-    we dont read contents of mysqld-auto.cnf file, thus append any new
+-    variables which are persisted to this file.
++    Always write to backup file. Once write is successfull, rename backup
++    file to original file.
+   */
+-
+-  if (open_persist_file(O_CREAT | O_WRONLY)) {
++  if (open_persist_backup_file(O_CREAT | O_WRONLY)) {
+     ret = true;
+   } else {
++    DBUG_EXECUTE_IF("crash_after_open_persist_file", DBUG_SUICIDE(););
+     /* write to file */
+     if (mysql_file_fputs(dest.c_ptr(), m_fd) < 0) {
+       ret = true;
+     }
+   }
+-
++  DBUG_EXECUTE_IF("crash_after_write_persist_file", DBUG_SUICIDE(););
+   close_persist_file();
++  if (!ret) {
++    DBUG_EXECUTE_IF("crash_after_close_persist_file", DBUG_SUICIDE(););
++    my_rename(m_persist_backup_filename.c_str(), m_persist_filename.c_str(),
++              MYF(MY_WME));
++  }
+   if (ret == false && do_cleanup == true) clear_sensitive_blob_and_iv();
+   mysql_mutex_unlock(&m_LOCK_persist_file);
+   unlock();
+@@ -834,8 +838,30 @@ bool Persisted_variables_cache::flush_to_file() {
+     @retval false Success
+ */
+ bool Persisted_variables_cache::open_persist_file(int flag) {
++  /*
++    If file does not exists create one. When persisted_globals_load is 0
++    we dont read contents of mysqld-auto.cnf file, thus append any new
++    variables which are persisted to this file.
++  */
++  if (m_fd) return 1;
+   m_fd = mysql_file_fopen(key_persist_file_cnf, m_persist_filename.c_str(),
+                           flag, MYF(0));
++
++  return (m_fd ? 0 : 1);
++}
++
++/**
++  Open persisted backup config file
++
++  @param [in] flag file open mode
++  @return Error state
++    @retval true An error occurred
++    @retval false Success
++*/
++bool Persisted_variables_cache::open_persist_backup_file(int flag) {
++  if (m_fd) return 1;
++  m_fd = mysql_file_fopen(key_persist_file_cnf,
++                          m_persist_backup_filename.c_str(), flag, MYF(0));
+   return (m_fd ? 0 : 1);
+ }
+ 
+@@ -1796,29 +1822,41 @@ void Persisted_variables_cache::load_aliases() {
+     @retval 0 Success
+ */
+ int Persisted_variables_cache::read_persist_file() {
+-  char buff[4096] = {0};
+-  string parsed_value;
+-  const char *error = nullptr;
+-  size_t offset = 0;
+-
++  Json_dom_ptr json;
+   if ((check_file_permissions(m_persist_filename.c_str(), false)) < 2)
+     return -1;
+ 
+-  if (open_persist_file(O_RDONLY)) return -1;
+-  do {
+-    /* Read the persisted config file into a string buffer */
+-    parsed_value.append(buff);
+-    buff[0] = '\0';
+-  } while (mysql_file_fgets(buff, sizeof(buff) - 1, m_fd));
+-  close_persist_file();
++  auto read_file = [&]() -> bool {
++    string parsed_value;
++    char buff[4096] = {0};
++    size_t offset = 0;
++    const char *error = nullptr;
++    do {
++      /* Read the persisted config file into a string buffer */
++      parsed_value.append(buff);
++      buff[0] = '\0';
++    } while (mysql_file_fgets(buff, sizeof(buff) - 1, m_fd));
++    close_persist_file();
++    /* parse the file contents to check if it is in json format or not */
++    json = Json_dom::parse(parsed_value.c_str(), parsed_value.length(), &error,
++                           &offset);
++    if (!json.get()) return true;
++    return false;
++  };
+ 
+-  /* parse the file contents to check if it is in json format or not */
+-  std::unique_ptr<Json_dom> json(Json_dom::parse(
+-      parsed_value.c_str(), parsed_value.length(), &error, &offset));
+-  if (!json.get()) {
+-    LogErr(ERROR_LEVEL, ER_JSON_PARSE_ERROR);
+-    return 1;
++  if (!(open_persist_backup_file(O_RDONLY) == false && read_file() == false)) {
++    /*
++      if opening or reading of backup file failed, delete backup file
++      and read original file
++    */
++    my_delete(m_persist_backup_filename.c_str(), MYF(0));
++    if (open_persist_file(O_RDONLY)) return -1;
++    if (read_file()) {
++      LogErr(ERROR_LEVEL, ER_JSON_PARSE_ERROR);
++      return 1;
++    }
+   }
++
+   Json_object *json_obj = down_cast<Json_object *>(json.get());
+   /* Check file version */
+   Json_dom *version_dom = json_obj->get("Version");
+diff --git a/sql/persisted_variable.h b/sql/persisted_variable.h
+index 5283ba6d119..e0955542ba0 100644
+--- a/sql/persisted_variable.h
++++ b/sql/persisted_variable.h
+@@ -252,6 +252,7 @@ class Persisted_variables_cache final {
+   /* Helper functions for file IO */
+   void clear_sensitive_blob_and_iv();
+   bool open_persist_file(int flag);
++  bool open_persist_backup_file(int flag);
+   void close_persist_file();
+ 
+  private:
+@@ -343,6 +344,7 @@ class Persisted_variables_cache final {
+   /* File handler members */
+   MYSQL_FILE *m_fd;
+   std::string m_persist_filename;
++  std::string m_persist_backup_filename;
+   mysql_mutex_t m_LOCK_persist_file;
+   /* Memory for parse early read only persisted options */
+   MEM_ROOT parse_early_persisted_argv_alloc{

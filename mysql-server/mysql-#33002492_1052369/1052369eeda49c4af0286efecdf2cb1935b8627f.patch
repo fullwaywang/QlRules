@@ -1,0 +1,27 @@
+commit 1052369eeda49c4af0286efecdf2cb1935b8627f	1052369eeda49c4af0286efecdf2cb1935b8627f
+Author: Yasufumi Kinoshita <yasufumi.kinoshita@oracle.com>
+Date:   Fri Jul 2 18:44:04 2021 +0900
+
+    Bug#33002492: SEVERAL MLOG_FILE_EXTEND CAUSES ASSERTION CRASH AT RECOVERY FOR THE LIMITED DISK-FULL CASES
+    
+    Around disk_full case, crash recovery including file-extend (MLOG_FILE_EXTEND) might cause crash.
+    Just file->size should be based on the actual file size at fil_tablespace_redo_extend().
+    
+    RB: 26574
+    Reviewed-by: Debarun Banerjee <debarun.banerjee@oracle.com>
+
+diff --git a/storage/innobase/fil/fil0fil.cc b/storage/innobase/fil/fil0fil.cc
+index a086d746c64..bc2f07f3497 100644
+--- a/storage/innobase/fil/fil0fil.cc
++++ b/storage/innobase/fil/fil0fil.cc
+@@ -10866,9 +10866,7 @@ byte *fil_tablespace_redo_extend(byte *ptr, const byte *end,
+   /* Get the final size of the file and adjust file->size accordingly. */
+   os_offset_t end_fsize = os_file_get_size(file->handle);
+ 
+-  page_no_t pages_added = (end_fsize - initial_fsize) / phy_page_size;
+-
+-  file->size += pages_added;
++  file->size = end_fsize / phy_page_size;
+   space->size = file->size;
+ 
+   fil_flush(space->id);

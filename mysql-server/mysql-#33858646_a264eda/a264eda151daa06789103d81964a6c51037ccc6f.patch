@@ -1,0 +1,82 @@
+commit a264eda151daa06789103d81964a6c51037ccc6f	a264eda151daa06789103d81964a6c51037ccc6f
+Author: Samar Pratap Singh <samar.pratap.singh@oracle.com>
+Date:   Fri Jun 24 07:21:47 2022 +0000
+
+    BUG#33858646 Cannot disable TLS in MySQL 8.0.28
+    
+    PROBLEM:
+    User was not able to disable use of encrypted connections by providing
+    --tls-version='' in server options.
+    Use of "--ssl=off" shows a deprecation warning with an alternative
+    (--tls-version=invalid) different from what is documented
+    (--tls-version='').
+    
+    ========================================================================
+    
+    FIX:
+    Allowed --tls-version='' as a server option to disable use of encrypted
+    connections.
+    The "--ssl=off" deprecation warning is fixed to display the documented
+    alternative(--tls-version='').
+    
+    Change-Id: I3afc5d44bdadf362d3c580f24be255e74edb8c4a
+
+diff --git a/mysql-test/t/mysqld_cmdline_no_adminssl.test b/mysql-test/t/mysqld_cmdline_no_adminssl.test
+index d76cbfeeb5c..5837ac8098a 100644
+--- a/mysql-test/t/mysqld_cmdline_no_adminssl.test
++++ b/mysql-test/t/mysqld_cmdline_no_adminssl.test
+@@ -3,7 +3,7 @@ call mtr.add_suppression("Failed to set up SSL because of the following SSL libr
+ 
+ 
+ --echo # WL#14481: deprecated --admin-ssl=0
+---let $assert_select = Please use --admin-tls-version=invalid instead
++--let $assert_select = Please use --admin-tls-version='' instead
+ --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+ --let $assert_count = 1
+ --let $assert_text = Found a --admin-ssl=0 deprecation message in the log
+diff --git a/mysql-test/t/ssl_dynamic_nossl.test b/mysql-test/t/ssl_dynamic_nossl.test
+index de7be8fef9b..dcbfc318550 100644
+--- a/mysql-test/t/ssl_dynamic_nossl.test
++++ b/mysql-test/t/ssl_dynamic_nossl.test
+@@ -3,7 +3,7 @@ call mtr.add_suppression("Failed to set up SSL because of the following SSL libr
+ 
+ 
+ --echo # WL#14481: deprecated --ssl
+---let $assert_select = Please use --tls-version=invalid instead
++--let $assert_select = Please use --tls-version='' instead
+ --let $assert_file = $MYSQLTEST_VARDIR/log/mysqld.1.err
+ --let $assert_count = 1
+ --let $assert_text = Found a --ssl deprecation message in the log
+diff --git a/sql/mysqld.cc b/sql/mysqld.cc
+index 32c0328a659..fb4044eceb4 100644
+--- a/sql/mysqld.cc
++++ b/sql/mysqld.cc
+@@ -10257,13 +10257,13 @@ bool mysqld_get_one_option(int optid,
+         push_deprecated_warn_no_replacement(nullptr, "--admin-ssl=on");
+       else
+         push_deprecated_warn(nullptr, "--admin-ssl=off",
+-                             "--admin-tls-version=invalid");
++                             "--admin-tls-version=''");
+       break;
+     case OPT_USE_SSL:
+       if (opt_use_ssl)
+         push_deprecated_warn_no_replacement(nullptr, "--ssl=on");
+       else
+-        push_deprecated_warn(nullptr, "--ssl=off", "--tls-version=invalid");
++        push_deprecated_warn(nullptr, "--ssl=off", "--tls-version=''");
+       break;
+     case OPT_ADMIN_SSL_KEY:
+     case OPT_ADMIN_SSL_CERT:
+diff --git a/sql/ssl_init_callback.cc b/sql/ssl_init_callback.cc
+index e5cfaea6e08..6d72fce2a06 100644
+--- a/sql/ssl_init_callback.cc
++++ b/sql/ssl_init_callback.cc
+@@ -67,7 +67,7 @@ static const char *opt_admin_tls_version = nullptr;
+ static PolyLock_mutex lock_admin_ssl_ctx(&LOCK_admin_tls_ctx_options);
+ 
+ bool validate_tls_version(const char *val) {
+-  if (val && val[0] == 0) return true;
++  if (val && val[0] == 0) return false;
+   std::string token;
+   std::stringstream str(val);
+   while (getline(str, token, ',')) {

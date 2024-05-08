@@ -1,0 +1,1439 @@
+commit 4996f20b4ef40aadd202fb6b2af416c036ebac5e	4996f20b4ef40aadd202fb6b2af416c036ebac5e
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Tue Jun 29 15:01:39 2021 +0200
+
+    Bug #33000142 INNODB CRASH LOCK0LOCK.CC: LOCK_GET_WAIT(OTHER_LOCK)
+    
+    There was a bug: two observers could disagree about whether or not a given transaction is still active, and consequently, about the status of its implicit locks. This could lead to an inconsitency in the Lock System: the thread which believed the transaction is still active and its implicit lock should be honoured, converted it to an explicit lock, while a thread which believed they are already released, placed its own explicit lock on the same record, so that there were two conflicting explicit locks being granted in the end.
+    The root cause of the problem was that we violated the assumption stated in the comment:
+    ```
+       /* Please consider this particular point in time as the moment the trx's
+       implicit locks become released.
+       This change is protected by both Trx_shard's mutex and trx->mutex.
+       Therefore, there are two secure ways to check if the trx still can hold
+       implicit locks:
+       (1) if you only know id of the trx, then you can obtain Trx_shard's mutex and
+           check if trx is still in the Trx_shard's rw_trx_set. This works, because
+           the removal from the rw_trx_set is also protected by the same mutex.
+           We use this approach in lock_rec_convert_impl_to_expl() by using
+           trx_rw_is_active()
+       (2) if you have pointer to trx, and you know it is safe to access (say, you
+           hold reference to this trx which prevents it from being freed) then you
+           TRX_STATE_COMMITTED_IN_MEMORY. We use this approach in
+           lock_rec_convert_impl_to_expl_for_trx() when deciding for the final time
+           if we really want to create explicit lock on behalf of implicit lock
+           holder. */
+    ```
+    The actual code had a structure:
+    ```
+    with trx_sys->mutex {
+       trx_sys->rw_trx_ids.erase(it);
+       trx_sys->min_active_trx_id.store(min_id);
+       trx_remove_from_rw_trx_list(trx);
+    }
+    with trx_sys->shards[trx_shard_no].mutex{
+       with trx->mutex {
+          trx->state = TRX_STATE_COMMITTED_IN_MEMORY;
+       }
+       trx_sys->shards[trx_shard_no].rw_trx_set.erase(TrxTrack(trx->id));
+    }
+    ```
+    which would be very well, if all the observers strictly followed access method (1) or (2) as described above.
+    However, in reality the `trx_rw_is_active(trx_id)` method had a heuristic optimization: in order to avoid taking the mutex, it first compared `trx_id` to `trx_sys->min_active_trx_id.load()` - intuitively, if `trx_id` was smaller than minimal active trx id, then "obviously" `trx_id` is not active.
+    Unfortunatelly, as you can see in the pseudocode above, we bump `trx_sys->min_active_trx_id` as one of the first steps - in recent code it's even outside `trx_sys->shards[trx_shard_no].mutex`, but even in earlier versions it was always before `trx->mutex` acquisition.
+    This means that an observer calling `trx_rw_is_active(trx_id)` can conclude that it's not active anymore due to the heuristic, yet the observer using access method (2), which takes `trx->mutex`, can still see `trx->state` as `TRX_STATE_ACTIVE`. Even if the first observation `happens-before` the second!
+    
+    The fix is to bump the "min active id" inside the innermost critical section - "at the same time" we change `trx->state`, and erase `trx->id` from `rw_trx_set`.
+    As we use shard's mutex protection, we also shard the `min_active_trx_id` - this only makes sense, given its purpose is to serve as lower bound for the shard's `rw_trx_set` (which is already sharded).
+    
+    Maintaining minimum of the ids residing in a shard requires reacting to two events:
+    - adding a new id to the set
+    - removing an id from the set
+    Even though ids are assigned in increasing order, there is a possibility of a race, as assignement and adding to the set are done in two separate critical sections protected by different mutexes. So, it might happen that the newly added id is lower than previously added one, perhaps its even the new minimum.
+    Still, we exepect the sequence to be almost monotone, so the chosen implementation is:
+    - when adding `id`:  let `min_id` = `min(id, min_id)`
+    - when removing `id`: if `id == min_id`, then find the next minimal id value which belongs to the set. As we use an unordered container, we simply check `id+|Shards|`, `id+2|Shards|`,... until we find one that belongs to the set. This should work in amortized O(1) time (if we disregard the race conditions which set us back from time to time, hopefully only a little).
+    Note, that if the set is empty, we can just set the value to `id+|Shards|`.
+    
+    This changeset also changes `std::unordered_set<pair<trx_id_t,trx_t>>` to more semantically adequate `std::unordered_map<trx_id_t,trx_t>`.
+    
+    TBD: this could perhaps be `std::map`, which would simplify computing the minimal value greatly, however its unclear what would be the overall performance impact (map uses allocator quite often). Tests on OLTP_RW {pareto,unifom}x{64,1024}clients did not reveal any difference, but I don't want risk performance regression with this correctness bug fix.
+    
+    Reviewed-by: Pawel Olchawa <pawel.olchawa@oracle.com>
+    RB:26600
+
+diff --git a/mysql-test/suite/innodb/r/implicit_to_explicit_conversion.result b/mysql-test/suite/innodb/r/implicit_to_explicit_conversion.result
+index 393f0d003c8..d4c1b728c03 100644
+--- a/mysql-test/suite/innodb/r/implicit_to_explicit_conversion.result
++++ b/mysql-test/suite/innodb/r/implicit_to_explicit_conversion.result
+@@ -166,3 +166,33 @@ id	val
+ 2	2
+ COMMIT;
+ DROP TABLE t1;
++CREATE TABLE t1(id INT PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 (id) VALUES (1),(3);
++BEGIN;
++INSERT INTO t1 (id) VALUES (2);
++BEGIN;
++INSERT INTO t1 (id) VALUES (4);
++BEGIN;
++SET DEBUG_SYNC = "before_lock_rec_convert_impl_to_expl_for_trx
++        SIGNAL c2_decided
++        WAIT_FOR c2_can_convert";
++SET DEBUG_SYNC = "after_lock_clust_rec_read_check_and_lock SIGNAL c2_will_wait";
++SELECT * FROM t1 WHERE id=2 FOR UPDATE;
++SET DEBUG_SYNC = "now WAIT_FOR c2_decided";
++SET DEBUG_SYNC = "after_trx_erase_lists
++        SIGNAL c1_will_commit
++        WAIT_FOR c1_can_commit";
++COMMIT;
++SET DEBUG_SYNC = "now WAIT_FOR c1_will_commit";
++SET DEBUG_SYNC = "after_lock_clust_rec_read_check_and_lock SIGNAL c2_can_convert WAIT_FOR c3_can_verify";
++SELECT * FROM t1 WHERE id=2 FOR UPDATE;;
++SET DEBUG_SYNC = "now WAIT_FOR c2_will_wait";
++SET DEBUG_SYNC = "now SIGNAL c1_can_commit";
++SET DEBUG_SYNC = "now SIGNAL c3_can_verify";
++id
++2
++COMMIT;
++id
++2
++COMMIT;
++DROP TABLE t1;
+diff --git a/mysql-test/suite/innodb/r/nonmonotone_trx_ids.result b/mysql-test/suite/innodb/r/nonmonotone_trx_ids.result
+new file mode 100644
+index 00000000000..9bd1dd7a454
+--- /dev/null
++++ b/mysql-test/suite/innodb/r/nonmonotone_trx_ids.result
+@@ -0,0 +1,253 @@
++CREATE TABLE t1(id INT PRIMARY KEY, v INT NOT NULL) ENGINE=InnoDB;
++# Adding debug point 'trx_sys_rw_trx_add_rc' to @@GLOBAL.debug
++CREATE PROCEDURE create_rw_transactions(k INT)
++BEGIN
++WHILE 1 DO
++START TRANSACTION;
++UPDATE t1 SET v=v+1 WHERE id=k;
++COMMIT;
++END WHILE;
++END|
++INSERT INTO t1 (id,v) VALUES (0,0);
++CALL create_rw_transactions(0);
++INSERT INTO t1 (id,v) VALUES (1,0);
++CALL create_rw_transactions(1);
++INSERT INTO t1 (id,v) VALUES (2,0);
++CALL create_rw_transactions(2);
++INSERT INTO t1 (id,v) VALUES (3,0);
++CALL create_rw_transactions(3);
++INSERT INTO t1 (id,v) VALUES (4,0);
++CALL create_rw_transactions(4);
++INSERT INTO t1 (id,v) VALUES (5,0);
++CALL create_rw_transactions(5);
++INSERT INTO t1 (id,v) VALUES (6,0);
++CALL create_rw_transactions(6);
++INSERT INTO t1 (id,v) VALUES (7,0);
++CALL create_rw_transactions(7);
++INSERT INTO t1 (id,v) VALUES (8,0);
++CALL create_rw_transactions(8);
++INSERT INTO t1 (id,v) VALUES (9,0);
++CALL create_rw_transactions(9);
++INSERT INTO t1 (id,v) VALUES (10,0);
++CALL create_rw_transactions(10);
++INSERT INTO t1 (id,v) VALUES (11,0);
++CALL create_rw_transactions(11);
++INSERT INTO t1 (id,v) VALUES (12,0);
++CALL create_rw_transactions(12);
++INSERT INTO t1 (id,v) VALUES (13,0);
++CALL create_rw_transactions(13);
++INSERT INTO t1 (id,v) VALUES (14,0);
++CALL create_rw_transactions(14);
++INSERT INTO t1 (id,v) VALUES (15,0);
++CALL create_rw_transactions(15);
++INSERT INTO t1 (id,v) VALUES (16,0);
++CALL create_rw_transactions(16);
++INSERT INTO t1 (id,v) VALUES (17,0);
++CALL create_rw_transactions(17);
++INSERT INTO t1 (id,v) VALUES (18,0);
++CALL create_rw_transactions(18);
++INSERT INTO t1 (id,v) VALUES (19,0);
++CALL create_rw_transactions(19);
++INSERT INTO t1 (id,v) VALUES (20,0);
++CALL create_rw_transactions(20);
++INSERT INTO t1 (id,v) VALUES (21,0);
++CALL create_rw_transactions(21);
++INSERT INTO t1 (id,v) VALUES (22,0);
++CALL create_rw_transactions(22);
++INSERT INTO t1 (id,v) VALUES (23,0);
++CALL create_rw_transactions(23);
++INSERT INTO t1 (id,v) VALUES (24,0);
++CALL create_rw_transactions(24);
++INSERT INTO t1 (id,v) VALUES (25,0);
++CALL create_rw_transactions(25);
++INSERT INTO t1 (id,v) VALUES (26,0);
++CALL create_rw_transactions(26);
++INSERT INTO t1 (id,v) VALUES (27,0);
++CALL create_rw_transactions(27);
++INSERT INTO t1 (id,v) VALUES (28,0);
++CALL create_rw_transactions(28);
++INSERT INTO t1 (id,v) VALUES (29,0);
++CALL create_rw_transactions(29);
++INSERT INTO t1 (id,v) VALUES (30,0);
++CALL create_rw_transactions(30);
++INSERT INTO t1 (id,v) VALUES (31,0);
++CALL create_rw_transactions(31);
++INSERT INTO t1 (id,v) VALUES (32,0);
++CALL create_rw_transactions(32);
++INSERT INTO t1 (id,v) VALUES (33,0);
++CALL create_rw_transactions(33);
++INSERT INTO t1 (id,v) VALUES (34,0);
++CALL create_rw_transactions(34);
++INSERT INTO t1 (id,v) VALUES (35,0);
++CALL create_rw_transactions(35);
++INSERT INTO t1 (id,v) VALUES (36,0);
++CALL create_rw_transactions(36);
++INSERT INTO t1 (id,v) VALUES (37,0);
++CALL create_rw_transactions(37);
++INSERT INTO t1 (id,v) VALUES (38,0);
++CALL create_rw_transactions(38);
++INSERT INTO t1 (id,v) VALUES (39,0);
++CALL create_rw_transactions(39);
++INSERT INTO t1 (id,v) VALUES (40,0);
++CALL create_rw_transactions(40);
++INSERT INTO t1 (id,v) VALUES (41,0);
++CALL create_rw_transactions(41);
++INSERT INTO t1 (id,v) VALUES (42,0);
++CALL create_rw_transactions(42);
++INSERT INTO t1 (id,v) VALUES (43,0);
++CALL create_rw_transactions(43);
++INSERT INTO t1 (id,v) VALUES (44,0);
++CALL create_rw_transactions(44);
++INSERT INTO t1 (id,v) VALUES (45,0);
++CALL create_rw_transactions(45);
++INSERT INTO t1 (id,v) VALUES (46,0);
++CALL create_rw_transactions(46);
++INSERT INTO t1 (id,v) VALUES (47,0);
++CALL create_rw_transactions(47);
++INSERT INTO t1 (id,v) VALUES (48,0);
++CALL create_rw_transactions(48);
++INSERT INTO t1 (id,v) VALUES (49,0);
++CALL create_rw_transactions(49);
++INSERT INTO t1 (id,v) VALUES (50,0);
++CALL create_rw_transactions(50);
++INSERT INTO t1 (id,v) VALUES (51,0);
++CALL create_rw_transactions(51);
++INSERT INTO t1 (id,v) VALUES (52,0);
++CALL create_rw_transactions(52);
++INSERT INTO t1 (id,v) VALUES (53,0);
++CALL create_rw_transactions(53);
++INSERT INTO t1 (id,v) VALUES (54,0);
++CALL create_rw_transactions(54);
++INSERT INTO t1 (id,v) VALUES (55,0);
++CALL create_rw_transactions(55);
++INSERT INTO t1 (id,v) VALUES (56,0);
++CALL create_rw_transactions(56);
++INSERT INTO t1 (id,v) VALUES (57,0);
++CALL create_rw_transactions(57);
++INSERT INTO t1 (id,v) VALUES (58,0);
++CALL create_rw_transactions(58);
++INSERT INTO t1 (id,v) VALUES (59,0);
++CALL create_rw_transactions(59);
++INSERT INTO t1 (id,v) VALUES (60,0);
++CALL create_rw_transactions(60);
++INSERT INTO t1 (id,v) VALUES (61,0);
++CALL create_rw_transactions(61);
++INSERT INTO t1 (id,v) VALUES (62,0);
++CALL create_rw_transactions(62);
++INSERT INTO t1 (id,v) VALUES (63,0);
++CALL create_rw_transactions(63);
++INSERT INTO t1 (id,v) VALUES (64,0);
++CALL create_rw_transactions(64);
++INSERT INTO t1 (id,v) VALUES (65,0);
++CALL create_rw_transactions(65);
++INSERT INTO t1 (id,v) VALUES (66,0);
++CALL create_rw_transactions(66);
++INSERT INTO t1 (id,v) VALUES (67,0);
++CALL create_rw_transactions(67);
++INSERT INTO t1 (id,v) VALUES (68,0);
++CALL create_rw_transactions(68);
++INSERT INTO t1 (id,v) VALUES (69,0);
++CALL create_rw_transactions(69);
++INSERT INTO t1 (id,v) VALUES (70,0);
++CALL create_rw_transactions(70);
++INSERT INTO t1 (id,v) VALUES (71,0);
++CALL create_rw_transactions(71);
++INSERT INTO t1 (id,v) VALUES (72,0);
++CALL create_rw_transactions(72);
++INSERT INTO t1 (id,v) VALUES (73,0);
++CALL create_rw_transactions(73);
++INSERT INTO t1 (id,v) VALUES (74,0);
++CALL create_rw_transactions(74);
++INSERT INTO t1 (id,v) VALUES (75,0);
++CALL create_rw_transactions(75);
++INSERT INTO t1 (id,v) VALUES (76,0);
++CALL create_rw_transactions(76);
++INSERT INTO t1 (id,v) VALUES (77,0);
++CALL create_rw_transactions(77);
++INSERT INTO t1 (id,v) VALUES (78,0);
++CALL create_rw_transactions(78);
++INSERT INTO t1 (id,v) VALUES (79,0);
++CALL create_rw_transactions(79);
++INSERT INTO t1 (id,v) VALUES (80,0);
++CALL create_rw_transactions(80);
++INSERT INTO t1 (id,v) VALUES (81,0);
++CALL create_rw_transactions(81);
++INSERT INTO t1 (id,v) VALUES (82,0);
++CALL create_rw_transactions(82);
++INSERT INTO t1 (id,v) VALUES (83,0);
++CALL create_rw_transactions(83);
++INSERT INTO t1 (id,v) VALUES (84,0);
++CALL create_rw_transactions(84);
++INSERT INTO t1 (id,v) VALUES (85,0);
++CALL create_rw_transactions(85);
++INSERT INTO t1 (id,v) VALUES (86,0);
++CALL create_rw_transactions(86);
++INSERT INTO t1 (id,v) VALUES (87,0);
++CALL create_rw_transactions(87);
++INSERT INTO t1 (id,v) VALUES (88,0);
++CALL create_rw_transactions(88);
++INSERT INTO t1 (id,v) VALUES (89,0);
++CALL create_rw_transactions(89);
++INSERT INTO t1 (id,v) VALUES (90,0);
++CALL create_rw_transactions(90);
++INSERT INTO t1 (id,v) VALUES (91,0);
++CALL create_rw_transactions(91);
++INSERT INTO t1 (id,v) VALUES (92,0);
++CALL create_rw_transactions(92);
++INSERT INTO t1 (id,v) VALUES (93,0);
++CALL create_rw_transactions(93);
++INSERT INTO t1 (id,v) VALUES (94,0);
++CALL create_rw_transactions(94);
++INSERT INTO t1 (id,v) VALUES (95,0);
++CALL create_rw_transactions(95);
++INSERT INTO t1 (id,v) VALUES (96,0);
++CALL create_rw_transactions(96);
++INSERT INTO t1 (id,v) VALUES (97,0);
++CALL create_rw_transactions(97);
++INSERT INTO t1 (id,v) VALUES (98,0);
++CALL create_rw_transactions(98);
++INSERT INTO t1 (id,v) VALUES (99,0);
++CALL create_rw_transactions(99);
++INSERT INTO t1 (id,v) VALUES (100,0);
++CALL create_rw_transactions(100);
++INSERT INTO t1 (id,v) VALUES (101,0);
++CALL create_rw_transactions(101);
++INSERT INTO t1 (id,v) VALUES (102,0);
++CALL create_rw_transactions(102);
++INSERT INTO t1 (id,v) VALUES (103,0);
++CALL create_rw_transactions(103);
++INSERT INTO t1 (id,v) VALUES (104,0);
++CALL create_rw_transactions(104);
++INSERT INTO t1 (id,v) VALUES (105,0);
++CALL create_rw_transactions(105);
++INSERT INTO t1 (id,v) VALUES (106,0);
++CALL create_rw_transactions(106);
++INSERT INTO t1 (id,v) VALUES (107,0);
++CALL create_rw_transactions(107);
++INSERT INTO t1 (id,v) VALUES (108,0);
++CALL create_rw_transactions(108);
++INSERT INTO t1 (id,v) VALUES (109,0);
++CALL create_rw_transactions(109);
++INSERT INTO t1 (id,v) VALUES (110,0);
++CALL create_rw_transactions(110);
++INSERT INTO t1 (id,v) VALUES (111,0);
++CALL create_rw_transactions(111);
++INSERT INTO t1 (id,v) VALUES (112,0);
++CALL create_rw_transactions(112);
++INSERT INTO t1 (id,v) VALUES (113,0);
++CALL create_rw_transactions(113);
++INSERT INTO t1 (id,v) VALUES (114,0);
++CALL create_rw_transactions(114);
++INSERT INTO t1 (id,v) VALUES (115,0);
++CALL create_rw_transactions(115);
++INSERT INTO t1 (id,v) VALUES (116,0);
++CALL create_rw_transactions(116);
++INSERT INTO t1 (id,v) VALUES (117,0);
++CALL create_rw_transactions(117);
++INSERT INTO t1 (id,v) VALUES (118,0);
++CALL create_rw_transactions(118);
++INSERT INTO t1 (id,v) VALUES (119,0);
++CALL create_rw_transactions(119);
++DROP PROCEDURE create_rw_transactions;
++DROP TABLE t1;
++# Removing debug point 'trx_sys_rw_trx_add_rc' from @@GLOBAL.debug
+diff --git a/mysql-test/suite/innodb/t/implicit_to_explicit_conversion.test b/mysql-test/suite/innodb/t/implicit_to_explicit_conversion.test
+index 74a2eb97b1e..e9563b1333c 100644
+--- a/mysql-test/suite/innodb/t/implicit_to_explicit_conversion.test
++++ b/mysql-test/suite/innodb/t/implicit_to_explicit_conversion.test
+@@ -1,4 +1,5 @@
+ --source include/have_debug_sync.inc
++--source include/count_sessions.inc
+ 
+ # Scenario:
+ # C1 obtains implicit lock
+@@ -350,3 +351,73 @@ INSERT INTO t1 (id,val) VALUES (1,1),(3,3);
+ --disconnect C3
+ 
+ DROP TABLE t1;
++
++# Scenario:
++# C1 obtains implicit lock
++# C2 notices the implicit lock and decides to do impl-to-expl conversion
++# C1 starts commit and pauses after trx_erase_lists
++# C3 ignores C1 (as it is no longer in rw-list) and adds own exclusive lock on
++#    the record
++# C2 finishes impl-to-explicit conversion
++# (at this point we have two X locks on the same row)
++
++CREATE TABLE t1(id INT PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 (id) VALUES (1),(3);
++
++--connect(C1,localhost,root,,test)
++--connect(C2,localhost,root,,test)
++--connect(C3,localhost,root,,test)
++
++--connection C1
++    BEGIN;
++    INSERT INTO t1 (id) VALUES (2);
++
++--connection C3
++    #ensure that C3 has assigned trx->id before we start hogging the trx_sys->mutex
++    BEGIN;
++    INSERT INTO t1 (id) VALUES (4);
++
++--connection C2
++    BEGIN;
++    SET DEBUG_SYNC = "before_lock_rec_convert_impl_to_expl_for_trx
++        SIGNAL c2_decided
++        WAIT_FOR c2_can_convert";
++    SET DEBUG_SYNC = "after_lock_clust_rec_read_check_and_lock SIGNAL c2_will_wait";
++    --send SELECT * FROM t1 WHERE id=2 FOR UPDATE
++
++--connection C1
++    SET DEBUG_SYNC = "now WAIT_FOR c2_decided";
++    SET DEBUG_SYNC = "after_trx_erase_lists
++        SIGNAL c1_will_commit
++        WAIT_FOR c1_can_commit";
++    --send COMMIT
++
++--connection C3
++    SET DEBUG_SYNC = "now WAIT_FOR c1_will_commit";
++    SET DEBUG_SYNC = "after_lock_clust_rec_read_check_and_lock SIGNAL c2_can_convert WAIT_FOR c3_can_verify";
++    --send SELECT * FROM t1 WHERE id=2 FOR UPDATE;
++
++--connection default
++    SET DEBUG_SYNC = "now WAIT_FOR c2_will_wait";
++    SET DEBUG_SYNC = "now SIGNAL c1_can_commit";
++    SET DEBUG_SYNC = "now SIGNAL c3_can_verify";
++
++--connection C3
++    --reap
++    COMMIT;
++
++--connection C1
++    --reap
++
++--connection C2
++    --reap
++    COMMIT;
++
++--connection default
++--disconnect C1
++--disconnect C2
++--disconnect C3
++
++DROP TABLE t1;
++
++--source include/wait_until_count_sessions.inc
+diff --git a/mysql-test/suite/innodb/t/nonmonotone_trx_ids.test b/mysql-test/suite/innodb/t/nonmonotone_trx_ids.test
+new file mode 100644
+index 00000000000..b8211d3ab43
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/nonmonotone_trx_ids.test
+@@ -0,0 +1,41 @@
++--source include/big_test.inc
++--source include/have_debug.inc
++--source include/count_sessions.inc
++
++CREATE TABLE t1(id INT PRIMARY KEY, v INT NOT NULL) ENGINE=InnoDB;
++
++--let $debug_point=trx_sys_rw_trx_add_rc
++--let $debug_type=GLOBAL
++--source include/add_debug_point.inc
++
++DELIMITER |;
++CREATE PROCEDURE create_rw_transactions(k INT)
++ BEGIN
++     WHILE 1 DO
++       START TRANSACTION;
++         UPDATE t1 SET v=v+1 WHERE id=k;
++       COMMIT;
++     END WHILE;
++ END|
++DELIMITER ;|
++let $N=120;
++let $i=0;
++while($i<$N){
++    --connect(C$i,localhost,root,,test)
++        --eval INSERT INTO t1 (id,v) VALUES ($i,0)
++        --send_eval CALL create_rw_transactions($i)
++    --inc $i
++}
++--sleep 30
++let $i=0;
++while($i<$N){
++    --disconnect C$i
++    --inc $i
++}
++--connection default
++
++DROP PROCEDURE create_rw_transactions;
++DROP TABLE t1;
++--source include/remove_debug_point.inc
++
++--source include/wait_until_count_sessions.inc
+diff --git a/storage/innobase/include/trx0sys.h b/storage/innobase/include/trx0sys.h
+index bfc9311c01c..cd6466d5b91 100644
+--- a/storage/innobase/include/trx0sys.h
++++ b/storage/innobase/include/trx0sys.h
+@@ -44,10 +44,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
+ #include "page0types.h"
+ #include "ut0byte.h"
+ #include "ut0class_life_cycle.h"
++#include "ut0guarded.h"
+ #include "ut0lst.h"
+ #include "ut0mutex.h"
+ #endif /* !UNIV_HOTBACKUP */
+ #include <atomic>
++#include <unordered_map>
+ #include <vector>
+ #include "trx0trx.h"
+ 
+@@ -160,12 +162,6 @@ static inline void trx_write_trx_id(byte *ptr, trx_id_t id);
+ static inline trx_id_t trx_read_trx_id(
+     const byte *ptr); /*!< in: pointer to memory from where to read */
+ 
+-/** Looks for the trx handle with the given id in rw trxs list.
+-The caller must be holding trx_sys->shard's mutex for trx_id.
+-@param[in]   trx_id   trx id to search for
+-@return the trx handle or nullptr if not found */
+-static inline trx_t *trx_get_rw_trx_by_id_low(trx_id_t trx_id);
+-
+ /** Returns the minimum trx id in rw trx list. This is the smallest id for which
+ the rw trx can possibly be active. (But, you must look at the trx->state
+ to find out if the minimum trx id transaction itself is active, or already
+@@ -173,11 +169,6 @@ committed.)
+ @return the minimum trx id, or trx_sys->rw_max_trx_id+1 if the list is empty */
+ static inline trx_id_t trx_rw_min_trx_id(void);
+ 
+-/** Checks if a rw transaction with the given id is active.
+-@param[in]	trx_id		trx id of the transaction
+-@return transaction instance if active, or NULL */
+-static inline trx_t *trx_rw_is_active_low(trx_id_t trx_id);
+-
+ /** Checks if a rw transaction with the given id is active.
+ Please note, that positive result means only that the trx was active
+ at some moment during the call, but it might have already become
+@@ -415,26 +406,90 @@ class Space_Ids : public std::vector<space_id_t, ut_allocator<space_id_t>> {
+   iterator find(space_id_t id) { return (std::find(begin(), end(), id)); }
+ };
+ 
+-/** Shard for subset of transactions. */
+-struct Trx_shard {
+-  Trx_shard() { mutex_create(LATCH_ID_TRX_SYS_SHARD, &mutex); }
++/** Number of shards created for transactions. */
++constexpr size_t TRX_SHARDS_N = 256;
+ 
+-  ~Trx_shard() { mutex_free(&mutex); }
++/** Computes shard number for a given trx_id.
++@param[in]  trx_id  trx_id for which shard_no should be computed
++@return the computed shard number (number in range 0..TRX_SHARDS_N-1) */
++inline size_t trx_get_shard_no(trx_id_t trx_id) {
++  ut_ad(trx_id != 0);
++  return trx_id % TRX_SHARDS_N;
++}
+ 
+-  /** Mutex protecting members inside this shard. */
+-  TrxSysMutex mutex;
++#ifndef UNIV_HOTBACKUP
++class Trx_by_id_with_min {
++  struct Trx_track_hash {
++    size_t operator()(const trx_id_t &key) const {
++      return static_cast<size_t>(key / TRX_SHARDS_N);
++    }
++  };
+ 
+-  /** Padding to avoid false sharing between mutex and rw_trx_set. */
+-  char pad_after_mutex[ut::INNODB_CACHE_LINE_SIZE];
++  using By_id = std::unordered_map<trx_id_t, trx_t *, Trx_track_hash>;
++  By_id m_by_id;
+ 
+-  /** Set of active RW transactions. */
+-  TrxIdSet rw_trx_set;
++  /** For observers which use Trx_shard::mutex protection: each transaction id
++  in the m_by_id is guaranteed to be at least m_min_id.
++  Writes are protected with Trx_shard::mutex.
++  Reads can be performed without any latch before accessing m_by_id,
++  but care must be taken to interpret the result -
++  @see trx_rw_is_active for details.*/
++  std::atomic<trx_id_t> m_min_id{0};
+ 
+-  /** Padding to eliminate risk of false sharing between consecutive shards. */
+-  char pad_after_shard[ut::INNODB_CACHE_LINE_SIZE];
++ public:
++  By_id const &by_id() const { return m_by_id; }
++  trx_id_t min_id() const { return m_min_id.load(); }
++  trx_t *get(trx_id_t trx_id) const {
++    const auto it = m_by_id.find(trx_id);
++    trx_t *trx = it == m_by_id.end() ? nullptr : it->second;
++    /* We remove trx from active_rw_trxs and change state to
++    TRX_STATE_COMMITTED_IN_MEMORY in a same critical section protected by
++    Trx_shard's mutex, which we happen to hold here, so we expect the state
++    of trx to match its presence in that set */
++    ut_ad(trx == nullptr || !trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));
++    return trx;
++  }
++  void insert(trx_t &trx) {
++    const trx_id_t trx_id = trx.id;
++    ut_ad(0 == m_by_id.count(trx_id));
++    m_by_id.emplace(trx_id, &trx);
++    if (m_by_id.size() == 1 ||
++        trx_id < m_min_id.load(std::memory_order_relaxed)) {
++      m_min_id.store(trx_id, std::memory_order_release);
++    }
++  }
++  void erase(trx_id_t trx_id) {
++    ut_ad(1 == m_by_id.count(trx_id));
++    m_by_id.erase(trx_id);
++    if (m_min_id.load(std::memory_order_relaxed) == trx_id) {
++      // We want at most 1 release store, so we use a local variable for the
++      // loop.
++      trx_id_t new_min = trx_id + TRX_SHARDS_N;
++      if (!m_by_id.empty()) {
++#ifdef UNIV_DEBUG
++        // These asserts ensure while loop terminates:
++        const trx_id_t some_id = m_by_id.begin()->first;
++        ut_a(new_min <= some_id);
++        ut_a((some_id - new_min) % TRX_SHARDS_N == 0);
++#endif /* UNIV_DEBUG */
++        while (m_by_id.count(new_min) == 0) {
++          new_min += TRX_SHARDS_N;
++        }
++      }
++      m_min_id.store(new_min, std::memory_order_release);
++    }
++  }
++};
++
++/** Shard for subset of transactions. */
++struct Trx_shard {
++  /** Mapping from trx->id to trx of active rw transactions.
++  The peek() interface can only be used safely for the min_id().
++  Use latch_and_execute() interface to access other members. */
++  ut::Cacheline_padded<ut::Guarded<Trx_by_id_with_min, LATCH_ID_TRX_SYS_SHARD>>
++      active_rw_trxs;
+ };
+ 
+-#ifndef UNIV_HOTBACKUP
+ /** The transaction system central memory data structure. */
+ struct trx_sys_t {
+   /* Members protected by neither trx_sys_t::mutex nor serialisation_mutex. */
+@@ -516,10 +571,6 @@ struct trx_sys_t {
+   /** Mutex protecting most fields in this structure (the default one). */
+   TrxSysMutex mutex;
+ 
+-  /** Minimum trx->id of active RW transactions (minimum in the rw_trx_ids).
+-  Protected by the trx_sys_t::mutex but might be read without the mutex. */
+-  std::atomic<trx_id_t> min_active_trx_id;
+-
+   char pad5[ut::INNODB_CACHE_LINE_SIZE];
+ 
+   /** List of active and committed in memory read-write transactions, sorted
+@@ -558,6 +609,19 @@ struct trx_sys_t {
+   /** @} */
+ 
+   char pad_after[ut::INNODB_CACHE_LINE_SIZE];
++
++  Trx_shard &get_shard_by_trx_id(trx_id_t trx_id) {
++    return trx_sys->shards[trx_get_shard_no(trx_id)];
++  }
++  template <typename F>
++  auto latch_and_execute_with_active_trx(trx_id_t trx_id, F &&f,
++                                         const ut::Location &loc) {
++    return get_shard_by_trx_id(trx_id).active_rw_trxs.latch_and_execute(
++        [&](Trx_by_id_with_min &trx_by_id_with_min) {
++          return std::forward<F>(f)(trx_by_id_with_min.get(trx_id));
++        },
++        loc);
++  }
+ };
+ 
+ #endif /* !UNIV_HOTBACKUP */
+@@ -590,64 +654,6 @@ constexpr trx_id_t TRX_SYS_TRX_ID_WRITE_MARGIN = 256;
+     trx_sys->mutex.exit();   \
+   } while (0)
+ 
+-/** Computes shard number for a given trx_id.
+-@param[in]  trx_id  trx_id for which shard_no should be computed
+-@return the computed shard number (number in range 0..TRX_SHARDS_N-1) */
+-inline size_t trx_get_shard_no(trx_id_t trx_id) {
+-  ut_ad(trx_id != 0);
+-  return trx_id % TRX_SHARDS_N;
+-}
+-
+-#ifdef UNIV_LIBRARY
+-#ifdef UNIV_DEBUG
+-inline bool trx_sys_shard_mutex_own(size_t) { return true; }
+-#endif /* UNIV_DEBUG */
+-inline void trx_sys_shard_mutex_enter(size_t, ut::Location) {}
+-inline void trx_sys_shard_mutex_exit(size_t) {}
+-#else
+-#ifdef UNIV_DEBUG
+-/** Test if mutex protecting a given trx shard is owned.
+-@param[in]  shard_no  shard number
+-@return true iff the shard's mutex is owned */
+-inline bool trx_sys_shard_mutex_own(size_t shard_no) {
+-  ut_ad(shard_no < TRX_SHARDS_N);
+-  return trx_sys->shards[shard_no].mutex.is_owned();
+-}
+-#endif /* UNIV_DEBUG */
+-/** Acquire the mutex protecting a given trx shard.
+-@param[in]  shard_no  shard number
+-@param[in]  location  defines place in code where this function is called */
+-inline void trx_sys_shard_mutex_enter(size_t shard_no, ut::Location location) {
+-  ut_ad(shard_no < TRX_SHARDS_N);
+-  mutex_enter_inline(&trx_sys->shards[shard_no].mutex, location);
+-}
+-/** Release the mutex protecting a given trx shard.
+-@param[in]  shard_no  shard number */
+-inline void trx_sys_shard_mutex_exit(size_t shard_no) {
+-  ut_ad(shard_no < TRX_SHARDS_N);
+-  trx_sys->shards[shard_no].mutex.exit();
+-}
+-#endif /* !UNIV_LIBRARY */
+-
+-/** RAII-alike guard for a critical section protected by
+-the trx_sys->shard's mutex. */
+-struct Trx_shard_latch_guard : private ut::Non_copyable {
+-  /** Acquires the trx_sys->shard's mutex for shard containing a given trx_id.
+-  @param[in]  trx_id    the given trx_id
+-  @param[in]  location  defines place in code, where it was called */
+-  Trx_shard_latch_guard(trx_id_t trx_id, ut::Location location)
+-      : m_shard_no{trx_get_shard_no(trx_id)} {
+-    trx_sys_shard_mutex_enter(m_shard_no, location);
+-  }
+-
+-  /** Releases the acquired trx_sys->shard's mutex (acquired in ctor). */
+-  ~Trx_shard_latch_guard() { trx_sys_shard_mutex_exit(m_shard_no); }
+-
+- private:
+-  /** Shard which mutex was acquired in ctor (index in trx_sys->shards). */
+-  const size_t m_shard_no;
+-};
+-
+ /** Test if trx_sys->serialisation_mutex is owned. */
+ #define trx_sys_serialisation_mutex_own() \
+   (trx_sys->serialisation_mutex.is_owned())
+diff --git a/storage/innobase/include/trx0sys.ic b/storage/innobase/include/trx0sys.ic
+index aed6d841473..e32f59c3134 100644
+--- a/storage/innobase/include/trx0sys.ic
++++ b/storage/innobase/include/trx0sys.ic
+@@ -174,19 +174,6 @@ static inline trx_id_t trx_read_trx_id(
+   return (mach_read_from_6(ptr));
+ }
+ 
+-static inline trx_t *trx_get_rw_trx_by_id_low(trx_id_t trx_id) {
+-  ut_ad(trx_id > 0);
+-
+-  const auto trx_shard_no = trx_get_shard_no(trx_id);
+-  ut_ad(trx_sys_shard_mutex_own(trx_shard_no));
+-
+-  const auto &trx_shard = trx_sys->shards[trx_shard_no];
+-
+-  const auto it = trx_shard.rw_trx_set.find(TrxTrack(trx_id));
+-
+-  return it == trx_shard.rw_trx_set.end() ? nullptr : it->m_trx;
+-}
+-
+ /** Returns the minimum trx id in trx list. This is the smallest id for which
+ the trx can possibly be active. (But, you must look at the trx->state
+ to find out if the minimum trx id transaction itself is active, or already
+@@ -219,35 +206,58 @@ static inline trx_id_t trx_rw_min_trx_id(void) {
+   return (id);
+ }
+ 
+-static inline trx_t *trx_rw_is_active_low(trx_id_t trx_id) {
+-  ut_ad(trx_sys_shard_mutex_own(trx_get_shard_no(trx_id)));
+-
+-  trx_t *const trx = trx_get_rw_trx_by_id_low(trx_id);
+-  /* We remove trx from rw_trx_set and change state to
+-  TRX_STATE_COMMITTED_IN_MEMORY in a same critical section protected by
+-  Trx_shard's mutex, which we happen to hold here, so we expect the state
+-  of trx to match its presence in that set */
+-  ut_ad(trx == nullptr || !trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));
+-
+-  return trx;
+-}
+-
+ static inline trx_t *trx_rw_is_active(trx_id_t trx_id, bool do_ref_count) {
+-  /* Fast checking. If it's smaller than minimal active trx id, just
+-  return NULL. */
+-  if (trx_sys->min_active_trx_id.load() > trx_id) {
++  /* Fast checking without Trx_shard::mutex to see if trx_id can't be in the
++  Trx_shard::active_rw_trxs because it's too small. This works, because
++  whenever we add or remove an element from Trx_by_id_with_min::m_by_id under
++  Trx_shard::mutex, we also modify the m_min_id to be lower or equal to
++  each of ids inside Trx_by_id_with_min::m_by_id in the same critical
++  section. We assume that trx_id is an identifier of a transaction for which the
++  call to trx_sys_rw_trx_add(trx) happened-before the current call to
++  trx_rw_is_active(trx_id,..) - indeed in current implementation of InnoDB, the
++  trx_id comes from:
++  - a recovered transaction (for which trx_sys_rw_trx_add happened before crash)
++  - a header of a row (stored there by an active transaction which must have
++    finished a call to trx_sys_rw_trx_add before)
++  - a prepared transaction (which must have called trx_sys_rw_trx_add before
++    becoming PREPAREd)
++  so clearly trx_sys_rw_trx_add() happened-before.
++  Under this assumption, if trx_id < Trx_shard::min_id, then the value of
++  Trx_shard::min_id is loaded from a store which must have occurred in a
++  critical section protected by Trx_shard::mutex which happened-after the
++  trx_sys_rw_trx_add(trx) for the trx with trx->id==trx_id - it could not be an
++  earlier critical section, by our assumption, and it couldn't be stored during
++  that particular trx_sys_rw_trx_add(trx) because of the invariant for min_id.
++  Further, given that the loaded value is larger than trx_id, it must be the
++  case that during that critical section the trx with trx->id==trx_id no longer
++  belonged to Trx_shard::active_rw_trxs.m_by_id. In other words, this load of
++  min_id synchronizes with a store, which happens-after Trx_shard::mutex
++  acquisition of a critical section in which trx_id was not in
++  active_rw_trxs.m_by_id. So, if this thread were to check the contents
++  of active_rw_trxs.m_by_id after the if's condition evaluated to true,
++  it would first have to acquire Trx_shard::mutex, which could only succeed
++  *after* that critical section, thus it would not find trx_id in it for sure.
++  NOTE: to appreciate why the assumption is important, observe, that if we call
++  the trx_rw_is_active(trx_id,..) with trx_id for which trx_sys_rw_trx_add(trx)
++  wasn't called yet, then it could happen, that trx_id+TRX_SHARDS_N was already
++  assigned and added to Trx_shard::active_rw_trxs.m_by_id, and Trx_shard::min_id
++  was set to larger than trx_id, so we decide to return nullptr, even though, if
++  we were to repeat the call in just a moment we might get a different result if
++  the trx_sys_rw_trx_add() for the trx_id happens meanwhile. */
++  ut_ad(trx_id < trx_sys_get_next_trx_id_or_no());
++  auto &shard = trx_sys->get_shard_by_trx_id(trx_id);
++  if (trx_id < shard.active_rw_trxs.peek().min_id()) {
+     return nullptr;
+   }
+-
+-  Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
+-
+-  trx_t *trx = trx_rw_is_active_low(trx_id);
+-
+-  if (trx != nullptr) {
+-    trx = trx_reference(trx, do_ref_count);
+-  }
+-
+-  return trx;
++  return trx_sys->latch_and_execute_with_active_trx(
++      trx_id,
++      [&](trx_t *trx) {
++        if (trx != nullptr && do_ref_count) {
++          trx_reference(trx);
++        }
++        return trx;
++      },
++      UT_LOCATION_HERE);
+ }
+ 
+ inline bool trx_sys_id_is_corrupted(trx_id_t trx_id) {
+@@ -324,11 +334,21 @@ static inline bool trx_sys_need_rollback() {
+ }
+ 
+ static inline void trx_sys_rw_trx_add(trx_t *trx) {
+-  ut_ad(trx->id != 0);
+-  const auto trx_shard_no = trx_get_shard_no(trx->id);
+-  trx_sys_shard_mutex_enter(trx_shard_no, UT_LOCATION_HERE);
+-  trx_sys->shards[trx_shard_no].rw_trx_set.insert(TrxTrack(trx->id, trx));
+-  trx_sys_shard_mutex_exit(trx_shard_no);
++  const trx_id_t trx_id = trx->id;
++  ut_ad(trx_id != 0);
++  const auto trx_shard_no = trx_get_shard_no(trx_id);
++  DBUG_EXECUTE_IF("trx_sys_rw_trx_add_rc", {
++    if (trx_shard_no == 123 && (trx_id / TRX_SHARDS_N) % 3 == 0) {
++      std::this_thread::sleep_for(std::chrono::seconds(1));
++    }
++  });
++  trx_sys->shards[trx_shard_no].active_rw_trxs.latch_and_execute(
++      [&](Trx_by_id_with_min &trx_by_id_with_min) {
++        trx_by_id_with_min.insert(*trx);
++        ut_ad(trx_by_id_with_min.min_id() <= trx_id);
++        ut_ad(trx_by_id_with_min.min_id() % TRX_SHARDS_N == trx_shard_no);
++      },
++      UT_LOCATION_HERE);
+ }
+ 
+ #endif /* !UNIV_HOTBACKUP */
+diff --git a/storage/innobase/include/trx0trx.h b/storage/innobase/include/trx0trx.h
+index e46a77af832..7f1337270f2 100644
+--- a/storage/innobase/include/trx0trx.h
++++ b/storage/innobase/include/trx0trx.h
+@@ -381,11 +381,10 @@ void trx_set_rw_mode(trx_t *trx);
+ /**
+ Increase the reference count. If the transaction is in state
+ TRX_STATE_COMMITTED_IN_MEMORY then the transaction is considered
+-committed and the reference count is not incremented.
++committed and this function fails on assertion.
+ @param trx Transaction that is being referenced
+-@param do_ref_count Increment the reference iff this is true
+-@return transaction instance if it is not committed */
+-static inline trx_t *trx_reference(trx_t *trx, bool do_ref_count);
++*/
++static inline void trx_reference(trx_t *trx);
+ 
+ /**
+ Release the transaction. Decrease the reference count.
+diff --git a/storage/innobase/include/trx0trx.ic b/storage/innobase/include/trx0trx.ic
+index 319da2a1d67..dc97eba1813 100644
+--- a/storage/innobase/include/trx0trx.ic
++++ b/storage/innobase/include/trx0trx.ic
+@@ -221,28 +221,12 @@ static inline bool trx_is_rseg_assigned(
+           trx->rsegs.m_noredo.rseg != nullptr);
+ }
+ 
+-/**
+-Increase the reference count. If the transaction is in state
+-TRX_STATE_COMMITTED_IN_MEMORY then the transaction is considered
+-committed and the reference count is not incremented.
+-@param trx Transaction that is being referenced
+-@param do_ref_count Increment the reference iff this is true
+-@return transaction instance if it is not committed */
+-static inline trx_t *trx_reference(trx_t *trx, bool do_ref_count) {
++static inline void trx_reference(trx_t *trx) {
+   trx_mutex_enter(trx);
+-
+-  if (trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY)) {
+-    trx_mutex_exit(trx);
+-    trx = nullptr;
+-  } else if (do_ref_count) {
+-    ut_ad(trx->n_ref >= 0);
+-    ++trx->n_ref;
+-    trx_mutex_exit(trx);
+-  } else {
+-    trx_mutex_exit(trx);
+-  }
+-
+-  return (trx);
++  ut_a(!trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));
++  ut_ad(trx->n_ref >= 0);
++  ++trx->n_ref;
++  trx_mutex_exit(trx);
+ }
+ 
+ /**
+diff --git a/storage/innobase/include/trx0types.h b/storage/innobase/include/trx0types.h
+index da9150158df..4612b6efd95 100644
+--- a/storage/innobase/include/trx0types.h
++++ b/storage/innobase/include/trx0types.h
+@@ -44,8 +44,6 @@ this program; if not, write to the Free Software Foundation, Inc.,
+ #include <set>
+ #include <vector>
+ 
+-//#include <unordered_set>
+-
+ /** printf(3) format used for printing DB_TRX_ID and other system fields */
+ #define TRX_ID_FMT IB_ID_FMT
+ 
+@@ -596,36 +594,6 @@ typedef std::priority_queue<
+ 
+ typedef std::vector<trx_id_t, ut_allocator<trx_id_t>> trx_ids_t;
+ 
+-/** Mapping read-write transactions from id to transaction instance, for
+-creating read views and during trx id lookup for MVCC and locking. */
+-struct TrxTrack {
+-  explicit TrxTrack(trx_id_t id, trx_t *trx = nullptr) : m_id(id), m_trx(trx) {
+-    // Do nothing
+-  }
+-
+-  trx_id_t m_id;
+-  trx_t *m_trx;
+-};
+-
+-/** Number of shards created for transactions. */
+-constexpr size_t TRX_SHARDS_N = 256;
+-
+-struct TrxTrackHash {
+-  size_t operator()(const TrxTrack &key) const {
+-    return static_cast<size_t>(key.m_id / TRX_SHARDS_N);
+-  }
+-};
+-
+-/**
+-Comparator for TrxMap */
+-struct TrxTrackHashCmp {
+-  bool operator()(const TrxTrack &lhs, const TrxTrack &rhs) const {
+-    return (lhs.m_id == rhs.m_id);
+-  }
+-};
+-
+-typedef std::unordered_set<TrxTrack, TrxTrackHash, TrxTrackHashCmp> TrxIdSet;
+-
+ struct TrxVersion {
+   TrxVersion(trx_t *trx);
+ 
+diff --git a/storage/innobase/include/ut0cpu_cache.h b/storage/innobase/include/ut0cpu_cache.h
+index cc955a53eca..17afc339b57 100644
+--- a/storage/innobase/include/ut0cpu_cache.h
++++ b/storage/innobase/include/ut0cpu_cache.h
+@@ -50,6 +50,9 @@ not handle over-aligned types.
+ template <typename T>
+ struct Cacheline_padded : public T {
+   char pad[INNODB_CACHE_LINE_SIZE];
++
++  template <class... Args>
++  Cacheline_padded(Args &&... args) : T{std::forward<Args>(args)...} {}
+ };
+ } /* namespace ut */
+ 
+diff --git a/storage/innobase/include/ut0guarded.h b/storage/innobase/include/ut0guarded.h
+new file mode 100644
+index 00000000000..f7fcf1a3e78
+--- /dev/null
++++ b/storage/innobase/include/ut0guarded.h
+@@ -0,0 +1,59 @@
++/*****************************************************************************
++
++Copyright (c) 2021, Oracle and/or its affiliates.
++
++This program is free software; you can redistribute it and/or modify it under
++the terms of the GNU General Public License, version 2.0, as published by the
++Free Software Foundation.
++
++This program is also distributed with certain software (including but not
++limited to OpenSSL) that is licensed under separate terms, as designated in a
++particular file or component or in included license documentation. The authors
++of MySQL hereby grant you an additional permission to link the program and
++your derivative works with the separately licensed software that they have
++included with MySQL.
++
++This program is distributed in the hope that it will be useful, but WITHOUT
++ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
++FOR A PARTICULAR PURPOSE. See the GNU General Public License, version 2.0,
++for more details.
++
++You should have received a copy of the GNU General Public License along with
++this program; if not, write to the Free Software Foundation, Inc.,
++51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
++
++*****************************************************************************/
++
++/** @file include/ut0guarded.h
++The ut::Guarded template which protects access to another class with mutex. */
++
++#ifndef ut0guarded_h
++#define ut0guarded_h
++
++#ifndef UNIV_LIBRARY
++#include "ut0cpu_cache.h"
++#include "ut0mutex.h"
++#endif
++
++namespace ut {
++// TBD: should latch_id be specified at runtime?
++template <typename Inner, latch_id_t latch_id>
++class Guarded {
++#ifndef UNIV_LIBRARY
++  Cacheline_padded<IB_mutex> mutex{latch_id};
++#endif
++  Inner inner;
++
++ public:
++  template <typename F>
++  auto latch_and_execute(F &&f, const ut::Location &loc) {
++#ifndef UNIV_LIBRARY
++    IB_mutex_guard guard{&mutex, loc};
++#endif
++    return std::forward<F>(f)(inner);
++  }
++
++  const Inner &peek() const { return inner; }
++};
++}  // namespace ut
++#endif /* ut0guarded_h */
+diff --git a/storage/innobase/include/ut0mutex.h b/storage/innobase/include/ut0mutex.h
+index ee7b86bb15a..f95ea57b54b 100644
+--- a/storage/innobase/include/ut0mutex.h
++++ b/storage/innobase/include/ut0mutex.h
+@@ -132,6 +132,11 @@ struct IB_mutex_guard {
+     mutex_enter(in_mutex);
+   }
+ 
++  IB_mutex_guard(ib_mutex_t *in_mutex, const ut::Location &loc)
++      : m_mutex(in_mutex) {
++    mutex_enter_inline(in_mutex, loc);
++  }
++
+   /** Destructor to release mutex */
+   ~IB_mutex_guard() { mutex_exit(m_mutex); }
+ 
+@@ -240,7 +245,20 @@ template <typename Mutex>
+ void mutex_destroy(Mutex *mutex) {
+   mutex->destroy();
+ }
+-#endif /* UNIV_LIBRARY */
++
++class IB_mutex : public ib_mutex_t {
++ public:
++  explicit IB_mutex(latch_id_t latch_id) {
++    mutex_create(latch_id, static_cast<ib_mutex_t *>(this));
++  }
++  ~IB_mutex() { mutex_free(static_cast<ib_mutex_t *>(this)); }
++  void lock(const ut::Location &loc) {
++    mutex_enter_inline(static_cast<ib_mutex_t *>(this), loc);
++  }
++  void unlock() { exit(); }
++};
++
+ #endif /* !UNIV_HOTBACKUP */
++#endif /* UNIV_LIBRARY */
+ 
+ #endif /* ut0mutex_h */
+diff --git a/storage/innobase/lock/lock0lock.cc b/storage/innobase/lock/lock0lock.cc
+index f255ae564b4..1715b5554c7 100644
+--- a/storage/innobase/lock/lock0lock.cc
++++ b/storage/innobase/lock/lock0lock.cc
+@@ -4933,31 +4933,33 @@ static void rec_queue_validate_latched(const buf_block_t *block,
+ 
+     trx_id = lock_clust_rec_some_has_impl(rec, index, offsets);
+ 
+-    Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
+-
+-    const trx_t *impl_trx = trx_rw_is_active_low(trx_id);
+-    if (impl_trx != nullptr) {
+-      ut_ad(owns_page_shard(block->get_page_id()));
+-      /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed from
+-      rw_trx_set until we release Trx_shard's mutex, which means that currently
+-      all other threads in the system consider this impl_trx active and thus
+-      should respect implicit locks held by impl_trx*/
+-
+-      const lock_t *other_lock =
+-          lock_rec_other_has_expl_req(LOCK_S, block, true, heap_no, impl_trx);
+-
+-      /* The impl_trx is holding an implicit lock on the
+-      given record 'rec'. So there cannot be another
+-      explicit granted lock.  Also, there can be another
+-      explicit waiting lock only if the impl_trx has an
+-      explicit granted lock. */
+-
+-      if (other_lock != nullptr) {
+-        ut_a(lock_get_wait(other_lock));
+-        ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
+-                               impl_trx));
+-      }
+-    }
++    trx_sys->latch_and_execute_with_active_trx(
++        trx_id,
++        [&](const trx_t *impl_trx) {
++          if (impl_trx != nullptr) {
++            ut_ad(owns_page_shard(block->get_page_id()));
++            /* impl_trx cannot become TRX_STATE_COMMITTED_IN_MEMORY nor removed
++            from active_rw_trxs.by_id until we release Trx_shard's mutex, which
++            means that currently all other threads in the system consider this
++            impl_trx active and thus should respect implicit locks held by
++            impl_trx*/
++
++            const lock_t *other_lock = lock_rec_other_has_expl_req(
++                LOCK_S, block, true, heap_no, impl_trx);
++
++            /* The impl_trx is holding an implicit lock on the given 'rec'.
++            So there cannot be another explicit granted lock. Also, there can
++            be another explicit waiting lock only if the impl_trx has an
++            explicit granted lock. */
++
++            if (other_lock != nullptr) {
++              ut_a(lock_get_wait(other_lock));
++              ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP, block, heap_no,
++                                     impl_trx));
++            }
++          }
++        },
++        UT_LOCATION_HERE);
+   }
+ 
+   Lock_iter::for_each(rec_id, [&](lock_t *lock) {
+@@ -5386,7 +5388,7 @@ void lock_rec_convert_active_impl_to_expl(const buf_block_t *block,
+                                           const rec_t *rec, dict_index_t *index,
+                                           const ulint *offsets, trx_t *trx,
+                                           ulint heap_no) {
+-  trx_reference(trx, true);
++  trx_reference(trx);
+   lock_rec_convert_impl_to_expl_for_trx(block, rec, index, offsets, trx,
+                                         heap_no);
+ }
+@@ -5605,10 +5607,10 @@ dberr_t lock_clust_rec_read_check_and_lock(
+ 
+     MONITOR_INC(MONITOR_NUM_RECLOCK_REQ);
+   }
++  DEBUG_SYNC_C("after_lock_clust_rec_read_check_and_lock");
+ 
+   ut_d(locksys::rec_queue_latch_and_validate(block, rec, index, offsets));
+ 
+-  DEBUG_SYNC_C("after_lock_clust_rec_read_check_and_lock");
+   ut_ad(err == DB_SUCCESS || err == DB_SUCCESS_LOCKED_REC ||
+         err == DB_LOCK_WAIT || err == DB_DEADLOCK || err == DB_SKIP_LOCKED ||
+         err == DB_LOCK_NOWAIT);
+diff --git a/storage/innobase/read/read0read.cc b/storage/innobase/read/read0read.cc
+index 2cb0af22790..ebf94916454 100644
+--- a/storage/innobase/read/read0read.cc
++++ b/storage/innobase/read/read0read.cc
+@@ -411,19 +411,21 @@ void ReadView::copy_trx_ids(const trx_ids_t &trx_ids) {
+   if (ut_rnd_interval(0, 99) == 0) {
+     /* Assert that all transaction ids in list are active. */
+     for (auto trx_id : trx_ids) {
+-      while (true) {
+-        {
+-          Trx_shard_latch_guard guard{trx_id, UT_LOCATION_HERE};
+-          trx_t *trx = trx_get_rw_trx_by_id_low(trx_id);
+-          if (trx != nullptr) {
+-            const auto trx_state = trx->state.load(std::memory_order_relaxed);
+-            /* Transaction in rw_trx_ids might only be ACTIVE or PREPARED,
+-            before it becomes COMMITTED it is removed from rw_trx_ids. */
+-            ut_ad(trx_state == TRX_STATE_ACTIVE ||
+-                  trx_state == TRX_STATE_PREPARED);
+-            break;
+-          }
+-        }
++      while (trx_sys->latch_and_execute_with_active_trx(
++          trx_id,
++          [](trx_t *trx) {
++            if (trx != nullptr) {
++              const auto trx_state = trx->state.load(std::memory_order_relaxed);
++              /* Transaction in active_rw_trxs might only be ACTIVE or
++              PREPARED, before it becomes COMMITTED it is removed from
++              active_rw_trxs. */
++              ut_ad(trx_state == TRX_STATE_ACTIVE ||
++                    trx_state == TRX_STATE_PREPARED);
++              return false;
++            }
++            return true;
++          },
++          UT_LOCATION_HERE)) {
+         /* It might happen that transaction became added to rw_trx_ids,
+         then trx_sys mutex has been released and thread become scheduled
+         out before the call to trx_sys_rw_trx_add(trx). We need to wait,
+diff --git a/storage/innobase/row/row0vers.cc b/storage/innobase/row/row0vers.cc
+index f6f3ecd2b4c..5ab7b25f9e3 100644
+--- a/storage/innobase/row/row0vers.cc
++++ b/storage/innobase/row/row0vers.cc
+@@ -1382,7 +1382,6 @@ void row_vers_build_for_semi_consistent_read(
+   ut_ad(!vrow || !(*vrow));
+ 
+   for (;;) {
+-    const trx_t *version_trx;
+     mem_heap_t *heap2;
+     rec_t *prev_version;
+     trx_id_t version_trx_id;
+@@ -1391,21 +1390,7 @@ void row_vers_build_for_semi_consistent_read(
+     if (rec == version) {
+       rec_trx_id = version_trx_id;
+     }
+-
+-    {
+-      Trx_shard_latch_guard guard{version_trx_id, UT_LOCATION_HERE};
+-      version_trx = trx_get_rw_trx_by_id_low(version_trx_id);
+-      /* Because version_trx is a read-write transaction,
+-      its state cannot change from or to NOT_STARTED while
+-      we are holding the trx_sys->mutex.  It may change from
+-      ACTIVE to PREPARED or COMMITTED. */
+-      if (version_trx &&
+-          trx_state_eq(version_trx, TRX_STATE_COMMITTED_IN_MEMORY)) {
+-        version_trx = nullptr;
+-      }
+-    }
+-
+-    if (!version_trx) {
++    if (!trx_rw_is_active(version_trx_id, false)) {
+     committed_version_trx:
+       /* We found a version that belongs to a
+       committed transaction: return it. */
+diff --git a/storage/innobase/trx/trx0sys.cc b/storage/innobase/trx/trx0sys.cc
+index 40f00fb960b..b484f0d46ba 100644
+--- a/storage/innobase/trx/trx0sys.cc
++++ b/storage/innobase/trx/trx0sys.cc
+@@ -573,8 +573,6 @@ void trx_sys_create(void) {
+ 
+   trx_sys->serialisation_min_trx_no.store(0);
+ 
+-  trx_sys->min_active_trx_id.store(0);
+-
+   ut_d(trx_sys->rw_max_trx_no = 0);
+ 
+   new (&trx_sys->rw_trx_ids)
+diff --git a/storage/innobase/trx/trx0trx.cc b/storage/innobase/trx/trx0trx.cc
+index 8402b948fc5..80a1baec202 100644
+--- a/storage/innobase/trx/trx0trx.cc
++++ b/storage/innobase/trx/trx0trx.cc
+@@ -783,6 +783,7 @@ static trx_t *trx_resurrect_insert(
+   trx->rsegs.m_redo.rseg = rseg;
+   *trx->xid = undo->xid;
+   trx->id = undo->trx_id;
++  trx_sys_rw_trx_add(trx);
+   trx->rsegs.m_redo.insert_undo = undo;
+   trx->is_recovered = true;
+ 
+@@ -901,6 +902,7 @@ static void trx_resurrect_update(
+     trx->rsegs.m_redo.rseg = rseg;
+     *trx->xid = undo->xid;
+     trx->id = undo->trx_id;
++    trx_sys_rw_trx_add(trx);
+     trx->is_recovered = true;
+   }
+ 
+@@ -956,19 +958,15 @@ static void trx_resurrect(trx_rseg_t *rseg) {
+   for (auto undo : rseg->insert_undo_list) {
+     auto trx = trx_resurrect_insert(undo, rseg);
+ 
+-    trx_sys_rw_trx_add(trx);
+-
+     trx_resurrect_table_ids(trx, &trx->rsegs.m_redo, undo);
+   }
+ 
+   /* Ressurrect transactions that were doing updates. */
+   for (auto undo : rseg->update_undo_list) {
+-    /* Check the rw_trx_set first. */
+-    trx_t *trx;
+-    {
+-      Trx_shard_latch_guard guard{undo->trx_id, UT_LOCATION_HERE};
+-      trx = trx_get_rw_trx_by_id_low(undo->trx_id);
+-    }
++    /* Check the active_rw_trxs.by_id first. */
++
++    trx_t *trx = trx_sys->latch_and_execute_with_active_trx(
++        undo->trx_id, [](trx_t *trx) { return trx; }, UT_LOCATION_HERE);
+ 
+     if (trx == nullptr) {
+       trx = trx_allocate_for_background();
+@@ -979,8 +977,6 @@ static void trx_resurrect(trx_rseg_t *rseg) {
+ 
+     trx_resurrect_update(trx, undo, rseg);
+ 
+-    trx_sys_rw_trx_add(trx);
+-
+     trx_resurrect_table_ids(trx, &trx->rsegs.m_redo, undo);
+   }
+ }
+@@ -1035,9 +1031,13 @@ void trx_lists_init_at_db_start(void) {
+ 
+   ut::vector<trx_t *> trxs;
+   for (auto &shard : trx_sys->shards) {
+-    for (const auto &trx_track : shard.rw_trx_set) {
+-      trxs.emplace_back(trx_track.m_trx);
+-    }
++    shard.active_rw_trxs.latch_and_execute(
++        [&](const Trx_by_id_with_min &trx_by_id_with_min) {
++          for (const auto &trx_track : trx_by_id_with_min.by_id()) {
++            trxs.emplace_back(trx_track.second);
++          }
++        },
++        UT_LOCATION_HERE);
+   }
+   std::sort(trxs.begin(), trxs.end(),
+             [&](trx_t *a, trx_t *b) { return a->id < b->id; });
+@@ -1774,23 +1774,9 @@ static void trx_erase_lists(trx_t *trx) {
+   trx_ids_t::iterator it = std::lower_bound(trx_sys->rw_trx_ids.begin(),
+                                             trx_sys->rw_trx_ids.end(), trx->id);
+ 
+-  const bool update_min_active = it == trx_sys->rw_trx_ids.begin();
+-
+   ut_ad(*it == trx->id);
+   trx_sys->rw_trx_ids.erase(it);
+ 
+-  /* We update min_active_trx_id only if needed (separate cache line). */
+-  if (update_min_active) {
+-    trx_id_t min_id =
+-        trx_sys->rw_trx_ids.empty()
+-            ? trx_sys->rw_max_trx_id.load(std::memory_order_relaxed) + 1
+-            : trx_sys->rw_trx_ids.front();
+-
+-    ut_ad(min_id > trx_sys->min_active_trx_id.load());
+-
+-    trx_sys->min_active_trx_id.store(min_id);
+-  }
+-
+   if (trx->read_only || trx->rsegs.m_redo.rseg == nullptr) {
+     ut_ad(!trx->in_rw_trx_list);
+   } else {
+@@ -1801,6 +1787,7 @@ static void trx_erase_lists(trx_t *trx) {
+       trx_sys->mvcc->view_close(trx->read_view, true);
+     }
+   }
++  DEBUG_SYNC_C("after_trx_erase_lists");
+ }
+ 
+ static void trx_release_impl_and_expl_locks(trx_t *trx, bool serialised) {
+@@ -1842,38 +1829,40 @@ static void trx_release_impl_and_expl_locks(trx_t *trx, bool serialised) {
+     trx_sys_mutex_exit();
+   }
+ 
+-  size_t trx_shard_no{};
+-  if (trx->id > 0) {
+-    trx_shard_no = trx_get_shard_no(trx->id);
+-    trx_sys_shard_mutex_enter(trx_shard_no, UT_LOCATION_HERE);
+-  }
+-
+-  trx_mutex_enter(trx);
+-  /* Please consider this particular point in time as the moment the trx's
+-  implicit locks become released.
+-  This change is protected by both Trx_shard's mutex and trx->mutex.
+-  Therefore, there are two secure ways to check if the trx still can hold
+-  implicit locks:
+-  (1) if you only know id of the trx, then you can obtain Trx_shard's mutex and
+-      check if trx is still in the Trx_shard's rw_trx_set. This works, because
+-      the removal from the rw_trx_set is also protected by the same mutex.
+-      We use this approach in lock_rec_convert_impl_to_expl() by using
+-      trx_rw_is_active()
+-  (2) if you have pointer to trx, and you know it is safe to access (say, you
+-      hold reference to this trx which prevents it from being freed) then you
+-      can obtain trx->mutex and check if trx->state is equal to
+-      TRX_STATE_COMMITTED_IN_MEMORY. We use this approach in
+-      lock_rec_convert_impl_to_expl_for_trx() when deciding for the final time
+-      if we really want to create explicit lock on behalf of implicit lock
+-      holder. */
+-  trx->state.store(TRX_STATE_COMMITTED_IN_MEMORY, std::memory_order_relaxed);
+-  trx_mutex_exit(trx);
+-
++  auto state_transition = [&]() {
++    trx_mutex_enter(trx);
++    /* Please consider this particular point in time as the moment the trx's
++    implicit locks become released.
++    This change is protected by both Trx_shard's mutex and trx->mutex.
++    Therefore, there are two secure ways to check if the trx still can hold
++    implicit locks:
++    (1) if you only know id of the trx, then you can obtain Trx_shard's mutex
++    and check if trx is still in the Trx_shard's active_rw_trxs. This works,
++        because the removal from the active_rw_trxs is also protected by the
++        same mutex. We use this approach in lock_rec_convert_impl_to_expl() by
++        using trx_rw_is_active()
++    (2) if you have pointer to trx, and you know it is safe to access (say, you
++        hold reference to this trx which prevents it from being freed) then you
++        can obtain trx->mutex and check if trx->state is equal to
++        TRX_STATE_COMMITTED_IN_MEMORY. We use this approach in
++        lock_rec_convert_impl_to_expl_for_trx() when deciding for the final time
++        if we really want to create explicit lock on behalf of implicit lock
++        holder. */
++    trx->state.store(TRX_STATE_COMMITTED_IN_MEMORY, std::memory_order_relaxed);
++    trx_mutex_exit(trx);
++  };
+   if (trx->id > 0) {
+-    ut_ad(1 ==
+-          trx_sys->shards[trx_shard_no].rw_trx_set.count(TrxTrack(trx->id)));
+-    trx_sys->shards[trx_shard_no].rw_trx_set.erase(TrxTrack(trx->id));
+-    trx_sys_shard_mutex_exit(trx_shard_no);
++    trx_sys->get_shard_by_trx_id(trx->id).active_rw_trxs.latch_and_execute(
++        [&](Trx_by_id_with_min &trx_by_id_with_min) {
++          state_transition();
++          ut_d(const size_t trx_shard_no = trx_get_shard_no(trx->id));
++          ut_ad(trx_get_shard_no(trx_by_id_with_min.min_id()) == trx_shard_no);
++          trx_by_id_with_min.erase(trx->id);
++          ut_ad(trx_get_shard_no(trx_by_id_with_min.min_id()) == trx_shard_no);
++        },
++        UT_LOCATION_HERE);
++  } else {
++    state_transition();
+   }
+ 
+   /* It is important to remove the transaction from the serialisation list

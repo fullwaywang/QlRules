@@ -1,0 +1,552 @@
+commit abb8ffea2befdd534ea35945d8407aa49a239bc1	abb8ffea2befdd534ea35945d8407aa49a239bc1
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Mon Feb 7 17:38:25 2022 +0100
+
+    Bug #33789526 srv_error_monitor_thread shouldn't call functions which can deadlock
+    
+    This patch fixes the main issue, by moving the srv_refresh_innodb_monitor_stats()
+    call from srv_error_monitor_thread() which shouldn't bother with it, to the
+    srv_monitor_thread() which really needs it. This "helping" use to have
+    some sense in the past when the srv_monitor_thread could be suspended,
+    while we still needed to keep refreshing the stats, but in todays trunk
+    the srv_monitor_thread never gets suspended.
+    
+    Also, the patch simplifies the implementation based on observation that
+    current implementation in trunk doesn't really react to os_event_set
+    calls from various places in the way it was supposed to in the old
+    times. Originally, the intention was to wake up a suspended monitor
+    thread when we enable the monitoring. But, at least since 5.0 import
+    commit, we never really suspend the monitoring thread, and all this
+    os_event_set achieves is that it needlessly wakes up the monitoring
+    thread which will check the clock, notice that the time that passed is
+    smaller than 15 seconds, and will get back to sleep again.
+    So, we can remove all these os_event_set complication.
+    Also, there's only one thread which calls the os_event_reset.
+    Also, after the changes, we only ever call os_event_set on shutdown.
+    Combining these observations we can simplify the code further, by
+    changing the os_event_wait timeout to 15 seconds, and interpreting the
+    event as a signal to quit.
+    
+    Renamed srv_last_monitor_time to srv_monitor_stats_refreshed_at.
+    
+    When innodb needs to enable or disable the monitor, it should be done
+    independently to the user setting the sys var, and properly counting the
+    number of threads which wanted to enabled/disable it.
+    The neew srv_innodb_needs_monitoring atomic will keep track of it.
+    This change also fixes:
+    Bug #93878 innodb_status_output fails to restore to old value
+    
+    Fixed a bug in shutdown, that we forgot to signal 4 threads:
+    - srv_threads.m_error_monitor
+    - srv_threads.m_monitor
+    - srv_threads.m_buf_dump
+    - srv_threads.m_buf_resize
+    This wasn't a big deal as some of them were noticing the shutdown
+    themselves, when waiting on event timed out, and others typically
+    wasn't even started at the moment the shutdown occurred.
+    
+    Reviewed by: Marcin Babij <marcin.babij@oracle.com>
+    Change-Id: Ie483e6993aae54a069d0806255afbcd70e33b7e3
+    Change-Id: I3e28240030f7a167e0ede2a55a4f2ec7d79ab55b
+    Change-Id: Ia1a9cba1953cf1f6fd58430676968f93f7775756
+    Change-Id: I3d4602f34ecddc39d1d4a7e88399124ba465c3d2
+    Change-Id: Iee0af945bbaf107178690577b6aa6bed3c177ff6
+    Change-Id: I1356decfe54b2987eaad7b64dbd5b1214e5f230c
+    Change-Id: I554266fd1ce9ea1e43162f406981e8d31d506664
+    
+    Change-Id: Ib8838647a756f297f7f9808eff8ab85f46d1b3ca
+
+diff --git a/storage/innobase/buf/buf0lru.cc b/storage/innobase/buf/buf0lru.cc
+index 47d7b8f0076..429b4b47877 100644
+--- a/storage/innobase/buf/buf0lru.cc
++++ b/storage/innobase/buf/buf0lru.cc
+@@ -85,7 +85,7 @@ static const ulint BUF_LRU_SEARCH_SCAN_THRESHOLD = 100;
+ 
+ /** If we switch on the InnoDB monitor because there are too few available
+ frames in the buffer pool, we set this to true */
+-static bool buf_lru_switched_on_innodb_mon = false;
++static std::atomic_bool buf_lru_switched_on_innodb_mon = false;
+ 
+ /** These statistics are not 'of' LRU but 'for' LRU.  We keep count of I/O
+  and page_zip_decompress() operations.  Based on the statistics,
+@@ -1292,7 +1292,7 @@ static void buf_LRU_check_size_of_non_data_objects(
+              buf_pool->curr_size == buf_pool->old_size &&
+              (UT_LIST_GET_LEN(buf_pool->free) +
+               UT_LIST_GET_LEN(buf_pool->LRU)) < buf_pool->curr_size / 3) {
+-    if (!buf_lru_switched_on_innodb_mon) {
++    if (!buf_lru_switched_on_innodb_mon.exchange(true)) {
+       /* Over 67 % of the buffer pool is occupied by lock
+       heaps or the adaptive hash index. This may be a memory
+       leak! */
+@@ -1309,19 +1309,13 @@ static void buf_LRU_check_size_of_non_data_objects(
+              " diagnostics, including lock heap and hash"
+              " index sizes.";
+ 
+-      buf_lru_switched_on_innodb_mon = true;
+-      srv_print_innodb_monitor = true;
+-      os_event_set(srv_monitor_event);
++      srv_innodb_needs_monitoring++;
+     }
+ 
+-  } else if (buf_lru_switched_on_innodb_mon) {
+-    /* Switch off the InnoDB Monitor; this is a simple way
+-    to stop the monitor if the situation becomes less urgent,
+-    but may also surprise users if the user also switched on the
+-    monitor! */
+-
+-    buf_lru_switched_on_innodb_mon = false;
+-    srv_print_innodb_monitor = false;
++  } else if (buf_lru_switched_on_innodb_mon.load()) {
++    if (buf_lru_switched_on_innodb_mon.exchange(false)) {
++      srv_innodb_needs_monitoring--;
++    }
+   }
+ }
+ 
+@@ -1354,7 +1348,6 @@ buf_block_t *buf_LRU_get_free_block(buf_pool_t *buf_pool) {
+   bool freed = false;
+   ulint n_iterations = 0;
+   ulint flush_failures = 0;
+-  bool mon_value_was = false;
+   bool started_monitor = false;
+ 
+   ut_ad(!mutex_own(&buf_pool->LRU_list_mutex));
+@@ -1372,7 +1365,7 @@ loop:
+     memset(&block->page.zip, 0, sizeof block->page.zip);
+ 
+     if (started_monitor) {
+-      srv_print_innodb_monitor = static_cast<bool>(mon_value_was);
++      srv_innodb_needs_monitoring--;
+     }
+ 
+     block->page.reset_flush_observer();
+@@ -1424,11 +1417,10 @@ loop:
+         << " OS file writes, " << os_n_fsyncs
+         << " OS fsyncs. Starting InnoDB Monitor to print"
+            " further diagnostics to the standard output.";
+-
+-    mon_value_was = srv_print_innodb_monitor;
+-    started_monitor = true;
+-    srv_print_innodb_monitor = true;
+-    os_event_set(srv_monitor_event);
++    if (!started_monitor) {
++      started_monitor = true;
++      srv_innodb_needs_monitoring++;
++    }
+   }
+ 
+   /* If we have scanned the whole LRU and still are unable to
+diff --git a/storage/innobase/handler/ha_innodb.cc b/storage/innobase/handler/ha_innodb.cc
+index 477a3af816e..ffe022934f5 100644
+--- a/storage/innobase/handler/ha_innodb.cc
++++ b/storage/innobase/handler/ha_innodb.cc
+@@ -21585,18 +21585,6 @@ static void innodb_thread_concurrency_update(THD *thd, SYS_VAR *, void *,
+   }
+ }
+ 
+-/** Update innodb_status_output or innodb_status_output_locks,
+-which control InnoDB "status monitor" output to the error log.
+-@param[out]     var_ptr   current value
+-@param[in]      save      to-be-assigned value */
+-static void innodb_status_output_update(THD *, SYS_VAR *, void *var_ptr,
+-                                        const void *save) {
+-  *static_cast<bool *>(var_ptr) = *static_cast<const bool *>(save);
+-  /* The lock timeout monitor thread also takes care of this
+-  output. */
+-  os_event_set(srv_monitor_event);
+-}
+-
+ /** Update the innodb_log_checksums parameter.
+ @param[out]     var_ptr   current value
+ @param[in]      save      immediate result from check function */
+@@ -22692,13 +22680,13 @@ static MYSQL_SYSVAR_STR(monitor_reset_all, innobase_reset_all_monitor_counter,
+ static MYSQL_SYSVAR_BOOL(status_output, srv_print_innodb_monitor,
+                          PLUGIN_VAR_OPCMDARG,
+                          "Enable InnoDB monitor output to the error log.",
+-                         nullptr, innodb_status_output_update, false);
++                         nullptr, nullptr, false);
+ 
+ static MYSQL_SYSVAR_BOOL(status_output_locks, srv_print_innodb_lock_monitor,
+                          PLUGIN_VAR_OPCMDARG,
+                          "Enable InnoDB lock monitor output to the error log."
+                          " Requires innodb_status_output=ON.",
+-                         nullptr, innodb_status_output_update, false);
++                         nullptr, nullptr, false);
+ 
+ static MYSQL_SYSVAR_BOOL(
+     print_all_deadlocks, srv_print_all_deadlocks, PLUGIN_VAR_OPCMDARG,
+diff --git a/storage/innobase/include/srv0srv.h b/storage/innobase/include/srv0srv.h
+index 5d13bf9d0d9..074310a82e4 100644
+--- a/storage/innobase/include/srv0srv.h
++++ b/storage/innobase/include/srv0srv.h
+@@ -696,6 +696,11 @@ std::chrono::milliseconds get_srv_replication_delay();
+ /*-------------------------------------------*/
+ 
+ extern bool srv_print_innodb_monitor;
++/** In contrast to srv_print_innodb_monitor which is controlled by the user,
++this variable is controlled by InnoDB itself: if some module of InnoDB decides
++it would be good to print the monitoring information it increments this value,
++and decrements it when it no longer needs it. */
++extern std::atomic_uint32_t srv_innodb_needs_monitoring;
+ extern bool srv_print_innodb_lock_monitor;
+ 
+ extern ulong srv_n_spin_wait_rounds;
+diff --git a/storage/innobase/srv/srv0srv.cc b/storage/innobase/srv/srv0srv.cc
+index e9290766841..e8e28e6fac7 100644
+--- a/storage/innobase/srv/srv0srv.cc
++++ b/storage/innobase/srv/srv0srv.cc
+@@ -606,6 +606,7 @@ static ulint srv_n_system_rows_read_old = 0;
+ ulint srv_truncated_status_writes = 0;
+ 
+ bool srv_print_innodb_monitor = false;
++std::atomic_uint32_t srv_innodb_needs_monitoring{0};
+ bool srv_print_innodb_lock_monitor = false;
+ 
+ /* Array of English strings describing the current state of an
+@@ -615,7 +616,7 @@ const char *srv_io_thread_op_info[SRV_MAX_N_IO_THREADS];
+ const char *srv_io_thread_function[SRV_MAX_N_IO_THREADS];
+ 
+ #ifndef UNIV_HOTBACKUP
+-static std::chrono::steady_clock::time_point srv_last_monitor_time;
++static std::chrono::steady_clock::time_point srv_monitor_stats_refreshed_at;
+ #endif /* !UNIV_HOTBACKUP */
+ 
+ static ib_mutex_t srv_innodb_monitor_mutex;
+@@ -1294,7 +1295,7 @@ void srv_boot(void) {
+ static void srv_refresh_innodb_monitor_stats(void) {
+   mutex_enter(&srv_innodb_monitor_mutex);
+ 
+-  srv_last_monitor_time = std::chrono::steady_clock::now();
++  srv_monitor_stats_refreshed_at = std::chrono::steady_clock::now();
+ 
+   os_aio_refresh_stats();
+ 
+@@ -1354,11 +1355,11 @@ bool srv_printf_innodb_monitor(FILE *file, bool nowait, ulint *trx_start_pos,
+   same time */
+ 
+   const auto time_elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+-                                current_time - srv_last_monitor_time)
++                                current_time - srv_monitor_stats_refreshed_at)
+                                 .count() +
+                             0.001;
+ 
+-  srv_last_monitor_time = std::chrono::steady_clock::now();
++  srv_monitor_stats_refreshed_at = current_time;
+ 
+   fputs("\n=====================================\n", file);
+ 
+@@ -1760,35 +1761,17 @@ void srv_export_innodb_status(void) {
+ 
+ /** A thread which prints the info output by various InnoDB monitors. */
+ void srv_monitor_thread() {
+-  int64_t sig_count;
+-  ulint mutex_skipped;
++  uint16_t mutex_skipped{0};
+   bool last_srv_print_monitor = srv_print_innodb_monitor;
+ 
+   ut_ad(!srv_read_only_mode);
+ 
+-  auto last_monitor_time = std::chrono::steady_clock::now();
+-  srv_last_monitor_time = last_monitor_time;
+-
+-  mutex_skipped = 0;
+-
+-loop:
+-  /* Wake up every 5 seconds to see if we need to print
+-  monitor information or if signaled at shutdown. */
+-
+-  sig_count = os_event_reset(srv_monitor_event);
+-
+-  os_event_wait_time_low(srv_monitor_event, std::chrono::seconds{5}, sig_count);
+-
+-  auto current_time = std::chrono::steady_clock::now();
+-
+-  auto time_elapsed = current_time - last_monitor_time;
+-
+-  if (time_elapsed > std::chrono::seconds(15)) {
+-    last_monitor_time = std::chrono::steady_clock::now();
+-
+-    if (srv_print_innodb_monitor) {
+-      /* Reset mutex_skipped counter every time srv_print_innodb_monitor
+-      changes. This is to ensure we will not be blocked by lock_sys global
++  srv_monitor_stats_refreshed_at = std::chrono::steady_clock::now();
++  const auto sleep_interval = std::chrono::seconds{15};
++  while (0 != os_event_wait_time(srv_monitor_event, sleep_interval)) {
++    if (srv_print_innodb_monitor || 0 < srv_innodb_needs_monitoring.load()) {
++      /* Reset mutex_skipped counter every time the condition above becomes
++      true. This is to ensure we will not be blocked by lock_sys global
+       latch for short duration information printing, such as requested by
+       sync_array_print_long_waits() */
+       if (!last_srv_print_monitor) {
+@@ -1807,8 +1790,7 @@ loop:
+       last_srv_print_monitor = false;
+     }
+ 
+-    /* We don't create the temp files or associated
+-    mutexes in read-only-mode */
++    /* We don't create the temp files or associated mutexes in read-only-mode */
+ 
+     if (!srv_read_only_mode && srv_innodb_status) {
+       mutex_enter(&srv_monitor_file_mutex);
+@@ -1824,11 +1806,16 @@ loop:
+       os_file_set_eof(srv_monitor_file);
+       mutex_exit(&srv_monitor_file_mutex);
+     }
+-  }
+ 
+-  if (srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP) {
+-    goto loop;
++    if (srv_monitor_stats_refreshed_at + std::chrono::minutes{1} <
++        std::chrono::steady_clock::now() + sleep_interval) {
++      /* We refresh InnoDB Monitor values so that averages are printed from at
++      most 60 last seconds and at least 15 seconds*/
++
++      srv_refresh_innodb_monitor_stats();
++    }
+   }
++  ut_ad(SRV_SHUTDOWN_CLEANUP <= srv_shutdown_state.load());
+ }
+ 
+ /** A thread which prints warnings about semaphore waits which have lasted
+@@ -1863,23 +1850,17 @@ loop:
+ 
+   old_lsn = new_lsn;
+ 
+-  if (std::chrono::steady_clock::now() - srv_last_monitor_time >
+-      std::chrono::minutes{1}) {
+-    /* We refresh InnoDB Monitor values so that averages are
+-    printed from at most 60 last seconds */
+-
+-    srv_refresh_innodb_monitor_stats();
+-  }
+-
+-  /* Update the statistics collected for deciding LRU
+-  eviction policy. */
++  /* Update the statistics collected for deciding LRU eviction policy.
++  NOTE: While this doesn't relate to error monitoring, it's here for historical
++  reasons, as it depends on being called ~1Hz. It is lock-free, so can't cause a
++  deadlock itself. */
+   buf_LRU_stat_update();
+ 
+   /* In case mutex_exit is not a memory barrier, it is
+   theoretically possible some threads are left waiting though
+   the semaphore is already released. Wake up those threads: */
+-
+   sync_arr_wake_threads_if_sema_free();
++
+   sync_array_detect_deadlock();
+ 
+   if (sync_array_print_long_waits(&waiter, &sema) && sema == old_sema &&
+diff --git a/storage/innobase/srv/srv0start.cc b/storage/innobase/srv/srv0start.cc
+index 004ef0aa12b..44e5bc19e32 100644
+--- a/storage/innobase/srv/srv0start.cc
++++ b/storage/innobase/srv/srv0start.cc
+@@ -149,15 +149,14 @@ static bool srv_start_has_been_called = false;
+ determine which threads need to be stopped if we need to abort during
+ the initialisation step. */
+ enum srv_start_state_t {
+-  SRV_START_STATE_NONE = 0,     /*!< No thread started */
+-  SRV_START_STATE_LOCK_SYS = 1, /*!< Started lock-timeout
+-                                thread. */
+-  SRV_START_STATE_IO = 2,       /*!< Started IO threads */
+-  SRV_START_STATE_MONITOR = 4,  /*!< Started montior thread */
+-  SRV_START_STATE_MASTER = 8,   /*!< Started master threadd. */
+-  SRV_START_STATE_PURGE = 16,   /*!< Started purge thread(s) */
+-  SRV_START_STATE_STAT = 32     /*!< Started bufdump + dict stat
+-                                and FTS optimize thread. */
++  /** No thread started */
++  SRV_START_STATE_NONE = 0,
++  /** Started IO threads */
++  SRV_START_STATE_IO = 1,
++  /** Started purge thread(s) */
++  SRV_START_STATE_PURGE = 2,
++  /** Started bufdump + dict stat and FTS optimize thread. */
++  SRV_START_STATE_STAT = 4
+ };
+ 
+ /** Track server thrd starting phases */
+@@ -1656,6 +1655,43 @@ static inline bool srv_start_state_is_set(
+   return (srv_start_state & state);
+ }
+ 
++struct Thread_to_stop {
++  /** Name of the thread, printed to the error log if we waited too
++  long (after 60 seconds and then every 60 seconds). */
++  const char *m_name;
++
++  /** Future which allows to check if given task is completed. */
++  const IB_thread &m_thread;
++
++  /** Function which can be called any number of times to wake
++  the possibly waiting thread, so it could exit. */
++  std::function<void()> m_notify;
++
++  /** Shutdown state in which we are waiting until thread is exited
++  (earlier we keep notifying but we don't require it to exit before
++  we may switch to the next state). */
++  srv_shutdown_t m_wait_on_state;
++};
++
++static const Thread_to_stop threads_to_stop[]{
++    {"lock_wait_timeout", srv_threads.m_lock_wait_timeout,
++     lock_set_timeout_event, SRV_SHUTDOWN_CLEANUP},
++
++    {"error_monitor", srv_threads.m_error_monitor,
++     []() { os_event_set(srv_error_event); }, SRV_SHUTDOWN_CLEANUP},
++
++    {"monitor", srv_threads.m_monitor,
++     []() { os_event_set(srv_monitor_event); }, SRV_SHUTDOWN_CLEANUP},
++
++    {"buf_dump", srv_threads.m_buf_dump,
++     []() { os_event_set(srv_buf_dump_event); }, SRV_SHUTDOWN_CLEANUP},
++
++    {"buf_resize", srv_threads.m_buf_resize,
++     []() { os_event_set(srv_buf_resize_event); }, SRV_SHUTDOWN_CLEANUP},
++
++    {"master", srv_threads.m_master, srv_wake_master_thread,
++     SRV_SHUTDOWN_MASTER_STOP}};
++
+ void srv_shutdown_exit_threads() {
+   srv_shutdown_state.store(SRV_SHUTDOWN_EXIT_THREADS);
+ 
+@@ -1672,29 +1708,23 @@ void srv_shutdown_exit_threads() {
+     /* NOTE: IF YOU CREATE THREADS IN INNODB, YOU MUST EXIT THEM
+     HERE OR EARLIER */
+ 
+-    if (!srv_read_only_mode) {
+-      if (srv_start_state_is_set(SRV_START_STATE_LOCK_SYS)) {
+-        /* a. Let the lock timeout thread exit */
+-        os_event_set(lock_sys->timeout_event);
+-      }
+-
+-      /* b. srv error monitor thread exits automatically,
+-      no need to do anything here */
+-
+-      if (srv_start_state_is_set(SRV_START_STATE_MASTER)) {
+-        /* c. We wake the master thread so that
+-        it exits */
+-        srv_wake_master_thread();
++    /* These threads normally finish when reaching SRV_SHUTDOWN_CLEANUP or
++    SRV_SHUTDOWN_MASTER_STOP state, which we might have jumped over. */
++    for (const auto &thread_info : threads_to_stop) {
++      if (srv_thread_is_active(thread_info.m_thread)) {
++        thread_info.m_notify();
+       }
++    }
+ 
++    if (!srv_read_only_mode) {
+       if (srv_start_state_is_set(SRV_START_STATE_PURGE)) {
+-        /* d. Wakeup purge threads. */
++        /* Wakeup purge threads. */
+         srv_purge_wakeup();
+       }
+     }
+ 
+     if (srv_start_state_is_set(SRV_START_STATE_IO)) {
+-      /* e. Exit the i/o threads */
++      /* Exit the i/o threads */
+       if (!srv_read_only_mode) {
+         if (recv_sys->flush_start != nullptr) {
+           os_event_set(recv_sys->flush_start);
+@@ -2140,7 +2170,6 @@ dberr_t srv_start(bool create_new_db) {
+   recv_sys_init();
+   trx_sys_create();
+   lock_sys_create(srv_lock_table_size);
+-  srv_start_state_set(SRV_START_STATE_LOCK_SYS);
+ 
+   /* Create i/o-handler threads: */
+ 
+@@ -2828,8 +2857,6 @@ files_checked:
+         os_thread_create(srv_monitor_thread_key, 0, srv_monitor_thread);
+ 
+     srv_threads.m_monitor.start();
+-
+-    srv_start_state_set(SRV_START_STATE_MONITOR);
+   }
+ 
+   srv_sys_tablespaces_open = true;
+@@ -3068,8 +3095,6 @@ void srv_start_threads(bool bootstrap) {
+   srv_threads.m_master =
+       os_thread_create(srv_master_thread_key, 0, srv_master_thread);
+ 
+-  srv_start_state_set(SRV_START_STATE_MASTER);
+-
+   srv_threads.m_master.start();
+ 
+   if (srv_force_recovery == 0) {
+@@ -3320,44 +3345,6 @@ static void srv_shutdown_cleanup_and_master_stop() {
+ 
+   srv_shutdown_set_state(SRV_SHUTDOWN_CLEANUP);
+ 
+-  struct Thread_to_stop {
+-    /** Name of the thread, printed to the error log if we waited too
+-    long (after 60 seconds and then every 60 seconds). */
+-    const char *m_name;
+-
+-    /** Future which allows to check if given task is completed. */
+-    const IB_thread &m_thread;
+-
+-    /** Function which can be called any number of times to wake
+-    the possibly waiting thread, so it could exit. */
+-    std::function<void()> m_notify;
+-
+-    /** Shutdown state in which we are waiting until thread is exited
+-    (earlier we keep notifying but we don't require it to exit before
+-    we may switch to the next state). */
+-    srv_shutdown_t m_wait_on_state;
+-  };
+-
+-  const Thread_to_stop threads_to_stop[]{
+-
+-      {"lock_wait_timeout", srv_threads.m_lock_wait_timeout,
+-       lock_set_timeout_event, SRV_SHUTDOWN_CLEANUP},
+-
+-      {"error_monitor", srv_threads.m_error_monitor,
+-       std::bind(os_event_set, srv_error_event), SRV_SHUTDOWN_CLEANUP},
+-
+-      {"monitor", srv_threads.m_monitor,
+-       std::bind(os_event_set, srv_monitor_event), SRV_SHUTDOWN_CLEANUP},
+-
+-      {"buf_dump", srv_threads.m_buf_dump,
+-       std::bind(os_event_set, srv_buf_dump_event), SRV_SHUTDOWN_CLEANUP},
+-
+-      {"buf_resize", srv_threads.m_buf_resize,
+-       std::bind(os_event_set, srv_buf_resize_event), SRV_SHUTDOWN_CLEANUP},
+-
+-      {"master", srv_threads.m_master, srv_wake_master_thread,
+-       SRV_SHUTDOWN_MASTER_STOP}};
+-
+   const srv_shutdown_t max_wait_on_state{SRV_SHUTDOWN_MASTER_STOP};
+ 
+   uint32_t count = 0;
+diff --git a/storage/innobase/sync/sync0arr.cc b/storage/innobase/sync/sync0arr.cc
+index 522aace3ea3..e7fd8ffd7e7 100644
+--- a/storage/innobase/sync/sync0arr.cc
++++ b/storage/innobase/sync/sync0arr.cc
+@@ -875,8 +875,6 @@ bool sync_array_print_long_waits(
+             "InnoDB: ###### Starts InnoDB Monitor"
+             " for 30 secs to print diagnostic info:\n");
+ 
+-    auto old_val = srv_print_innodb_monitor;
+-
+     /* If some crucial semaphore is reserved, then also the InnoDB
+     Monitor can hang, and we do not get diagnostics. Since in
+     many cases an InnoDB hang is caused by a pwrite() or a pread()
+@@ -886,7 +884,7 @@ bool sync_array_print_long_waits(
+     fprintf(stderr, "InnoDB: Pending preads %lu, pwrites %lu\n",
+             (ulong)os_n_pending_reads, (ulong)os_n_pending_writes);
+ 
+-    srv_print_innodb_monitor = true;
++    srv_innodb_needs_monitoring++;
+ 
+ #ifndef UNIV_NO_ERR_MSGS
+     lock_set_timeout_event();
+@@ -894,7 +892,7 @@ bool sync_array_print_long_waits(
+ 
+     std::this_thread::sleep_for(std::chrono::seconds(30));
+ 
+-    srv_print_innodb_monitor = static_cast<bool>(old_val);
++    srv_innodb_needs_monitoring--;
+     fprintf(stderr,
+             "InnoDB: ###### Diagnostic info printed"
+             " to the standard error stream\n");

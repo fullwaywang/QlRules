@@ -1,0 +1,313 @@
+commit 70cf38f9528fc577905053dbe95782463baff9c7	70cf38f9528fc577905053dbe95782463baff9c7
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Fri Apr 16 16:11:50 2021 +0530
+
+    BUG#32103192: REPLICA ACCEPTS GTID_LOG_EVENT WITH GNO=INT64_MAX
+    
+     Description:
+     ------------
+     The valid range for the GNO part of a GTID (the second, numeric
+     component) is 1 to (1<<63)-2, inclusive.  However, a replica accepts
+     Gtid_log_events having GNO=(1<<63)-1, despite being out of range.
+     This may break automation, cause downstream replicas to go out of
+     sync, and probably other bad things.
+    
+     Analysis:
+     ---------
+     In debug mode, replica fails with an assertion. In optimized mode,
+     the consequences are a bit unclear. From testing, apparently
+     auto-skip does not work for this GNO and several transactions with
+     the same GTID can be committed, and their GTIDs will be repeated in
+     gtid_executed.
+    
+     Moreover, GNO_MAX is defined as LLONG_MAX, which may be bigger than
+     (1<<63)-1 on platforms where long long is bigger than 64 bits.
+     Therefore, such platforms will allow big GTIDs, which will fail on
+     downstream replicas. Also, the text representation is assumed to
+     take at most 19 bytes (the length of the decimal representation of
+     (1<<63)-2), so on platforms where we allow bigger GTIDs, we may
+     overflow buffers.
+    
+     Fix:
+     ----
+     - Add a check to prevent the replica to apply a Gtid_event that has
+       a GTID with an invalid GNO number.
+     - Change all places to use INT64_MAX as an exclusive limit instead
+       of LLONG_MAX.
+     - Rename MAX_GNO to GNO_END for better representation.
+    
+     RB:25925
+
+diff --git a/rapid/plugin/group_replication/src/certifier.cc b/rapid/plugin/group_replication/src/certifier.cc
+index 2a7f0fc959c..559d0cf92b8 100644
+--- a/rapid/plugin/group_replication/src/certifier.cc
++++ b/rapid/plugin/group_replication/src/certifier.cc
+@@ -475,14 +475,14 @@ void Certifier::compute_group_available_gtid_intervals()
+   }
+ 
+   // For each used interval find the upper bound and from there
+-  // add the free GTIDs up to the next interval or MAX_GNO.
++  // add the free GTIDs up to the next interval or GNO_END.
+   while ((iv= ivit.get()) != NULL)
+   {
+     ivit.next();
+     iv_next= ivit.get();
+ 
+     rpl_gno start= iv->end;
+-    rpl_gno end= MAX_GNO;
++    rpl_gno end= GNO_END;
+     if (iv_next != NULL)
+       end= iv_next->start - 1;
+ 
+@@ -494,7 +494,7 @@ void Certifier::compute_group_available_gtid_intervals()
+   // No GTIDs used, so the available interval is the complete set.
+   if (group_available_gtid_intervals.size() == 0)
+   {
+-    Gtid_set::Interval interval= {1, MAX_GNO, NULL};
++    Gtid_set::Interval interval= {1, GNO_END, NULL};
+     group_available_gtid_intervals.push_back(interval);
+   }
+ 
+@@ -1001,7 +1001,7 @@ rpl_gno Certifier::get_group_next_available_gtid(const char *member_uuid)
+ 
+   if (member_uuid == NULL || gtid_assignment_block_size <= 1)
+   {
+-    result= get_group_next_available_gtid_candidate(1, MAX_GNO);
++    result= get_group_next_available_gtid_candidate(1, GNO_END);
+     if (result < 0)
+     {
+       assert(result == -1);
+@@ -1093,7 +1093,7 @@ Certifier::get_group_next_available_gtid_candidate(rpl_gno start,
+   {
+     assert(candidate >= start);
+     const Gtid_set::Interval *iv= ivit.get();
+-    rpl_gno next_interval_start= iv != NULL ? iv->start : MAX_GNO;
++    rpl_gno next_interval_start= iv != NULL ? iv->start : GNO_END;
+ 
+     // Correct interval.
+     if (candidate < next_interval_start)
+diff --git a/rapid/plugin/group_replication/src/plugin.cc b/rapid/plugin/group_replication/src/plugin.cc
+index f2782bf86d3..0d2401febae 100644
+--- a/rapid/plugin/group_replication/src/plugin.cc
++++ b/rapid/plugin/group_replication/src/plugin.cc
+@@ -193,7 +193,7 @@ ulong compression_threshold_var= DEFAULT_COMPRESSION_THRESHOLD;
+ /* GTID assignment block size options */
+ #define DEFAULT_GTID_ASSIGNMENT_BLOCK_SIZE 1000000
+ #define MIN_GTID_ASSIGNMENT_BLOCK_SIZE 1
+-#define MAX_GTID_ASSIGNMENT_BLOCK_SIZE MAX_GNO
++#define MAX_GTID_ASSIGNMENT_BLOCK_SIZE GNO_END
+ ulonglong gtid_assignment_block_size_var= DEFAULT_GTID_ASSIGNMENT_BLOCK_SIZE;
+ 
+ /* Flow control options */
+diff --git a/sql/log_event.cc b/sql/log_event.cc
+index 91229cab194..56b642d71ab 100644
+--- a/sql/log_event.cc
++++ b/sql/log_event.cc
+@@ -13405,7 +13405,20 @@ Gtid_log_event::Gtid_log_event(const char *buffer, uint event_len,
+              ANONYMOUS_GROUP : GTID_GROUP;
+   sid.copy_from((uchar *)Uuid_parent_struct.bytes);
+   spec.gtid.sidno= gtid_info_struct.rpl_gtid_sidno;
++  //GNO sanity check
++  if (spec.type == GTID_GROUP) {
++    if (gtid_info_struct.rpl_gtid_gno <= 0 || gtid_info_struct.rpl_gtid_gno >= GNO_END)
++      goto err;
++  } else { //ANONYMOUS_GTID_LOG_EVENT
++    if (gtid_info_struct.rpl_gtid_gno != 0)
++      goto err;
++  }
+   spec.gtid.gno= gtid_info_struct.rpl_gtid_gno;
++
++  DBUG_VOID_RETURN;
++
++err:
++  is_valid_param= false;
+   DBUG_VOID_RETURN;
+ }
+ 
+@@ -13464,10 +13477,15 @@ Gtid_log_event::Gtid_log_event(uint32 server_id_arg, bool using_trans,
+   DBUG_ENTER("Gtid_log_event::Gtid_log_event(uint32, bool, int64, int64, const Gtid_specification)");
+   server_id= server_id_arg;
+   common_header->unmasked_server_id= server_id_arg;
++  is_valid_param= true;
+ 
+   if (spec_arg.type == GTID_GROUP)
+   {
+-    assert(spec_arg.gtid.sidno > 0 && spec_arg.gtid.gno > 0);
++    assert(spec_arg.gtid.sidno > 0);
++    assert(spec_arg.gtid.gno > 0);
++    assert(spec_arg.gtid.gno < GNO_END);
++    if (spec_arg.gtid.gno <= 0 || spec_arg.gtid.gno >= GNO_END)
++      is_valid_param= false;
+     spec.set(spec_arg.gtid);
+     global_sid_lock->rdlock();
+     sid= global_sid_map->sidno_to_sid(spec_arg.gtid.sidno);
+@@ -13492,7 +13510,6 @@ Gtid_log_event::Gtid_log_event(uint32 server_id_arg, bool using_trans,
+   to_string(buf);
+   DBUG_PRINT("info", ("%s", buf));
+ #endif
+-  is_valid_param= true;
+   DBUG_VOID_RETURN;
+ }
+ #endif
+@@ -13580,6 +13597,11 @@ uint32 Gtid_log_event::write_data_header_to_memory(uchar *buffer)
+   sid.copy_to(ptr_buffer);
+   ptr_buffer+= ENCODED_SID_LENGTH;
+ 
++#ifndef NDEBUG
++  if (DBUG_EVALUATE_IF("send_invalid_gno_to_replica", true, false))
++    int8store(ptr_buffer, GNO_END);
++  else
++#endif
+   int8store(ptr_buffer, spec.gtid.gno);
+   ptr_buffer+= ENCODED_GNO_LENGTH;
+ 
+diff --git a/sql/rpl_gtid.h b/sql/rpl_gtid.h
+index 15a79a07d87..7cf232b18e5 100644
+--- a/sql/rpl_gtid.h
++++ b/sql/rpl_gtid.h
+@@ -36,6 +36,10 @@
+ #include "table.h"
+ #endif
+ 
++#ifndef INT64_MAX
++#define INT64_MAX   0x7fffffffffffffffLL
++#endif
++
+ #include <list>
+ #include "atomic_class.h"
+ 
+@@ -401,7 +405,7 @@ inline const char *get_gtid_consistency_mode_string()
+ 
+ 
+ /// The maximum value of GNO
+-const rpl_gno MAX_GNO= LLONG_MAX;
++const rpl_gno GNO_END= INT64_MAX;
+ /// The length of MAX_GNO when printed in decimal.
+ const int MAX_GNO_TEXT_LENGTH= 19;
+ /// The maximal possible length of thread_id when printed in decimal.
+@@ -981,6 +985,7 @@ struct Gtid
+   {
+     assert(sidno_arg > 0);
+     assert(gno_arg > 0);
++    assert(gno_arg < GNO_END);
+     sidno= sidno_arg;
+     gno= gno_arg;
+   }
+@@ -1140,6 +1145,9 @@ public:
+   void _add_gtid(rpl_sidno sidno, rpl_gno gno)
+   {
+     DBUG_ENTER("Gtid_set::_add_gtid(sidno, gno)");
++    assert(sidno > 0);
++    assert(gno > 0);
++    assert(gno < GNO_END);
+     Interval_iterator ivit(this, sidno);
+     Free_intervals_lock lock(this);
+     add_gno_interval(&ivit, gno, gno + 1, &lock);
+diff --git a/sql/rpl_gtid_execution.cc b/sql/rpl_gtid_execution.cc
+index 76f923af406..9c3f34ad883 100644
+--- a/sql/rpl_gtid_execution.cc
++++ b/sql/rpl_gtid_execution.cc
+@@ -93,6 +93,7 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec)
+     assert(spec.type == GTID_GROUP);
+     assert(spec.gtid.sidno >= 1);
+     assert(spec.gtid.gno >= 1);
++    assert(spec.gtid.gno < GNO_END);
+     while (true)
+     {
+       // loop invariant: we should always hold global_sid_lock.rdlock
+@@ -128,6 +129,7 @@ bool set_gtid_next(THD *thd, const Gtid_specification &spec)
+         thd->variables.gtid_next= spec;
+         assert(thd->owned_gtid.sidno >= 1);
+         assert(thd->owned_gtid.gno >= 1);
++        assert(thd->owned_gtid.gno < GNO_END);
+         break;
+       }
+       // GTID owned by someone (other thread)
+diff --git a/sql/rpl_gtid_owned.cc b/sql/rpl_gtid_owned.cc
+index 7f6544ce50c..4c8c2d0ca04 100644
+--- a/sql/rpl_gtid_owned.cc
++++ b/sql/rpl_gtid_owned.cc
+@@ -87,6 +87,8 @@ enum_return_status Owned_gtids::add_gtid_owner(const Gtid &gtid,
+ {
+   DBUG_ENTER("Owned_gtids::add_gtid_owner(Gtid, my_thread_id)");
+   assert(gtid.sidno <= get_max_sidno());
++  assert(gtid.gno > 0);
++  assert(gtid.gno < GNO_END);
+   Node *n= (Node *)my_malloc(key_memory_Sid_map_Node,
+                              sizeof(Node), MYF(MY_WME));
+   if (n == NULL)
+diff --git a/sql/rpl_gtid_set.cc b/sql/rpl_gtid_set.cc
+index 1e894e6b8a9..1132c59e23b 100644
+--- a/sql/rpl_gtid_set.cc
++++ b/sql/rpl_gtid_set.cc
+@@ -449,7 +449,7 @@ rpl_gno parse_gno(const char **s)
+ {
+   char *endp;
+   rpl_gno ret= my_strtoll(*s, &endp, 0);
+-  if (ret < 0 || ret == LLONG_MAX)
++  if (ret < 0 || ret >= GNO_END)
+     return -1;
+   *s= endp;
+   return ret;
+@@ -790,11 +790,12 @@ void Gtid_set::remove_gtid_set(const Gtid_set *other)
+ bool Gtid_set::contains_gtid(rpl_sidno sidno, rpl_gno gno) const
+ {
+   DBUG_ENTER("Gtid_set::contains_gtid");
+-  assert(sidno >= 1 && gno >= 1);
+   if (sid_lock != NULL)
+     sid_lock->assert_some_lock();
+   if (sidno > get_max_sidno())
+     DBUG_RETURN(false);
++  assert(sidno >= 1);
++  assert(gno >= 1);
+   Const_interval_iterator ivit(this, sidno);
+   const Interval *iv;
+   while ((iv= ivit.get()) != NULL)
+@@ -970,7 +971,8 @@ void Gtid_set::get_gtid_intervals(list<Gtid_interval> *gtid_intervals) const
+ */
+ static size_t get_string_length(rpl_gno gno)
+ {
+-  assert(gno >= 1 && gno < MAX_GNO);
++  assert(gno >= 1);
++  assert(gno < GNO_END);
+   rpl_gno tmp_gno= gno;
+   size_t len= 0;
+   do
+diff --git a/sql/rpl_gtid_state.cc b/sql/rpl_gtid_state.cc
+index 5b1cbbc2098..9ffff3a0612 100644
+--- a/sql/rpl_gtid_state.cc
++++ b/sql/rpl_gtid_state.cc
+@@ -471,7 +471,7 @@ rpl_gno Gtid_state::get_automatic_gno(rpl_sidno sidno) const
+   while (true)
+   {
+     const Gtid_set::Interval *iv= ivit.get();
+-    rpl_gno next_interval_start= iv != NULL ? iv->start : MAX_GNO;
++    rpl_gno next_interval_start= iv != NULL ? iv->start : GNO_END;
+     while (next_candidate.gno < next_interval_start &&
+            DBUG_EVALUATE_IF("simulate_gno_exhausted", false, true))
+     {
+@@ -486,7 +486,7 @@ rpl_gno Gtid_state::get_automatic_gno(rpl_sidno sidno) const
+       my_error(ER_GNO_EXHAUSTED, MYF(0));
+       DBUG_RETURN(-1);
+     }
+-    if (next_candidate.gno <= iv->end)
++    if (next_candidate.gno < iv->end)
+       next_candidate.gno= iv->end;
+     ivit.next();
+   }
+diff --git a/sql/rpl_slave.cc b/sql/rpl_slave.cc
+index 0ec73c3907c..27639669643 100644
+--- a/sql/rpl_slave.cc
++++ b/sql/rpl_slave.cc
+@@ -8589,6 +8589,11 @@ bool queue_event(Master_info* mi,const char* buf, ulong event_len)
+                            checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF ?
+                            event_len - BINLOG_CHECKSUM_LEN : event_len,
+                            mi->get_mi_description_event());
++    if (!gtid_ev.is_valid())
++    {
++      global_sid_lock->unlock();
++      goto err;
++    }
+     gtid.sidno= gtid_ev.get_sidno(false);
+     global_sid_lock->unlock();
+     if (gtid.sidno < 0)

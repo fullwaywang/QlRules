@@ -1,0 +1,39 @@
+commit 06588ba9c85ea453c289e353c4ded7fea664e80b	06588ba9c85ea453c289e353c4ded7fea664e80b
+Author: Darshan M N <darshan.m.n@oracle.com>
+Date:   Thu May 27 17:47:14 2021 +0530
+
+    Bug#32851525 SETTING INNODB_REDO_LOG_ENCRYPT TO NULL CRASHES THE SERVER
+    
+    Issue
+    =====
+    The server crashes when innodb_redo_log_encrypt parameter is set to NULL.
+    This is because the string value entered is not checked for nullptr,
+    resulting in a crash.
+    
+    Fix
+    ===
+    Check the user entered string value for nullptr.
+    
+    Reviewed-by: Mateusz Rukowicz <mateusz.rukowicz@oracle.com>
+    Reviewed on Slack.
+
+diff --git a/storage/innobase/handler/ha_innodb.cc b/storage/innobase/handler/ha_innodb.cc
+index 5a6ac009258..7306f776626 100644
+--- a/storage/innobase/handler/ha_innodb.cc
++++ b/storage/innobase/handler/ha_innodb.cc
+@@ -19853,9 +19853,14 @@ static int check_func_bool(THD *, SYS_VAR *, void *save,
+   if (value->value_type(value) == MYSQL_VALUE_TYPE_STRING) {
+     char buff[STRING_BUFFER_USUAL_SIZE];
+     int length = sizeof(buff);
++
+     const char *str = value->val_str(value, buff, &length);
++
++    if (str == nullptr) return 1;
++
+     result = find_type(&bool_typelib, str, length, true) - 1;
+-    if (str == nullptr || result < 0) return 1;
++
++    if (result < 0) return 1;
+   } else {
+     long long tmp;
+     if (value->val_int(value, &tmp) < 0) return 1;

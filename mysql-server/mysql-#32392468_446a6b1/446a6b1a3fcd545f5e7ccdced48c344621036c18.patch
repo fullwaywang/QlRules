@@ -1,0 +1,176 @@
+commit 446a6b1a3fcd545f5e7ccdced48c344621036c18	446a6b1a3fcd545f5e7ccdced48c344621036c18
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Fri Sep 24 06:58:57 2021 +0530
+
+    Bug#32392468: SELECT PERFORMANCE_SCHEMA.REPLICATION_GROUP_MEMBER_STATS
+     ASSERT IN Release/DEBUG MODE
+    
+     Description:
+     ------------
+     Group replication node asserts/fails when querying
+     performance_schema.replication_group_member_stats concurrently with
+     STOP/START group replication.
+    
+     Analysis:
+     ------------
+     There are two issues here:
+    
+     1. Assert/failure in `Gcs_message_pipeline::register_pipeline`.
+    
+        This issue is due to race between START GR thread(T1) and
+        PS_STATS query thread(T2). Both are trying to access
+        `get_group_interfaces()->configure_message_stages()` at the same
+        time and causing the failure.
+        In `configure_message_stages()` both START GR and PS_INFO points
+        to same Gcs_xcom_communication and Gcs_message_pipeline.
+         - T1 and T2 call `pipeline.cleanup()`.
+         - T1 calls pipeline.register_pipeline() and insert into
+           `m_pipelines`.
+         - T2 try to call `pipeline.register_pipeline()` and fails at
+           `assert(m_pipelines.size() == 0)`.
+    
+     2. Failure in `get_group_member_stats`.
+    
+        PS_STATS query thread is trying to access an invalid pointer to
+        `applier_module` and fails. The function `get_group_member_stats`
+        is receiving a pointer to `applier_module` through a parameter
+        that is invalidated by a plugin restart.
+        The issue is due to a race between STOP GR thread, START GR thread
+        and PS_STATS query thread.
+    
+     Fix:
+     ----
+     1. Bug#33085494 fix covers the fix for this issue.
+    
+     2. Use global `applier_module` pointer in `get_group_member_stats()`.
+        Passing it as a parameter is not needed, `get_group_member_stats`
+        can access the always updated global `applier_module` pointer.
+        The same applies to `group_member_manager` and `gcs_module`.
+    
+        The same thing applies to the function `get_group_members_info()`,
+        which also suffer from the same issue.
+    
+    
+     RB:27024
+
+diff --git a/plugin/group_replication/include/ps_information.h b/plugin/group_replication/include/ps_information.h
+index f0fb1caba84..ef783264604 100644
+--- a/plugin/group_replication/include/ps_information.h
++++ b/plugin/group_replication/include/ps_information.h
+@@ -32,13 +32,10 @@
+ 
+ bool get_group_members_info(
+     uint index, const GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS &callbacks,
+-    Group_member_info_manager_interface *group_member_manager,
+-    Gcs_operations *gcs_module, char *channel_name);
++    char *channel_name);
+ 
+ bool get_group_member_stats(
+     uint index, const GROUP_REPLICATION_GROUP_MEMBER_STATS_CALLBACKS &callbacks,
+-    Group_member_info_manager_interface *group_member_manager,
+-    Applier_module *applier_module, Gcs_operations *gcs_module,
+     char *channel_name);
+ 
+ bool get_connection_status(
+diff --git a/plugin/group_replication/src/plugin.cc b/plugin/group_replication/src/plugin.cc
+index 77ccbac589e..533bcecbb5a 100644
+--- a/plugin/group_replication/src/plugin.cc
++++ b/plugin/group_replication/src/plugin.cc
+@@ -468,8 +468,7 @@ bool plugin_get_group_members(
+     uint index, const GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS &callbacks) {
+   char *channel_name = applier_module_channel_name;
+ 
+-  return get_group_members_info(index, callbacks, group_member_mgr, gcs_module,
+-                                channel_name);
++  return get_group_members_info(index, callbacks, channel_name);
+ }
+ 
+ /*
+@@ -493,8 +492,7 @@ bool plugin_get_group_member_stats(
+     const GROUP_REPLICATION_GROUP_MEMBER_STATS_CALLBACKS &callbacks) {
+   char *channel_name = applier_module_channel_name;
+ 
+-  return get_group_member_stats(index, callbacks, group_member_mgr,
+-                                applier_module, gcs_module, channel_name);
++  return get_group_member_stats(index, callbacks, channel_name);
+ }
+ 
+ int plugin_group_replication_start(char **error_message) {
+diff --git a/plugin/group_replication/src/ps_information.cc b/plugin/group_replication/src/ps_information.cc
+index ee0a7151731..af4736bc193 100644
+--- a/plugin/group_replication/src/ps_information.cc
++++ b/plugin/group_replication/src/ps_information.cc
+@@ -31,8 +31,7 @@ using std::string;
+ 
+ bool get_group_members_info(
+     uint index, const GROUP_REPLICATION_GROUP_MEMBERS_CALLBACKS &callbacks,
+-    Group_member_info_manager_interface *group_member_manager,
+-    Gcs_operations *gcs_module, char *channel_name) {
++    char *channel_name) {
+   if (channel_name != nullptr) {
+     callbacks.set_channel_name(callbacks.context, *channel_name,
+                                strlen(channel_name));
+@@ -42,7 +41,7 @@ bool get_group_members_info(
+    This case means that the plugin has never been initialized...
+    and one would not be able to extract information
+    */
+-  if (group_member_manager == nullptr) {
++  if (group_member_mgr == nullptr) {
+     const char *member_state = Group_member_info::get_member_status_string(
+         Group_member_info::MEMBER_OFFLINE);
+     callbacks.set_member_state(callbacks.context, *member_state,
+@@ -50,7 +49,7 @@ bool get_group_members_info(
+     return false;
+   }
+ 
+-  size_t number_of_members = group_member_manager->get_number_of_members();
++  size_t number_of_members = group_member_mgr->get_number_of_members();
+   if (index >= number_of_members) {
+     /* purecov: begin inspected */
+     if (index != 0) {
+@@ -69,10 +68,10 @@ bool get_group_members_info(
+   if (local_member_info != nullptr &&
+       local_member_info->get_recovery_status() ==
+           Group_member_info::MEMBER_OFFLINE) {
+-    member_info = group_member_manager->get_group_member_info(
+-        local_member_info->get_uuid());
++    member_info =
++        group_member_mgr->get_group_member_info(local_member_info->get_uuid());
+   } else {
+-    member_info = group_member_manager->get_group_member_info_by_index(index);
++    member_info = group_member_mgr->get_group_member_info_by_index(index);
+   }
+ 
+   if (member_info == nullptr)  // The requested member is not managed...
+@@ -139,8 +138,6 @@ bool get_group_members_info(
+ 
+ bool get_group_member_stats(
+     uint index, const GROUP_REPLICATION_GROUP_MEMBER_STATS_CALLBACKS &callbacks,
+-    Group_member_info_manager_interface *group_member_manager,
+-    Applier_module *applier_module, Gcs_operations *gcs_module,
+     char *channel_name) {
+   if (channel_name != nullptr) {
+     callbacks.set_channel_name(callbacks.context, *channel_name,
+@@ -151,7 +148,7 @@ bool get_group_member_stats(
+    This case means that the plugin has never been initialized...
+    and one would not be able to extract information
+    */
+-  if (group_member_manager == nullptr) {
++  if (group_member_mgr == nullptr) {
+     return false;
+   }
+ 
+@@ -164,10 +161,10 @@ bool get_group_member_stats(
+   if (local_member_info != nullptr &&
+       local_member_info->get_recovery_status() ==
+           Group_member_info::MEMBER_OFFLINE) {
+-    member_info = group_member_manager->get_group_member_info(
+-        local_member_info->get_uuid());
++    member_info =
++        group_member_mgr->get_group_member_info(local_member_info->get_uuid());
+   } else {
+-    member_info = group_member_manager->get_group_member_info_by_index(index);
++    member_info = group_member_mgr->get_group_member_info_by_index(index);
+   }
+ 
+   if (member_info == nullptr)  // The requested member is not managed...

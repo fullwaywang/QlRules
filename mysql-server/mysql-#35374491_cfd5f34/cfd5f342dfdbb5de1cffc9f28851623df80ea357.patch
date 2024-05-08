@@ -1,0 +1,23 @@
+commit cfd5f342dfdbb5de1cffc9f28851623df80ea357	cfd5f342dfdbb5de1cffc9f28851623df80ea357
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Thu May 11 12:26:55 2023 +0200
+
+    Bug#35374491: Mysql read_ok_ex missing length check
+    
+    Added a validity check on the length received from the network
+    for unknown trackers.
+    
+    Change-Id: Idc7d229fc5905d919bd8c59907be1a5439a08efe
+
+diff --git a/sql-common/client.c b/sql-common/client.c
+index b38a95412ab..fb5cd1e81cc 100644
+--- a/sql-common/client.c
++++ b/sql-common/client.c
+@@ -1011,6 +1011,7 @@ void read_ok_ex(MYSQL *mysql, ulong length) {
+             len = (size_t)net_field_length_ll_safe(mysql, &pos, length,
+                                                    &is_error);
+             if (is_error) return;
++            if (!buffer_check_remaining(mysql, pos, length, len)) return;
+             pos += len;
+             break;
+           }

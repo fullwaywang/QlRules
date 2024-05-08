@@ -1,0 +1,952 @@
+commit b02433bb10f2a93cd9fbb0b43e39b1a4ba46ea23	b02433bb10f2a93cd9fbb0b43e39b1a4ba46ea23
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Tue Apr 5 12:44:26 2022 +0200
+
+    Bug #33830934 Race between ut_lock_free_list_node<T>::grow and ut_lock_free_hash_t::get_tuple
+    
+    This patch fixes three problems with ut_lock_free_hash_t.
+    
+    1. The ut_lock_free_hash_t stores key-value pairs in buffers which it
+    allocates when previous buffer is full, and deallocates once all data is
+    moved from old buffer to one of the newer and there are no more
+    references to the old buffer.
+    Each buffer is represented as an instance of ut_lock_free_list_node_t
+    which has a field of type ut_lock_free_cnt_t which counts the number of
+    references.
+    For scalability there are 256 individual sub-counters, and a thread
+    increments one when entering a "critical section", and decrements one
+    when leaving it, and the thread doing reclamation checks if the sum is
+    zero.
+    Unfortunately, if a thread does inc() on a counter i but dec() on
+    counter i+k, then it may happen that the thread doing the summation in a
+    loop will see the decrement but not the increment and conclude the sum
+    is smaller than it should be. In particular it can appear that it is 0
+    while in reality the array is still in use. This crashes each time on
+    Apple M1 machine, because there we use RNG instead of CPU ID to
+    determine `i`, but in principle it could happen even with CPU IDs if the
+    thread switches from one CPU to another during "critical section".
+    
+    The fix for this problem is to remember which of the sub-counters was
+    incremented and to decrement the same one. To make a mistake impossible,
+    this patch introduces a helper handle_t RAII-like class, which remembers
+    which of the counters should be released by it's destructor. An instance
+    of this class represents an "open handle" to the table, and can be moved
+    around to keep it open, but not copied.
+    
+    2. I also found that the code has a race condition in ref-counting and
+    reclaiming a memory, as it tries to enforce "Store-Load barrier", a
+    thing which is notoriously hard to express/achieve. One thread wants to
+    Store a flag saying that array is scheduled for reclamation and then
+    Load the ref-counter, and another thread wants to Store the incremented
+    ref-counter and then load the pointer to data. I could not reproduce a
+    crash due to that, but I think the code is flawed anyway.
+    
+    The fix here is to use seq_cst variant of atomic operations for
+    `arr->m_pending_free.store(true)` and for loads and increments of the
+    counters, and for m_pending_free.load().
+    This way, there must be some single total order on these operations,
+    which must be consistent with happens-before, which permits only two
+    possibilities:
+    i) m_pending_free.store(true) is ordered before m_pending_free.load(),
+    but then the loaded value must be `true` and the reader will refrain
+    from access.
+    ii) m_pending_free.store(true) is ordered after m_pending_free.load(),
+    but then counter.fetch_add(1) is ordered before counter.load() so the
+    non-zero value of the counter should prevent freeing the buffer.
+    
+    3. There's insufficient memory ordering enforced between
+    a) ut_lock_free_list_node<T>::grow() operation which allocates memory,
+    constructs an object in it, and publishes a pointer to an object via
+    m_next atomic field, and
+    b) ut_lock_free_hash_t::get_tuple() which loads the m_next field, and
+    then tries to access the object pointed by it
+    
+    In particular it seems to have a "classic" bug of publishing pointer to
+    newly initialized memory without enforcing correct ordering, so that
+    another thread can load the pointer to it, but still see the object as
+    uninitialized.
+    
+    Take a look at `grow(...)`:
+    
+        next_t new_arr = ut::new_withkey<ut_lock_free_list_node_t<T>>(
+            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), new_size);
+    
+        /* Publish the allocated entry. If somebody did this in the
+        meantime then just discard the allocated entry and do
+        nothing. */
+        next_t expected = nullptr;
+        if (!m_next.compare_exchange_strong(expected, new_arr,
+                                            std::memory_order_relaxed)) {
+    
+    note the use of `std::memory_order_relaxed`: what it means is that we
+    *don't* want to establish synchronizes-with (and thus: happens-before)
+    relation with the thread which will read the `m_next`'s value stored by
+    us. Now take a look at the read side of things in `get_tuple(..)`:
+    
+       arr_node_t *next = (*arr)->m_next.load(std::memory_order_relaxed);
+       (*arr)->end_access();
+       if (next == nullptr) {
+          return (nullptr);
+       }
+       *arr = next
+     [....in the next loop iteration]:
+       while (!(*arr)->begin_access()) {
+    
+    here we load the pointer from `m_next` (again: resigning from
+    establishing happens-before) check it's not null (so far so good), and
+    try to call a method on the object pointed by it (apparently assuming,
+    that we already can see the results of the constructor of this object,
+    as opposed to some garbage or all-zeros!).
+    
+    The fix for this bug is to use seq_cst variant of atomic operations, for
+    accesses of m_next, so that they properly establish happens-before.
+    Perhaps it would be sufficient to use release and acquire, but on ARM64
+    there's no additional cost for using seq_cst here, and the operation is
+    rare anyway.
+    
+    4. The numa-specific code in ut0lock_free_hash.h was disabled by
+    quickfix to Bug#27792853 which simply setting the local member
+    `m_numa_available = false;` in the counter class.
+    The problem with this approach is that the number of counters was now
+    always set to 256, but the compiler did not attempt to optimize it as a
+    constant, because it wasn't literally a constant - it's still a member
+    field m_cnt_size, which just happened to be 256 always. This meant that
+    the `i%m_cnt_size` operation couldn't be optimized to simply extracting
+    the lowest significant byte of `i`.
+    Also, the code was simply allocating the atomic counters without any
+    padding, so it could happen that they got allocated close to each other.
+    In performance tests on tetra02 which is a NUMA machine with 90+ cpus,
+    it turned out that while the code for m_numa_available=true is indeed
+    very fast, it's wasting a lot of memory, because it uses
+    numa_alloc_onnode() which always allocates at least 4096 bytes, which
+    amounts to 1MB of memory just to store all 256 counters.
+    Also, the tests shown that it is not as important to allocate counters
+    to proper numa nodes - same performance gain could be obtained by simply
+    putting each counter in a different cache line.
+    
+    The fix was to remove the unused code and to use cache-aligned atomics,
+    so that the code is 2x faster than the version with
+    m_numa_available=false, and as fast as old m_numa_available=true, but
+    doesn't waste so much space, nor time for modulo operations.
+    
+    5. The m_base was a pointer to the actual array storing the key-value
+    pairs, and it was managed manually.
+    
+    It was simply replaced with ut::unique_ptr<T[]> to simplify code.
+    
+    6. On platforms such as Apple M1 where there is no easy way to find the
+    id of the CPU on which we are executing, we were using ut_rnd_gen_ulint
+    to pick the index of the subcounter to increment. This meant that the
+    same thread even if long running on the same CPU would try to modify
+    many different memory locations leading to contention.
+    
+    The fix for this is to use this_thread::id() to compute the index,
+    which leads to observable performance improvement on Apple M1.
+    
+    Change-Id: Ic5929cc949c51256f835e5a9502a6eb10a9d87ec
+
+diff --git a/storage/innobase/include/os0thread.h b/storage/innobase/include/os0thread.h
+index 7a30ec2f87a..f2371478eaa 100644
+--- a/storage/innobase/include/os0thread.h
++++ b/storage/innobase/include/os0thread.h
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 1995, 2021, Oracle and/or its affiliates.
++Copyright (c) 1995, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify it under
+ the terms of the GNU General Public License, version 2.0, as published by the
+@@ -67,6 +67,12 @@ class IB_thread {
+ /** Operating system thread native handle */
+ using os_thread_id_t = std::thread::native_handle_type;
+ 
++namespace ut {
++/** The hash value of the current thread's id */
++const inline thread_local size_t this_thread_hash =
++    std::hash<std::thread::id>{}(std::this_thread::get_id());
++}  // namespace ut
++
+ /** Returns the string representation of the thread ID supplied. It uses the
+  only standard-compliant way of printing the thread ID.
+  @param thread_id The thread ID to convert to string.
+diff --git a/storage/innobase/include/ut0counter.h b/storage/innobase/include/ut0counter.h
+index 91366f99b4f..6b544fffc9b 100644
+--- a/storage/innobase/include/ut0counter.h
++++ b/storage/innobase/include/ut0counter.h
+@@ -78,7 +78,7 @@ struct counter_indexer_t : public generic_indexer_t<Type, N> {
+       /* We may go here if my_timer_cycles() returns 0,
+       so we have to have the plan B for the counter. */
+ #if !defined(_WIN32)
+-      return std::hash<std::thread::id>{}(std::this_thread::get_id());
++      return ut::this_thread_hash;
+ #else
+       LARGE_INTEGER cnt;
+       QueryPerformanceCounter(&cnt);
+diff --git a/storage/innobase/include/ut0cpu_cache.h b/storage/innobase/include/ut0cpu_cache.h
+index 17afc339b57..b46bec475b2 100644
+--- a/storage/innobase/include/ut0cpu_cache.h
++++ b/storage/innobase/include/ut0cpu_cache.h
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 2020, 2021, Oracle and/or its affiliates.
++Copyright (c) 2020, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify it under
+ the terms of the GNU General Public License, version 2.0, as published by the
+@@ -50,10 +50,20 @@ not handle over-aligned types.
+ template <typename T>
+ struct Cacheline_padded : public T {
+   char pad[INNODB_CACHE_LINE_SIZE];
++  // "Inherit" constructors
++  using T::T;
++};
+ 
+-  template <class... Args>
+-  Cacheline_padded(Args &&... args) : T{std::forward<Args>(args)...} {}
++/**
++A utility wrapper class, which aligns T to cacheline boundary.
++This is to avoid false-sharing.
++*/
++template <typename T>
++struct alignas(INNODB_CACHE_LINE_SIZE) Cacheline_aligned : public T {
++  // "Inherit" constructors
++  using T::T;
+ };
++
+ } /* namespace ut */
+ 
+ #endif /* ut0cpu_cache_h */
+diff --git a/storage/innobase/include/ut0lock_free_hash.h b/storage/innobase/include/ut0lock_free_hash.h
+index 1a420672ca0..c41faa3b8d2 100644
+--- a/storage/innobase/include/ut0lock_free_hash.h
++++ b/storage/innobase/include/ut0lock_free_hash.h
+@@ -40,10 +40,12 @@ this program; if not, write to the Free Software Foundation, Inc.,
+ #include <atomic>
+ #include <list>
+ 
+-#include "os0numa.h"  /* os_numa_*() */
+-#include "ut0mutex.h" /* ib_mutex_t */
+-#include "ut0new.h"   /* UT_NEW*(), ut::delete_*() */
+-#include "ut0rnd.h"   /* ut_fold_ull() */
++#include "os0numa.h"      /* os_getcpu() */
++#include "os0thread.h"    /* ut::this_thread_hash */
++#include "ut0cpu_cache.h" /* Cache_aligned<T> */
++#include "ut0mutex.h"     /* ib_mutex_t */
++#include "ut0new.h"       /* UT_NEW*(), ut::delete_*() */
++#include "ut0rnd.h"       /* ut_fold_ull() */
+ 
+ /** An interface class to a basic hash table, that ut_lock_free_hash_t is. */
+ class ut_hash_interface_t {
+@@ -87,98 +89,58 @@ class ut_hash_interface_t {
+ #endif /* UT_HASH_IMPLEMENT_PRINT_STATS */
+ };
+ 
+-/** Lock free counter. A counter class that uses a few counter variables
+-internally to improve performance on machines with lots of CPUs. The get()
+-method sums all the internal counters without taking any locks, so due to
+-concurrent modification of the counter, get() may return a number which
+-never was the sum of all the internal counters. */
++/** Lock free ref counter. It uses a few counter variables internally to improve
++performance on machines with lots of CPUs.  */
+ class ut_lock_free_cnt_t {
+  public:
+   /** Constructor. */
+   ut_lock_free_cnt_t() {
+-    /* It is possible that the machine has NUMA available for use.  But the
+-    process/thread might not have sufficient permissions to use the same.
+-    Hence, we need to check whether the current thread has permissions to
+-    use them. Currently, disabling the use of numa here.  */
+-    m_numa_available = false;
+-
+-    if (m_numa_available) {
+-      m_cnt_size = os_numa_num_configured_cpus();
+-    } else {
+-      /* Just pick up some number that is supposedly larger
+-      than the number of CPUs on the system or close to it.
+-      That many pointers and 64 bit integers will be
+-      allocated once in the hash table lifetime.
+-      Ie 256 * 8 * 8 = 16 KiB. */
+-      m_cnt_size = 256;
++    /* The initial value of std::atomic depends on C++ standard and the way
++    the containing object was initialized, so make sure it's always zero. */
++    for (size_t i = 0; i < m_cnt.size(); i++) {
++      m_cnt[i].store(0);
+     }
++  }
+ 
+-    m_cnt = ut::new_arr_withkey<std::atomic<int64_t> *>(
+-        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
+-        ut::Count{m_cnt_size});
+-
+-    for (size_t i = 0; i < m_cnt_size; i++) {
+-      const size_t s = sizeof(std::atomic<int64_t>);
+-      void *mem;
+-
+-      if (m_numa_available) {
+-        const int node = os_numa_node_of_cpu(static_cast<int>(i));
+-
+-        mem = os_numa_alloc_onnode(s, node);
+-      } else {
+-        mem = ut::malloc_withkey(
+-            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), s);
+-      }
+-
+-      ut_a(mem != nullptr);
+-
+-      m_cnt[i] = new (mem) std::atomic<int64_t>;
++  class handle_t {
++   public:
++    handle_t() : m_counter{nullptr} {}
+ 
+-      m_cnt[i]->store(0, std::memory_order_relaxed);
++    handle_t(std::atomic<uint64_t> *counter) : m_counter{counter} {
++      m_counter->fetch_add(1);
+     }
+-  }
+ 
+-  /** Destructor. */
+-  ~ut_lock_free_cnt_t() {
+-    using namespace std;
++    handle_t(handle_t &&other) noexcept : m_counter{other.m_counter} {
++      other.m_counter = nullptr;
++    }
+ 
+-    for (size_t i = 0; i < m_cnt_size; i++) {
+-      m_cnt[i]->~atomic<int64_t>();
++    explicit operator bool() const noexcept { return m_counter != nullptr; }
+ 
+-      if (m_numa_available) {
+-        os_numa_free(m_cnt[i], sizeof(std::atomic<int64_t>));
+-      } else {
+-        ut::free(m_cnt[i]);
++    ~handle_t() {
++      if (m_counter != nullptr) {
++        m_counter->fetch_sub(1);
+       }
+     }
+ 
+-    ut::delete_arr(m_cnt);
+-  }
++   private:
++    std::atomic<uint64_t> *m_counter;
++  };
+ 
+   /** Increment the counter. */
+-  void inc() {
+-    const size_t i = n_cnt_index();
+-
+-    m_cnt[i]->fetch_add(1, std::memory_order_relaxed);
+-  }
+-
+-  /** Decrement the counter. */
+-  void dec() {
+-    const size_t i = n_cnt_index();
+-
+-    m_cnt[i]->fetch_sub(1, std::memory_order_relaxed);
+-  }
+-
+-  /** Get the value of the counter.
+-  @return counter's value */
+-  int64_t get() const {
+-    int64_t ret = 0;
+-
+-    for (size_t i = 0; i < m_cnt_size; i++) {
+-      ret += m_cnt[i]->load(std::memory_order_relaxed);
++  handle_t reference() { return handle_t{&m_cnt[n_cnt_index()]}; }
++
++  /** Wait until all previously existing references get released.
++  This function assumes that the caller ensured that no new references
++  should appear (or rather: no long-lived references - there can be treads which
++  call reference(), realize the object should no longer be referenced and
++  immediately release it)
++  */
++  void await_release_of_old_references() const {
++    for (size_t i = 0; i < m_cnt.size(); i++) {
++      while (m_cnt[i].load()) {
++        std::this_thread::yield();
++      }
+     }
+-
+-    return (ret);
+   }
+ 
+  private:
+@@ -189,26 +151,23 @@ class ut_lock_free_cnt_t {
+ 
+ #ifdef HAVE_OS_GETCPU
+     cpu = static_cast<size_t>(os_getcpu());
+-
+-    if (cpu >= m_cnt_size) {
+-      /* Could happen (rarely) if more CPUs get
+-      enabled after m_cnt_size is initialized. */
+-      cpu %= m_cnt_size;
+-    }
+ #else  /* HAVE_OS_GETCPU */
+-    cpu = static_cast<size_t>(ut_rnd_gen_ulint() % m_cnt_size);
++    cpu = ut::this_thread_hash;
+ #endif /* HAVE_OS_GETCPU */
+ 
+-    return (cpu);
++    return cpu % m_cnt.size();
+   }
+ 
+-  /** Designate whether os_numa_*() functions can be used. */
+-  bool m_numa_available;
+-
+-  /** The sum of all the counters in m_cnt[] designates the overall
+-  count. */
+-  std::atomic<int64_t> **m_cnt;
+-  size_t m_cnt_size;
++  /** The shards of the counter.
++  We've just picked up some number that is supposedly larger than the number of
++  CPUs on the system or close to it, but small enough that
++  await_release_of_old_references() finishes in reasonable time, and that the
++  size (256 * 64B = 16 KiB) is not too large.
++  We pad the atomics to avoid false sharing. In particular, we hope that on
++  platforms which HAVE_OS_GETCPU the same CPU will always fetch the same counter
++  and thus will store it in its local cache. This should also help on NUMA
++  architectures by avoiding the cost of synchronizing caches between CPUs.*/
++  std::array<ut::Cacheline_aligned<std::atomic<uint64_t>>, 256> m_cnt;
+ };
+ 
+ /** A node in a linked list of arrays. The pointer to the next node is
+@@ -221,16 +180,23 @@ class ut_lock_free_list_node_t {
+   /** Constructor.
+   @param[in]    n_elements      number of elements to create */
+   explicit ut_lock_free_list_node_t(size_t n_elements)
+-      : m_n_base_elements(n_elements), m_pending_free(false), m_next(nullptr) {
+-    m_base = ut::new_arr_withkey<T>(
+-        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
+-        ut::Count{m_n_base_elements});
+-
++      : m_base{ut::make_unique<T[]>(
++            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), n_elements)},
++        m_n_base_elements{n_elements},
++        m_pending_free{false},
++        m_next{nullptr} {
+     ut_ad(n_elements > 0);
+   }
+ 
+-  /** Destructor. */
+-  ~ut_lock_free_list_node_t() { ut::delete_arr(m_base); }
++  static ut_lock_free_list_node_t *alloc(size_t n_elements) {
++    return ut::aligned_new_withkey<ut_lock_free_list_node_t<T>>(
++        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t),
++        alignof(ut_lock_free_list_node_t<T>), n_elements);
++  }
++
++  static void dealloc(ut_lock_free_list_node_t *ptr) {
++    ut::aligned_delete(ptr);
++  }
+ 
+   /** Create and append a new array to this one and store a pointer
+   to it in 'm_next'. This is done in a way that multiple threads can
+@@ -255,17 +221,15 @@ class ut_lock_free_list_node_t {
+       new_size = m_n_base_elements * 2;
+     }
+ 
+-    next_t new_arr = ut::new_withkey<ut_lock_free_list_node_t<T>>(
+-        ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), new_size);
++    next_t new_arr = alloc(new_size);
+ 
+     /* Publish the allocated entry. If somebody did this in the
+     meantime then just discard the allocated entry and do
+     nothing. */
+     next_t expected = nullptr;
+-    if (!m_next.compare_exchange_strong(expected, new_arr,
+-                                        std::memory_order_relaxed)) {
++    if (!m_next.compare_exchange_strong(expected, new_arr)) {
+       /* Somebody just did that. */
+-      ut::delete_(new_arr);
++      dealloc(new_arr);
+ 
+       /* 'expected' has the current value which
+       must be != NULL because the CAS failed. */
+@@ -286,48 +250,32 @@ class ut_lock_free_list_node_t {
+   to zero. */
+ 
+   /** Mark the beginning of an access to this object. Used to prevent a
+-  destruction of this object while some threads may be accessing it.
+-  @retval true  access is granted, the caller should invoke
+-  end_access() when done
+-  @retval false access is denied, this object is to be removed from
+-  the list and thus new access to it is not allowed. The caller should
+-  retry from the head of the list and need not to call end_access(). */
+-  bool begin_access() {
+-    m_n_ref.inc();
+-
+-    std::atomic_thread_fence(std::memory_order_acq_rel);
+-
+-    if (m_pending_free.load(std::memory_order_acquire)) {
++  destruction of an array pointed by m_base while our thread is accessing it.
++  @return A handle which protects the m_base as long as the handle is not
++  destructed. If the handle is {} (==false), the access was denied, this object
++  is to be removed from the list and thus new access to it is not allowed.
++  The caller should retry from the head of the list. */
++  ut_lock_free_cnt_t::handle_t begin_access() {
++    auto handle = m_n_ref.reference();
++
++    if (m_pending_free.load()) {
+       /* Don't allow access if freeing is pending. Ie if
+       another thread is waiting for readers to go away
+       before it can free the m_base's member of this
+       object. */
+-      m_n_ref.dec();
+-      return (false);
++      return {};
+     }
+ 
+-    return (true);
++    return handle;
+   }
+ 
+-  /** Mark the ending of an access to this object. */
+-  void end_access() {
+-    std::atomic_thread_fence(std::memory_order_release);
+-
+-    m_n_ref.dec();
+-  }
+-
+-  /** Get the number of threads that are accessing this object now.
+-  @return number of users (threads) of this object */
+-  int64_t n_ref() {
+-    int64_t ret = m_n_ref.get();
+-
+-    std::atomic_thread_fence(std::memory_order_acq_rel);
+-
+-    return (ret);
++  /** Wait until all previously held references are released */
++  void await_release_of_old_references() {
++    m_n_ref.await_release_of_old_references();
+   }
+ 
+   /** Base array. */
+-  T *m_base;
++  ut::unique_ptr<T[]> m_base;
+ 
+   /** Number of elements in 'm_base'. */
+   size_t m_n_base_elements;
+@@ -441,10 +389,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_a(initial_size > 0);
+     ut_a(ut_is_2pow(initial_size));
+ 
+-    m_data.store(
+-        ut::new_withkey<arr_node_t>(
+-            ut::make_psi_memory_key(mem_key_ut_lock_free_hash_t), initial_size),
+-        std::memory_order_relaxed);
++    m_data.store(arr_node_t::alloc(initial_size));
+ 
+     mutex_create(LATCH_ID_LOCK_FREE_HASH, &m_optimize_latch);
+ 
+@@ -457,18 +402,18 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+   ~ut_lock_free_hash_t() override {
+     mutex_destroy(&m_optimize_latch);
+ 
+-    arr_node_t *arr = m_data.load(std::memory_order_relaxed);
++    arr_node_t *arr = m_data.load();
+ 
+     do {
+-      arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
++      arr_node_t *next = arr->m_next.load();
+ 
+-      ut::delete_(arr);
++      arr_node_t::dealloc(arr);
+ 
+       arr = next;
+     } while (arr != nullptr);
+ 
+     while (!m_hollow_objects->empty()) {
+-      ut::delete_(m_hollow_objects->front());
++      arr_node_t::dealloc(m_hollow_objects->front());
+       m_hollow_objects->pop_front();
+     }
+     ut::delete_(m_hollow_objects);
+@@ -481,10 +426,11 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_ad(key != UNUSED);
+     ut_ad(key != AVOID);
+ 
+-    arr_node_t *arr = m_data.load(std::memory_order_relaxed);
++    arr_node_t *arr = m_data.load();
+ 
+     for (;;) {
+-      const key_val_t *tuple = get_tuple(key, &arr);
++      auto handle_and_tuple{get_tuple(key, &arr)};
++      const auto tuple = handle_and_tuple.second;
+ 
+       if (tuple == nullptr) {
+         return (NOT_FOUND);
+@@ -499,32 +445,17 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+       int64_t v = tuple->m_val.load(std::memory_order_relaxed);
+ 
+       if (v == DELETED) {
+-        arr->end_access();
+         return (NOT_FOUND);
+       } else if (v != GOTO_NEXT_ARRAY) {
+-        arr->end_access();
+         return (v);
+       }
+ 
+       /* Prevent reorder of the below m_next.load() with
+       the above m_val.load().
+       We want to be sure that if m_val is GOTO_NEXT_ARRAY,
+-      then the next array exists. It would be the same to
+-      m_val.load(memory_order_acquire)
+-      but that would impose the more expensive
+-      memory_order_acquire in all cases, whereas in the most
+-      common execution path m_val is not GOTO_NEXT_ARRAY and
+-      we return earlier, only using the cheaper
+-      memory_order_relaxed. */
+-      std::atomic_thread_fence(std::memory_order_acquire);
+-
+-      arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
++      then the next array exists. */
+ 
+-      ut_a(next != nullptr);
+-
+-      arr->end_access();
+-
+-      arr = next;
++      arr = arr->m_next.load();
+     }
+   }
+ 
+@@ -546,7 +477,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_ad(val != DELETED);
+     ut_ad(val != GOTO_NEXT_ARRAY);
+ 
+-    insert_or_update(key, val, false, m_data.load(std::memory_order_relaxed));
++    insert_or_update(key, val, false, m_data.load());
+   }
+ 
+   /** Delete a (key, val) pair from the hash.
+@@ -571,10 +502,11 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_ad(key != UNUSED);
+     ut_ad(key != AVOID);
+ 
+-    arr_node_t *arr = m_data.load(std::memory_order_relaxed);
++    arr_node_t *arr = m_data.load();
+ 
+     for (;;) {
+-      key_val_t *tuple = get_tuple(key, &arr);
++      auto handle_and_tuple{get_tuple(key, &arr)};
++      const auto tuple = handle_and_tuple.second;
+ 
+       if (tuple == nullptr) {
+         /* Nothing to delete. */
+@@ -588,9 +520,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+           break;
+         }
+ 
+-        if (tuple->m_val.compare_exchange_strong(v, DELETED,
+-                                                 std::memory_order_relaxed)) {
+-          arr->end_access();
++        if (tuple->m_val.compare_exchange_strong(v, DELETED)) {
+           return;
+         }
+ 
+@@ -602,23 +532,9 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+       above m_val.load() or the load from
+       m_val.compare_exchange_strong().
+       We want to be sure that if m_val is GOTO_NEXT_ARRAY,
+-      then the next array exists. It would be the same to
+-      m_val.load(memory_order_acquire) or
+-      m_val.compare_exchange_strong(memory_order_acquire)
+-      but that would impose the more expensive
+-      memory_order_acquire in all cases, whereas in the most
+-      common execution path m_val is not GOTO_NEXT_ARRAY and
+-      we return earlier, only using the cheaper
+-      memory_order_relaxed. */
+-      std::atomic_thread_fence(std::memory_order_acquire);
++      then the next array exists. */
+ 
+-      arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
+-
+-      ut_a(next != nullptr);
+-
+-      arr->end_access();
+-
+-      arr = next;
++      arr = arr->m_next.load();
+     }
+   }
+ 
+@@ -641,7 +557,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_ad(key != UNUSED);
+     ut_ad(key != AVOID);
+ 
+-    insert_or_update(key, 1, true, m_data.load(std::memory_order_relaxed));
++    insert_or_update(key, 1, true, m_data.load());
+   }
+ 
+   /** Decrement the value of a given key with 1 or insert a new tuple
+@@ -655,7 +571,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     ut_ad(key != UNUSED);
+     ut_ad(key != AVOID);
+ 
+-    insert_or_update(key, -1, true, m_data.load(std::memory_order_relaxed));
++    insert_or_update(key, -1, true, m_data.load());
+   }
+ 
+ #ifdef UT_HASH_IMPLEMENT_PRINT_STATS
+@@ -769,33 +685,31 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+   @param[in,out]        arr     start the search from this array; when this
+   method ends, *arr will point to the array in which the search
+   ended (in which the returned key_val resides)
+-  @return pointer to the array cell or NULL if not found */
+-  key_val_t *get_tuple(uint64_t key, arr_node_t **arr) const {
++  @return If key was found: handle to the (updated) arr which contains the tuple
++  and pointer to the array cell with the tuple. Otherwise an empty handle, and
++  nullptr. */
++  std::pair<ut_lock_free_cnt_t::handle_t, key_val_t *> get_tuple(
++      uint64_t key, arr_node_t **arr) const {
+     for (;;) {
+-      while (!(*arr)->begin_access()) {
+-        /* The array has been garbaged, restart
+-        the search from the beginning. */
+-        *arr = m_data.load(std::memory_order_relaxed);
++      auto handle = (*arr)->begin_access();
++      if (!handle) {
++        /* The array has been garbaged, restart the search from the beginning.*/
++        *arr = m_data.load();
++        continue;
+       }
+ 
+-      key_val_t *t =
+-          get_tuple_from_array((*arr)->m_base, (*arr)->m_n_base_elements, key);
++      key_val_t *t = get_tuple_from_array((*arr)->m_base.get(),
++                                          (*arr)->m_n_base_elements, key);
+ 
+       if (t != nullptr) {
+-        /* end_access() will be invoked by the
+-        caller. */
+-        return (t);
++        return {std::move(handle), t};
+       }
+ 
+-      arr_node_t *next = (*arr)->m_next.load(std::memory_order_relaxed);
++      *arr = (*arr)->m_next.load();
+ 
+-      (*arr)->end_access();
+-
+-      if (next == nullptr) {
+-        return (nullptr);
++      if (*arr == nullptr) {
++        return {};
+       }
+-
+-      *arr = next;
+     }
+   }
+ 
+@@ -835,8 +749,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+ 
+       if (cur_key == UNUSED) {
+         uint64_t expected = UNUSED;
+-        if (cur_tuple->m_key.compare_exchange_strong(
+-                expected, key, std::memory_order_relaxed)) {
++        if (cur_tuple->m_key.compare_exchange_strong(expected, key)) {
+           return (cur_tuple);
+         }
+ 
+@@ -871,8 +784,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+       uint64_t k = t->m_key.load(std::memory_order_relaxed);
+ 
+       /* Prevent further inserts into empty cells. */
+-      if (k == UNUSED && t->m_key.compare_exchange_strong(
+-                             k, AVOID, std::memory_order_relaxed)) {
++      if (k == UNUSED && t->m_key.compare_exchange_strong(k, AVOID)) {
+         continue;
+       }
+ 
+@@ -908,15 +820,13 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+         next arrays (ie that insert_or_update() has
+         completed and that its effects are visible to
+         other threads). */
+-        std::atomic_thread_fence(std::memory_order_release);
+ 
+         /* Now that we know (k, v) is present in some
+         of the next arrays, try to CAS the tuple
+         (k, v) to (k, GOTO_NEXT_ARRAY) in the current
+         array. */
+ 
+-        if (t->m_val.compare_exchange_strong(v, GOTO_NEXT_ARRAY,
+-                                             std::memory_order_relaxed)) {
++        if (t->m_val.compare_exchange_strong(v, GOTO_NEXT_ARRAY)) {
+           break;
+         }
+ 
+@@ -958,8 +868,7 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+         new_val = val_to_set;
+       }
+ 
+-      if (t->m_val.compare_exchange_strong(cur_val, new_val,
+-                                           std::memory_order_relaxed)) {
++      if (t->m_val.compare_exchange_strong(cur_val, new_val)) {
+         return (true);
+       }
+ 
+@@ -980,44 +889,37 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     mutex_enter(&m_optimize_latch);
+ 
+     for (;;) {
+-      arr_node_t *arr = m_data.load(std::memory_order_relaxed);
++      arr_node_t *arr = m_data.load();
+ 
+-      arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
++      arr_node_t *next = arr->m_next.load();
+ 
+       if (next == nullptr) {
+         break;
+       }
+ 
+-      /* begin_access() / end_access() for 'arr' and 'next'
++      /* begin_access() (ref counting) for 'arr' and 'next'
+       around copy_to_another_array() is not needed here
+       because the only code that frees memory is below,
+       serialized with a mutex. */
+ 
+       copy_to_another_array(arr, next);
+ 
+-      arr->m_pending_free.store(true, std::memory_order_release);
++      arr->m_pending_free.store(true);
+ 
+       arr_node_t *expected = arr;
+ 
+       /* Detach 'arr' from the list. Ie move the head of the
+       list 'm_data' from 'arr' to 'arr->m_next'. */
+-      ut_a(m_data.compare_exchange_strong(expected, next,
+-                                          std::memory_order_relaxed));
++      ut_a(m_data.compare_exchange_strong(expected, next));
+ 
+       /* Spin/wait for all threads to stop looking at
+       this array. If at some point this turns out to be
+       sub-optimal (ie too long busy wait), then 'arr' could
+       be added to some lazy deletion list
+       arrays-awaiting-destruction-once-no-readers. */
+-      while (arr->n_ref() > 0) {
+-        ;
+-      }
++      arr->await_release_of_old_references();
+ 
+-      ut::delete_arr(arr->m_base);
+-      /* The destructor of arr will call ut::delete_arr()
+-      on m_base again. Make sure it is a noop and avoid
+-      double free. */
+-      arr->m_base = nullptr;
++      arr->m_base.reset();
+ 
+       m_hollow_objects->push_back(arr);
+     }
+@@ -1051,14 +953,15 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+     or until we find a tuple with the specified key and manage to
+     update it. */
+     for (;;) {
+-      while (!arr->begin_access()) {
+-        /* The array has been garbaged, try the next
+-        one. */
+-        arr = arr->m_next.load(std::memory_order_relaxed);
++      auto handle = arr->begin_access();
++      if (!handle) {
++        /* The array has been garbaged, try the next one. */
++        arr = arr->m_next.load();
++        continue;
+       }
+ 
+       key_val_t *t = insert_or_get_position_in_array(
+-          arr->m_base, arr->m_n_base_elements, key);
++          arr->m_base.get(), arr->m_n_base_elements, key);
+ 
+       /* t == NULL means that the array is full, must expand
+       and go to the next array. */
+@@ -1068,34 +971,27 @@ class ut_lock_free_hash_t : public ut_hash_interface_t {
+       next array. */
+ 
+       if (t != nullptr && update_tuple(t, val, is_delta)) {
+-        arr->end_access();
+         break;
+       }
+ 
+-      arr_node_t *next = arr->m_next.load(std::memory_order_relaxed);
++      arr_node_t *next = arr->m_next.load();
+ 
+       if (next != nullptr) {
+-        arr->end_access();
+         arr = next;
+         /* Prevent any subsequent memory operations
+         (the reads from the next array in particular)
+         to be reordered before the m_next.load()
+         above. */
+-        std::atomic_thread_fence(std::memory_order_acquire);
+         continue;
+       }
+ 
+       bool grown_by_this_thread;
+ 
+-      next = arr->grow(DELETED, &grown_by_this_thread);
++      arr = arr->grow(DELETED, &grown_by_this_thread);
+ 
+       if (grown_by_this_thread) {
+         call_optimize = true;
+       }
+-
+-      arr->end_access();
+-
+-      arr = next;
+     }
+ 
+     if (optimize_allowed && call_optimize) {
+diff --git a/unittest/gunit/innodb/ut0lock_free_hash-t.cc b/unittest/gunit/innodb/ut0lock_free_hash-t.cc
+index 177a5030876..bb3ed8b2edb 100644
+--- a/unittest/gunit/innodb/ut0lock_free_hash-t.cc
++++ b/unittest/gunit/innodb/ut0lock_free_hash-t.cc
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2015, 2021, Oracle and/or its affiliates.
++/* Copyright (c) 2015, 2022, Oracle and/or its affiliates.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -680,4 +680,42 @@ TEST_F(ut0lock_free_hash, multi_threaded_100r0w) {
+       thread_100r0w /* thr func */
+   );
+ }
++TEST_F(ut0lock_free_hash, too_relaxed) {
++  /* Tests race conditions between writer (the main thread) and readers.
++  The writer puts T*CAPACITY elements into the hashmap, which has a smallest
++  possible capacity (2k) of a single node, to force frequent allocation of new
++  nodes. If the capacity was smaller than 2k, then the hashmap would keep
++  doubling the size of new nodes until it reached 2k. Also, there's a heuristic
++  to not double the size if the old node contained lots of deleted elements,
++  thus our writer will mark all inserted elements as deleted. The goal of all
++  this is to execute node allocation logic as often as possible, while the
++  readers are busy calling get(), which will fail with NOT_FOUND for the
++  duration of whole test, until the writer finally calls set(T*CAPACITY,42).
++  Note that due to the way get() implements probing, it takes linear time when
++  a node is full of elements (even deleted), thus these get()s are slow.
++  */
++  constexpr uint64_t CAPACITY = 2048;
++  constexpr uint64_t T = 10000;
++  constexpr uint64_t READERS = 10;
++  ut_lock_free_hash_t hash_table{CAPACITY, false};
++  const auto reading = [&]() {
++    while (hash_table.get(T * CAPACITY) == ut_lock_free_hash_t::NOT_FOUND) {
++      // whatever
++    }
++  };
++  std::vector<std::thread> readers;
++  for (uint64_t i = 0; i < READERS; ++i) {
++    readers.emplace_back(reading);
++  }
++  for (uint64_t i = 0; i < T; ++i) {
++    for (uint64_t j = 0; j < CAPACITY; ++j) {
++      hash_table.set(i * CAPACITY + j, 17);
++      hash_table.del(i * CAPACITY + j);
++    }
++  }
++  hash_table.set(T * CAPACITY, 42);
++  for (auto &reader : readers) {
++    reader.join();
++  }
++}
+ }  // namespace innodb_lock_free_hash_unittest

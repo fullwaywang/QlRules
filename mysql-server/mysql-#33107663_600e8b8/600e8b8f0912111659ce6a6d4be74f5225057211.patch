@@ -1,0 +1,561 @@
+commit 600e8b8f0912111659ce6a6d4be74f5225057211	600e8b8f0912111659ce6a6d4be74f5225057211
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Sun Aug 22 08:26:07 2021 +0530
+
+    BUG#33107663:LOCKING READS ON THE REPLICA: CAN'T FIND RECORD IN 'T',
+     ERROR_CODE: 1032; HANDLER ERROR HA_ERR_KEY_NOT_FOUND
+    
+     Description:
+     ------------
+     In the source, repeatedly execute a transaction with insert/delete.
+     Then a SELECT workload on the replica locks rows
+     (e.g. SELECT .. FOR UPDATE, or serializable transaction_isolation),
+     the applier thread dies with 'HA_ERR_KEY_NOT_FOUND' error.
+    
+     Analysis:
+     ------------
+     In replica, when storage engine reports retryable errors (like
+     'HA_ERR_LOCK_WAIT_TIMEOUT' or 'HA_ERR_LOCK_DEADLOCK') back to
+     applier thread, it is not handled properly by applier thread, infact
+     it always override any error from storage engine to
+     'HA_ERR_KEY_NOT_FOUND', causing applier thread to error out and stop
+     instead of retrying the transaction.
+    
+      - In 'Rows_log_event::next_record_scan()' invokes
+        'table->file->ha_index_read_map()' and, then, the invocation
+        of 'ha_innobase::index_read' returns 'HA_ERR_LOCK_DEADLOCK'.
+      - 'Rows_log_event::next_record_scan()' then returns
+        'HA_ERR_KEY_NOT_FOUND'.
+      - This makes replica thread to error out and stop.
+    
+     Fix:
+     ----
+     In 'Rows_log_event::next_record_scan(bool first_read)' do not
+     override storage engine retryable errors(HA_ERR_LOCK_WAIT_TIMEOUT,
+     HA_ERR_LOCK_DEADLOCK) return from 'table->file->ha_index_read_map()'
+     with HA_ERR_KEY_NOT_FOUND.
+    
+    
+     RB:26833
+
+diff --git a/mysql-test/include/stop_slave_sql.inc b/mysql-test/include/stop_slave_sql.inc
+index b4ceadb05c8..97d344a2ae6 100644
+--- a/mysql-test/include/stop_slave_sql.inc
++++ b/mysql-test/include/stop_slave_sql.inc
+@@ -12,6 +12,7 @@
+ # ==== Usage ====
+ #
+ # [--let $rpl_channel_name= 'NAME']
++# [--let $slave_sql_errno= NUMBER[, NUMBER...]]
+ # [--let $slave_timeout= NUMBER]
+ # [--let $rpl_debug= 1]
+ # --source include/stop_slave_sql.inc
+@@ -20,6 +21,11 @@
+ #   $rpl_channel_name
+ #     If set, a FOR CHANNEL $rpl_channel_name is added.
+ #
++#   $slave_sql_errno
++#     By default, this script fails the test if there is an error in the
++#     applier thread. Set this to a comma-separated list of numeric error
++#     codes, to allow the given values.
++#
+ #   $slave_timeout
+ #     See include/wait_for_slave_param.inc
+ #
+diff --git a/mysql-test/include/wait_for_slave_sql_to_stop.inc b/mysql-test/include/wait_for_slave_sql_to_stop.inc
+index 0f3b0b742ba..dfb05901459 100644
+--- a/mysql-test/include/wait_for_slave_sql_to_stop.inc
++++ b/mysql-test/include/wait_for_slave_sql_to_stop.inc
+@@ -14,6 +14,7 @@
+ # ==== Usage ====
+ #
+ # [--let $rpl_channel_name= 'NAME']
++# [--let $slave_sql_errno= NUMBER[, NUMBER...]]
+ # [--let $slave_timeout= NUMBER]
+ # [--let $rpl_debug= 1]
+ # --source include/wait_for_slave_sql_to_stop.inc
+@@ -22,6 +23,11 @@
+ #   $rpl_channel_name
+ #     See include/wait_for_slave_param.inc
+ #
++#   $slave_sql_errno
++#     By default, this script fails the test if there is an error in the
++#     applier thread. Set this to a comma-separated list of numeric error
++#     codes, to allow the given values.
++#
+ #   $slave_timeout
+ #     See include/wait_for_slave_param.inc
+ #
+diff --git a/mysql-test/suite/rpl/r/rpl_replica_read_lock.result b/mysql-test/suite/rpl/r/rpl_replica_read_lock.result
+new file mode 100644
+index 00000000000..d42d312294e
+--- /dev/null
++++ b/mysql-test/suite/rpl/r/rpl_replica_read_lock.result
+@@ -0,0 +1,239 @@
++include/only_with_option.inc [GLOBAL.replica_transaction_retries > 2]
++#
++# 1. Create source-replica topology
++include/master-slave.inc
++Warnings:
++Note	####	Sending passwords in plain text without SSL/TLS is extremely insecure.
++Note	####	Storing MySQL user name or password information in the master info repository is not secure and is therefore not recommended. Please consider using the USER and PASSWORD connection options for START SLAVE; see the 'START SLAVE Syntax' in the MySQL Manual for more information.
++[connection master]
++[connection slave]
++SET GLOBAL innodb_lock_wait_timeout = 2;
++SET GLOBAL slave_rows_search_algorithms = 'INDEX_SCAN,HASH_SCAN';
++CALL mtr.add_suppression("Slave SQL for channel.*Consider raising the value of the replica_transaction_retries variable.*");
++CALL mtr.add_suppression("Slave SQL for channel.*The slave coordinator and worker threads are stopped.*");
++# 2. For each slave_rows_search_algorithms[INDEX_SCAN, HASH_SCAN(with
++#    index), HASH_SCAN(with two non-unique index), HASH_SCAN(with out
++#    index), TABLE_SCAN]
++#
++# 2.0 Configure source and replica
++[connection master]
++CREATE TABLE t1 (a INT PRIMARY KEY, b INT) ENGINE=innodb;
++INSERT INTO t1 VALUES (10, 10), (20, 20);
++include/sync_slave_sql_with_master.inc
++#
++# 2.1 Stop replica
++include/stop_slave.inc
++#
++# 2.2 Execute DELETE transaction on source
++[connection master]
++BEGIN;
++DELETE FROM t1;
++COMMIT;
++#
++# 2.3 Begin SELECT ... FOR UPDATE on replica
++[connection slave]
++BEGIN;
++SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++a	b
++20	20
++#
++# 2.4 Start replica from another connection
++[connection slave1]
++include/start_slave.inc
++#
++# 2.5 Wait until the applier retries:'count_transactions_retries' will be
++#    incremented
++[connection slave]
++#
++# 2.6 Commit SELECT ... FOR UPDATE on replica
++COMMIT;
++SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++Variable_name	Value
++Replica_rows_last_search_algorithm_used	INDEX_SCAN
++#
++# 2.7 Restart replica applier
++include/stop_slave_sql.inc
++include/start_slave_sql.inc
++[connection master]
++DROP TABLE t1;
++include/sync_slave_sql_with_master.inc
++#
++# 2.0 Configure source and replica
++[connection master]
++CREATE TABLE t1 (a INT, b INT, key(a)) ENGINE=innodb;
++INSERT INTO t1 VALUES (10, 10), (20, 20);
++include/sync_slave_sql_with_master.inc
++#
++# 2.1 Stop replica
++include/stop_slave.inc
++#
++# 2.2 Execute DELETE transaction on source
++[connection master]
++BEGIN;
++DELETE FROM t1;
++COMMIT;
++#
++# 2.3 Begin SELECT ... FOR UPDATE on replica
++[connection slave]
++BEGIN;
++SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++a	b
++20	20
++#
++# 2.4 Start replica from another connection
++[connection slave1]
++include/start_slave.inc
++#
++# 2.5 Wait until the applier retries:'count_transactions_retries' will be
++#    incremented
++[connection slave]
++#
++# 2.6 Commit SELECT ... FOR UPDATE on replica
++COMMIT;
++SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++Variable_name	Value
++Replica_rows_last_search_algorithm_used	HASH_SCAN
++#
++# 2.7 Restart replica applier
++include/stop_slave_sql.inc
++include/start_slave_sql.inc
++[connection master]
++DROP TABLE t1;
++include/sync_slave_sql_with_master.inc
++#
++# 2.0 Configure source and replica
++[connection master]
++CREATE TABLE t1 (a INT, b INT, KEY(a), KEY(b)) ENGINE=innodb;
++INSERT INTO t1 VALUES (10, 10), (10, 20), (10, 30), (20, 10), (20, 20);
++include/sync_slave_sql_with_master.inc
++#
++# 2.1 Stop replica
++include/stop_slave.inc
++#
++# 2.2 Execute DELETE transaction on source
++[connection master]
++BEGIN;
++DELETE FROM t1;
++COMMIT;
++#
++# 2.3 Begin SELECT ... FOR UPDATE on replica
++[connection slave]
++BEGIN;
++SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++a	b
++10	20
++20	20
++#
++# 2.4 Start replica from another connection
++[connection slave1]
++include/start_slave.inc
++#
++# 2.5 Wait until the applier retries:'count_transactions_retries' will be
++#    incremented
++[connection slave]
++#
++# 2.6 Commit SELECT ... FOR UPDATE on replica
++COMMIT;
++SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++Variable_name	Value
++Replica_rows_last_search_algorithm_used	HASH_SCAN
++#
++# 2.7 Restart replica applier
++include/stop_slave_sql.inc
++include/start_slave_sql.inc
++[connection master]
++DROP TABLE t1;
++include/sync_slave_sql_with_master.inc
++#
++# 2.0 Configure source and replica
++[connection master]
++CREATE TABLE t1 (a INT, b INT) ENGINE=innodb;
++INSERT INTO t1 VALUES (10, 10), (20, 20);
++include/sync_slave_sql_with_master.inc
++#
++# 2.1 Stop replica
++include/stop_slave.inc
++#
++# 2.2 Execute DELETE transaction on source
++[connection master]
++BEGIN;
++DELETE FROM t1;
++COMMIT;
++#
++# 2.3 Begin SELECT ... FOR UPDATE on replica
++[connection slave]
++BEGIN;
++SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++a	b
++20	20
++#
++# 2.4 Start replica from another connection
++[connection slave1]
++include/start_slave.inc
++#
++# 2.5 Wait until the applier retries:'count_transactions_retries' will be
++#    incremented
++[connection slave]
++#
++# 2.6 Commit SELECT ... FOR UPDATE on replica
++COMMIT;
++SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++Variable_name	Value
++Replica_rows_last_search_algorithm_used	HASH_SCAN
++#
++# 2.7 Restart replica applier
++include/stop_slave_sql.inc
++include/start_slave_sql.inc
++[connection master]
++DROP TABLE t1;
++include/sync_slave_sql_with_master.inc
++#
++# 2.0 Configure source and replica
++[connection master]
++CREATE TABLE t1 (a INT, b INT) ENGINE=innodb;
++INSERT INTO t1 VALUES (10, 10), (20, 20);
++include/sync_slave_sql_with_master.inc
++#
++# 2.1 Stop replica
++include/stop_slave.inc
++#
++# 2.2 Execute DELETE transaction on source
++[connection master]
++BEGIN;
++DELETE FROM t1;
++COMMIT;
++#
++# 2.3 Begin SELECT ... FOR UPDATE on replica
++[connection slave]
++SET GLOBAL slave_rows_search_algorithms = 'TABLE_SCAN';
++BEGIN;
++SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++a	b
++20	20
++#
++# 2.4 Start replica from another connection
++[connection slave1]
++include/start_slave.inc
++#
++# 2.5 Wait until the applier retries:'count_transactions_retries' will be
++#    incremented
++[connection slave]
++#
++# 2.6 Commit SELECT ... FOR UPDATE on replica
++COMMIT;
++SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++Variable_name	Value
++Replica_rows_last_search_algorithm_used	TABLE_SCAN
++#
++# 2.7 Restart replica applier
++include/stop_slave_sql.inc
++include/start_slave_sql.inc
++[connection master]
++DROP TABLE t1;
++include/sync_slave_sql_with_master.inc
++#
++# 3. Clean up
++[connection slave]
++SET GLOBAL innodb_lock_wait_timeout = INNODB_LOCK_WAIT_TIMEOUT;
++SET GLOBAL slave_rows_search_algorithms = "SLAVE_ROWS_SEARCH_ALGORITHMS";
++include/rpl_end.inc
+diff --git a/mysql-test/suite/rpl/t/rpl_replica_read_lock.test b/mysql-test/suite/rpl/t/rpl_replica_read_lock.test
+new file mode 100644
+index 00000000000..b2e84163764
+--- /dev/null
++++ b/mysql-test/suite/rpl/t/rpl_replica_read_lock.test
+@@ -0,0 +1,163 @@
++##############################################################################
++# ==== Purpose ====
++# The purpose of this test is to verify that during row lookup, applier thread
++# retries the transaction when storage engine reports retryable errors
++# (like 'HA_ERR_LOCK_WAIT_TIMEOUT' or 'HA_ERR_LOCK_DEADLOCK') instead of error
++# out and stop execution. This test checks for all three(HASH_SCAN, INDEX_SCAN
++# and TABLE_SCAN) row lookup algorithms.
++#
++# ==== Requirement ====
++# When storage engine reports retryable errors(like 'HA_ERR_LOCK_WAIT_TIMEOUT'
++# or 'HA_ERR_LOCK_DEADLOCK') back to applier thread, it should be retried as
++# per # 'replica_transaction_retries'.
++#
++# ==== Implementation ====
++# 1. Create source-replica topology
++# 2. For each slave_rows_search_algorithms[INDEX_SCAN, HASH_SCAN(with index),
++#    HASH_SCAN(with two non-unique index), HASH_SCAN(with out index),
++#    TABLE_SCAN],
++#    2.0 Configure source and replica
++#    2.1 Stop replica
++#    2.2 Execute DELETE transaction on source
++#    2.3 Begin SELECT ... FOR UPDATE on replica
++#    2:4 Start replica from another connection
++#    2.5 Wait until the applier retries
++#    2.6 Commit SELECT ... FOR UPDATE on replica
++#    2.7 Restart replica applier
++# 3. Clean up
++#
++# ==== References ====
++# BUG#33107663:LOCKING READS ON THE REPLICA: CAN'T FIND RECORD IN 'T',
++#              ERROR_CODE: 1032; HANDLER ERROR HA_ERR_KEY_NOT_FOUND
++###############################################################################
++
++--source include/have_binlog_format_row.inc
++--let $option_name = replica_transaction_retries
++--let $option_operator = >
++--let $option_value = 2
++--source include/only_with_option.inc
++
++--echo #
++--echo # 1. Create source-replica topology
++--source include/master-slave.inc
++
++--source include/rpl_connection_slave.inc
++--let $saved_innodb_lock_wait_timeout = `SELECT @@GLOBAL.innodb_lock_wait_timeout`
++--let $saved_slave_rows_search_algorithms = `SELECT @@GLOBAL.slave_rows_search_algorithms`
++SET GLOBAL innodb_lock_wait_timeout = 2;
++--disable_warnings
++SET GLOBAL slave_rows_search_algorithms = 'INDEX_SCAN,HASH_SCAN';
++--enable_warnings
++CALL mtr.add_suppression("Slave SQL for channel.*Consider raising the value of the replica_transaction_retries variable.*");
++CALL mtr.add_suppression("Slave SQL for channel.*The slave coordinator and worker threads are stopped.*");
++
++--echo # 2. For each slave_rows_search_algorithms[INDEX_SCAN, HASH_SCAN(with
++--echo #    index), HASH_SCAN(with two non-unique index), HASH_SCAN(with out
++--echo #    index), TABLE_SCAN]
++
++#0. INDEX_SCAN
++#1. HASH_SCAN(with index)
++#2. HASH_SCAN(with two non-unique index)
++#3. HASH_SCAN(with out index)
++#4. TABLE_SCAN
++--let $i = 0
++while ($i < 5) {
++
++  --echo #
++  --echo # 2.0 Configure source and replica
++  --source include/rpl_connection_master.inc
++  if ($i == 0){
++    CREATE TABLE t1 (a INT PRIMARY KEY, b INT) ENGINE=innodb;
++  }
++  if ($i == 1){
++    CREATE TABLE t1 (a INT, b INT, key(a)) ENGINE=innodb;
++  }
++  if ($i == 2){
++    CREATE TABLE t1 (a INT, b INT, KEY(a), KEY(b)) ENGINE=innodb;
++    INSERT INTO t1 VALUES (10, 10), (10, 20), (10, 30), (20, 10), (20, 20);
++  }
++  if ($i > 2){
++    CREATE TABLE t1 (a INT, b INT) ENGINE=innodb;
++  }
++  if ($i != 2){
++    INSERT INTO t1 VALUES (10, 10), (20, 20);
++  }
++  --source include/sync_slave_sql_with_master.inc
++
++  --echo #
++  --echo # 2.1 Stop replica
++  --source include/stop_slave.inc
++
++  --echo #
++  --echo # 2.2 Execute DELETE transaction on source
++  --source include/rpl_connection_master.inc
++  BEGIN;
++  DELETE FROM t1;
++  COMMIT;
++
++  --echo #
++  --echo # 2.3 Begin SELECT ... FOR UPDATE on replica
++  --source include/rpl_connection_slave.inc
++  if ($i == 4)
++  {
++    --disable_warnings
++    SET GLOBAL slave_rows_search_algorithms = 'TABLE_SCAN';
++    --enable_warnings
++  }
++
++  BEGIN;
++  SELECT * FROM t1 WHERE b = 20 FOR UPDATE;
++  # Save value of 'count_transactions_retries' before lock_wait_timeout
++  let $count_transactions_retries= query_get_value(
++  "select count_transactions_retries from
++  performance_schema.replication_applier_status",count_transactions_retries, 1);
++
++  --echo #
++  --echo # 2.4 Start replica from another connection
++  --source include/rpl_connection_slave1.inc
++  --source include/start_slave.inc
++  --echo #
++  --echo # 2.5 Wait until the applier retries:'count_transactions_retries' will be
++  --echo #    incremented
++  --source include/rpl_connection_slave.inc
++  let $status_col= count_transactions_retries;
++  let $status_col_value= $count_transactions_retries;
++  let $table=replication_applier_status;
++  let $status_col_comparsion= >;
++  --source include/wait_for_rpl_pfs_status.inc
++  --echo #
++  --echo # 2.6 Commit SELECT ... FOR UPDATE on replica
++  COMMIT;
++
++  SHOW STATUS LIKE 'Replica_rows_last_search_algorithm_used';
++
++  --echo #
++  --echo # 2.7 Restart replica applier
++  # This is required to avoid race condition. If the mysqltest process executes
++  # very slowly, the applier may retry multiple times, and eventually reach the
++  # maximum number of retries and will error out(#1205 ER_LOCK_WAIT_TIMEOUT) and
++  # stop.
++  --disable_warnings
++  --let $slave_sql_errno= 0,1205
++  --source include/stop_slave_sql.inc
++  --enable_warnings
++  --source include/start_slave_sql.inc
++
++  # Drop table for the next test
++  --source include/rpl_connection_master.inc
++  DROP TABLE t1;
++  --source include/sync_slave_sql_with_master.inc
++  --inc $i
++}
++
++--echo #
++--echo # 3. Clean up
++--source include/rpl_connection_slave.inc
++--replace_result $saved_innodb_lock_wait_timeout INNODB_LOCK_WAIT_TIMEOUT
++eval SET GLOBAL innodb_lock_wait_timeout = $saved_innodb_lock_wait_timeout;
++--replace_result $saved_slave_rows_search_algorithms SLAVE_ROWS_SEARCH_ALGORITHMS
++--disable_warnings
++eval SET GLOBAL slave_rows_search_algorithms = "$saved_slave_rows_search_algorithms";
++--enable_warnings
++
++--source include/rpl_end.inc
+diff --git a/sql/log_event.cc b/sql/log_event.cc
+index cf009372ad8..5cafff533ef 100644
+--- a/sql/log_event.cc
++++ b/sql/log_event.cc
+@@ -8489,6 +8489,10 @@ bool Rows_log_event::is_auto_inc_in_extra_columns() {
+               m_table->next_number_field->field_index()) >= m_width);
+ }
+ 
++bool Rows_log_event::is_trx_retryable_upon_engine_error(int error) {
++  return (error == HA_ERR_LOCK_DEADLOCK || error == HA_ERR_LOCK_WAIT_TIMEOUT);
++}
++
+ /*
+   Compares table->record[0] and table->record[1]
+ 
+@@ -8793,8 +8797,10 @@ int Rows_log_event::next_record_scan(bool first_read) {
+             m_key = *m_itr;
+             m_itr++;
+             first_read = true;
+-          } else
+-            error = HA_ERR_KEY_NOT_FOUND;
++          } else {
++            if (!is_trx_retryable_upon_engine_error(error))
++              error = HA_ERR_KEY_NOT_FOUND;
++          }
+         }
+       }
+     }
+@@ -8803,7 +8809,8 @@ int Rows_log_event::next_record_scan(bool first_read) {
+       if ((error = table->file->ha_index_read_map(
+                table->record[0], m_key, HA_WHOLE_KEY, HA_READ_KEY_EXACT))) {
+         DBUG_PRINT("info", ("no record matching the key found in the table"));
+-        error = HA_ERR_KEY_NOT_FOUND;
++        if (!is_trx_retryable_upon_engine_error(error))
++          error = HA_ERR_KEY_NOT_FOUND;
+       }
+   }
+ 
+diff --git a/sql/log_event.h b/sql/log_event.h
+index aa0afd9e1cf..72fd9083a01 100644
+--- a/sql/log_event.h
++++ b/sql/log_event.h
+@@ -2968,6 +2968,16 @@ class Rows_log_event : public virtual binary_log::Rows_event, public Log_event {
+             columns, false otherwise.
+    */
+   bool is_auto_inc_in_extra_columns();
++
++  /**
++    Helper function to check whether the storage engine error
++    allows for the transaction to be retried or not.
++
++    @param error Storage engine error
++    @retval true if the error is retryable.
++    @retval false if the error is non-retryable.
++   */
++  static bool is_trx_retryable_upon_engine_error(int error);
+ #endif
+ 
+   bool is_rbr_logging_format() const override { return true; }

@@ -1,0 +1,46 @@
+commit d42ffb0b7103011da185b9a2ed97c06c9bec957e	d42ffb0b7103011da185b9a2ed97c06c9bec957e
+Author: Justin Jose <justin.jose@oracle.com>
+Date:   Thu Apr 21 09:11:21 2022 +0530
+
+    BUG#31976209: ACK_RECEIVER MAY LOST THE SLAVE SEMI-SYNC ACK DUE TO
+     NET TIMEOUT
+    
+     Description:
+     ------------
+     Semi-sync source ack_receiver may lost the replica ACK message due
+     to net time out. This can lead to partial read of ACK message and
+     cause packet out of order error.
+    
+     Source sometimes reports the following message in error log:
+     [ERROR] Read semi-sync reply magic number error
+     [ERROR] mysqld: Got timeout reading communication packets
+     [ERROR] mysqld: Got packets out of order
+     [ERROR] mysqld: Got a packet bigger than 'max_allowed_packet' bytes
+    
+     Analysis:
+     ------------
+     The read timeout is being forced to 1 millisec in the semi-sync
+     replica connections and the net_read_timeout system variable value
+     isn't being respected.
+    
+     Fix:
+     ----
+     Make semi-sync connections to use net_read_timeout system variable
+     value instead of being forced the read_time_out to 1 millisec. So
+     that semi-sync sockets aren't prone to timeouts while other
+     connections are functioning properly.
+    
+    Change-Id: I300559c6822de9e012d21fe9a07bac9746cf925f
+
+diff --git a/plugin/semisync/semisync_source_ack_receiver.cc b/plugin/semisync/semisync_source_ack_receiver.cc
+index b4183687fb2..972d1634bbc 100644
+--- a/plugin/semisync/semisync_source_ack_receiver.cc
++++ b/plugin/semisync/semisync_source_ack_receiver.cc
+@@ -154,7 +154,6 @@ bool Ack_receiver::add_slave(THD *thd) {
+   slave.is_leaving = false;
+   slave.vio = thd->get_protocol_classic()->get_vio();
+   slave.vio->mysql_socket.m_psi = nullptr;
+-  slave.vio->read_timeout = 1;
+ 
+   /* push_back() may throw an exception */
+   try {

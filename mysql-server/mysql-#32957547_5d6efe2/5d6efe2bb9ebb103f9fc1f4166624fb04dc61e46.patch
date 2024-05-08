@@ -1,0 +1,57 @@
+commit 5d6efe2bb9ebb103f9fc1f4166624fb04dc61e46	5d6efe2bb9ebb103f9fc1f4166624fb04dc61e46
+Author: Martin Sköld <Martin.Skold@oracle.com>
+Date:   Thu Sep 23 09:33:36 2021 +0200
+
+    Bug #32957547 ZDI-CAN-13866: ORACLE MYSQL CLUSTER MANAGEMENT API ..
+    
+    Defined buffer size as a constant.
+    Added checks that the passed data fits the fixed sized buffer by truncating
+    output (added assert for debug code).
+    
+    Approved-by: Maitrayi Sabaratnam <maitrayi.sabaratnam@oracle.com>
+
+diff --git a/storage/ndb/src/mgmsrv/Services.cpp b/storage/ndb/src/mgmsrv/Services.cpp
+index 196379cc35f..fd307611b14 100644
+--- a/storage/ndb/src/mgmsrv/Services.cpp
++++ b/storage/ndb/src/mgmsrv/Services.cpp
+@@ -1840,14 +1840,18 @@ MgmApiSession::report_event(Parser_t::Context &ctx,
+ {
+   Uint32 length;
+   const char *data_string;
+-  Uint32 data[25];
++  Uint32 data[MAX_EVENT_LENGTH];
+ 
+   args.get("length", &length);
++  assert(length < MAX_EVENT_LENGTH);
+   args.get("data", &data_string);
+ 
+   BaseString tmp(data_string);
+   Vector<BaseString> item;
+   tmp.split(item, " ");
++  if (length > MAX_EVENT_LENGTH)
++    // Data is going to be truncated
++    length = MAX_EVENT_LENGTH;
+   for (int i = 0; (Uint32) i < length ; i++)
+   {
+     sscanf(item[i].c_str(), "%u", data+i);
+diff --git a/storage/ndb/src/mgmsrv/Services.hpp b/storage/ndb/src/mgmsrv/Services.hpp
+index 191c3839deb..d45cc8b458d 100644
+--- a/storage/ndb/src/mgmsrv/Services.hpp
++++ b/storage/ndb/src/mgmsrv/Services.hpp
+@@ -1,6 +1,5 @@
+ /*
+-   Copyright (C) 2003-2008 MySQL AB, 2008-2010 Sun Microsystems, Inc.
+-    All rights reserved. Use is subject to license terms.
++   Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -121,6 +120,8 @@ public:
+ 
+   void get_mgmd_nodeid(Parser_t::Context &ctx, Properties const &args);
+ 
++  static const unsigned MAX_EVENT_LENGTH = 25;
++
+   void report_event(Parser_t::Context &ctx, Properties const &args);
+ 
+   void listSessions(Parser_t::Context &ctx, Properties const &args);

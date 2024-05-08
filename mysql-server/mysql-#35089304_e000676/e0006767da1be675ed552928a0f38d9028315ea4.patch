@@ -1,0 +1,34 @@
+commit e0006767da1be675ed552928a0f38d9028315ea4	e0006767da1be675ed552928a0f38d9028315ea4
+Author: Georgi Kodinov <georgi.kodinov@oracle.com>
+Date:   Mon Mar 13 15:03:04 2023 +0100
+
+    Bug#35089304: Incorrect grant is used if account is specified with an IP address
+    
+    When comparing two grants to sort them the server would short-circuit
+    the sort code if the two grants were done for a user with an IP address
+    instead of a host name and would compare them the same if the IP mask
+    matches.
+    Fixed by using the mask only if the masks of the two grants are
+    different and reverting to the sort value (as is done for host names)
+    when they are the same.
+    
+    Change-Id: Idc1307dbcc984decb23ba693d1578f7b670e3080
+
+diff --git a/sql/auth/sql_auth_cache.cc b/sql/auth/sql_auth_cache.cc
+index 9381be466cd..0eefa6cfa58 100644
+--- a/sql/auth/sql_auth_cache.cc
++++ b/sql/auth/sql_auth_cache.cc
+@@ -3728,7 +3728,12 @@ bool ACL_compare::operator()(const ACL_ACCESS &a, const ACL_ACCESS &b) {
+       if (a.host.ip_mask_type != b.host.ip_mask_type)
+         return a.host.ip_mask_type < b.host.ip_mask_type;
+ 
+-      return a.host.ip_mask > b.host.ip_mask;
++      /* if masks are not equal compare these */
++      if (a.host.ip_mask != b.host.ip_mask)
++        return a.host.ip_mask > b.host.ip_mask;
++
++      /* otherwise stick with the sort value */
++      return a.sort > b.sort;
+     }
+     /* The element with the IP goes first. */
+     return true;

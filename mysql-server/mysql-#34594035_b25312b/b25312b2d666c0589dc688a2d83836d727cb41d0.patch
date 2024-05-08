@@ -1,0 +1,128 @@
+commit b25312b2d666c0589dc688a2d83836d727cb41d0	b25312b2d666c0589dc688a2d83836d727cb41d0
+Author: Michal Jankowski <michal.jankowski@oracle.com>
+Date:   Mon Jan 16 15:05:37 2023 +0100
+
+    Bug#34594035: Crash at unregistering dynamic privilege
+    
+    Problem:
+    ========
+    The server sometimes crashes on shutdown while unregistering dynamic
+    privilege after plugin uninstall.
+    
+    Fix:
+    ====
+    - Move call to mysql_audit_free_thd() earlier in THD::release_resources()
+      before MDL_context and debug_sync are destroyed.
+    - Move clearing thd->audit_class_plugins just after the plugins are deleted
+      in plugin_unlock().
+    
+    Tests:
+    ======
+    - Added debug conditional execution to provoke the crash condition in
+      dynamic_privilege_services_impl::unregister_privilege and
+      MDL_context::acquire_lock
+    - Added test to audit_log_debug_bugs.test
+    
+    Change-Id: Iea84432c6d648c2eee6ea035cb6d7f90e8205f31
+
+diff --git a/sql/auth/dynamic_privileges_impl.cc b/sql/auth/dynamic_privileges_impl.cc
+index ee34995575c..2dba40b7af7 100644
+--- a/sql/auth/dynamic_privileges_impl.cc
++++ b/sql/auth/dynamic_privileges_impl.cc
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2017, 2022, Oracle and/or its affiliates.
++/* Copyright (c) 2017, 2023, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License, version 2.0,
+@@ -154,6 +154,8 @@ DEFINE_BOOL_METHOD(dynamic_privilege_services_impl::unregister_privilege,
+       Thd_creator get_thd(current_thd);
+       Acl_cache_lock_guard acl_cache_lock(get_thd(),
+                                           Acl_cache_lock_mode::WRITE_MODE);
++      DBUG_EXECUTE_IF("bug34594035_simulate_lock_failure",
++                      DBUG_SET("+d,bug34594035_fail_acl_cache_lock"););
+       acl_cache_lock.lock();
+       return (get_dynamic_privilege_register()->erase(priv) == 0);
+     } else
+diff --git a/sql/mdl.cc b/sql/mdl.cc
+index 4b59920e56a..346df4daaed 100644
+--- a/sql/mdl.cc
++++ b/sql/mdl.cc
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2007, 2022, Oracle and/or its affiliates.
++/* Copyright (c) 2007, 2023, Oracle and/or its affiliates.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -3357,6 +3357,14 @@ void MDL_lock::object_lock_notify_conflicting_locks(MDL_context *ctx,
+ 
+ bool MDL_context::acquire_lock(MDL_request *mdl_request,
+                                Timeout_type lock_wait_timeout) {
++  // in order to test bug#34594035 call functions that before the fix
++  // caused crash and return failure
++  DBUG_EXECUTE_IF("bug34594035_fail_acl_cache_lock",
++                  debug_sync(get_thd(), "123", 3);
++                  mysql_prlock_wrlock(&m_LOCK_waiting_for);
++                  mysql_prlock_unlock(&m_LOCK_waiting_for);
++                  DBUG_SET("-d,bug34594035_fail_acl_cache_lock"); return true;);
++
+   if (lock_wait_timeout == 0) {
+     /*
+       Resort to try_acquire_lock() in case of zero timeout.
+diff --git a/sql/sql_audit.cc b/sql/sql_audit.cc
+index c56053e19a9..23e451266e3 100644
+--- a/sql/sql_audit.cc
++++ b/sql/sql_audit.cc
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2007, 2022, Oracle and/or its affiliates.
++/* Copyright (c) 2007, 2023, Oracle and/or its affiliates.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -1154,12 +1154,15 @@ void mysql_audit_release(THD *thd) {
+     data->release_thd(thd);
+   }
+ 
++  /* Move audit plugins array from THD to a tmp variable in order to avoid calls
++     to them via THD after the plugin is unlocked (#bug34594035) */
++  Plugin_array audit_class_plugins(std::move(thd->audit_class_plugins));
++
+   /* Now we actually unlock the plugins */
+-  plugin_unlock_list(nullptr, thd->audit_class_plugins.begin(),
+-                     thd->audit_class_plugins.size());
++  plugin_unlock_list(nullptr, audit_class_plugins.begin(),
++                     audit_class_plugins.size());
+ 
+   /* Reset the state of thread values */
+-  thd->audit_class_plugins.clear();
+   thd->audit_class_mask.clear();
+   thd->audit_class_mask.resize(MYSQL_AUDIT_CLASS_MASK_SIZE);
+ }
+diff --git a/sql/sql_class.cc b/sql/sql_class.cc
+index 7ff756796af..04051a4b137 100644
+--- a/sql/sql_class.cc
++++ b/sql/sql_class.cc
+@@ -1,5 +1,5 @@
+ /*
+-   Copyright (c) 2000, 2022, Oracle and/or its affiliates.
++   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
+ 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License, version 2.0,
+@@ -1358,6 +1358,8 @@ void THD::release_resources() {
+   mysql_mutex_lock(&LOCK_thd_query);
+   mysql_mutex_unlock(&LOCK_thd_query);
+ 
++  mysql_audit_free_thd(this);
++
+   stmt_map.reset(); /* close all prepared statements */
+   if (!is_cleanup_done()) cleanup();
+ 
+@@ -1384,7 +1386,6 @@ void THD::release_resources() {
+     delete rli_fake;
+     rli_fake = nullptr;
+   }
+-  mysql_audit_free_thd(this);
+ 
+   /* See if any component stored data. If so, try to free it */
+   if (!external_store_.empty())

@@ -1,0 +1,333 @@
+commit cad4d3a6f15d0ec09f555b75cddbf0c10b898890	cad4d3a6f15d0ec09f555b75cddbf0c10b898890
+Author: Ramakrishnan Kamalakannan <ramakrishnan.kamalakannan@oracle.com>
+Date:   Wed Jun 29 07:19:39 2022 +0200
+
+    Bug#34302445 : Assertion failure: dict0dd.cc:1693: dd_column_is_dropped(old_col)
+    
+    Issue:
+      During truncate, table is dropped but DD is retained. So if table has
+      INSTANT ADD/DROP columns, their metadata is retained. The metadata is
+      being cleared at the end of truncate to make sure there is no instant
+      ADD/DROP columns and table is as good as new. But metadata of INSTANT
+      DROP columns is present whereas post truncate these dropped column
+      metadata should not exist.
+    
+    Fix:
+      Remove the metadata of dropped column from DD::Table post truncate.
+    
+      NOTE: This needs changes in DD code so we need to get the code changes
+      reviewed by runtime team as well.
+    
+    Change-Id: I4ef737894d1d0373b2d8c9621edb20f9a2fbfdef
+
+diff --git a/mysql-test/suite/innodb/r/instant_ddl_misc.result b/mysql-test/suite/innodb/r/instant_ddl_misc.result
+index 85e584ce333..d1f1e4c4e1e 100644
+--- a/mysql-test/suite/innodb/r/instant_ddl_misc.result
++++ b/mysql-test/suite/innodb/r/instant_ddl_misc.result
+@@ -1566,7 +1566,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -1604,7 +1603,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -1744,7 +1742,6 @@ c5	4	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_ROW_ID	5	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_TRX_ID	6	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	7	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-c3_dropped_v2	8	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p0	100	NULL
+@@ -3479,7 +3476,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -3517,7 +3513,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -3657,7 +3652,6 @@ c5	4	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_ROW_ID	5	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_TRX_ID	6	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	7	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-c3_dropped_v2	8	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p0	100	NULL
+@@ -5392,7 +5386,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -5430,7 +5423,6 @@ a	1	MYSQL_TYPE_LONG	1	Visible	table_id=TABLE_ID;
+ c	2	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_TRX_ID	3	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	4	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-b_dropped_v2	5	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p1	10	NULL
+@@ -5570,7 +5562,6 @@ c5	4	MYSQL_TYPE_LONG	0	Visible	table_id=TABLE_ID;
+ DB_ROW_ID	5	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_TRX_ID	6	MYSQL_TYPE_INT24	0	SE	table_id=TABLE_ID;
+ DB_ROLL_PTR	7	MYSQL_TYPE_LONGLONG	0	SE	table_id=TABLE_ID;
+-c3_dropped_v2	8	MYSQL_TYPE_LONG	0	SE	table_id=TABLE_ID;
+ # DD Metadata of partitions in table
+ NAME	DESCRIPTION_UTF8	SE_PRIVATE_DATA
+ p0	100	NULL
+diff --git a/share/messages_to_error_log.txt b/share/messages_to_error_log.txt
+index 216789c95b8..149d2da33ce 100644
+--- a/share/messages_to_error_log.txt
++++ b/share/messages_to_error_log.txt
+@@ -11886,6 +11886,21 @@ ER_CONDITIONAL_DEBUG
+ ER_IB_MSG_PARSE_OLD_REDO_INDEX_VERSION
+   eng "Recovery: Generating index information for INSTANT DDL Table in 8.0.29 format"
+ 
++ER_RES_GRP_FAILED_TO_SWITCH_RESOURCE_GROUP
++  eng "Failed to switch resource group. %s".
++
++ER_RES_GRP_SWITCH_FAILED_COULD_NOT_ACQUIRE_GLOBAL_LOCK
++  eng "Failed to switch resource group. Could not acquire resource groups global lock."
++
++ER_RES_GRP_SWITCH_FAILED_COULD_NOT_ACQUIRE_LOCK
++  eng "Failed to switch resource group. Could not acquire lock on resource group %s."
++
++ER_RES_GRP_SWITCH_FAILED_UNABLE_TO_APPLY_RES_GRP
++  eng "Failed to switch resource group. Unable to apply resource group controller %s."
++
++ER_IB_MSG_CLEAR_INSTANT_DROP_COLUMN_METADATA
++  eng "Failed to clear instant drop column metadata for table %s"
++
+ # DO NOT add server-to-client messages here;
+ # they go in messages_to_clients.txt
+ # in the same directory as this file.
+diff --git a/sql/dd/impl/types/abstract_table_impl.cc b/sql/dd/impl/types/abstract_table_impl.cc
+index ea8ec195d16..1f55555a98c 100644
+--- a/sql/dd/impl/types/abstract_table_impl.cc
++++ b/sql/dd/impl/types/abstract_table_impl.cc
+@@ -271,6 +271,18 @@ Column *Abstract_table_impl::add_column() {
+   return c;
+ }
+ 
++bool Abstract_table_impl::drop_column(const String_type &name) {
++  for (Column *c : m_columns) {
++    if (my_strcasecmp(system_charset_info, name.c_str(), c->name().c_str()) ==
++        0) {
++      m_columns.remove(down_cast<Column_impl *>(c));
++      return true;
++    }
++  }
++
++  return false;
++}
++
+ ///////////////////////////////////////////////////////////////////////////
+ 
+ Column *Abstract_table_impl::get_column(Object_id column_id) {
+diff --git a/sql/dd/impl/types/abstract_table_impl.h b/sql/dd/impl/types/abstract_table_impl.h
+index 68c4b17426b..f441bab035f 100644
+--- a/sql/dd/impl/types/abstract_table_impl.h
++++ b/sql/dd/impl/types/abstract_table_impl.h
+@@ -156,6 +156,7 @@ class Abstract_table_impl : public Entity_object_impl,
+   /////////////////////////////////////////////////////////////////////////
+ 
+   Column *add_column() override;
++  bool drop_column(const String_type &name) override;
+ 
+   const Column_collection &columns() const override { return m_columns; }
+ 
+diff --git a/sql/dd/impl/types/table_impl.h b/sql/dd/impl/types/table_impl.h
+index 39d4c8ba110..aed56a95faa 100644
+--- a/sql/dd/impl/types/table_impl.h
++++ b/sql/dd/impl/types/table_impl.h
+@@ -459,6 +459,9 @@ class Table_impl : public Abstract_table_impl, virtual public Table {
+     Abstract_table_impl::set_last_altered(last_altered);
+   }
+   Column *add_column() override { return Abstract_table_impl::add_column(); }
++  bool drop_column(const String_type &name) override {
++    return Abstract_table_impl::drop_column(name);
++  }
+   const Column_collection &columns() const override {
+     return Abstract_table_impl::columns();
+   }
+diff --git a/sql/dd/impl/types/view_impl.h b/sql/dd/impl/types/view_impl.h
+index 28b44a7d992..19f94c62694 100644
+--- a/sql/dd/impl/types/view_impl.h
++++ b/sql/dd/impl/types/view_impl.h
+@@ -255,6 +255,9 @@ class View_impl : public Abstract_table_impl, public View {
+     Abstract_table_impl::set_last_altered(last_altered);
+   }
+   Column *add_column() override { return Abstract_table_impl::add_column(); }
++  bool drop_column(const String_type &name) override {
++    return Abstract_table_impl::drop_column(name);
++  }
+   const Column_collection &columns() const override {
+     return Abstract_table_impl::columns();
+   }
+diff --git a/sql/dd/types/abstract_table.h b/sql/dd/types/abstract_table.h
+index 80f72d7c51b..38e4482ba21 100644
+--- a/sql/dd/types/abstract_table.h
++++ b/sql/dd/types/abstract_table.h
+@@ -166,6 +166,7 @@ class Abstract_table : virtual public Entity_object {
+   /////////////////////////////////////////////////////////////////////////
+ 
+   virtual Column *add_column() = 0;
++  virtual bool drop_column(const String_type &name) = 0;
+ 
+   virtual const Column_collection &columns() const = 0;
+ 
+diff --git a/storage/innobase/dict/dict0dd.cc b/storage/innobase/dict/dict0dd.cc
+index 128927e8d26..51cba486637 100644
+--- a/storage/innobase/dict/dict0dd.cc
++++ b/storage/innobase/dict/dict0dd.cc
+@@ -1735,11 +1735,15 @@ void dd_part_adjust_table_id(dd::Table *new_table) {
+ 
+ /** Clear the instant ADD COLUMN information of a table
+ @param[in,out]  dd_table        dd::Table
+-@param[in]      clear_version   true if version metadata is to be cleared */
+-void dd_clear_instant_table(dd::Table &dd_table, bool clear_version) {
++@param[in]      clear_version   true if version metadata is to be cleared
++@return DB_SUCCESS or error code */
++dberr_t dd_clear_instant_table(dd::Table &dd_table, bool clear_version) {
++  dberr_t err = DB_SUCCESS;
+   dd_table.se_private_data().remove(
+       dd_table_key_strings[DD_TABLE_INSTANT_COLS]);
+ 
++  std::vector<std::string> cols_to_drop;
++
+   for (auto col : *dd_table.columns()) {
+     auto fn = [&](const char *s) {
+       if (col->se_private_data().exists(s)) {
+@@ -1758,6 +1762,10 @@ void dd_clear_instant_table(dd::Table &dd_table, bool clear_version) {
+       fn(dd_column_key_strings[DD_INSTANT_COLUMN_DEFAULT]);
+     } else {
+       /* Possibly an INSTANT ADD/DROP column with a version */
++      if (dd_column_is_dropped(col)) {
++        cols_to_drop.push_back(col->name().c_str());
++        continue;
++      }
+       fn(dd_column_key_strings[DD_INSTANT_COLUMN_DEFAULT_NULL]);
+       fn(dd_column_key_strings[DD_INSTANT_COLUMN_DEFAULT]);
+       fn(dd_column_key_strings[DD_INSTANT_VERSION_ADDED]);
+@@ -1765,6 +1773,23 @@ void dd_clear_instant_table(dd::Table &dd_table, bool clear_version) {
+       fn(dd_column_key_strings[DD_INSTANT_PHYSICAL_POS]);
+     }
+   }
++
++  if (!cols_to_drop.empty()) {
++    for (auto col_name : cols_to_drop) {
++      if (!dd_drop_hidden_column(&dd_table, col_name.c_str())) {
++        ib::error(ER_IB_MSG_CLEAR_INSTANT_DROP_COLUMN_METADATA)
++            << dd_table.name().c_str();
++        my_error(
++            ER_INTERNAL_ERROR, MYF(0),
++            "Failed to truncate table. You may drop and re-create this table.");
++        ut_ad(0);
++        err = DB_ERROR;
++      }
++    }
++  }
++  cols_to_drop.clear();
++
++  return err;
+ }
+ 
+ /** Clear the instant ADD COLUMN information of a partition, to make it
+diff --git a/storage/innobase/handler/ha_innodb.cc b/storage/innobase/handler/ha_innodb.cc
+index 5268d4ad3b1..31938a81d04 100644
+--- a/storage/innobase/handler/ha_innodb.cc
++++ b/storage/innobase/handler/ha_innodb.cc
+@@ -15271,7 +15271,9 @@ int ha_innobase::truncate_impl(const char *name, TABLE *form,
+     }
+ 
+     if (is_instant) {
+-      dd_clear_instant_table(*table_def, true);
++      if (dd_clear_instant_table(*table_def, true) != DB_SUCCESS) {
++        error = HA_ERR_GENERIC;
++      }
+     }
+   }
+ 
+diff --git a/storage/innobase/handler/ha_innopart.cc b/storage/innobase/handler/ha_innopart.cc
+index 6ea8037a564..e64581508bd 100644
+--- a/storage/innobase/handler/ha_innopart.cc
++++ b/storage/innobase/handler/ha_innopart.cc
+@@ -3042,7 +3042,9 @@ int ha_innopart::truncate_impl(const char *name, TABLE *form,
+       }
+     }
+ 
+-    dd_clear_instant_table(*table_def, true);
++    if (dd_clear_instant_table(*table_def, true) != DB_SUCCESS) {
++      error = HA_ERR_GENERIC;
++    }
+   }
+ 
+   return error;
+@@ -3145,7 +3147,9 @@ int ha_innopart::truncate_partition_low(dd::Table *dd_table) {
+     } else {
+       if (is_instant && !dd_table_part_has_instant_cols(*dd_table)) {
+         /* Not all partition truncate. Don't clear the versioned metadata. */
+-        dd_clear_instant_table(*dd_table, false);
++        if (dd_clear_instant_table(*dd_table, false) != DB_SUCCESS) {
++          error = HA_ERR_GENERIC;
++        }
+       }
+     }
+   }
+diff --git a/storage/innobase/include/dict0dd.h b/storage/innobase/include/dict0dd.h
+index c0fc2735747..dbe0a684032 100644
+--- a/storage/innobase/include/dict0dd.h
++++ b/storage/innobase/include/dict0dd.h
+@@ -797,8 +797,9 @@ void dd_add_instant_columns(const dd::Table *old_dd_table,
+ 
+ /** Clear the instant ADD COLUMN information of a table
+ @param[in,out]  dd_table        dd::Table
+-@param[in]      clear_version   true if version metadata is to be cleared */
+-void dd_clear_instant_table(dd::Table &dd_table, bool clear_version);
++@param[in]      clear_version   true if version metadata is to be cleared
++@return DB_SUCCESS or error code */
++dberr_t dd_clear_instant_table(dd::Table &dd_table, bool clear_version);
+ 
+ /** Clear the instant ADD COLUMN information of a partition, to make it
+ as a normal partition
+diff --git a/storage/innobase/include/dict0dd.ic b/storage/innobase/include/dict0dd.ic
+index 10b038c04fc..5ac19d3430a 100644
+--- a/storage/innobase/include/dict0dd.ic
++++ b/storage/innobase/include/dict0dd.ic
+@@ -105,6 +105,15 @@ inline dd::Column *dd_add_hidden_column(dd::Table *dd_table, const char *name,
+   return (col);
+ }
+ 
++inline bool dd_drop_hidden_column(dd::Table *dd_table, const char *name) {
++#ifdef UNIV_DEBUG
++  const dd::Column *col = dd_find_column(dd_table, name);
++  ut_ad(col != nullptr);
++  ut_ad(dd_column_is_dropped(col));
++#endif
++  return dd_table->drop_column(name);
++}
++
+ /** Add a hidden index element at the end.
+ @param[in,out]  index   created index metadata
+ @param[in]      column  column of the index */

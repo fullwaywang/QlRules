@@ -1,0 +1,61 @@
+commit b37ddc746c429df960464f16dd6d85999530b1ab	b37ddc746c429df960464f16dd6d85999530b1ab
+Author: Nisha Gopalakrishnan <nisha.gopalakrishnan@oracle.com>
+Date:   Thu May 5 13:52:45 2022 +1000
+
+    Bug#33945602 : Server may assert if innodb-log-buffer-size is smaller than 2M.
+    
+    Analysis
+    ========
+    
+    Recovering mini transactions from the redo log files may trigger a debug assertion during
+    the server start up if:
+    1) The innodb-log-buffer-size is smaller than 2MB and
+    2) The mini transaction size is greater than 2MB.
+    
+    During the server startup, while trying to recover mini transactions, the parsing buffer
+    is set to a fixed size of 2MB. If the MTR transaction size is greater than 2MB, while
+    the innodb-buffer-size is smaller than 2MB, a debug assertion i.e
+    ut_ad(recv_sys->buf_len <= srv_log_buffer_size) is fired when trying to resize
+    the buffer to parse the transaction record.
+    
+    Fix
+    ===
+    
+    Instead of allocating fixed size parsing buffer of 2MB, allocate the smallest size of the two
+    i.e 2MB or innodb-log-buffer-size.
+    
+    Thanks to Mengchu Shi for the contribution.
+    
+    Change-Id: Ib045d274c6037d8079f0e237c4188e4f7339848c
+
+diff --git a/storage/innobase/log/log0recv.cc b/storage/innobase/log/log0recv.cc
+index 15195201ff3..5a6f73a9f01 100644
+--- a/storage/innobase/log/log0recv.cc
++++ b/storage/innobase/log/log0recv.cc
+@@ -606,9 +606,10 @@ void recv_sys_init() {
+   recv_sys->apply_file_operations = false;
+ #endif /* !UNIV_HOTBACKUP */
+ 
++  recv_sys->buf_len =
++      std::min<unsigned long>(RECV_PARSING_BUF_SIZE, srv_log_buffer_size);
+   recv_sys->buf = static_cast<byte *>(
+-      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, RECV_PARSING_BUF_SIZE));
+-  recv_sys->buf_len = RECV_PARSING_BUF_SIZE;
++      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, recv_sys->buf_len));
+ 
+   recv_sys->len = 0;
+   recv_sys->recovered_offset = 0;
+@@ -3584,6 +3585,13 @@ bool meb_scan_log_recs(
+       parsing buffer if parse_start_lsn is already
+       non-zero */
+ 
++      DBUG_EXECUTE_IF("simulate_3mb_mtr_recovery", {
++        uint saved_len = recv_sys->len;
++        recv_sys->len = 3 * 1024 * 1024;
++        recv_sys_resize_buf();
++        recv_sys->len = saved_len;
++      });
++
+       if (recv_sys->len + 4 * OS_FILE_LOG_BLOCK_SIZE >= recv_sys->buf_len) {
+         if (!recv_sys_resize_buf()) {
+           recv_sys->found_corrupt_log = true;

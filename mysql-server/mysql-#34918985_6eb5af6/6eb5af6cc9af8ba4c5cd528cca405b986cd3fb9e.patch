@@ -1,0 +1,160 @@
+commit 6eb5af6cc9af8ba4c5cd528cca405b986cd3fb9e	6eb5af6cc9af8ba4c5cd528cca405b986cd3fb9e
+Author: Arpit Goswami <arpit.goswami@oracle.com>
+Date:   Wed Feb 15 09:00:13 2023 +0100
+
+    Bug#34918985 Can't recover XA transactions with XIDs containing
+    null bytes
+    
+    Problem -
+    
+    A binary log containing two XA PREPARE transactions in
+    sequence with different XIDs containing null bytes fails
+    on recovery.
+    
+    Analysis/Root-cause analysis -
+    
+    Upon running test case, the two XIDs with same substring
+    upto '\0' character fails on recovery due to strncmp().
+    strncmp() compares the string and terminates string after
+    '\0' character or n characters whichever comes first (assuming
+    string contains n characters). Hence, strncmp() makes the both
+    the XID strings
+    equal.
+    
+    Solution-
+    
+    Change strncmp() to memcmp() in xa.cc. memcmp() compares
+    whole string including null characters ('\0' characters),
+    hence not making equal XID strings equal.
+    
+    Change-Id: I42489e91ea22e0023fcd776655ece4e91af84cec
+
+diff --git a/mysql-test/suite/binlog/r/binlog_xid_xa_nullbyte.result b/mysql-test/suite/binlog/r/binlog_xid_xa_nullbyte.result
+new file mode 100644
+index 00000000000..a6df3ef2d21
+--- /dev/null
++++ b/mysql-test/suite/binlog/r/binlog_xid_xa_nullbyte.result
+@@ -0,0 +1,31 @@
++include/rpl_init.inc [topology=none]
++#
++# 1) Configuration
++#
++include/suppress_messages.inc
++# Connection 1 suppresses message <Found 2 prepared XA transactions>.
++#
++# 2) Create a table and prepare 2 XA transactions
++#
++CREATE TABLE t (a INT);
++XA START X'0011';
++INSERT INTO t VALUES (1);
++XA END X'0011';
++XA PREPARE X'0011';
++XA START X'0022';
++INSERT INTO t VALUES (2);
++XA END X'0022';
++XA PREPARE X'0022';
++#
++# 3) Restart the server
++#
++include/rpl_restart_server.inc [server_number=1]
++#
++# 4) Rollback the transaction to remove XID from prepared state.
++#
++XA rollback X'0011';
++XA rollback X'0022';
++#
++# 5) Cleanup
++#
++DROP TABLE t;
+diff --git a/mysql-test/suite/binlog/t/binlog_xid_xa_nullbyte.test b/mysql-test/suite/binlog/t/binlog_xid_xa_nullbyte.test
+new file mode 100644
+index 00000000000..53d7bf07c01
+--- /dev/null
++++ b/mysql-test/suite/binlog/t/binlog_xid_xa_nullbyte.test
+@@ -0,0 +1,71 @@
++###############################################################################
++# === Purpose ===
++#
++# The purpose of this test is to recover XA transactions with XIDs containing null bytes.
++#
++# === Requirements ===
++#
++# A binary log containing 2 XA PREPARE transactions in sequence with different XIDs containing null
++# bytes does not fail on recovery.
++#
++# === Implementation ===
++#
++#  1) Configuration
++#  2) Create a table and  prepare 2 XA transactions
++#  3) Restart the server
++#  4) Rollback the transaction to remove XID from prepared state.
++#  5) Cleanup
++#
++# === Reference ===
++#
++# Bug#34918985 : Can't recover XA transactions with XIDs containing null bytes
++#
++###############################################################################
++
++--source include/have_log_bin.inc
++--source include/have_binlog_format_row.inc
++--let $rpl_extra_connections_per_server= 1
++--let $rpl_topology= none
++--let $rpl_server_count= 1
++--source include/rpl_init.inc
++--echo #
++--echo # 1) Configuration
++--echo #
++--let $messages=Found 2 prepared XA transactions
++--source include/suppress_messages.inc
++
++--let $xid1=X'0011'
++--let $xid2=X'0022'
++
++--echo #
++--echo # 2) Create a table and prepare 2 XA transactions
++--echo #
++CREATE TABLE t (a INT);
++eval XA START $xid1;
++INSERT INTO t VALUES (1);
++eval XA END $xid1;
++eval XA PREPARE $xid1;
++eval XA START $xid2;
++INSERT INTO t VALUES (2);
++eval XA END $xid2;
++eval XA PREPARE $xid2;
++
++--echo #
++--echo # 3) Restart the server
++--echo #
++--let $rpl_server_number = 1
++--let $rpl_force_stop = 1
++#Test requirement is validated when rpl_restart_server.inc does not fail
++--source include/rpl_restart_server.inc
++
++--echo #
++--echo # 4) Rollback the transaction to remove XID from prepared state.
++--echo #
++eval XA rollback $xid1;
++eval XA rollback $xid2;
++
++--echo #
++--echo # 5) Cleanup
++--echo #
++DROP TABLE t;
++
+diff --git a/sql/xa.cc b/sql/xa.cc
+index b1f4a87e945..bd625dd0b0d 100644
+--- a/sql/xa.cc
++++ b/sql/xa.cc
+@@ -146,8 +146,8 @@ bool xid_t::operator<(const xid_t &rhs) const {
+   if (this->get_bqual_length() > rhs.get_bqual_length()) {
+     return false;
+   }
+-  if (std::strncmp(this->get_data(), rhs.get_data(),
+-                   this->get_gtrid_length() + this->get_bqual_length()) < 0)
++  if (std::memcmp(this->get_data(), rhs.get_data(),
++                  this->get_gtrid_length() + this->get_bqual_length()) < 0)
+     return true;
+   return false;
+ }

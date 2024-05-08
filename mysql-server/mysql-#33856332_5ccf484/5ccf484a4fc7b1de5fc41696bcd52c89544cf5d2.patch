@@ -1,0 +1,516 @@
+commit 5ccf484a4fc7b1de5fc41696bcd52c89544cf5d2	5ccf484a4fc7b1de5fc41696bcd52c89544cf5d2
+Author: Jakub Łopuszański <jakub.lopuszanski@oracle.com>
+Date:   Fri Feb 25 17:57:33 2022 +0100
+
+    Bug #33856332 InnoDB should let HP transaction timeout while waiting on a lock
+    
+    InnoDB didn't let a High Priority transaction to timeout when waiting for a lock. It simply ignored the time limit being exceeded and kept waiting.
+    In case of undetected deadlock (involving commit order violation in group replication appliers) that is more damaging than helping.
+    It seems it's better to let it timeout and be retried, than to have the whole system being stuck in the deadlock forever.
+    A proper solution to that is probably to properly KILL QUERY of the deadlock's victim, but implementing this will take some time and investigation.
+    This simple quick-fix will buy us some time reducing the severity of the issue faced by a customer.
+    
+    This fix lets an HP transaction to give up waiting if it was interrupted (KILL QUERY) or exceeded the timeout, but only if the blocking transaction is also HP.
+    In case the blocking transaction is non-HP, it will keep on waiting in the hope that the non-HP will eventually release the locks.
+    (Note: in case the non-HP indeed releases the locks, and HP gets finally woken up, it's query will still end with an error in case of interruption, but this is exactly as it works in trunk now)
+    
+    This new rule required some small refactoring in the code which is executed by the woken up transaction's thread to determine what was the reason for wakup.
+    It's no longer enough to check how much time has passed and if current transaction is HP or not, to determine if the reason for wakeup was a timeout, because now it also depends on the priority of the blocker (who might be already gone, and thus difficult to check).
+    Therefore instead of redundantly checking the clock and own type, we simply rely on the `trx->error_state` being correctly set by the thread which has woken up the trx.
+    That is, in trunk, it was the duty of the trx itself to set the `error_state` to `DB_LOCK_WAIT_TIMEOUT` conditionally, but with this patch it is the `lock_wait_timeout_thread`'s duty to set it corrrectly before issuing the wake up signal.
+    I know of 4 possible reasons for wake up:
+    1. interruption
+    2. timeout
+    3. deadlock (can be "faked" by HP transaction)
+    4. succesfully obtaining the lock
+    (5. the transaction itself no longer needs the lock in semi-consistent read, but then it hasn't really started waiting)
+    I've added asserts which prove that timeout and deadlock are mutually exclusive.
+    
+    Also, as we've replaced `gettimeofday()` with `std::chrono::steady_clock::now()` some time ago, the fix for Bug#36819 is no longer needed, so I've removed it.
+    
+    RB: 27683
+    Change-Id: I36279352499a89acdd1cc1c4233bfad8382fc031
+
+diff --git a/mysql-test/suite/innodb/r/hp_deadlock.result b/mysql-test/suite/innodb/r/hp_deadlock.result
+new file mode 100644
+index 00000000000..9f13ff6a1ce
+--- /dev/null
++++ b/mysql-test/suite/innodb/r/hp_deadlock.result
+@@ -0,0 +1,57 @@
++SET @old_innodb_lock_wait_timeout= @@GLOBAL.innodb_lock_wait_timeout;
++SET GLOBAL innodb_lock_wait_timeout= 4;
++# SCENARIO 1
++CREATE TABLE t1 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 VALUES (0);
++CREATE TABLE t2 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t2 VALUES (0);
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t2;
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t1;
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con3_will_wait';
++DELETE FROM t2; COMMIT;
++SET DEBUG_SYNC='now WAIT_FOR con3_will_wait';
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con1_will_wait';
++DELETE FROM t1; COMMIT;
++COMMIT;
++DROP TABLE t1;
++DROP TABLE t2;
++# SCENARIO 2
++CREATE TABLE t1 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 VALUES (0);
++CREATE TABLE t2 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t2 VALUES (0);
++CREATE TABLE t3 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t3 VALUES (0);
++BEGIN;
++SELECT * FROM t3 FOR UPDATE;
++c1
++0
++BEGIN;
++DELETE FROM t2;
++SET DEBUG_SYNC='lock_wait_has_finished_waiting WAIT_FOR con2_can_rollback';
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con2_will_wait';
++SELECT * FROM t3 FOR UPDATE;
++SET DEBUG_SYNC='now WAIT_FOR con2_will_wait';
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t1;
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con3_will_wait';
++DELETE FROM t2; COMMIT;
++SET DEBUG_SYNC='now WAIT_FOR con3_will_wait';
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con1_will_wait';
++DELETE FROM t1; COMMIT;
++Got one of the listed errors
++SET DEBUG_SYNC='now SIGNAL con2_can_rollback';
++ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
++DROP TABLE t3;
++DROP TABLE t1;
++DROP TABLE t2;
++SET GLOBAL innodb_lock_wait_timeout= @old_innodb_lock_wait_timeout;
+diff --git a/mysql-test/suite/innodb/r/hp_deadlock_shutdown.result b/mysql-test/suite/innodb/r/hp_deadlock_shutdown.result
+new file mode 100644
+index 00000000000..8af8e3f6b82
+--- /dev/null
++++ b/mysql-test/suite/innodb/r/hp_deadlock_shutdown.result
+@@ -0,0 +1,38 @@
++SET GLOBAL innodb_deadlock_detect = 'OFF';
++CREATE TABLE t1 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 VALUES (0);
++CREATE TABLE t2 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t2 VALUES (0);
++CREATE TABLE t3 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t3 VALUES (0);
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t1;
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t2;
++include/start_transaction_high_prio.inc
++START TRANSACTION /* HIGH PRIORITY */;
++DELETE FROM t3;
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con3_will_wait';
++DELETE FROM t2; COMMIT;
++SET DEBUG_SYNC='now WAIT_FOR con3_will_wait';
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con2_will_wait';
++DELETE FROM t1; COMMIT;
++SET DEBUG_SYNC='now WAIT_FOR con2_will_wait';
++SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con1_will_wait';
++DELETE FROM t3; COMMIT;
++SET DEBUG_SYNC='now WAIT_FOR con1_will_wait';
++# restart
++SELECT * FROM t1;
++c1
++0
++DROP TABLE t1;
++SELECT * FROM t2;
++c1
++0
++DROP TABLE t2;
++SELECT * FROM t3;
++c1
++0
++DROP TABLE t3;
+diff --git a/mysql-test/suite/innodb/t/hp_deadlock.test b/mysql-test/suite/innodb/t/hp_deadlock.test
+new file mode 100644
+index 00000000000..fe28dbcf018
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/hp_deadlock.test
+@@ -0,0 +1,134 @@
++# Scenario:
++# We have just 3 transactions, T1, T2, T3 which should commit in the order: T1, T2, T3.
++# Now suppose that
++# T1 is waiting for a lock held by T3
++# T3 is waiting for a lock held by T2
++# T2 is waiting for T1 to commit
++# InnoDB informs Coordinator about T1->T3 edge, which is bad as 1<3, and
++# coordinator decides to abort T3.
++# But T3 sits in the waiting slot, and is immune to killing.
++# T2 can't proceed, as it waits for T1.
++# T1 can't proceed as it waits for T3.
++# T3 can't proceed as it waits for T2.
++# Deadlock
++
++# It's also important that in case T2 is a regular (not HP) transaction, then T3 should
++# keep waiting for T2. OTOH T1 can timeout while waiting for T3 as both are HP.
++
++# In $scenario = 1 all transactions are HP
++# IN $scenario = 2 transaction T2 is not HP
++
++--source include/have_debug_sync.inc
++--source include/have_debug.inc
++--source include/count_sessions.inc
++SET @old_innodb_lock_wait_timeout= @@GLOBAL.innodb_lock_wait_timeout;
++SET GLOBAL innodb_lock_wait_timeout= 4;
++
++
++--let $scenario = 1
++
++while($scenario <= 2){
++  --echo # SCENARIO $scenario
++
++  CREATE TABLE t1 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++  INSERT INTO t1 VALUES (0);
++  CREATE TABLE t2 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++  INSERT INTO t2 VALUES (0);
++
++  if($scenario == 2){
++    --connect(con0,localhost,root,,test)
++    CREATE TABLE t3 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++    INSERT INTO t3 VALUES (0);
++    BEGIN;
++    SELECT * FROM t3 FOR UPDATE;
++  }
++  --connect(con1,localhost,root,,test)
++  --connect(con2,localhost,root,,test)
++  --connect(con3,localhost,root,,test)
++
++  --connection con2
++    if($scenario == 1) {
++      --source include/start_transaction_high_prio.inc
++    }
++    if($scenario == 2){
++      BEGIN;
++    }
++    DELETE FROM t2;
++    if($scenario == 2){
++      # We want to see how con3 handles timeing out while waiting for a lock held by con2.
++      # In $scenario == 2 con3 might try to "kill" con2 in some way.
++      # To prevent con2 from being rolled back and releasing locks too soon we make it wait for con0,
++      # so that con3 will force a fake deadlock error on con2, and then we pause con2 before rollback.
++      SET DEBUG_SYNC='lock_wait_has_finished_waiting WAIT_FOR con2_can_rollback';
++      SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con2_will_wait';
++      --send SELECT * FROM t3 FOR UPDATE
++    }
++
++  --connection con3
++    if($scenario == 2){
++      SET DEBUG_SYNC='now WAIT_FOR con2_will_wait';
++    }
++    --source include/start_transaction_high_prio.inc
++    DELETE FROM t1;
++    SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con3_will_wait';
++    --send DELETE FROM t2; COMMIT
++
++  --connection con1
++    SET DEBUG_SYNC='now WAIT_FOR con3_will_wait';
++    --source include/start_transaction_high_prio.inc
++    SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con1_will_wait';
++    --send DELETE FROM t1; COMMIT
++
++  # Now let's try to commit all of them in the order con1, con2, con3
++  # In $scenario = 1, we accept timeouts and deadlock as a valid outcomes.
++  # What we don't accept is undetected deadlocks which make whole test fail.
++  # In $scenario = 2, we additionally care that con3 should succeed.
++  # This implies that con1 (which waits for con3 but commits first) must fail.
++
++  --connection con1
++    if($scenario == 1){
++      --error 0,ER_LOCK_DEADLOCK,ER_LOCK_WAIT_TIMEOUT
++      --reap
++    }
++    if($scenario == 2){
++      --error ER_LOCK_DEADLOCK,ER_LOCK_WAIT_TIMEOUT
++      --reap
++      SET DEBUG_SYNC='now SIGNAL con2_can_rollback';
++    }
++
++  --connection con2
++    if($scenario == 1){
++      COMMIT;
++    }
++    if($scenario == 2){
++      --error ER_LOCK_DEADLOCK
++      --reap
++    }
++
++  --connection con3
++    if($scenario == 1){
++      --error 0,ER_LOCK_DEADLOCK,ER_LOCK_WAIT_TIMEOUT
++      --reap
++    }
++    if($scenario == 2){
++      --reap
++    }
++
++
++  --connection default
++  --disconnect con1
++  --disconnect con2
++  --disconnect con3
++  if($scenario == 2){
++    --disconnect con0
++    DROP TABLE t3;
++  }
++
++  DROP TABLE t1;
++  DROP TABLE t2;
++
++  --inc $scenario
++}
++
++SET GLOBAL innodb_lock_wait_timeout= @old_innodb_lock_wait_timeout;
++--source include/wait_until_count_sessions.inc
+diff --git a/mysql-test/suite/innodb/t/hp_deadlock_shutdown.test b/mysql-test/suite/innodb/t/hp_deadlock_shutdown.test
+new file mode 100644
+index 00000000000..ced5d992828
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/hp_deadlock_shutdown.test
+@@ -0,0 +1,62 @@
++--source include/have_debug_sync.inc
++--source include/have_debug.inc
++--source include/count_sessions.inc
++
++SET GLOBAL innodb_deadlock_detect = 'OFF';
++
++CREATE TABLE t1 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t1 VALUES (0);
++CREATE TABLE t2 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t2 VALUES (0);
++CREATE TABLE t3 (c1 INT NOT NULL PRIMARY KEY) ENGINE=InnoDB;
++INSERT INTO t3 VALUES (0);
++
++
++--connect(con1,localhost,root,,test)
++--connect(con2,localhost,root,,test)
++--connect(con3,localhost,root,,test)
++
++--connection con1
++  --source include/start_transaction_high_prio.inc
++  DELETE FROM t1;
++
++
++--connection con2
++  --source include/start_transaction_high_prio.inc
++  DELETE FROM t2;
++
++--connection con3
++  --source include/start_transaction_high_prio.inc
++  DELETE FROM t3;
++
++--connection con3
++    SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con3_will_wait';
++    --send DELETE FROM t2; COMMIT
++
++--connection con2
++    SET DEBUG_SYNC='now WAIT_FOR con3_will_wait';
++    SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con2_will_wait';
++    --send DELETE FROM t1; COMMIT
++
++--connection con1
++    SET DEBUG_SYNC='now WAIT_FOR con2_will_wait';
++    SET DEBUG_SYNC='lock_wait_will_wait SIGNAL con1_will_wait';
++    --send DELETE FROM t3; COMMIT
++
++--connection default
++    SET DEBUG_SYNC='now WAIT_FOR con1_will_wait';
++
++--source include/shutdown_mysqld.inc
++--source include/start_mysqld.inc
++
++--disconnect con1
++--disconnect con2
++--disconnect con3
++SELECT * FROM t1;
++DROP TABLE t1;
++SELECT * FROM t2;
++DROP TABLE t2;
++SELECT * FROM t3;
++DROP TABLE t3;
++
++--source include/wait_until_count_sessions.inc
+diff --git a/storage/innobase/include/lock0lock.h b/storage/innobase/include/lock0lock.h
+index bdc01efc6bb..bc1fc98b541 100644
+--- a/storage/innobase/include/lock0lock.h
++++ b/storage/innobase/include/lock0lock.h
+@@ -893,8 +893,8 @@ void lock_wait_timeout_thread();
+ void lock_wait_request_check_for_cycles();
+ 
+ /** Puts a user OS thread to wait for a lock to be released. If an error
+- occurs during the wait trx->error_state associated with thr is
+- != DB_SUCCESS when we return. DB_LOCK_WAIT_TIMEOUT and DB_DEADLOCK
++ occurs during the wait trx->error_state associated with thr is != DB_SUCCESS
++ when we return. DB_INTERRUPTED, DB_LOCK_WAIT_TIMEOUT and DB_DEADLOCK
+  are possible errors. DB_DEADLOCK is returned if selective deadlock
+  resolution chose this transaction as a victim. */
+ void lock_wait_suspend_thread(que_thr_t *thr); /*!< in: query thread associated
+diff --git a/storage/innobase/include/trx0trx.h b/storage/innobase/include/trx0trx.h
+index a8391479208..17812877ac1 100644
+--- a/storage/innobase/include/trx0trx.h
++++ b/storage/innobase/include/trx0trx.h
+@@ -963,11 +963,13 @@ struct trx_t {
+   trx_sys->mysql_trx_list */
+ #endif /* UNIV_DEBUG */
+   /*------------------------------*/
+-  dberr_t error_state;             /*!< 0 if no error, otherwise error
+-                                   number; NOTE That ONLY the thread
+-                                   doing the transaction is allowed to
+-                                   set this field: this is NOT protected
+-                                   by any mutex */
++
++  /** DB_SUCCESS if no error, otherwise error number.
++  Accessed without any mutex only by the thread doing the transaction or, if it
++  is suspended (waiting for a lock), by the thread holding this->mutex which
++  has changed trx->lock.wait_lock to nullptr and will wake up the transaction.*/
++  dberr_t error_state;
++
+   const dict_index_t *error_index; /*!< if the error number indicates a
+                                    duplicate key error, a pointer to
+                                    the problematic index is stored here */
+diff --git a/storage/innobase/lock/lock0wait.cc b/storage/innobase/lock/lock0wait.cc
+index b27a5b28639..2b5a9386229 100644
+--- a/storage/innobase/lock/lock0wait.cc
++++ b/storage/innobase/lock/lock0wait.cc
+@@ -1,6 +1,6 @@
+ /*****************************************************************************
+ 
+-Copyright (c) 1996, 2021, Oracle and/or its affiliates.
++Copyright (c) 1996, 2022, Oracle and/or its affiliates.
+ 
+ This program is free software; you can redistribute it and/or modify it under
+ the terms of the GNU General Public License, version 2.0, as published by the
+@@ -194,14 +194,7 @@ static srv_slot_t *lock_wait_table_reserve_slot(
+ 
+ void lock_wait_request_check_for_cycles() { lock_set_timeout_event(); }
+ 
+-/** Puts a user OS thread to wait for a lock to be released. If an error
+- occurs during the wait trx->error_state associated with thr is
+- != DB_SUCCESS when we return. DB_LOCK_WAIT_TIMEOUT and DB_DEADLOCK
+- are possible errors. DB_DEADLOCK is returned if selective deadlock
+- resolution chose this transaction as a victim. */
+-void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
+-                                              with the user OS thread */
+-{
++void lock_wait_suspend_thread(que_thr_t *thr) {
+   srv_slot_t *slot;
+   trx_t *trx;
+   std::chrono::steady_clock::time_point start_time;
+@@ -321,8 +314,6 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
+     rw_lock_x_lock(dict_operation_lock, UT_LOCATION_HERE);
+   }
+ 
+-  const auto wait_time = std::chrono::steady_clock::now() - slot->suspend_time;
+-
+   /* Release the slot for others to use */
+ 
+   lock_wait_table_release_slot(slot);
+@@ -335,10 +326,7 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
+         std::chrono::duration_cast<std::chrono::microseconds>(diff_time)
+             .count());
+ 
+-    /* Only update the variable if we successfully
+-    retrieved the start and finish times. See Bug#36819. */
+-    if (diff_time > lock_sys->n_lock_max_wait_time &&
+-        start_time != std::chrono::steady_clock::time_point{}) {
++    if (diff_time > lock_sys->n_lock_max_wait_time) {
+       lock_sys->n_lock_max_wait_time = diff_time;
+     }
+ 
+@@ -355,10 +343,7 @@ void lock_wait_suspend_thread(que_thr_t *thr) /*!< in: query thread associated
+     return;
+   }
+ 
+-  if (lock_wait_timeout < std::chrono::seconds(100000000) &&
+-      wait_time > lock_wait_timeout && !trx_is_high_priority(trx)) {
+-    trx->error_state = DB_LOCK_WAIT_TIMEOUT;
+-
++  if (trx->error_state == DB_LOCK_WAIT_TIMEOUT) {
+     MONITOR_INC(MONITOR_TIMEOUT);
+   }
+ 
+@@ -482,26 +467,56 @@ static void lock_wait_check_and_cancel(
+   trx_t *trx;
+ 
+   const auto wait_time = std::chrono::steady_clock::now() - slot->suspend_time;
+-
++  /* Timeout exceeded or a wrap-around in system time counter */
++  const auto timeout = slot->wait_timeout < std::chrono::seconds{100000000} &&
++                       wait_time > slot->wait_timeout;
+   trx = thr_get_trx(slot->thr);
+ 
+-  if (trx_is_interrupted(trx) ||
+-      (slot->wait_timeout < std::chrono::seconds{100000000} &&
+-       wait_time > slot->wait_timeout)) {
+-    /* Timeout exceeded or a wrap-around in system time counter: cancel the lock
+-    request queued by the transaction and release possible other transactions
+-    waiting behind; it is possible that the lock has already been granted: in
+-    that case do nothing.
+-    The lock_cancel_waiting_and_release() needs exclusive global latch.
++  if (trx_is_interrupted(trx) || timeout) {
++    /* The lock_cancel_waiting_and_release() needs exclusive global latch.
+     Also, we need to latch the shard containing wait_lock to read the field and
+     access the lock itself. */
+     locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
+ 
+     trx_mutex_enter(trx);
+-
+-    if (trx->lock.wait_lock != nullptr && !trx_is_high_priority(trx)) {
++    bool should_cancel{false};
++    /* It is possible that the lock has already been granted: in that case do
++    nothing. */
++    if (trx->lock.wait_lock != nullptr) {
+       ut_a(trx->lock.que_state == TRX_QUE_LOCK_WAIT);
+-
++      if (trx_is_high_priority(trx)) {
++        /* We read blocking_trx under Global exclusive latch so it can't change
++        and we know that wait_lock is non-null so there must be a blocker. */
++        const trx_t *blocker = trx->lock.blocking_trx.load();
++        ut_ad(blocker != nullptr);
++        /* An HP trx should not give up if the blocker is not HP. */
++        if (trx_is_high_priority(blocker)) {
++          should_cancel = true;
++        }
++      } else {
++        should_cancel = true;
++      }
++    }
++    if (should_cancel) {
++      if (timeout) {
++        /* Make sure we are not overwriting the DB_DEADLOCK which would be more
++        important to report as it rolls back whole transaction, not just the
++        current query. We set error_state to DB_DEADLOCK only:
++        1) before the transaction reserves a slot. But, we know it's in a slot.
++        2) when wait_lock is already set to nullptr. But, it's not nullptr. */
++        ut_ad(trx->error_state != DB_DEADLOCK);
++        trx->error_state = DB_LOCK_WAIT_TIMEOUT;
++        /* This flag can't be set, as we always call the
++        lock_cancel_waiting_and_release() immediately after setting it, which
++        either prevents the trx from going to sleep or resets the wait_lock, and
++        we've ruled out both of these possibilities. This means that the
++        subsequent call to lock_cancel_waiting_and_release() shouldn't overwrite
++        the error_state we've just set. This isn't a crucial property, but makes
++        reasoning simpler, I hope, hence this assert. */
++        ut_ad(!trx->lock.was_chosen_as_deadlock_victim);
++      }
++      /* Cancel the lock request queued by the transaction and release possible
++      other transactions waiting behind. */
+       lock_cancel_waiting_and_release(trx->lock.wait_lock);
+     }
+ 

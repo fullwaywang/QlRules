@@ -1,0 +1,131 @@
+commit 14c90a0c0fe7edb423ca811de5c6212c67cbde14	14c90a0c0fe7edb423ca811de5c6212c67cbde14
+Author: Dag Wanvik <dag.wanvik@oracle.com>
+Date:   Fri Dec 8 14:03:24 2023 +0100
+
+    Bug#35471522 AccessPath* MoveCompositeIteratorsFromTablePath(AccessPath*, const Query_block& Bug#35228083 Assertion `false' failed|sql/sql_executor.cc [back-port]
+    
+    Back-port to 8.0 branch. It differs slightly from original patch due
+    to dependencies on unported code, but the diffs are trivial.
+    
+    Assert when ordering a unary (nested block) and the order by contains a
+    window function:
+    
+       ( block LIMIT .. ) ORDER BY .. window-function ..
+    
+    The ORDER BY is somewhat conservatively not pushed into the nested
+    block in this case due to the presence of the LIMIT.
+    
+    MoveCompositeIteratorsFromTablePath is missing a case for
+    bottom_of_table_path->type being a window, so we see an assert in
+    debug build. In production build I do not see a crash.  The patch adds
+    handling of this case which makes the repro not assert in debug
+    builds.
+    
+    For explain, we saw another assert. To fix this, we added a new case
+    calling a new function EstimateWindowCost.
+    
+    The issue also contains another repro which does not contain a window
+    function which fails on the same assert. This is a similar bug
+    but a distinct error: in the case the unexpected access path is a
+    DYNAMIC_INDEX_RANGE_SCAN. The patch also solves this issue.
+    
+    Finally, there is another issue 35228083 which is a duplicate of the
+    first repro (window function), so this patch solves that as well.
+    
+    Change-Id: I2cea641a3206dfdc276e85583c624c3c1e7b26a2
+
+diff --git a/sql/join_optimizer/access_path.cc b/sql/join_optimizer/access_path.cc
+index d1bdc96dc90..178a56a12c6 100644
+--- a/sql/join_optimizer/access_path.cc
++++ b/sql/join_optimizer/access_path.cc
+@@ -951,7 +951,9 @@ unique_ptr_destroy_only<RowIterator> CreateIteratorFromAccessPath(
+             path->materialize().table_path->type == AccessPath::CONST_TABLE ||
+             path->materialize().table_path->type == AccessPath::INDEX_SCAN ||
+             path->materialize().table_path->type ==
+-                AccessPath::INDEX_RANGE_SCAN);
++                AccessPath::INDEX_RANGE_SCAN ||
++            path->materialize().table_path->type ==
++                AccessPath::DYNAMIC_INDEX_RANGE_SCAN);
+ 
+         MaterializePathParameters *param = path->materialize().param;
+         if (job.children.is_null()) {
+diff --git a/sql/join_optimizer/access_path.h b/sql/join_optimizer/access_path.h
+index c14544477a9..c8d488c6f57 100644
+--- a/sql/join_optimizer/access_path.h
++++ b/sql/join_optimizer/access_path.h
+@@ -1148,8 +1148,8 @@ struct AccessPath {
+     } stream;
+     struct {
+       // NOTE: The only legal access paths within table_path are
+-      // TABLE_SCAN, REF, REF_OR_NULL, EQ_REF, ALTERNATIVE and
+-      // CONST_TABLE (the latter is somewhat nonsensical).
++      // TABLE_SCAN, REF, REF_OR_NULL, EQ_REF, ALTERNATIVE,
++      // CONST_TABLE (somewhat nonsensical), INDEX_SCAN and DYNAMIC_INDEX_SCAN
+       AccessPath *table_path;
+ 
+       // Large, and has nontrivial destructors, so split out
+diff --git a/sql/join_optimizer/cost_model.cc b/sql/join_optimizer/cost_model.cc
+index bbe2f0dd203..61248d6ab3f 100644
+--- a/sql/join_optimizer/cost_model.cc
++++ b/sql/join_optimizer/cost_model.cc
+@@ -914,3 +914,13 @@ void EstimateLimitOffsetCost(AccessPath *path) {
+                       fraction_start_read * (child->cost - child->init_cost);
+   }
+ }
++
++void EstimateWindowCost(AccessPath *path) {
++  auto &win = path->window();
++  AccessPath *child = win.child;
++
++  path->set_num_output_rows(child->num_output_rows());
++  path->init_cost = child->init_cost;
++  path->init_once_cost = child->init_once_cost;
++  path->cost = child->cost + kWindowOneRowCost * child->num_output_rows();
++}
+diff --git a/sql/join_optimizer/cost_model.h b/sql/join_optimizer/cost_model.h
+index 9d84e73a9a0..961faa9a5ed 100644
+--- a/sql/join_optimizer/cost_model.h
++++ b/sql/join_optimizer/cost_model.h
+@@ -136,6 +136,9 @@ void EstimateStreamCost(AccessPath *path);
+ /// Estimate the costs and row count for a LIMIT_OFFSET AccessPath.
+ void EstimateLimitOffsetCost(AccessPath *path);
+ 
++/// Estimate the costs and row count for a WINDOW AccessPath.
++void EstimateWindowCost(AccessPath *path);
++
+ inline double FindOutputRowsForJoin(double left_rows, double right_rows,
+                                     const JoinPredicate *edge) {
+   double fanout = right_rows * edge->selectivity;
+diff --git a/sql/sql_executor.cc b/sql/sql_executor.cc
+index 467998e4b65..63502db46aa 100644
+--- a/sql/sql_executor.cc
++++ b/sql/sql_executor.cc
+@@ -1522,6 +1522,10 @@ static void RecalculateTablePathCost(AccessPath *path,
+       EstimateMaterializeCost(current_thd, path);
+       break;
+ 
++    case AccessPath::WINDOW:
++      EstimateWindowCost(path);
++      break;
++
+     default:
+       assert(false);
+   }
+@@ -1548,6 +1552,7 @@ AccessPath *MoveCompositeIteratorsFromTablePath(
+       case AccessPath::CONST_TABLE:
+       case AccessPath::INDEX_SCAN:
+       case AccessPath::INDEX_RANGE_SCAN:
++      case AccessPath::DYNAMIC_INDEX_RANGE_SCAN:
+         // We found our real bottom.
+         path->materialize().table_path = sub_path;
+         if (explain) {
+@@ -1609,6 +1614,9 @@ AccessPath *MoveCompositeIteratorsFromTablePath(
+             .param->query_blocks[0]
+             .subquery_path = path;
+         break;
++      case AccessPath::WINDOW:
++        bottom_of_table_path->window().child = path;
++        break;
+       default:
+         assert(false);
+     }

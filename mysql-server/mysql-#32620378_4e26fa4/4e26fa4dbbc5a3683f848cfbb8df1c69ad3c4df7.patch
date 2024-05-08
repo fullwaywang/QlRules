@@ -1,0 +1,86 @@
+commit 4e26fa4dbbc5a3683f848cfbb8df1c69ad3c4df7	4e26fa4dbbc5a3683f848cfbb8df1c69ad3c4df7
+Author: Yasufumi Kinoshita <yasufumi.kinoshita@oracle.com>
+Date:   Fri May 28 12:14:37 2021 +0900
+
+    Bug#32620378, Bug#32620398: ZDI-CAN-13265, ZDI-CAN-13266: MYSQL MEMCACHED PLUGIN INTEGER UNDERFLOW
+    
+    Fixed integer underflow possibilities of memcached code in innodb_memcached plugin
+    
+    RB: 26411
+    Reviewed-by: Sunny Bains <Sunny.Bains@oracle.com>
+
+diff --git a/plugin/innodb_memcached/daemon_memcached/daemon/memcached.c b/plugin/innodb_memcached/daemon_memcached/daemon/memcached.c
+index 912389daaec..417d58ab93d 100644
+--- a/plugin/innodb_memcached/daemon_memcached/daemon/memcached.c
++++ b/plugin/innodb_memcached/daemon_memcached/daemon/memcached.c
+@@ -2172,6 +2172,8 @@ static void process_bin_sasl_auth(conn *c) {
+     int nkey = c->binary_header.request.keylen;
+     int vlen = c->binary_header.request.bodylen - nkey;
+ 
++    assert(vlen >= 0);
++
+     if (nkey > MAX_SASL_MECH_LEN) {
+         write_bin_packet(c, PROTOCOL_BINARY_RESPONSE_EINVAL, vlen);
+         c->write_and_go = conn_swallow;
+@@ -2904,10 +2906,16 @@ static RESPONSE_HANDLER response_handlers[256] = {
+ static void dispatch_bin_command(conn *c) {
+     int protocol_error = 0;
+ 
+-    int extlen = c->binary_header.request.extlen;
++    uint8_t extlen = c->binary_header.request.extlen;
+     uint16_t keylen = c->binary_header.request.keylen;
+     uint32_t bodylen = c->binary_header.request.bodylen;
+ 
++    if (keylen > bodylen || keylen + extlen > bodylen) {
++        write_bin_packet(c, PROTOCOL_BINARY_RESPONSE_UNKNOWN_COMMAND, 0);
++        c->write_and_go = conn_closing;
++        return;
++    }
++
+     if (settings.require_sasl && !authenticated(c)) {
+         write_bin_packet(c, PROTOCOL_BINARY_RESPONSE_AUTH_ERROR, 0);
+         c->write_and_go = conn_closing;
+@@ -3240,6 +3248,8 @@ static void process_bin_append_prepend(conn *c) {
+     nkey = c->binary_header.request.keylen;
+     vlen = c->binary_header.request.bodylen - nkey;
+ 
++    assert(vlen >= 0);
++
+     if (settings.verbose > 1) {
+         settings.extensions.logger->log(EXTENSION_LOG_DEBUG, c,
+                                         "Value len is %d\n", vlen);
+diff --git a/plugin/innodb_memcached/innodb_memcache/cache-src/items.c b/plugin/innodb_memcached/innodb_memcache/cache-src/items.c
+index c3ef375233d..48dc68fe4cb 100644
+--- a/plugin/innodb_memcached/innodb_memcache/cache-src/items.c
++++ b/plugin/innodb_memcached/innodb_memcache/cache-src/items.c
+@@ -1,4 +1,8 @@
+ /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
++/*
++ *  Modifications Copyright (c) 2013, 2021, Oracle and/or its affiliates.
++ *  All rights reserved.
++ */
+ #include "config.h"
+ #include <fcntl.h>
+ #include <errno.h>
+@@ -90,6 +94,10 @@ hash_item *do_item_alloc(struct default_engine *engine,
+                          const int nbytes,
+                          const void *cookie) {
+     hash_item *it = NULL;
++    // Avoid potential underflows.
++    if (nbytes < 0)
++        return 0;
++
+     size_t ntotal = sizeof(hash_item) + nkey + nbytes;
+     if (engine->config.use_cas) {
+         ntotal += sizeof(uint64_t);
+@@ -131,6 +139,10 @@ hash_item *do_item_alloc(struct default_engine *engine,
+                          const int nbytes,
+                          const void *cookie) {
+     hash_item *it = NULL;
++    // Avoid potential underflows.
++    if (nbytes < 0)
++        return 0;
++
+     size_t ntotal = sizeof(hash_item) + nkey + nbytes;
+     if (engine->config.use_cas) {
+         ntotal += sizeof(uint64_t);

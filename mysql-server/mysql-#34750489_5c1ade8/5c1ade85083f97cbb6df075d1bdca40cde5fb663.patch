@@ -1,0 +1,128 @@
+commit 5c1ade85083f97cbb6df075d1bdca40cde5fb663	5c1ade85083f97cbb6df075d1bdca40cde5fb663
+Author: Yasufumi Kinoshita <yasufumi.kinoshita@oracle.com>
+Date:   Mon Dec 12 16:09:53 2022 +0900
+
+    Bug#34750489: applying a updated online log may access out-of-bounds memory
+    
+    Some online DDL operations scenes, which need rebuilding the table, may
+    access out-of-bounds memory, when the table has virtual columns.
+    
+    row_log_table_apply_op() needs to check buffer length before calls
+    trx_undo_read_v_cols().
+    
+    In addition, 8.0 code around this fix seems to have problem when mrec_end==next_mrec case.
+    (might miss to call trx_undo_read_v_cols() wrongly and cause mismatch log reading.)
+    The 8.0 code should be also same with this 5.7 fixed code.
+    
+    Change-Id: I016a581b0a6fd122921c9d4c04e655ceec679ed1
+
+diff --git a/mysql-test/suite/innodb/r/innodb_bug34750489.result b/mysql-test/suite/innodb/r/innodb_bug34750489.result
+new file mode 100644
+index 00000000000..bb0022e33f5
+--- /dev/null
++++ b/mysql-test/suite/innodb/r/innodb_bug34750489.result
+@@ -0,0 +1,12 @@
++show global variables like "innodb_sort_buffer_size";
++Variable_name	Value
++innodb_sort_buffer_size	66664
++SET debug_sync = 'alter_table_update_log signal send_concurrent WAIT_FOR concurrent_done';
++OPTIMIZE TABLE t1;;
++SET debug_sync = 'now wait_for send_concurrent';
++UPDATE t1 SET id = id + 1;
++SET debug_sync = 'now signal concurrent_done';
++Table	Op	Msg_type	Msg_text
++test.t1	optimize	note	Table does not support optimize, doing recreate + analyze instead
++test.t1	optimize	status	OK
++DROP TABLE t1;
+diff --git a/mysql-test/suite/innodb/t/innodb_bug34750489-master.opt b/mysql-test/suite/innodb/t/innodb_bug34750489-master.opt
+new file mode 100644
+index 00000000000..2dbadb89946
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/innodb_bug34750489-master.opt
+@@ -0,0 +1 @@
++--innodb_sort_buffer_size=66664
+diff --git a/mysql-test/suite/innodb/t/innodb_bug34750489.test b/mysql-test/suite/innodb/t/innodb_bug34750489.test
+new file mode 100644
+index 00000000000..0c7dd1f52e8
+--- /dev/null
++++ b/mysql-test/suite/innodb/t/innodb_bug34750489.test
+@@ -0,0 +1,48 @@
++# Bug#34750489 : applying a updated online log may access out-of-bounds memory
++
++--source include/have_debug.inc
++--source include/have_debug_sync.inc
++--source include/count_sessions.inc
++
++show global variables like "innodb_sort_buffer_size";
++
++connect(conn1,localhost,root,,);
++connect(conn2,localhost,root,,);
++
++connection default;
++--disable_query_log
++CREATE TABLE t1(
++  id INT,
++  name VARCHAR(1000),
++  g_col VARCHAR(20) GENERATED ALWAYS AS (concat(id, substr(`name`, 0, 10))) VIRTUAL,
++  KEY idx_id_g_col(id, g_col));
++
++let $i= 0;
++while ($i < 80)
++{
++  eval INSERT INTO `t1`(id, name) VALUES($i, repeat("a",1000));
++  inc $i;
++}
++--enable_query_log
++
++# main operation
++connection conn1;
++SET debug_sync = 'alter_table_update_log signal send_concurrent WAIT_FOR concurrent_done';
++--send OPTIMIZE TABLE t1;
++
++# concurrent operations
++connection conn2;
++SET debug_sync = 'now wait_for send_concurrent';
++UPDATE t1 SET id = id + 1;
++SET debug_sync = 'now signal concurrent_done';
++disconnect conn2;
++
++connection conn1;
++reap;
++disconnect conn1;
++
++# teardown
++connection default;
++
++DROP TABLE t1;
++--source include/wait_until_count_sessions.inc
+diff --git a/storage/innobase/row/row0log.cc b/storage/innobase/row/row0log.cc
+index 6bc162f4d01..54a227d797b 100644
+--- a/storage/innobase/row/row0log.cc
++++ b/storage/innobase/row/row0log.cc
+@@ -2686,17 +2686,22 @@ row_log_table_apply_op(
+ 
+ 			/* if there is more than 2 bytes length info */
+ 			if (n_v_size > 2) {
++				if (next_mrec + 2 > mrec_end) {
++					return(NULL);
++				}
++				o_v_size = mach_read_from_2(next_mrec);
++				if (next_mrec + o_v_size > mrec_end) {
++					return(NULL);
++				}
++
+ 				trx_undo_read_v_cols(
+ 					log->table, const_cast<byte*>(
+ 					next_mrec), old_pk, false,
+ 					&(log->col_map[log->n_old_col]));
+-				o_v_size = mach_read_from_2(next_mrec);
+ 			}
+ 
+ 			next_mrec += o_v_size;
+-			if (next_mrec > mrec_end) {
+-				return(NULL);
+-			}
++			ut_ad(next_mrec <= mrec_end);
+ 		}
+ 
+ 		ut_ad(next_mrec <= mrec_end);

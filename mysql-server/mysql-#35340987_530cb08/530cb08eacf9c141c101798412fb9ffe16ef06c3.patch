@@ -1,0 +1,181 @@
+commit 530cb08eacf9c141c101798412fb9ffe16ef06c3	530cb08eacf9c141c101798412fb9ffe16ef06c3
+Author: Dag Wanvik <dag.wanvik@oracle.com>
+Date:   Sat Apr 29 01:31:27 2023 +0200
+
+    Bug#35340987 [backport] Prepared SELECT returns different results on consecutive executions.
+    
+    This patch also solves:
+    Bug#35380604 issue with window functions in stored procedures
+    Bug#35846873 Segmentation fault in /mysql-8.0.34/sql/item.cc:2811
+    Bug#35846585 Arithmetic exception in /mysql-8.0.34/sql/item_sum.cc:5032
+    
+    A regression from
+    
+      Bug#35060385 Item::update_used_tables should also update the PROP_SUBQUERY
+    
+    which fully re-calculates m_accum_properties for an Item_func,
+    starting with 0.
+    
+    In the repro, we have a prepared statement which gives the wrong
+    result in the second execute.  We have an equality expression in the
+    select list, one argument of which is a window function. During
+    optimize, we find ourselves in this situation:
+    
+        Item_ref::update_used_tables   (Item_aggregate_ref to w.f.)
+        Item_func::update_used_tables  (equality function)
+        ReplaceMaterializedTable
+        CreateFrameBufferTable
+        make_tmp_tables_info
+        :
+    
+    But make_tmp_tables_info changes the slice for the window function
+    with this call: set_ref_item_slice(widx). So Item_ref's m_ref_item
+    then points to a field in a window tmp table, not the window function,
+    so we lose the PROP_WINDOW_FUNCTION property for the aggregate
+    reference and hence also the equality function, which leads to error
+    in the second execute of the prepared statement: since optimize now
+    finds the equality function now contains no window function it is
+    evaluated too early: during a call of copy_funcs from
+    BufferingWindowIterator::Read instead of during a call of copy_funcs
+    from process_buffered_windowing_record.
+    
+    The solution is always (re)compute update_used_tables for the function
+    fields in make_tmp_tables_info if windows are present, i.e. before we
+    start relying on the correct values of the PROP_WINDOW_FUNCTION
+    property for the (next) execution.
+    
+    Change-Id: I43617988424ea3fc17c0cca5d5e5e40a86b46b8c
+
+diff --git a/mysql-test/r/window_functions_bugs.result b/mysql-test/r/window_functions_bugs.result
+index cc62dc35013..f2c23131e65 100644
+--- a/mysql-test/r/window_functions_bugs.result
++++ b/mysql-test/r/window_functions_bugs.result
+@@ -1718,3 +1718,58 @@ Warnings:
+ Warning	1292	Truncated incorrect INTEGER value: 'it'
+ SET SQL_MODE=default;
+ DROP TABLE t1;
++#
++# Bug#35340987 Prepared SELECT returns different results on
++#              consecutive executions.
++#
++CREATE TABLE t(i INT);
++INSERT INTO t(i) VALUES (100), (101);
++PREPARE stmt1 FROM "
++  SELECT a.i, (LAST_VALUE(a.i) OVER outer_window) = a.i AS result
++  FROM (SELECT LAG(i) OVER inner_window AS i_lag,
++               i AS i
++        FROM t
++        WINDOW inner_window AS (ORDER BY i) ) AS a
++  WINDOW outer_window AS (ORDER BY a.i)";
++EXECUTE stmt1;
++i	result
++100	1
++101	1
++EXECUTE stmt1;
++i	result
++100	1
++101	1
++DROP PREPARE stmt1;
++DROP TABLE t;
++#
++# Bug#35380604 issue with window functions in stored procedures
++#
++CREATE TABLE table1(id INT);
++INSERT INTO table1 VALUES(1),(2),(3),(4),(5),(6);
++CREATE PROCEDURE test2()
++BEGIN
++SELECT COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS a,
++COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) + 1 AS "a+1",
++COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) - 1 AS "a-1",
++COUNT(*) OVER () AS b,
++COUNT(*) OVER () + 1 AS "b+1",
++COUNT(*) OVER () - 1 AS "b-1" FROM table1 ;
++END $
++CALL test2();
++a	a+1	a-1	b	b+1	b-1
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++CALL test2();
++a	a+1	a-1	b	b+1	b-1
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++6	7	5	6	7	5
++DROP PROCEDURE test2;
++DROP TABLE table1;
+diff --git a/mysql-test/t/window_functions_bugs.test b/mysql-test/t/window_functions_bugs.test
+index dd7df9bccde..bd189f808f8 100644
+--- a/mysql-test/t/window_functions_bugs.test
++++ b/mysql-test/t/window_functions_bugs.test
+@@ -1179,3 +1179,47 @@ ORDER BY ( EXPORT_SET( c2,
+ SET SQL_MODE=default;
+ 
+ DROP TABLE t1;
++
++--echo #
++--echo # Bug#35340987 Prepared SELECT returns different results on
++--echo #              consecutive executions.
++--echo #
++CREATE TABLE t(i INT);
++INSERT INTO t(i) VALUES (100), (101);
++
++PREPARE stmt1 FROM "
++  SELECT a.i, (LAST_VALUE(a.i) OVER outer_window) = a.i AS result
++  FROM (SELECT LAG(i) OVER inner_window AS i_lag,
++               i AS i
++        FROM t
++        WINDOW inner_window AS (ORDER BY i) ) AS a
++  WINDOW outer_window AS (ORDER BY a.i)";
++
++EXECUTE stmt1;
++EXECUTE stmt1;
++
++DROP PREPARE stmt1;
++DROP TABLE t;
++
++--echo #
++--echo # Bug#35380604 issue with window functions in stored procedures
++--echo #
++CREATE TABLE table1(id INT);
++INSERT INTO table1 VALUES(1),(2),(3),(4),(5),(6);
++DELIMITER $;
++CREATE PROCEDURE test2()
++BEGIN
++SELECT COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS a,
++COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) + 1 AS "a+1",
++COUNT(*) OVER (ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) - 1 AS "a-1",
++COUNT(*) OVER () AS b,
++COUNT(*) OVER () + 1 AS "b+1",
++COUNT(*) OVER () - 1 AS "b-1" FROM table1 ;
++END $
++DELIMITER ;$
++
++CALL test2();
++CALL test2();
++
++DROP PROCEDURE test2;
++DROP TABLE table1;
+diff --git a/sql/sql_select.cc b/sql/sql_select.cc
+index f7fa4651f88..87f174dc355 100644
+--- a/sql/sql_select.cc
++++ b/sql/sql_select.cc
+@@ -4390,6 +4390,13 @@ bool JOIN::make_tmp_tables_info() {
+ 
+   DBUG_TRACE;
+ 
++  // This is necessary to undo effects of any previous execute's call to
++  // CreateFramebufferTable->ReplaceMaterializedItems's calls of
++  // update_used_tables: loses PROP_WINDOW_FUNCTION needed here in next
++  // execution round
++  if (m_windows.elements > 0)
++    for (auto f : *fields) f->update_used_tables();
++
+   /*
+     In this function, we may change having_cond into a condition on a
+     temporary sort/group table, so we have to assign having_for_explain now:

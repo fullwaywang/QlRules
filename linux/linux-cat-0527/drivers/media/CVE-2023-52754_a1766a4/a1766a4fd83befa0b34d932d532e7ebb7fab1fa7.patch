@@ -1,0 +1,44 @@
+commit a1766a4fd83befa0b34d932d532e7ebb7fab1fa7
+Author: Takashi Iwai <tiwai@suse.de>
+Date:   Fri Sep 22 14:38:07 2023 +0200
+
+    media: imon: fix access to invalid resource for the second interface
+    
+    imon driver probes two USB interfaces, and at the probe of the second
+    interface, the driver assumes blindly that the first interface got
+    bound with the same imon driver.  It's usually true, but it's still
+    possible that the first interface is bound with another driver via a
+    malformed descriptor.  Then it may lead to a memory corruption, as
+    spotted by syzkaller; imon driver accesses the data from drvdata as
+    struct imon_context object although it's a completely different one
+    that was assigned by another driver.
+    
+    This patch adds a sanity check -- whether the first interface is
+    really bound with the imon driver or not -- for avoiding the problem
+    above at the probe time.
+    
+    Reported-by: syzbot+59875ffef5cb9c9b29e9@syzkaller.appspotmail.com
+    Closes: https://lore.kernel.org/all/000000000000a838aa0603cc74d6@google.com/
+    Tested-by: Ricardo B. Marliere <ricardo@marliere.net>
+    Link: https://lore.kernel.org/r/20230922005152.163640-1-ricardo@marliere.net
+    Signed-off-by: Takashi Iwai <tiwai@suse.de>
+    Signed-off-by: Sean Young <sean@mess.org>
+    Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+
+diff --git a/drivers/media/rc/imon.c b/drivers/media/rc/imon.c
+index 74546f7e3469..5719dda6e0f0 100644
+--- a/drivers/media/rc/imon.c
++++ b/drivers/media/rc/imon.c
+@@ -2427,6 +2427,12 @@ static int imon_probe(struct usb_interface *interface,
+ 		goto fail;
+ 	}
+ 
++	if (first_if->dev.driver != interface->dev.driver) {
++		dev_err(&interface->dev, "inconsistent driver matching\n");
++		ret = -EINVAL;
++		goto fail;
++	}
++
+ 	if (ifnum == 0) {
+ 		ictx = imon_init_intf0(interface, id);
+ 		if (!ictx) {

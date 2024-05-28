@@ -1,0 +1,51 @@
+commit 4afb912f439c4bc4e6a4f3e7547f2e69e354108f
+Author: Josef Bacik <josef@toxicpanda.com>
+Date:   Tue Oct 5 16:35:27 2021 -0400
+
+    btrfs: fix abort logic in btrfs_replace_file_extents
+    
+    Error injection testing uncovered a case where we'd end up with a
+    corrupt file system with a missing extent in the middle of a file.  This
+    occurs because the if statement to decide if we should abort is wrong.
+    
+    The only way we would abort in this case is if we got a ret !=
+    -EOPNOTSUPP and we called from the file clone code.  However the
+    prealloc code uses this path too.  Instead we need to abort if there is
+    an error, and the only error we _don't_ abort on is -EOPNOTSUPP and only
+    if we came from the clone file code.
+    
+    CC: stable@vger.kernel.org # 5.10+
+    Reviewed-by: Nikolay Borisov <nborisov@suse.com>
+    Reviewed-by: Filipe Manana <fdmanana@suse.com>
+    Signed-off-by: Josef Bacik <josef@toxicpanda.com>
+    Reviewed-by: David Sterba <dsterba@suse.com>
+    Signed-off-by: David Sterba <dsterba@suse.com>
+
+diff --git a/fs/btrfs/file.c b/fs/btrfs/file.c
+index a949cb2894f4..a1762363f61f 100644
+--- a/fs/btrfs/file.c
++++ b/fs/btrfs/file.c
+@@ -2703,14 +2703,16 @@ int btrfs_replace_file_extents(struct btrfs_inode *inode,
+ 						 drop_args.bytes_found);
+ 		if (ret != -ENOSPC) {
+ 			/*
+-			 * When cloning we want to avoid transaction aborts when
+-			 * nothing was done and we are attempting to clone parts
+-			 * of inline extents, in such cases -EOPNOTSUPP is
+-			 * returned by __btrfs_drop_extents() without having
+-			 * changed anything in the file.
++			 * The only time we don't want to abort is if we are
++			 * attempting to clone a partial inline extent, in which
++			 * case we'll get EOPNOTSUPP.  However if we aren't
++			 * clone we need to abort no matter what, because if we
++			 * got EOPNOTSUPP via prealloc then we messed up and
++			 * need to abort.
+ 			 */
+-			if (extent_info && !extent_info->is_new_extent &&
+-			    ret && ret != -EOPNOTSUPP)
++			if (ret &&
++			    (ret != -EOPNOTSUPP ||
++			     (extent_info && extent_info->is_new_extent)))
+ 				btrfs_abort_transaction(trans, ret);
+ 			break;
+ 		}

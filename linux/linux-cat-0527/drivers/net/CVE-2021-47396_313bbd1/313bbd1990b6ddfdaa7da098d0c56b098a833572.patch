@@ -1,0 +1,56 @@
+commit 313bbd1990b6ddfdaa7da098d0c56b098a833572
+Author: Johannes Berg <johannes.berg@intel.com>
+Date:   Wed Sep 15 11:29:37 2021 +0200
+
+    mac80211-hwsim: fix late beacon hrtimer handling
+    
+    Thomas explained in https://lore.kernel.org/r/87mtoeb4hb.ffs@tglx
+    that our handling of the hrtimer here is wrong: If the timer fires
+    late (e.g. due to vCPU scheduling, as reported by Dmitry/syzbot)
+    then it tries to actually rearm the timer at the next deadline,
+    which might be in the past already:
+    
+     1          2          3          N          N+1
+     |          |          |   ...    |          |
+    
+     ^ intended to fire here (1)
+                ^ next deadline here (2)
+                                          ^ actually fired here
+    
+    The next time it fires, it's later, but will still try to schedule
+    for the next deadline (now 3), etc. until it catches up with N,
+    but that might take a long time, causing stalls etc.
+    
+    Now, all of this is simulation, so we just have to fix it, but
+    note that the behaviour is wrong even per spec, since there's no
+    value then in sending all those beacons unaligned - they should be
+    aligned to the TBTT (1, 2, 3, ... in the picture), and if we're a
+    bit (or a lot) late, then just resume at that point.
+    
+    Therefore, change the code to use hrtimer_forward_now() which will
+    ensure that the next firing of the timer would be at N+1 (in the
+    picture), i.e. the next interval point after the current time.
+    
+    Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+    Reported-by: Dmitry Vyukov <dvyukov@google.com>
+    Reported-by: syzbot+0e964fad69a9c462bc1e@syzkaller.appspotmail.com
+    Fixes: 01e59e467ecf ("mac80211_hwsim: hrtimer beacon")
+    Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+    Link: https://lore.kernel.org/r/20210915112936.544f383472eb.I3f9712009027aa09244b65399bf18bf482a8c4f1@changeid
+    Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+
+diff --git a/drivers/net/wireless/mac80211_hwsim.c b/drivers/net/wireless/mac80211_hwsim.c
+index ffa894f7312a..0adae76eb8df 100644
+--- a/drivers/net/wireless/mac80211_hwsim.c
++++ b/drivers/net/wireless/mac80211_hwsim.c
+@@ -1867,8 +1867,8 @@ mac80211_hwsim_beacon(struct hrtimer *timer)
+ 		bcn_int -= data->bcn_delta;
+ 		data->bcn_delta = 0;
+ 	}
+-	hrtimer_forward(&data->beacon_timer, hrtimer_get_expires(timer),
+-			ns_to_ktime(bcn_int * NSEC_PER_USEC));
++	hrtimer_forward_now(&data->beacon_timer,
++			    ns_to_ktime(bcn_int * NSEC_PER_USEC));
+ 	return HRTIMER_RESTART;
+ }
+ 

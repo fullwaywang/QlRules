@@ -1,0 +1,41 @@
+commit 1ab19c5de4c537ec0d9b21020395a5b5a6c059b2
+Author: Hillf Danton <hdanton@sina.com>
+Date:   Tue May 18 16:46:25 2021 +0800
+
+    gfs2: Fix use-after-free in gfs2_glock_shrink_scan
+    
+    The GLF_LRU flag is checked under lru_lock in gfs2_glock_remove_from_lru() to
+    remove the glock from the lru list in __gfs2_glock_put().
+    
+    On the shrink scan path, the same flag is cleared under lru_lock but because
+    of cond_resched_lock(&lru_lock) in gfs2_dispose_glock_lru(), progress on the
+    put side can be made without deleting the glock from the lru list.
+    
+    Keep GLF_LRU across the race window opened by cond_resched_lock(&lru_lock) to
+    ensure correct behavior on both sides - clear GLF_LRU after list_del under
+    lru_lock.
+    
+    Reported-by: syzbot <syzbot+34ba7ddbf3021981a228@syzkaller.appspotmail.com>
+    Signed-off-by: Hillf Danton <hdanton@sina.com>
+    Signed-off-by: Andreas Gruenbacher <agruenba@redhat.com>
+
+diff --git a/fs/gfs2/glock.c b/fs/gfs2/glock.c
+index 797949e784cc..d9cb261f55b0 100644
+--- a/fs/gfs2/glock.c
++++ b/fs/gfs2/glock.c
+@@ -1795,6 +1795,7 @@ __acquires(&lru_lock)
+ 	while(!list_empty(list)) {
+ 		gl = list_first_entry(list, struct gfs2_glock, gl_lru);
+ 		list_del_init(&gl->gl_lru);
++		clear_bit(GLF_LRU, &gl->gl_flags);
+ 		if (!spin_trylock(&gl->gl_lockref.lock)) {
+ add_back_to_lru:
+ 			list_add(&gl->gl_lru, &lru_list);
+@@ -1840,7 +1841,6 @@ static long gfs2_scan_glock_lru(int nr)
+ 		if (!test_bit(GLF_LOCK, &gl->gl_flags)) {
+ 			list_move(&gl->gl_lru, &dispose);
+ 			atomic_dec(&lru_count);
+-			clear_bit(GLF_LRU, &gl->gl_flags);
+ 			freed++;
+ 			continue;
+ 		}

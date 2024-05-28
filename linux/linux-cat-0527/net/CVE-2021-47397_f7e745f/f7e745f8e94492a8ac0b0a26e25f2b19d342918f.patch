@@ -1,0 +1,45 @@
+commit f7e745f8e94492a8ac0b0a26e25f2b19d342918f
+Author: Xin Long <lucien.xin@gmail.com>
+Date:   Thu Sep 23 00:05:04 2021 -0400
+
+    sctp: break out if skb_header_pointer returns NULL in sctp_rcv_ootb
+    
+    We should always check if skb_header_pointer's return is NULL before
+    using it, otherwise it may cause null-ptr-deref, as syzbot reported:
+    
+      KASAN: null-ptr-deref in range [0x0000000000000000-0x0000000000000007]
+      RIP: 0010:sctp_rcv_ootb net/sctp/input.c:705 [inline]
+      RIP: 0010:sctp_rcv+0x1d84/0x3220 net/sctp/input.c:196
+      Call Trace:
+      <IRQ>
+       sctp6_rcv+0x38/0x60 net/sctp/ipv6.c:1109
+       ip6_protocol_deliver_rcu+0x2e9/0x1ca0 net/ipv6/ip6_input.c:422
+       ip6_input_finish+0x62/0x170 net/ipv6/ip6_input.c:463
+       NF_HOOK include/linux/netfilter.h:307 [inline]
+       NF_HOOK include/linux/netfilter.h:301 [inline]
+       ip6_input+0x9c/0xd0 net/ipv6/ip6_input.c:472
+       dst_input include/net/dst.h:460 [inline]
+       ip6_rcv_finish net/ipv6/ip6_input.c:76 [inline]
+       NF_HOOK include/linux/netfilter.h:307 [inline]
+       NF_HOOK include/linux/netfilter.h:301 [inline]
+       ipv6_rcv+0x28c/0x3c0 net/ipv6/ip6_input.c:297
+    
+    Fixes: 3acb50c18d8d ("sctp: delay as much as possible skb_linearize")
+    Reported-by: syzbot+581aff2ae6b860625116@syzkaller.appspotmail.com
+    Signed-off-by: Xin Long <lucien.xin@gmail.com>
+    Acked-by: Marcelo Ricardo Leitner <marcelo.leitner@gmail.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/net/sctp/input.c b/net/sctp/input.c
+index 5ef86fdb1176..1f1786021d9c 100644
+--- a/net/sctp/input.c
++++ b/net/sctp/input.c
+@@ -702,7 +702,7 @@ static int sctp_rcv_ootb(struct sk_buff *skb)
+ 		ch = skb_header_pointer(skb, offset, sizeof(*ch), &_ch);
+ 
+ 		/* Break out if chunk length is less then minimal. */
+-		if (ntohs(ch->length) < sizeof(_ch))
++		if (!ch || ntohs(ch->length) < sizeof(_ch))
+ 			break;
+ 
+ 		ch_end = offset + SCTP_PAD4(ntohs(ch->length));

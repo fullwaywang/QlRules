@@ -1,0 +1,51 @@
+commit e298aa358f0ca658406d524b6639fe389cb6e11e
+Author: Du Cheng <ducheng2@gmail.com>
+Date:   Mon May 10 12:16:49 2021 +0800
+
+    mac80211: fix skb length check in ieee80211_scan_rx()
+    
+    Replace hard-coded compile-time constants for header length check
+    with dynamic determination based on the frame type. Otherwise, we
+    hit a validation WARN_ON in cfg80211 later.
+    
+    Fixes: cd418ba63f0c ("mac80211: convert S1G beacon to scan results")
+    Reported-by: syzbot+405843667e93b9790fc1@syzkaller.appspotmail.com
+    Signed-off-by: Du Cheng <ducheng2@gmail.com>
+    Link: https://lore.kernel.org/r/20210510041649.589754-1-ducheng2@gmail.com
+    [style fixes, reword commit message]
+    Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+
+diff --git a/net/mac80211/scan.c b/net/mac80211/scan.c
+index d4cc9ac2d703..6b50cb5e0e3c 100644
+--- a/net/mac80211/scan.c
++++ b/net/mac80211/scan.c
+@@ -251,13 +251,24 @@ void ieee80211_scan_rx(struct ieee80211_local *local, struct sk_buff *skb)
+ 	struct ieee80211_mgmt *mgmt = (void *)skb->data;
+ 	struct ieee80211_bss *bss;
+ 	struct ieee80211_channel *channel;
++	size_t min_hdr_len = offsetof(struct ieee80211_mgmt,
++				      u.probe_resp.variable);
++
++	if (!ieee80211_is_probe_resp(mgmt->frame_control) &&
++	    !ieee80211_is_beacon(mgmt->frame_control) &&
++	    !ieee80211_is_s1g_beacon(mgmt->frame_control))
++		return;
+ 
+ 	if (ieee80211_is_s1g_beacon(mgmt->frame_control)) {
+-		if (skb->len < 15)
+-			return;
+-	} else if (skb->len < 24 ||
+-		 (!ieee80211_is_probe_resp(mgmt->frame_control) &&
+-		  !ieee80211_is_beacon(mgmt->frame_control)))
++		if (ieee80211_is_s1g_short_beacon(mgmt->frame_control))
++			min_hdr_len = offsetof(struct ieee80211_ext,
++					       u.s1g_short_beacon.variable);
++		else
++			min_hdr_len = offsetof(struct ieee80211_ext,
++					       u.s1g_beacon);
++	}
++
++	if (skb->len < min_hdr_len)
+ 		return;
+ 
+ 	sdata1 = rcu_dereference(local->scan_sdata);

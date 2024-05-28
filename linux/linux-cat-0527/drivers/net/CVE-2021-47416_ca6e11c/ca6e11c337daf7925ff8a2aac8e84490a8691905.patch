@@ -1,0 +1,48 @@
+commit ca6e11c337daf7925ff8a2aac8e84490a8691905
+Author: Pavel Skripkin <paskripkin@gmail.com>
+Date:   Thu Sep 30 20:50:28 2021 +0300
+
+    phy: mdio: fix memory leak
+    
+    Syzbot reported memory leak in MDIO bus interface, the problem was in
+    wrong state logic.
+    
+    MDIOBUS_ALLOCATED indicates 2 states:
+            1. Bus is only allocated
+            2. Bus allocated and __mdiobus_register() fails, but
+               device_register() was called
+    
+    In case of device_register() has been called we should call put_device()
+    to correctly free the memory allocated for this device, but mdiobus_free()
+    calls just kfree(dev) in case of MDIOBUS_ALLOCATED state
+    
+    To avoid this behaviour we need to set bus->state to MDIOBUS_UNREGISTERED
+    _before_ calling device_register(), because put_device() should be
+    called even in case of device_register() failure.
+    
+    Link: https://lore.kernel.org/netdev/YVMRWNDZDUOvQjHL@shell.armlinux.org.uk/
+    Fixes: 46abc02175b3 ("phylib: give mdio buses a device tree presence")
+    Reported-and-tested-by: syzbot+398e7dc692ddbbb4cfec@syzkaller.appspotmail.com
+    Reviewed-by: Dan Carpenter <dan.carpenter@oracle.com>
+    Signed-off-by: Pavel Skripkin <paskripkin@gmail.com>
+    Link: https://lore.kernel.org/r/eceae1429fbf8fa5c73dd2a0d39d525aa905074d.1633024062.git.paskripkin@gmail.com
+    Signed-off-by: Jakub Kicinski <kuba@kernel.org>
+
+diff --git a/drivers/net/phy/mdio_bus.c b/drivers/net/phy/mdio_bus.c
+index 53f034fc2ef7..fca8e335d750 100644
+--- a/drivers/net/phy/mdio_bus.c
++++ b/drivers/net/phy/mdio_bus.c
+@@ -534,6 +534,13 @@ int __mdiobus_register(struct mii_bus *bus, struct module *owner)
+ 	bus->dev.groups = NULL;
+ 	dev_set_name(&bus->dev, "%s", bus->id);
+ 
++	/* We need to set state to MDIOBUS_UNREGISTERED to correctly release
++	 * the device in mdiobus_free()
++	 *
++	 * State will be updated later in this function in case of success
++	 */
++	bus->state = MDIOBUS_UNREGISTERED;
++
+ 	err = device_register(&bus->dev);
+ 	if (err) {
+ 		pr_err("mii_bus %s failed to register\n", bus->id);

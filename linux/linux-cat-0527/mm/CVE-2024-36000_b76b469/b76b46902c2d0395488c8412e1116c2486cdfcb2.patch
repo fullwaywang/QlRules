@@ -1,0 +1,46 @@
+commit b76b46902c2d0395488c8412e1116c2486cdfcb2
+Author: Peter Xu <peterx@redhat.com>
+Date:   Wed Apr 17 17:18:35 2024 -0400
+
+    mm/hugetlb: fix missing hugetlb_lock for resv uncharge
+    
+    There is a recent report on UFFDIO_COPY over hugetlb:
+    
+    https://lore.kernel.org/all/000000000000ee06de0616177560@google.com/
+    
+    350:    lockdep_assert_held(&hugetlb_lock);
+    
+    Should be an issue in hugetlb but triggered in an userfault context, where
+    it goes into the unlikely path where two threads modifying the resv map
+    together.  Mike has a fix in that path for resv uncharge but it looks like
+    the locking criteria was overlooked: hugetlb_cgroup_uncharge_folio_rsvd()
+    will update the cgroup pointer, so it requires to be called with the lock
+    held.
+    
+    Link: https://lkml.kernel.org/r/20240417211836.2742593-3-peterx@redhat.com
+    Fixes: 79aa925bf239 ("hugetlb_cgroup: fix reservation accounting")
+    Signed-off-by: Peter Xu <peterx@redhat.com>
+    Reported-by: syzbot+4b8077a5fccc61c385a1@syzkaller.appspotmail.com
+    Reviewed-by: Mina Almasry <almasrymina@google.com>
+    Cc: David Hildenbrand <david@redhat.com>
+    Cc: <stable@vger.kernel.org>
+    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index 31d00eee028f..53e0ab5c0845 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -3268,9 +3268,12 @@ struct folio *alloc_hugetlb_folio(struct vm_area_struct *vma,
+ 
+ 		rsv_adjust = hugepage_subpool_put_pages(spool, 1);
+ 		hugetlb_acct_memory(h, -rsv_adjust);
+-		if (deferred_reserve)
++		if (deferred_reserve) {
++			spin_lock_irq(&hugetlb_lock);
+ 			hugetlb_cgroup_uncharge_folio_rsvd(hstate_index(h),
+ 					pages_per_huge_page(h), folio);
++			spin_unlock_irq(&hugetlb_lock);
++		}
+ 	}
+ 
+ 	if (!memcg_charge_ret)

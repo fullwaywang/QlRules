@@ -21,3 +21,6 @@
     knowledge about the types, components and nature of the vulnerabilities. Thus we
 	could only infer seemingly security-related bug-fixes in the git history according
 	to commit comments, code patches, etc.
+- 5/31/2024:
+  Set up a service to generate rules for new CVEs daily. These rules will be submitted
+  with a bot account. Currently only Linux kernel is supported.

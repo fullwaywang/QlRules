@@ -126,7 +126,7 @@ predicate func_6(Parameter vnet_1342, VariableCall target_6) {
 }
 
 predicate func_7(Parameter vnet_1342, WhileStmt target_7) {
-	exists(BlockStmt obj_0 | obj_0=target_7.getStmt(0) |
+	exists(BlockStmt obj_0 | obj_0=target_7.getStmt() |
 		exists(IfStmt obj_1 | obj_1=obj_0.getStmt(1) |
 			exists(EqualityOperation obj_2 | obj_2=obj_1.getCondition() |
 				obj_2.getLeftOperand().(VariableAccess).getTarget().getType().hasName("size_t")
